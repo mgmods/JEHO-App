@@ -357,9 +357,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (getParent() instanceof FrameLayout) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
             if (lp != null) {
-                lp.gravity = ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position))
-                        ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
+                boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
+                lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
                         : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                lp.topMargin = bottom ? 0 : dp(62);
+                lp.bottomMargin = bottom ? dp(76) : 0;
                 setLayoutParams(lp);
             }
             return;
