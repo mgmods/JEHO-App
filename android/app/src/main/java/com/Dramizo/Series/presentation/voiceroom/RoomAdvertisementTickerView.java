@@ -7,6 +7,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class RoomAdvertisementTickerView extends FrameLayout implements RealtimeClient.UserListener {
     public static volatile boolean SEND_BUTTON_ENABLED = true;
+    private final ImageView backgroundImage;
     private final ImageView avatar;
     private final TextView name;
     private final TextView text;
@@ -53,6 +55,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setClipToPadding(true);
         setVisibility(GONE);
 
+        backgroundImage = new ImageView(context);
+        backgroundImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        addView(backgroundImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         avatar = new ImageView(context);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
         name = new TextView(context);
@@ -68,9 +73,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setGravity(Gravity.CENTER_VERTICAL);
         textViewport.addView(text, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        addView(avatar, new FrameLayout.LayoutParams(34, 34));
-        addView(name, new FrameLayout.LayoutParams(90, 34));
-        FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 34);
+        addView(avatar, new FrameLayout.LayoutParams(dp(34), dp(34)));
+        addView(name, new FrameLayout.LayoutParams(dp(90), dp(34)));
+        FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34));
         addView(textViewport, vp);
         setContentDescription("شريط الإعلانات");
     }
@@ -157,12 +162,19 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void bindConfig(AdvertisementDtos.Ticker cfg) {
         if (cfg == null) return;
         int h = dp(Math.max(36, cfg.heightDp > 0 ? cfg.heightDp : 48));
-        getLayoutParams();
+        ViewGroup.LayoutParams own = getLayoutParams();
+        if (own != null && own.height != h) { own.height = h; setLayoutParams(own); }
         setMinimumHeight(h);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(parseColorWithOpacity(cfg.backgroundOpacity, cfg.background));
-        bg.setCornerRadius(dp(Math.max(0, cfg.radiusDp)));
-        setBackground(bg);
+        setBackground(buildBackground(cfg.background, cfg.backgroundOpacity, cfg.radiusDp));
+        backgroundImage.setAlpha(Math.max(0, Math.min(100, cfg.backgroundOpacity)) / 100f);
+        if (cfg.backgroundImage != null && (cfg.backgroundImage.startsWith("https://") || cfg.backgroundImage.startsWith("http://"))) {
+            Glide.with(this).load(cfg.backgroundImage).centerCrop().into(backgroundImage);
+            backgroundImage.setVisibility(VISIBLE);
+        } else {
+            Glide.with(this).clear(backgroundImage);
+            backgroundImage.setVisibility(GONE);
+        }
+        applySafePlacement(cfg.position);
 
         avatar.getLayoutParams().width = dp(Math.max(20, cfg.avatarDp));
         avatar.getLayoutParams().height = dp(Math.max(20, cfg.avatarDp));
@@ -188,12 +200,12 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setText(ad.senderName == null ? "عضو" : ad.senderName);
         text.setText(ad.text == null ? "" : ad.text);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
-            Glide.with(this).load(ad.senderImageUrl).centerCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar);
+            com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(this).load(ad.senderImageUrl).centerCrop()
+                    .placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar);
+            if (config != null && "circle".equalsIgnoreCase(config.avatarShape)) request = request.circleCrop();
+            request.into(avatar);
         } else {
             avatar.setImageResource(R.drawable.ic_default_avatar);
-        }
-        if (config != null && "square".equalsIgnoreCase(config.avatarShape)) {
-            avatar.setBackground(null);
         }
         setVisibility(VISIBLE);
     }
@@ -252,6 +264,47 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }
         });
         out.start();
+    }
+
+    private void applySafePlacement(String position) {
+        if (!(getParent() instanceof LinearLayout)) return;
+        LinearLayout parent = (LinearLayout) getParent();
+        int current = parent.indexOfChild(this);
+        if (current < 0) return;
+        int target = 0;
+        if ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position)) {
+            target = parent.getChildCount() - 1;
+            for (int i = 0; i < parent.getChildCount(); i++) {
+                View child = parent.getChildAt(i);
+                if (child.getId() == R.id.rowOfficialNews) { target = i + 1; break; }
+            }
+        }
+        if (current != target) {
+            parent.removeView(this);
+            parent.addView(this, Math.max(0, Math.min(target, parent.getChildCount())));
+        }
+    }
+
+    private GradientDrawable buildBackground(String value, int opacity, int radiusDp) {
+        int alpha = Math.max(0, Math.min(100, opacity)) * 255 / 100;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?").matcher(value == null ? "" : value);
+        java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
+        while (matcher.find()) {
+            try {
+                int color = Color.parseColor(matcher.group());
+                colors.add(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)));
+            } catch (Exception ignored) {}
+        }
+        GradientDrawable bg;
+        if (value != null && value.toLowerCase().contains("linear-gradient") && colors.size() >= 2) {
+            bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{colors.get(0), colors.get(colors.size() - 1)});
+        } else {
+            int color = safeColor(value, 0xFF21142D);
+            bg = new GradientDrawable();
+            bg.setColor(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)));
+        }
+        bg.setCornerRadius(dp(Math.max(0, radiusDp)));
+        return bg;
     }
 
     private boolean isReduceMotionEnabled() {
