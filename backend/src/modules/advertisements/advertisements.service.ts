@@ -75,7 +75,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const used = await this.ads.createQueryBuilder('a')
       .where('a.senderId=:userId',{userId})
       .andWhere('a.createdAt>=:start',{start})
-      .andWhere('a.status IN (:...statuses)',{statuses:[AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED]})
+      .andWhere('a.status IN (:...statuses)',{statuses:[AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED,AdvertisementStatus.REMOVED]})
       .getCount();
     return { limit, used, remaining: Math.max(0, limit-used) };
   }
@@ -90,7 +90,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
-    if (existing) { return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)}; }
+    if (existing) {
+      if (existing.senderId !== userId) throw new ConflictException('معرّف الطلب مستخدم مسبقاً');
+      return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
+    }
 
     // The transaction serializes all queue mutations so maxQueueSize and queueOrder
     // remain correct even when many devices submit at the same moment.
@@ -110,11 +113,12 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-ad-limit:'+userId+':'+this.resetKey(c.resetTimezone)]);
       const duplicate = await qr.manager.findOne(Advertisement,{where:{idempotencyKey:key}});
       if (duplicate) {
+        if (duplicate.senderId !== userId) throw new ConflictException('معرّف الطلب مستخدم مسبقاً');
         await qr.commitTransaction();
         return {duplicate:true, advertisement:this.publicAd(duplicate), remaining:await this.remainingForUser(userId)};
       }
       const start = await this.resetStartFromDb(c.resetTimezone);
-      const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED]))?.[0]?.count || 0);
+      const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5,$6)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED,AdvertisementStatus.REMOVED]))?.[0]?.count || 0);
       const limit = Math.max(0,Math.floor(Number(c.dailyLimit)||0));
       if (count >= limit) throw new ConflictException('لقد وصلت إلى الحد اليومي للإعلانات');
       const queueCount = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "status"=$1',[AdvertisementStatus.QUEUED]))?.[0]?.count || 0);
