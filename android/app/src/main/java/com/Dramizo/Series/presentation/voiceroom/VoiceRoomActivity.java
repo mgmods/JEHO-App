@@ -1268,6 +1268,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
+            applyRoomFeedTabsSeatOffset();
             refreshSupportChestIcon();
             final int bindSeq = ++roomUiBindSeq;
             // Disk chat wipe + history restore: off main thread (ANR on mid-range MIUI).
@@ -10870,6 +10871,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     // Room feed tabs filter presentation only; they do not change room events or audio state.
     private int activeRoomFeed = 0; // 0 = all activity, 1 = text chat, 2 = gifts only
+
+    /**
+     * Raises only the room feed tabs for the compact 10/15/20/30-seat layouts.
+     * No size, order, behavior, or other room controls are changed.
+     */
+    private void applyRoomFeedTabsSeatOffset() {
+        if (binding == null || binding.rowOfficialNews == null) return;
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        int seatCount = room != null ? room.seatCount : 0;
+        float raiseDp = (seatCount == 10 || seatCount == 15 || seatCount == 20 || seatCount == 30) ? 4f : 0f;
+        binding.rowOfficialNews.setTranslationY(-raiseDp * getResources().getDisplayMetrics().density);
+    }
 
     private void initRoomFeedTabs() {
         View all = findViewById(R.id.tabRoomAll);
