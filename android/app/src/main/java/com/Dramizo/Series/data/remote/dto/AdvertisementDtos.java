@@ -56,6 +56,8 @@ public final class AdvertisementDtos {
         public int textOffsetXDp;
         public int textOffsetYDp;
         public int textWidthDp;
+        public int positionXPercent;
+        public int positionYPercent;
     }
 
     public static class Remaining {
