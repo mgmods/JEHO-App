@@ -92,7 +92,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
     if (existing) {
-      if (existing.senderId !== userId) throw new ConflictException('معرّف الطلب مستخدم مسبقاً');
+      if (existing.senderId !== userId || existing.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
       return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
     }
 
@@ -114,7 +114,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-ad-limit:'+userId+':'+this.resetKey(c.resetTimezone)]);
       const duplicate = await qr.manager.findOne(Advertisement,{where:{idempotencyKey:key}});
       if (duplicate) {
-        if (duplicate.senderId !== userId) throw new ConflictException('معرّف الطلب مستخدم مسبقاً');
+        if (duplicate.senderId !== userId || duplicate.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
         await qr.commitTransaction();
         return {duplicate:true, advertisement:this.publicAd(duplicate), remaining:await this.remainingForUser(userId)};
       }
