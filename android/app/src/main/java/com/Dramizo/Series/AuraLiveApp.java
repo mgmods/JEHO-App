@@ -69,6 +69,8 @@ public class AuraLiveApp extends Application {
     private volatile int roomMicCaptureSessionIdBeforeExternalApp = -1;
     // Updated for every Android recording-config callback, including while JEHO is foreground.
     private volatile boolean externalRecorderActive;
+    // Separate handoff for JEHO's own chat voice-note recorder; WhatsApp handling stays unchanged.
+    private volatile boolean chatVoiceRecordingActive;
     @Nullable private String roomMicRoomIdBeforeExternalApp;
     @Nullable private AudioManager externalCaptureAudioManager;
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
@@ -79,9 +81,40 @@ public class AuraLiveApp extends Application {
     // deliver AudioRecordingCallback when another app starts a voice note.
     private final Runnable externalCaptureBackgroundProbe = this::runExternalCaptureBackgroundProbe;
 
+    /** Called by the in-app chat recorder only; does not alter WhatsApp's recorder path. */
+    public synchronized void onChatVoiceRecordingStarted() {
+        chatVoiceRecordingActive = true;
+        suspendRoomAudioForExternalApp();
+    }
+
+    /** Restore the active room after the in-app voice note has finished uploading/sending. */
+    public synchronized void onChatVoiceRecordingFinished() {
+        chatVoiceRecordingActive = false;
+        Handler handler = externalCaptureHandler;
+        if (handler != null) {
+            handler.removeCallbacks(externalCaptureRestoreCheck);
+        }
+        if (roomAudioSuspendedForExternalApp) {
+            // Keep the room yielded if a genuinely external recorder (e.g. WhatsApp)
+            // still owns capture; its existing monitor will restore us when it ends.
+            if (snapshotExternalCaptureActive()) {
+                externalRecorderActive = true;
+                if (handler != null) handler.postDelayed(externalCaptureRestoreCheck, 500L);
+                return;
+            }
+            externalRecorderActive = false;
+            restoreRoomAudioAfterExternalApp();
+        }
+    }
+
     private void runExternalCaptureRestoreCheck() {
         if (!roomAudioSuspendedForExternalApp) {
             if (!(roomAudioReleasedForBackground && isAppInForeground())) return;
+        }
+        if (chatVoiceRecordingActive) {
+            Handler handler = externalCaptureHandler;
+            if (handler != null) handler.postDelayed(externalCaptureRestoreCheck, 500L);
+            return;
         }
         boolean stillCapturing = snapshotExternalCaptureActive();
         externalRecorderActive = stillCapturing;
@@ -370,6 +403,10 @@ public class AuraLiveApp extends Application {
                     // is currently foreground: Android may deliver lifecycle callbacks
                     // after the external recorder has already taken capture priority.
                     suspendRoomAudioForExternalApp();
+                } else if (roomAudioSuspendedForExternalApp && chatVoiceRecordingActive) {
+                    // The in-app recorder is still active; wait for its send completion.
+                    Handler handler = externalCaptureHandler;
+                    if (handler != null) handler.removeCallbacks(externalCaptureRestoreCheck);
                 } else if (roomAudioSuspendedForExternalApp) {
                     // Require a stable capture-free window. Some Android/OEM builds
                     // briefly emit an empty recording-config list while WhatsApp changes
