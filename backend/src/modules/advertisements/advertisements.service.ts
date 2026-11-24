@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, QueryRunner } from 'typeorm';
 import { Advertisement, AdvertisementStatus } from '../../database/entities/advertisement.entity';
 import { User } from '../../database/entities/user.entity';
-import { UserProfile } from '../../database/entities/user-profile.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const DEFAULT_CONFIG: any = {
@@ -29,7 +28,6 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Advertisement) private readonly ads: Repository<Advertisement>,
     @InjectRepository(User) private readonly users: Repository<User>,
-    @InjectRepository(UserProfile) private readonly profiles: Repository<UserProfile>,
     private readonly db: DataSource,
     private readonly realtime: RealtimeGateway,
   ) {}
@@ -165,12 +163,11 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
       const user = await qr.manager.getRepository(User).findOne({where:{id:userId}});
       if (!user) throw new BadRequestException('الحساب غير موجود');
-      const profile = await qr.manager.getRepository(UserProfile).findOne({where:{userId}});
       const maxOrder = Number((await qr.query('SELECT COALESCE(MAX("queueOrder"),0)::bigint AS max FROM "jeho_own"."room_advertisements" WHERE "status"=$1',[AdvertisementStatus.QUEUED]))?.[0]?.max || 0);
       const ad = qr.manager.create(Advertisement,{
         senderId:userId,
-        senderName:String((profile as any)?.displayName || (user as any).username || 'عضو').slice(0,128),
-        senderImageUrl:String((profile as any)?.avatarUrl || '').trim() || null,
+        senderName:String((user as any).displayName || (user as any).username || 'عضو').slice(0,128),
+        senderImageUrl:String((user as any).avatarUrl || '').trim() || null,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
         displayDurationMs:this.bound(c.displayDurationMs,1000,120000,9000),
@@ -188,8 +185,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   private async recordRejected(userId:string,text:string,code:string,reason:string) {
     const user=await this.users.findOne({where:{id:userId}});
-    const profile=user?await this.profiles.findOne({where:{userId}}):null;
-    await this.ads.save(this.ads.create({senderId:userId,senderName:String((profile as any)?.displayName || (user as any)?.username || 'عضو').slice(0,128),senderImageUrl:String((profile as any)?.avatarUrl||'').trim()||null,text:text.slice(0,500),status:AdvertisementStatus.REJECTED,rejectionCode:code,rejectionReason:reason,queueOrder:0,displayDurationMs:0}));
+    await this.ads.save(this.ads.create({senderId:userId,senderName:String((user as any)?.displayName || (user as any)?.username || 'عضو').slice(0,128),senderImageUrl:String((user as any)?.avatarUrl||'').trim()||null,text:text.slice(0,500),status:AdvertisementStatus.REJECTED,rejectionCode:code,rejectionReason:reason,queueOrder:0,displayDurationMs:0}));
   }
 
   private async tick() {
