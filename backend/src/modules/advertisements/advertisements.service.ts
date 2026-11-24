@@ -71,7 +71,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async remainingForUser(userId: string) {
     const c = await this.config();
     const limit = Math.max(0, Math.floor(Number(c.dailyLimit) || 0));
-    const start = this.resetStart(c.resetTimezone);
+    const start = await this.resetStartFromDb(c.resetTimezone);
     const used = await this.ads.createQueryBuilder('a')
       .where('a.senderId=:userId',{userId})
       .andWhere('a.createdAt>=:start',{start})
@@ -107,7 +107,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     await qr.connect(); await qr.startTransaction();
     try {
       await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-ad-limit:'+userId+':'+this.resetKey(c.resetTimezone)]);
-      const start = this.resetStart(c.resetTimezone);
+      const start = await this.resetStartFromDb(c.resetTimezone);
       const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED]))?.[0]?.count || 0);
       const limit = Math.max(0,Math.floor(Number(c.dailyLimit)||0));
       if (count >= limit) throw new ConflictException('لقد وصلت إلى الحد اليومي للإعلانات');
@@ -206,6 +206,14 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private async getBannedWords(){const r=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_banned_words']);return String(r?.[0]?.value||'').split(',').map(x=>x.trim()).filter(Boolean);}
   private normalize(input:string){return String(input||'').normalize('NFKC').toLocaleLowerCase('ar').replace(/[ـ\\s\\u200b-\\u200f]+/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/ة/g,'ه');}
   private resetKey(timezone:string){try{return new Intl.DateTimeFormat('en-CA',{timeZone:timezone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch{return new Date().toISOString().slice(0,10);}}
-  private resetStart(timezone:string){return new Date(this.resetKey(timezone)+'T00:00:00.000Z');}
+  private async resetStartFromDb(timezone:string){
+    const safe = String(timezone || 'UTC').trim() || 'UTC';
+    try {
+      const rows = await this.db.query('SELECT date_trunc(\\'day\\', NOW(), $1) AS start',[safe]);
+      return rows?.[0]?.start ? new Date(rows[0].start) : new Date();
+    } catch {
+      return new Date(this.resetKey(safe)+'T00:00:00.000Z');
+    }
+  }
   private bound(v:any,min:number,max:number,fallback:number){const n=Number(v);return Math.max(min,Math.min(max,Number.isFinite(n)?n:fallback));}
 }
