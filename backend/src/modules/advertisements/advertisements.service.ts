@@ -224,6 +224,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         if(playing){await qr.commitTransaction();return;}
         const next=await qr.manager.createQueryBuilder(Advertisement,'a')
           .where('a.status=:s',{s:AdvertisementStatus.QUEUED})
+          // Give every accepted ad a fixed 10-second preparation window before global broadcast.
+          .andWhere('a.createdAt <= :eligibleAt',{eligibleAt:new Date(Date.now()-10000)})
           .orderBy('a.queueOrder','ASC').addOrderBy('a.createdAt','ASC')
           .setLock('pessimistic_write').setOnLocked('skip_locked').getOne();
         if(!next){await qr.commitTransaction();return;}
