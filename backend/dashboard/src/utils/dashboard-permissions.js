@@ -13,6 +13,7 @@ export const ROUTE_MODULE = {
   rooms: 'rooms',
   streams: 'rooms',
   'support-chest': 'supportChest',
+  advertisements: 'rooms',
   gifts: 'gifts',
   'toast-manager': 'settings',
   coins: 'coins',
