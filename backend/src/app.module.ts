@@ -52,6 +52,7 @@ import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { BadgesModule } from './modules/badges/badges.module';
 import { MomentsModule } from './modules/moments/moments.module';
+import { AdvertisementsModule } from './modules/advertisements/advertisements.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
