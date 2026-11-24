@@ -415,6 +415,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     client.data.roomProfiles = client.data.roomProfiles || {};
     client.data.roomProfiles[data.roomId] = profilePayload;
     client.join(roomChannel);
+    // Voice-room advertising is globally synchronized across active room clients.
+    client.join('rooms:all');
     const musicVolume = this.roomMusicVolumes.get(data.roomId);
     if (musicVolume !== undefined) {
       client.emit('room:event', {
