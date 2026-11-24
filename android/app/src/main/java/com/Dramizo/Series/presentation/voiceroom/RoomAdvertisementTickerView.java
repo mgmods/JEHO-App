@@ -235,14 +235,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        av.leftMargin = spacing; av.rightMargin = 0; avatar.setLayoutParams(av);
+        av.leftMargin = Math.max(0, spacing + dp(cfg.avatarOffsetXDp));
+        av.rightMargin = 0;
+        avatar.setLayoutParams(av);
+        avatar.setTranslationY(dp(cfg.avatarOffsetYDp));
+
+        int nameWidth = dp(cfg.nameWidthDp > 0 ? cfg.nameWidthDp : 90);
         FrameLayout.LayoutParams nm = (FrameLayout.LayoutParams) name.getLayoutParams();
+        nm.width = nameWidth;
         nm.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        nm.leftMargin = spacing + dp(cfg.avatarDp) + spacing; name.setLayoutParams(nm);
+        nm.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + dp(cfg.nameOffsetXDp));
+        name.setLayoutParams(nm);
+        name.setTranslationY(dp(cfg.nameOffsetYDp));
+
         FrameLayout.LayoutParams vp = (FrameLayout.LayoutParams) textViewport.getLayoutParams();
         vp.gravity = Gravity.CENTER_VERTICAL;
-        vp.leftMargin = spacing + dp(cfg.avatarDp) + spacing + dp(90);
-        vp.rightMargin = spacing; textViewport.setLayoutParams(vp);
+        vp.leftMargin = Math.max(0, spacing + dp(cfg.avatarDp) + spacing + nameWidth + dp(cfg.textOffsetXDp));
+        vp.rightMargin = spacing;
+        vp.width = cfg.textWidthDp > 0 ? dp(cfg.textWidthDp) : ViewGroup.LayoutParams.MATCH_PARENT;
+        textViewport.setLayoutParams(vp);
+        textViewport.setTranslationY(dp(cfg.textOffsetYDp));
     }
 
     private void bindAd(AdvertisementDtos.Advertisement ad) {
