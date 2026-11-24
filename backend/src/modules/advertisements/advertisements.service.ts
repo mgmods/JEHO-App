@@ -240,7 +240,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
     try { new Intl.DateTimeFormat('en-US',{timeZone:merged.resetTimezone || 'UTC'}).format(new Date()); }
     catch { throw new BadRequestException('منطقة التوقيت غير صالحة؛ استخدم اسم IANA مثل Asia/Riyadh'); }
-    if (merged.backgroundImage && !/^https?:\\/\\//i.test(merged.backgroundImage)) merged.backgroundImage='';
+    if (merged.backgroundImage && !/^https?:\/\//i.test(merged.backgroundImage)) merged.backgroundImage='';
     merged.backgroundImage=String(merged.backgroundImage||'').slice(0,2048);
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
