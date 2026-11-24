@@ -70,6 +70,7 @@ public final class AdvertisementDtos {
     public static class Current {
         public Advertisement advertisement;
         public Ticker config;
+        public String serverNow;
     }
 
     public static class RealtimeEvent {
