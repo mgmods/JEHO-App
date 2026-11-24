@@ -75,6 +75,9 @@ public class AuraLiveApp extends Application {
     @Nullable private HandlerThread externalCaptureThread;
     @Nullable private Handler externalCaptureHandler;
     private final Runnable externalCaptureRestoreCheck = this::runExternalCaptureRestoreCheck;
+    // Poll while JEHO is backgrounded because some Android/OEM builds do not
+    // deliver AudioRecordingCallback when another app starts a voice note.
+    private final Runnable externalCaptureBackgroundProbe = this::runExternalCaptureBackgroundProbe;
 
     private void runExternalCaptureRestoreCheck() {
         if (!roomAudioSuspendedForExternalApp) {
@@ -97,6 +100,46 @@ public class AuraLiveApp extends Application {
                 handler.postDelayed(externalCaptureRestoreCheck, 500L);
             }
         }
+    }
+
+    private void runExternalCaptureBackgroundProbe() {
+        if (isAppInForeground()) return;
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
+        String roomId = rtc.getCurrentRoomId();
+        boolean roomActive = roomId != null && !roomId.isEmpty() && rtc.isInRoom(roomId);
+        if (!roomActive) {
+            roomId = VoiceRoomForegroundService.activeRoomId(this);
+            roomActive = roomId != null && !roomId.isEmpty()
+                    && VoiceRoomForegroundService.hasActiveRoom(this, roomId);
+        }
+        if (!roomActive) return;
+
+        boolean anotherAppRecording = snapshotExternalCaptureActive();
+        externalRecorderActive = anotherAppRecording;
+        if (anotherAppRecording) {
+            Handler handler = externalCaptureHandler;
+            if (handler != null) handler.removeCallbacks(externalCaptureRestoreCheck);
+            suspendRoomAudioForExternalApp();
+            return;
+        }
+
+        Handler handler = externalCaptureHandler;
+        if (handler != null && !roomAudioSuspendedForExternalApp) {
+            handler.removeCallbacks(externalCaptureBackgroundProbe);
+            handler.postDelayed(externalCaptureBackgroundProbe, 250L);
+        }
+    }
+
+    private void startExternalCaptureBackgroundProbe() {
+        Handler handler = externalCaptureHandler;
+        if (handler == null || isAppInForeground()) return;
+        handler.removeCallbacks(externalCaptureBackgroundProbe);
+        handler.post(externalCaptureBackgroundProbe);
+    }
+
+    private void stopExternalCaptureBackgroundProbe() {
+        Handler handler = externalCaptureHandler;
+        if (handler != null) handler.removeCallbacks(externalCaptureBackgroundProbe);
     }
 
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
@@ -564,6 +607,7 @@ public class AuraLiveApp extends Application {
             @Override public void onActivityStarted(Activity activity) {
                 boolean returningFromBackground = startedActivities == 0;
                 startedActivities++;
+                stopExternalCaptureBackgroundProbe();
                 if (returningFromBackground) restoreRoomAudioAfterExternalApp();
                 // ThemedActivity pads contentRoot once in onPostCreate — skip global double-pad.
                 if (activity instanceof ThemedActivity) return;
@@ -611,7 +655,13 @@ public class AuraLiveApp extends Application {
                 // foreground service alive; this lets WhatsApp acquire the microphone.
                 // The recording monitor performs the full temporary room-audio handoff
                 // only when an external recorder actually starts capturing.
-                if (startedActivities == 0) releaseAudioModeForBackground();
+                if (startedActivities == 0) {
+                    releaseAudioModeForBackground();
+                    // Keep checking for an external recorder after the lifecycle
+                    // transition. This covers WhatsApp voice notes whose start does
+                    // not generate a recording-config callback on some OEM builds.
+                    startExternalCaptureBackgroundProbe();
+                }
             }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
             @Override public void onActivityDestroyed(Activity activity) {}
