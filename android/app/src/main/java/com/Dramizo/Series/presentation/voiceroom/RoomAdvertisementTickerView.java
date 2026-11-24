@@ -213,7 +213,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             Glide.with(this).clear(backgroundImage);
             backgroundImage.setVisibility(GONE);
         }
-        applySafePlacement(cfg.position);
+        applySafePlacement(cfg.position, cfg.customOffsetDp);
 
         avatar.getLayoutParams().width = dp(Math.max(20, cfg.avatarDp));
         avatar.getLayoutParams().height = dp(Math.max(20, cfg.avatarDp));
@@ -318,7 +318,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         out.start();
     }
 
-    private void applySafePlacement(String position) {
+    private void applySafePlacement(String position, int customOffsetDp) {
+        setTranslationY("custom-safe".equalsIgnoreCase(position) ? dp(Math.max(-100, Math.min(100, customOffsetDp))) : 0f);
         if (!(getParent() instanceof LinearLayout)) return;
         LinearLayout parent = (LinearLayout) getParent();
         int current = parent.indexOfChild(this);
