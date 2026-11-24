@@ -92,6 +92,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
     if (existing) {
+      await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة بنفس معرّف الطلب');
       if (existing.senderId !== userId || existing.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
       return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
     }
@@ -114,8 +115,9 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-ad-limit:'+userId+':'+this.resetKey(c.resetTimezone)]);
       const duplicate = await qr.manager.findOne(Advertisement,{where:{idempotencyKey:key}});
       if (duplicate) {
-        if (duplicate.senderId !== userId || duplicate.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
         await qr.commitTransaction();
+        await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة بنفس معرّف الطلب');
+        if (duplicate.senderId !== userId || duplicate.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
         return {duplicate:true, advertisement:this.publicAd(duplicate), remaining:await this.remainingForUser(userId)};
       }
       const start = await this.resetStartFromDb(c.resetTimezone);
@@ -207,8 +209,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     return{ok:false};
   }
 
-  async adminQueue(limit=50){
-    const [items,total]=await this.ads.findAndCount({where:[{status:AdvertisementStatus.PLAYING},{status:AdvertisementStatus.QUEUED}],order:{queueOrder:'ASC',createdAt:'ASC'},take:limit});
+  async adminQueue(limit=50, search='', history=false){
+    const qb=this.ads.createQueryBuilder('a');
+    if(history) qb.where('a.status IN (:...statuses)',{statuses:[AdvertisementStatus.COMPLETED,AdvertisementStatus.REJECTED,AdvertisementStatus.REMOVED]});
+    else qb.where('a.status IN (:...statuses)',{statuses:[AdvertisementStatus.PLAYING,AdvertisementStatus.QUEUED]});
+    const term=String(search||'').trim();
+    if(term) qb.andWhere('(CAST(a.id AS text)=:id OR a.senderName ILIKE :term OR a.text ILIKE :term OR CAST(a.senderId AS text)=:id)',{id:term,term:'%'+term+'%'});
+    const [items,total]=await qb.orderBy('a.status','ASC').addOrderBy('a.queueOrder','ASC').addOrderBy('a.createdAt','DESC').take(limit).getManyAndCount();
     return{total,items:items.map(a=>this.publicAd(a))};
   }
 
