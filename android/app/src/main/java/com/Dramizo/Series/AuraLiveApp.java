@@ -74,7 +74,9 @@ public class AuraLiveApp extends Application {
     @Nullable private AudioManager.AudioRecordingCallback externalCaptureCallback;
     @Nullable private HandlerThread externalCaptureThread;
     @Nullable private Handler externalCaptureHandler;
-    private final Runnable externalCaptureRestoreCheck = () -> {
+    private final Runnable externalCaptureRestoreCheck = this::runExternalCaptureRestoreCheck;
+
+    private void runExternalCaptureRestoreCheck() {
         if (!roomAudioSuspendedForExternalApp) {
             if (!(roomAudioReleasedForBackground && isAppInForeground())) return;
         }
@@ -95,7 +97,7 @@ public class AuraLiveApp extends Application {
                 handler.postDelayed(externalCaptureRestoreCheck, 500L);
             }
         }
-    };
+    }
 
     private static final int REQUEST_POST_NOTIFICATIONS = 8104;
     private static final String NOTIFICATION_PERMISSION_PREFS = "jeho_notification_permission";
