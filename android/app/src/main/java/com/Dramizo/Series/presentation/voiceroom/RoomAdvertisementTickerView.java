@@ -73,6 +73,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         super(context, attrs, defStyleAttr);
         setClipChildren(true);
         setClipToPadding(true);
+        setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         setVisibility(GONE);
 
         backgroundImage = new ImageView(context);
@@ -81,7 +82,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         avatar = new ImageView(context);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
         name = new TextView(context);
-        name.setGravity(Gravity.CENTER_VERTICAL);
+        name.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        name.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG_RTL);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -90,7 +92,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         textViewport.setClipToPadding(true);
         text = new TextView(context);
         text.setSingleLine(true);
-        text.setGravity(Gravity.CENTER_VERTICAL);
+        text.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        text.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG_RTL);
         textViewport.addView(text, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         addView(avatar, new FrameLayout.LayoutParams(dp(34), dp(34)));
@@ -242,7 +245,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             Glide.with(this).clear(backgroundImage);
             backgroundImage.setVisibility(GONE);
         }
-        applySafePlacement(cfg.position, cfg.customOffsetDp);
+        applySafePlacement(cfg.position, cfg.customOffsetDp, cfg.positionXPercent, cfg.positionYPercent);
 
         avatar.getLayoutParams().width = dp(Math.max(20, cfg.avatarDp));
         avatar.getLayoutParams().height = dp(Math.max(20, cfg.avatarDp));
@@ -255,24 +258,25 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         applyConfiguredGradients(cfg);
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
-        av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        av.leftMargin = spacing + signedDp(cfg.avatarOffsetXDp);
-        av.rightMargin = 0;
+        av.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+        av.rightMargin = spacing + signedDp(cfg.avatarOffsetXDp);
+        av.leftMargin = spacing;
         avatar.setLayoutParams(av);
         avatar.setTranslationY(signedDp(cfg.avatarOffsetYDp));
 
         int nameWidth = dp(cfg.nameWidthDp > 0 ? cfg.nameWidthDp : 90);
         FrameLayout.LayoutParams nm = (FrameLayout.LayoutParams) name.getLayoutParams();
         nm.width = nameWidth;
-        nm.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
-        nm.leftMargin = spacing + dp(cfg.avatarDp) + spacing + signedDp(cfg.nameOffsetXDp);
+        nm.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+        nm.rightMargin = spacing + dp(cfg.avatarDp) + spacing + signedDp(cfg.nameOffsetXDp);
+        nm.leftMargin = spacing;
         name.setLayoutParams(nm);
         name.setTranslationY(signedDp(cfg.nameOffsetYDp));
 
         FrameLayout.LayoutParams vp = (FrameLayout.LayoutParams) textViewport.getLayoutParams();
-        vp.gravity = Gravity.CENTER_VERTICAL;
-        vp.leftMargin = spacing + dp(cfg.avatarDp) + spacing + nameWidth + signedDp(cfg.textOffsetXDp);
-        vp.rightMargin = spacing;
+        vp.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+        vp.rightMargin = spacing + dp(cfg.avatarDp) + spacing + nameWidth + signedDp(cfg.textOffsetXDp);
+        vp.leftMargin = spacing;
         vp.width = cfg.textWidthDp > 0 ? dp(cfg.textWidthDp) : ViewGroup.LayoutParams.MATCH_PARENT;
         textViewport.setLayoutParams(vp);
         textViewport.setTranslationY(signedDp(cfg.textOffsetYDp));
@@ -436,55 +440,52 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         out.start();
     }
 
-    private void applySafePlacement(String position, int customOffsetDp) {
-        setTranslationY("custom-safe".equalsIgnoreCase(position) ? Math.round(Math.max(-100, Math.min(100, customOffsetDp)) * getResources().getDisplayMetrics().density) : 0f);
-        if (getParent() instanceof FrameLayout) {
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
-            if (lp != null) {
-                boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
-                lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
-                        : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-                lp.topMargin = bottom ? 0 : dp(62);
-                lp.bottomMargin = bottom ? dp(76) : 0;
-                setLayoutParams(lp);
-            }
-            return;
-        }
-        if (getParent() instanceof ConstraintLayout) {
+    private void applySafePlacement(String position, int customOffsetDp, int xPercent, int yPercent) {
+        ViewGroup parent = (ViewGroup) getParent();
+        if (parent instanceof ConstraintLayout) {
             ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) getLayoutParams();
-            if (lp != null) {
-                lp.topToTop = ConstraintLayout.LayoutParams.UNSET;
-                lp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
-                lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
-                lp.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
-                if ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position)) {
-                    lp.bottomToTop = R.id.bottomBar;
-                    lp.bottomMargin = dp(6);
-                } else {
-                    lp.topToBottom = R.id.rowRoomCupChip;
-                    lp.topMargin = dp(2);
-                }
-                setLayoutParams(lp);
+            if (lp == null) return;
+            lp.startToStart = ConstraintLayout.LayoutParams.UNSET;
+            lp.endToEnd = ConstraintLayout.LayoutParams.UNSET;
+            lp.topToTop = ConstraintLayout.LayoutParams.UNSET;
+            lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
+            lp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
+            lp.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
+            lp.horizontalBias = Math.max(0, Math.min(100, xPercent)) / 100f;
+            lp.verticalBias = Math.max(0, Math.min(100, yPercent)) / 100f;
+            if ("free".equalsIgnoreCase(position)) {
+                lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.topMargin = 0;
+                lp.bottomMargin = 0;
+            } else if ("safe-top".equalsIgnoreCase(position)) {
+                lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+                lp.topMargin = dp(68);
+                lp.horizontalBias = 0.5f;
+                lp.verticalBias = 0f;
+            } else {
+                lp.bottomToTop = R.id.bottomBar;
+                lp.bottomMargin = "custom-safe".equalsIgnoreCase(position)
+                        ? dp(Math.max(0, 76 - customOffsetDp)) : dp(6);
+                lp.horizontalBias = 0.5f;
+                lp.verticalBias = 1f;
             }
+            setTranslationX(0f);
+            setTranslationY(0f);
+            setLayoutParams(lp);
             return;
         }
-        if (!(getParent() instanceof LinearLayout)) return;
-        LinearLayout parent = (LinearLayout) getParent();
-        int current = parent.indexOfChild(this);
-        if (current < 0) return;
-        int target = 0;
-        if ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position)) {
-            target = parent.getChildCount() - 1;
-            for (int i = 0; i < parent.getChildCount(); i++) {
-                View child = parent.getChildAt(i);
-                if (child.getId() == R.id.rowOfficialNews) { target = i + 1; break; }
-            }
-        }
-        if (current != target) {
-            movingForPlacement = true;
-            parent.removeView(this);
-            parent.addView(this, Math.max(0, Math.min(target, parent.getChildCount())));
-            movingForPlacement = false;
+        if (parent instanceof FrameLayout) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
+            if (lp == null) return;
+            boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
+            lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
+                    : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            lp.topMargin = bottom ? 0 : dp(68);
+            lp.bottomMargin = bottom ? dp(76) : 0;
+            setLayoutParams(lp);
         }
     }
 
