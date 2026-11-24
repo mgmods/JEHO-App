@@ -793,7 +793,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
             if (holder.b.tvGiftCount != null) {
-                holder.b.tvGiftCount.setVisibility(View.GONE);
+                holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
             }
             bindGiftSelection(holder, null);
             return;
@@ -905,7 +905,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         bindCustomDisplayRank(holder, null);
         bindRoomSupportMedal(holder, null);
         if (holder.b.tvGiftCount != null) {
-            holder.b.tvGiftCount.setVisibility(View.GONE);
+            holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
         }
         if (holder.b.tvStatus != null) {
             holder.b.tvStatus.setVisibility(View.GONE);
@@ -1162,7 +1162,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         Long coins = userId != null ? giftCoinsByUser.get(userId) : null;
         if (coins == null || coins <= 0) {
-            holder.b.tvGiftCount.setVisibility(View.GONE);
+            holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
             holder.lastGiftCoins = 0L;
             return;
         }
