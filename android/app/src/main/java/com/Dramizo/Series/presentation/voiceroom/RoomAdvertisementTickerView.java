@@ -115,7 +115,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     @Override public void onConnected() { refreshCurrent(); }
-    @Override public void onDisconnected() { cancelActiveAnimator(); }
+    @Override public void onDisconnected() {}
 
     private void refreshCurrent() {
         if (!attached.get()) return;
