@@ -102,6 +102,15 @@
             <div class="col-6"><label class="form-label small">المسافة dp</label><input v-model.number="form.spacingDp" type="number" min="0" max="30" class="form-control"></div>
             <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="form.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
             <div class="col-6"><label class="form-label small">نوع الخط</label><select v-model="form.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select></div>
+            <div class="col-12"><hr class="border-secondary"><div class="fw-semibold small mb-2">موضع كل عنصر بشكل مستقل (dp)</div></div>
+            <div class="col-6"><label class="form-label small">الصورة: إزاحة أفقية</label><input v-model.number="form.avatarOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">الصورة: إزاحة عمودية</label><input v-model.number="form.avatarOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">الاسم: إزاحة أفقية</label><input v-model.number="form.nameOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">الاسم: إزاحة عمودية</label><input v-model.number="form.nameOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">عرض الاسم dp</label><input v-model.number="form.nameWidthDp" type="number" min="24" max="260" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">النص: إزاحة أفقية</label><input v-model.number="form.textOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">النص: إزاحة عمودية</label><input v-model.number="form.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
+            <div class="col-6"><label class="form-label small">عرض منطقة النص dp (0 تلقائي)</label><input v-model.number="form.textWidthDp" type="number" min="0" max="1000" class="form-control"></div>
           </div>
         </div>
       </div>
@@ -158,7 +167,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''), success=ref('')
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1',customOffsetDp:0})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
 function apply(data){ Object.assign(form,data||{}); }
 function applyTemplate(){
   if(form.template==='compact') Object.assign(form,{heightDp:42,avatarDp:28,radiusDp:12,spacingDp:6,nameSp:11,textSp:12,background:'linear-gradient(90deg,#17212B,#263746)'})
