@@ -28,7 +28,7 @@ export class Advertisement {
   @Column({ type: 'varchar', length: 500 })
   text: string;
 
-  @Column({ type: 'enum', enum: AdvertisementStatus, default: AdvertisementStatus.QUEUED })
+  @Column({ type: 'varchar', length: 16, default: AdvertisementStatus.QUEUED })
   status: AdvertisementStatus;
 
   @Index()
