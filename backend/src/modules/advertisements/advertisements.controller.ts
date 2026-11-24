@@ -23,8 +23,8 @@ export class AdvertisementsController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Get('admin/queue')
-  adminQueue(@Query('limit') limit?: string) {
-    return this.service.adminQueue(Math.min(200, Math.max(1, Number(limit) || 50)));
+  adminQueue(@Query('limit') limit?: string, @Query('q') q?: string, @Query('history') history?: string) {
+    return this.service.adminQueue(Math.min(200, Math.max(1, Number(limit) || 50)), q || '', history === 'true');
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
