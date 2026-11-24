@@ -38,6 +38,14 @@ public final class AdvertisementDtos {
         public int textSp;
         public String nameColor;
         public String textColor;
+        public boolean nameGradientEnabled;
+        public String nameGradientStartColor;
+        public String nameGradientEndColor;
+        public boolean textGradientEnabled;
+        public String textGradientStartColor;
+        public String textGradientEndColor;
+        public String customFontUrl;
+        public String customFontName;
         public int spacingDp;
         public int customOffsetDp;
         public int avatarOffsetXDp;
