@@ -35,6 +35,7 @@ import com.squareup.picasso.Picasso;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class RoomAdvertisementTickerView extends FrameLayout implements RealtimeClient.UserListener {
+    public static volatile boolean SEND_BUTTON_ENABLED = true;
     private final ImageView avatar;
     private final TextView name;
     private final TextView text;
@@ -80,6 +81,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
                 @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
                     AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
+                    if (current != null && current.config != null) SEND_BUTTON_ENABLED = current.config.sendButtonEnabled;
                     if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
                         post(() -> showAdvertisement(current.advertisement, current.config));
                     }
@@ -98,7 +100,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     @Override public void onUserEvent(String event, JsonObject payload) {
         if ("room:advertisement:config".equals(event)) {
-            try { AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class); config = next; if (next != null && !next.enabled) post(() -> setVisibility(GONE)); } catch (Exception ignored) {}
+            try { AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class); config = next; if (next != null) SEND_BUTTON_ENABLED = next.sendButtonEnabled; if (next != null && !next.enabled) post(() -> setVisibility(GONE)); } catch (Exception ignored) {}
             return;
         }
         if (!"room:advertisement".equals(event) || payload == null) return;
