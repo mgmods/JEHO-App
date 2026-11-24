@@ -30,7 +30,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import com.google.gson.JsonObject;
-import com.squareup.picasso.Picasso;
+import com.bumptech.glide.Glide;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -156,7 +156,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setText(ad.senderName == null ? "عضو" : ad.senderName);
         text.setText(ad.text == null ? "" : ad.text);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
-            Picasso.get().load(ad.senderImageUrl).fit().centerCrop().into(avatar);
+            Glide.with(this).load(ad.senderImageUrl).centerCrop().placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar).into(avatar);
         } else {
             avatar.setImageResource(R.drawable.ic_default_avatar);
         }
