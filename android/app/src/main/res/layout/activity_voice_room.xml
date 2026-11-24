@@ -754,27 +754,6 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Full-room overlay host: the ticker is hidden by default and never pushes room seats. -->
-    <FrameLayout
-        android:id="@+id/roomAdvertisementOverlay"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:clickable="false"
-        android:importantForAccessibility="no"
-        android:elevation="22dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementTickerView
-            android:id="@+id/roomAdvertisementTicker"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_gravity="top|center_horizontal"
-            android:visibility="gone" />
-    </FrameLayout>
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerSeats"
         android:layout_width="0dp"
