@@ -187,6 +187,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     return merged;
   }
 
+  async adminBannedWords(){ return {words:(await this.getBannedWords()).join(', ')}; }
+
   async patchBannedWords(words:string){
     const cleaned=String(words||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5000).join(', ');
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[cleaned,'voice_room_ads_banned_words']);
