@@ -251,7 +251,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!['default','sans','serif','mono','custom'].includes(merged.fontFamily)) merged.fontFamily='default';
     merged.customFontUrl=String(merged.customFontUrl||'').slice(0,2048);
     merged.customFontName=String(merged.customFontName||'').slice(0,128);
-    if (merged.fontFamily==='custom' && !/^\/uploads\/[a-z0-9-]+\\.(ttf|otf)$/i.test(merged.customFontUrl)) {
+    if (merged.fontFamily==='custom' && !/^\/uploads\/[a-z0-9-]+\.(ttf|otf)$/i.test(merged.customFontUrl)) {
       merged.fontFamily='default'; merged.customFontUrl=''; merged.customFontName='';
     }
     if (!['premium-v1','compact','gold'].includes(merged.template)) merged.template='premium-v1';
