@@ -126,6 +126,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!payload.has("advertisement") || !payload.get("advertisement").isJsonObject()) return;
         AdvertisementDtos.RealtimeEvent ev = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.RealtimeEvent.class);
         if (ev == null || ev.advertisement == null || !"start".equals(ev.type)) return;
+        if (ev.serverNow != null) {
+            long eventServerNow = parseIsoUtc(ev.serverNow, System.currentTimeMillis());
+            serverClockOffsetMs = eventServerNow - System.currentTimeMillis();
+            serverClockKnown = true;
+        }
         long remaining = ev.advertisement.displayDurationMs;
         if (serverClockKnown && ev.at != null) {
             long serverNow = System.currentTimeMillis() + serverClockOffsetMs;
