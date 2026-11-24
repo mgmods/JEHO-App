@@ -24,6 +24,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private busy = false;
   private leaderRunner: QueryRunner | null = null;
   private nextLeadershipCheckAt = 0;
+  private nextLeaderHealthAt = 0;
 
   constructor(
     @InjectRepository(Advertisement) private readonly ads: Repository<Advertisement>,
@@ -50,6 +51,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   private async ensureWorkerLeadership(): Promise<boolean> {
     if (this.leaderRunner && !this.leaderRunner.isReleased) {
+      if (Date.now() < this.nextLeaderHealthAt) return true;
+      this.nextLeaderHealthAt = Date.now() + 5000;
       try { await this.leaderRunner.query('SELECT 1'); return true; }
       catch { try { await this.leaderRunner.release(); } catch {} this.leaderRunner = null; }
     }
@@ -282,8 +285,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='rejected')::int AS rejected,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status='queued')::int AS waiting,
       COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND status IN ('queued','playing','completed','removed'))::int AS accepted,
-      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='blocked_word')::int AS blockedWordAttempts,
-      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='duplicate')::int AS duplicateAttempts
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='blocked_word')::int AS "blockedWordAttempts",
+      COUNT(*) FILTER (WHERE "createdAt" >= NOW() - ($1::int * INTERVAL '1 day') AND rejectionCode='duplicate')::int AS "duplicateAttempts"
       FROM "jeho_own"."room_advertisements"`;
     return (await this.db.query(sql,[days]))?.[0]||{};
   }
