@@ -212,10 +212,22 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async patchQueue(id:string,body:Record<string,unknown>){
-    const ad=await this.ads.findOne({where:{id}}); if(!ad)throw new BadRequestException('الإعلان غير موجود');
-    if(body.action==='remove'){if(ad.status===AdvertisementStatus.PLAYING)throw new ConflictException('لا يمكن حذف الإعلان الجاري');ad.status=AdvertisementStatus.REMOVED;await this.ads.save(ad);return{ok:true};}
-    if(body.action==='priority'){ad.queueOrder=Math.max(0,Number(body.queueOrder)||0);await this.ads.save(ad);return{ok:true};}
-    return{ok:false};
+    const qr=this.db.createQueryRunner(); await qr.connect(); await qr.startTransaction();
+    try {
+      await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-room-ad-queue']);
+      const ad=await qr.manager.findOne(Advertisement,{where:{id},lock:{mode:'pessimistic_write'}});
+      if(!ad)throw new BadRequestException('الإعلان غير موجود');
+      if(body.action==='remove'){
+        if(ad.status===AdvertisementStatus.PLAYING)throw new ConflictException('لا يمكن حذف الإعلان الجاري');
+        ad.status=AdvertisementStatus.REMOVED; await qr.manager.save(ad);
+      } else if(body.action==='priority') {
+        if(ad.status!==AdvertisementStatus.QUEUED)throw new ConflictException('يمكن تغيير أولوية الإعلانات المنتظرة فقط');
+        ad.queueOrder=Math.max(0,Number(body.queueOrder)||0); await qr.manager.save(ad);
+      } else throw new BadRequestException('إجراء غير صالح');
+      await qr.commitTransaction();
+      return{ok:true};
+    } catch(e) { await qr.rollbackTransaction(); throw e; }
+    finally { await qr.release(); }
   }
 
   async adminQueue(limit=50, search='', history=false){
