@@ -7,7 +7,7 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const DEFAULT_CONFIG: any = {
-  enabled: true, sendButtonEnabled: true, dailyLimit: 1, maxTextLength: 180,
+  enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180,
   resetTimezone: 'UTC', displayDurationMs: 9000, gapMs: 1800,
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
   template: 'premium-v1', position: 'safe-bottom', direction: 'rtl',
@@ -90,7 +90,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
-    if (existing) return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
+    if (existing) { await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة'); return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
+
+    const queuedCount = await this.ads.count({ where: { status: AdvertisementStatus.QUEUED } });
+    if (queuedCount >= Math.max(1, Math.floor(Number(c.maxQueueSize) || 500))) throw new ConflictException('طابور الإعلانات ممتلئ حالياً');
 
     const banned = await this.getBannedWords();
     const normalized = this.normalize(text);
@@ -137,7 +140,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if(this.busy)return; this.busy=true;
     try {
       const c=await this.config();
-      if(c.enabled!==true)return;
+      if(c.enabled!==true || c.paused===true)return;
       const now=Date.now();
       const current=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
       if(current){
@@ -168,8 +171,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,100],['avatarDp',20,56],['nameSp',8,24],['textSp',9,30],['spacingDp',0,30]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
-    ['enabled','sendButtonEnabled','reducedMotionStatic'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,100],['avatarDp',20,56],['nameSp',8,24],['textSp',9,30],['spacingDp',0,30]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    ['enabled','sendButtonEnabled','paused','reducedMotionStatic'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
