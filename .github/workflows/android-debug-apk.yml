@@ -18,6 +18,9 @@ on:
       - "backend/src/modules/users/**"
       - "backend/src/modules/vip/**"
       - "backend/src/modules/wallet/**"
+      - "backend/src/modules/advertisements/**"
+      - "backend/dashboard/src/views/AdvertisementsView.vue"
+      - "backend/database/migrations/**"
       - "backend/scripts/**"
       - "backend/public/mall/**"
   pull_request:
