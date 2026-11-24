@@ -21,12 +21,20 @@
               <label class="form-check-label" for="adsEnabled">تشغيل النظام</label>
             </div>
             <div class="col-md-3 form-check form-switch">
+              <input id="paused" v-model="form.paused" class="form-check-input" type="checkbox">
+              <label class="form-check-label" for="paused">إيقاف الطابور مؤقتاً</label>
+            </div>
+            <div class="col-md-3 form-check form-switch">
               <input id="sendEnabled" v-model="form.sendButtonEnabled" class="form-check-input" type="checkbox">
               <label class="form-check-label" for="sendEnabled">إظهار زر إرسال إعلان</label>
             </div>
             <div class="col-md-3">
               <label class="form-label small">الحد اليومي للعضو</label>
               <input v-model.number="form.dailyLimit" type="number" min="0" max="1000" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">أقصى عدد منتظرين</label>
+              <input v-model.number="form.maxQueueSize" type="number" min="1" max="5000" class="form-control">
             </div>
             <div class="col-md-3">
               <label class="form-label small">الحد الأقصى للأحرف</label>
@@ -120,7 +128,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''), success=ref('')
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=7
-const form=reactive({enabled:true,sendButtonEnabled:true,dailyLimit:1,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF})
 function apply(data){ Object.assign(form,data||{}); }
 async function load(){
   loading.value=true; error.value=''
