@@ -182,8 +182,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float start = rtl ? distance : -distance;
             float end = rtl ? -distance : distance;
             text.setTranslationX(start);
-            float speed = rtl ? safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120) : safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
-            long duration = Math.max(500L, Math.min(60000L, (long) ((distance / dp(speed)) * 1000L)));
+            float speedDpPerSec = rtl ? safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120) : safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
+            float speedPxPerSec = speedDpPerSec * getResources().getDisplayMetrics().density;
+            long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speedPxPerSec)) * 1000L)));
             ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
             in.setDuration(duration);
             in.addListener(new AnimatorListenerAdapter() {
@@ -202,7 +203,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         float end = rtl ? -(viewport + width) : (viewport + width);
         float distance = Math.abs(end);
         float speed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120);
-        long duration = Math.max(500L, Math.min(60000L, (long) ((distance / dp(speed)) * 1000L)));
+        long duration = Math.max(500L, Math.min(60000L, (long) ((distance / Math.max(1f, speed * getResources().getDisplayMetrics().density)) * 1000L)));
         ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
         out.setDuration(duration);
         out.addListener(new AnimatorListenerAdapter() {
