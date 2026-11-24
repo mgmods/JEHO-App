@@ -150,7 +150,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
         if (ad.id == null) return;
-        if (ad.id.equals(currentAdId)) return;
+        if (ad.id.equals(currentAdId)) {
+            config = cfg;
+            bindConfig(cfg);
+            return;
+        }
         cancelActiveAnimator();
         currentAdId = ad.id;
         config = cfg;
@@ -183,6 +187,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setTextColor(safeColor(cfg.nameColor, Color.WHITE));
         text.setTextSize(Math.max(9, cfg.textSp > 0 ? cfg.textSp : 13));
         text.setTextColor(safeColor(cfg.textColor, Color.WHITE));
+        Typeface face = "serif".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SERIF
+                : "mono".equalsIgnoreCase(cfg.fontFamily) ? Typeface.MONOSPACE
+                : "sans".equalsIgnoreCase(cfg.fontFamily) ? Typeface.SANS_SERIF : Typeface.DEFAULT;
+        text.setTypeface(face);
         int spacing = dp(Math.max(4, cfg.spacingDp > 0 ? cfg.spacingDp : 8));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
@@ -238,9 +246,12 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             long entryDuration = requestedTotal > budget ? Math.max(250L, budget * requestedEntry / requestedTotal) : requestedEntry;
             long exitDuration = Math.max(250L, budget - entryDuration);
             if (entryDuration + exitDuration > budget) entryDuration = Math.max(250L, budget - exitDuration);
+            boolean fade = cfg != null && "fade".equalsIgnoreCase(cfg.transitionType);
+            text.setAlpha(fade ? 0f : 1f);
             ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
             activeAnimator = in;
             in.setDuration(entryDuration);
+            if (fade) text.animate().alpha(1f).setDuration(Math.min(450L, entryDuration)).start();
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == in) activeAnimator = null;
@@ -259,6 +270,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
         activeAnimator = out;
         out.setDuration(Math.max(250L, exitDuration));
+        if (cfg != null && "fade".equalsIgnoreCase(cfg.transitionType)) text.animate().alpha(0f).setDuration(Math.min(450L, exitDuration)).start();
         out.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
                 if (activeAnimator == out) activeAnimator = null;
