@@ -13,7 +13,10 @@ const DEFAULT_CONFIG: any = {
   background: 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))',
   backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
   avatarDp: 34, avatarShape: 'circle', nameSp: 12, textSp: 13, customOffsetDp: 0,
-  nameColor: '#FFD98A', textColor: '#FFFFFF', spacingDp: 8,
+  nameColor: '#FFD98A', textColor: '#FFFFFF',
+  nameGradientEnabled: false, nameGradientStartColor: '#FFD98A', nameGradientEndColor: '#FF6B9D',
+  textGradientEnabled: false, textGradientStartColor: '#FFFFFF', textGradientEndColor: '#9EDCFF',
+  customFontUrl: '', customFontName: '', spacingDp: 8,
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
   textOffsetXDp: 0, textOffsetYDp: 0, textWidthDp: 0,
 };
@@ -242,10 +245,15 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
     [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
-    ['enabled','sendButtonEnabled','paused','reducedMotionStatic'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
-    ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
+    ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
-    if (!['default','sans','serif','mono'].includes(merged.fontFamily)) merged.fontFamily='default';
+    if (!['default','sans','serif','mono','custom'].includes(merged.fontFamily)) merged.fontFamily='default';
+    merged.customFontUrl=String(merged.customFontUrl||'').slice(0,2048);
+    merged.customFontName=String(merged.customFontName||'').slice(0,128);
+    if (merged.fontFamily==='custom' && !/^\/uploads\/[a-z0-9-]+\\.(ttf|otf)$/i.test(merged.customFontUrl)) {
+      merged.fontFamily='default'; merged.customFontUrl=''; merged.customFontName='';
+    }
     if (!['premium-v1','compact','gold'].includes(merged.template)) merged.template='premium-v1';
     if (!['circle','square'].includes(merged.avatarShape)) merged.avatarShape='circle';
     if (!['safe-top','safe-bottom','custom-safe'].includes(merged.position)) merged.position='safe-bottom';
