@@ -82,7 +82,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     @Override public void onUserEvent(String event, JsonObject payload) {
-        if (!"room:advertisement".equals(event) || payload == null) return;
+        if ("room:advertisement:config".equals(event)) {\n            try { AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class); config = next; if (next != null && !next.enabled) post(() -> setVisibility(GONE)); } catch (Exception ignored) {}\n            return;\n        }\n        if (!"room:advertisement".equals(event) || payload == null) return;
         if (!payload.has("advertisement") || !payload.get("advertisement").isJsonObject()) return;
         AdvertisementDtos.RealtimeEvent ev = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.RealtimeEvent.class);
         if (ev == null || ev.advertisement == null || !"start".equals(ev.type)) return;
