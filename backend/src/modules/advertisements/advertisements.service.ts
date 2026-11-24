@@ -90,7 +90,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
-    if (existing) { await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة'); return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
+    if (existing) { await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة'); return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)}; }
 
     const queuedCount = await this.ads.count({ where: { status: AdvertisementStatus.QUEUED } });
     if (queuedCount >= Math.max(1, Math.floor(Number(c.maxQueueSize) || 500))) throw new ConflictException('طابور الإعلانات ممتلئ حالياً');
