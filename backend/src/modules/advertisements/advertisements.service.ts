@@ -96,7 +96,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async current() {
     const config = await this.config();
     const ad = await this.ads.findOne({ where: { status: AdvertisementStatus.PLAYING }, order: { startedAt: 'ASC' } });
-    return { advertisement: ad ? this.publicAd(ad) : null, config };
+    return { advertisement: ad ? this.publicAd(ad) : null, config, serverNow: new Date().toISOString() };
   }
 
   async getPublicConfig() {
