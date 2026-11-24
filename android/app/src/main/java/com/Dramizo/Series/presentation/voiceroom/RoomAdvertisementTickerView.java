@@ -22,6 +22,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
@@ -353,6 +354,24 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void applySafePlacement(String position, int customOffsetDp) {
         setTranslationY("custom-safe".equalsIgnoreCase(position) ? Math.round(Math.max(-100, Math.min(100, customOffsetDp)) * getResources().getDisplayMetrics().density) : 0f);
+        if (getParent() instanceof ConstraintLayout) {
+            ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) getLayoutParams();
+            if (lp != null) {
+                lp.topToTop = ConstraintLayout.LayoutParams.UNSET;
+                lp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
+                lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
+                lp.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
+                if ("safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position)) {
+                    lp.bottomToTop = R.id.bottomBar;
+                    lp.bottomMargin = dp(6);
+                } else {
+                    lp.topToBottom = R.id.rowRoomCupChip;
+                    lp.topMargin = dp(2);
+                }
+                setLayoutParams(lp);
+            }
+            return;
+        }
         if (!(getParent() instanceof LinearLayout)) return;
         LinearLayout parent = (LinearLayout) getParent();
         int current = parent.indexOfChild(this);
