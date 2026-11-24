@@ -311,6 +311,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 colors.add(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)));
             } catch (Exception ignored) {}
         }
+        java.util.regex.Matcher rgba = java.util.regex.Pattern.compile("rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})").matcher(value == null ? "" : value);
+        while (rgba.find()) {
+            try {
+                int red = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(1))));
+                int green = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(2))));
+                int blue = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(3))));
+                colors.add(Color.argb(alpha, red, green, blue));
+            } catch (Exception ignored) {}
+        }
         GradientDrawable bg;
         if (value != null && value.toLowerCase().contains("linear-gradient") && colors.size() >= 2) {
             bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{colors.get(0), colors.get(colors.size() - 1)});
