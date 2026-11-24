@@ -72,6 +72,7 @@
           <h3 class="h6 mb-3">شريط الإعلان</h3>
           <div class="row g-2">
             <div class="col-6"><label class="form-label small">الموضع</label><select v-model="form.position" class="form-select"><option value="safe-top">أعلى آمن</option><option value="safe-bottom">أسفل آمن</option><option value="custom-safe">موضع مخصص آمن</option></select></div>
+            <div class="col-6"><label class="form-label small">إزاحة الموضع المخصص dp</label><input v-model.number="form.customOffsetDp" type="number" min="-100" max="100" class="form-control" :disabled="form.position!=='custom-safe'"></div>
             <div class="col-6"><label class="form-label small">الاتجاه</label><select v-model="form.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
             <div class="col-6"><label class="form-label small">نوع الانتقال</label><select v-model="form.transitionType" class="form-select"><option value="slide">انزلاق</option><option value="fade">تلاشي</option></select></div>
             <div class="col-6"><label class="form-label small">قالب الشريط</label><select v-model="form.template" class="form-select" @change="applyTemplate"><option value="premium-v1">فاخر</option><option value="compact">مختصر</option><option value="gold">ذهبي</option></select></div>
@@ -157,7 +158,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), error=ref(''), success=ref('')
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1'})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'safe-bottom',direction:'rtl',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',template:'premium-v1',customOffsetDp:0})
 function apply(data){ Object.assign(form,data||{}); }
 function applyTemplate(){
   if(form.template==='compact') Object.assign(form,{heightDp:42,avatarDp:28,radiusDp:12,spacingDp:6,nameSp:11,textSp:12,background:'linear-gradient(90deg,#17212B,#263746)'})
