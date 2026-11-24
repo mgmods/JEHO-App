@@ -1325,7 +1325,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="4dp"
             android:background="@android:color/transparent"
             android:gravity="center_vertical"
             android:minHeight="32dp"
