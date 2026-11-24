@@ -1307,7 +1307,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="6dp"
         android:minHeight="110dp"
@@ -1316,7 +1316,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowTopHosts"
+        app:layout_constraintTop_toBottomOf="@id/recyclerSeats"
         app:layout_constraintWidth_percent="0.72">
 
         <!-- Room feed tabs occupy the exact former official-news banner position. -->
