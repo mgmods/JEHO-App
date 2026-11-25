@@ -70,6 +70,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile long refreshGeneration = 0L;
     private CustomTarget<File> customFontTarget;
     private volatile String loadedCustomFontUrl = "";
+    private volatile String loadedBackgroundImageUrl = "";
     private volatile Typeface customTypeface;
 
     public RoomAdvertisementTickerView(Context context) { this(context, null); }
@@ -305,6 +306,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setAlpha(1f);
         avatar.setAlpha(1f);
         clearGlide(backgroundImage);
+        loadedBackgroundImageUrl = "";
         clearGlide(avatar);
         backgroundImage.setImageDrawable(null);
         avatar.setImageDrawable(null);
@@ -350,11 +352,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setMinimumHeight(h);
         setBackground(buildBackground(cfg.background, cfg.backgroundOpacity, cfg.radiusDp));
         backgroundImage.setAlpha(Math.max(0, Math.min(100, cfg.backgroundOpacity)) / 100f);
-        if (cfg.backgroundImage != null && (cfg.backgroundImage.startsWith("https://") || cfg.backgroundImage.startsWith("http://"))) {
-            Glide.with(getContext().getApplicationContext()).load(cfg.backgroundImage).centerCrop().into(backgroundImage);
+        String backgroundUrl = cfg.backgroundImage == null ? "" : cfg.backgroundImage.trim();
+        if ((backgroundUrl.startsWith("https://") || backgroundUrl.startsWith("http://"))) {
+            // bindConfig may run again for the same active ad after a realtime refresh.
+            // Re-submitting the same GIF request restarts its first frame and makes the
+            // animated ticker background look frozen; keep the running drawable alive.
+            if (!backgroundUrl.equals(loadedBackgroundImageUrl)) {
+                loadedBackgroundImageUrl = backgroundUrl;
+                Glide.with(getContext().getApplicationContext())
+                        .load(backgroundUrl)
+                        .centerCrop()
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                        .into(backgroundImage);
+            }
             backgroundImage.setVisibility(VISIBLE);
         } else {
-            Glide.with(getContext().getApplicationContext()).clear(backgroundImage);
+            if (!loadedBackgroundImageUrl.isEmpty()) {
+                Glide.with(getContext().getApplicationContext()).clear(backgroundImage);
+                backgroundImage.setImageDrawable(null);
+                loadedBackgroundImageUrl = "";
+            }
             backgroundImage.setVisibility(GONE);
         }
         applySafePlacement(cfg.position, cfg.customOffsetDp, cfg.positionXPercent, cfg.positionYPercent);
