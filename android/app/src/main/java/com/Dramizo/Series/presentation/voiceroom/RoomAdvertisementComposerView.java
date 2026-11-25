@@ -56,20 +56,25 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         openButton.setIncludeFontPadding(false);
         openButton.setClickable(true);
         openButton.setFocusable(true);
-        openButton.setText("✦ إعلان");
+        openButton.setText("✦  إعلان عام");
         openButton.setTextColor(Color.WHITE);
-        openButton.setTextSize(12);
+        openButton.setTextSize(13);
         openButton.setTypeface(Typeface.DEFAULT_BOLD);
-        GradientDrawable bg = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(164, 104, 26), Color.rgb(221, 166, 66)});
-        bg.setCornerRadius(dp(22));
-        openButton.setBackground(bg);
-        openButton.setElevation(dp(5));
-        openButton.setPadding(dp(16), 0, dp(16), 0);
-        openButton.setLetterSpacing(0.02f);
-        bg.setStroke(dp(1), Color.rgb(244, 206, 126));
-        addView(openButton, new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, dp(38), Gravity.CENTER));
+        openButton.setGravity(Gravity.CENTER);
+        openButton.setMinWidth(dp(142));
+        openButton.setMinHeight(dp(46));
+        openButton.setBackground(roundRectGradient(
+                new int[]{Color.rgb(105, 65, 23), Color.rgb(184, 126, 38), Color.rgb(229, 184, 91)},
+                dp(24)));
+        openButton.setElevation(dp(9));
+        openButton.setPadding(dp(19), 0, dp(19), 0);
+        openButton.setLetterSpacing(0.015f);
+        openButton.setContentDescription("فتح نافذة إرسال إعلان عام إلى جميع الغرف");
+        openButton.setStateListAnimator(android.animation.AnimatorInflater.loadStateListAnimator(
+                context, android.R.animator.button_state_list_animator));
+        FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
+                LayoutParams.WRAP_CONTENT, dp(46), Gravity.CENTER);
+        addView(openButton, buttonLp);
         openButton.setOnClickListener(v -> openComposer());
         setVisibility(GONE);
     }
@@ -132,7 +137,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     setVisibility(featureEnabled ? VISIBLE : GONE);
                     openButton.setEnabled(remaining > 0 && !loading.get());
                     openButton.setAlpha(remaining > 0 ? 1f : .55f);
-                    openButton.setText(remaining > 0 ? "إعلان · " + remaining : "انتهت إعلاناتك اليوم");
+                    openButton.setText(remaining > 0 ? "✦  إعلان عام  ·  " + remaining : "اكتملت حصة اليوم");
                 });
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
@@ -238,7 +243,6 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         deliveryIcon.setTextSize(22);
         deliveryIcon.setGravity(Gravity.CENTER);
         delivery.addView(deliveryIcon, new LinearLayout.LayoutParams(dp(34), dp(34)));
-
         LinearLayout deliveryText = new LinearLayout(getContext());
         deliveryText.setOrientation(LinearLayout.VERTICAL);
         deliveryText.setPadding(dp(9), 0, 0, 0);
@@ -354,6 +358,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             window.setBackgroundDrawableResource(android.R.color.transparent);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.setGravity(Gravity.BOTTOM);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
             WindowManager.LayoutParams p = new WindowManager.LayoutParams();
             p.copyFrom(window.getAttributes());
             p.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.96f);
@@ -381,6 +387,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.96f),
                     WindowManager.LayoutParams.WRAP_CONTENT);
             window.setGravity(Gravity.BOTTOM);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         }
     }
 
@@ -517,8 +525,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         title.setText(titleText);
         title.setTextColor(Color.rgb(38, 42, 50));
         title.setTextSize(18);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setGravity(Gravity.CENTER);
+        title.setTypeface(Typeface.DEFAULT_BOLD);        title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         titleLp.topMargin = dp(15);
