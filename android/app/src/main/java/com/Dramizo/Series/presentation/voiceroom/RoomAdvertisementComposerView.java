@@ -16,6 +16,14 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ImageView;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.PorterDuff;
+
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import android.widget.Toast;
 
 import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
@@ -42,6 +50,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     private int maxWords = 30;
     private int publishDelaySeconds = 10;
     private boolean featureEnabled = false;
+    private AdvertisementDtos.Ticker composerConfig;
     // Reuse this key whenever the request outcome is uncertain; the backend deduplicates it.
     private String pendingIdempotencyKey;
     private String pendingIdempotencyText;
@@ -102,6 +111,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
             publishDelaySeconds = next.publishDelayMs > 0 ? Math.max(1, next.publishDelayMs / 1000) : 10;
+            composerConfig = next;
             if (!featureEnabled) {
                 post(() -> setVisibility(GONE));
             } else {
@@ -120,7 +130,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
-                if (cfg.ticker != null && cfg.ticker.publishDelayMs > 0) publishDelaySeconds = Math.max(1, cfg.ticker.publishDelayMs / 1000);
+                if (cfg.ticker != null) {
+                    composerConfig = cfg.ticker;
+                    if (cfg.ticker.publishDelayMs > 0) publishDelaySeconds = Math.max(1, cfg.ticker.publishDelayMs / 1000);
+                }
                 refreshRemaining();
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
@@ -135,7 +148,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Remaining>> call,
                                              Response<ApiResponse<AdvertisementDtos.Remaining>> response) {
                 AdvertisementDtos.Remaining data = response.body() == null ? null : response.body().data;
-                if (data == null) { post(() -> setVisibility(GONE)); return; }
+                if (data == null) { post(() -> {
+                    setVisibility(featureEnabled ? VISIBLE : GONE);
+                    openButton.setEnabled(featureEnabled && !loading.get());
+                    openButton.setAlpha(.78f);
+                    openButton.setText("✦  إعلان عام  ·  التحقق من الحصة");
+                }); return; }
                 remaining = Math.max(0, data.remaining);
                 post(() -> {
                     setVisibility(featureEnabled ? VISIBLE : GONE);
@@ -145,21 +163,38 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 });
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
-                post(() -> setVisibility(GONE));
+                post(() -> {
+                    setVisibility(featureEnabled ? VISIBLE : GONE);
+                    openButton.setEnabled(featureEnabled && !loading.get());
+                    openButton.setAlpha(.78f);
+                    openButton.setText("✦  إعلان عام  ·  تعذر قراءة الحصة — اضغط لإعادة المحاولة");
+                });
             }
         });
     }
 
     private void openComposer() {
-        if (!featureEnabled || remaining <= 0 || loading.get()) {
+        if (!featureEnabled || remaining == 0 || loading.get()) {
             refreshQuota();
-            if (remaining <= 0) Toast.makeText(getContext(), "انتهت إعلاناتك اليوم", Toast.LENGTH_SHORT).show();
+            if (remaining == 0) Toast.makeText(getContext(), "انتهت إعلاناتك اليوم", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        final int gold = Color.rgb(191, 139, 57);
-        final int muted = Color.rgb(115, 125, 145);
-        final int dark = Color.rgb(19, 24, 39);
+        final AdvertisementDtos.Ticker cfg = composerConfig;
+        final int muted = colorOr(cfg == null ? null : cfg.composerSubtitleColor, Color.rgb(102, 116, 136));
+        final int dark = colorOr(cfg == null ? null : cfg.composerTitleColor, Color.rgb(25, 34, 49));
+        final int inputTextColor = colorOr(cfg == null ? null : cfg.composerInputTextColor, Color.rgb(17, 24, 39));
+        final int inputHintColor = colorOr(cfg == null ? null : cfg.composerInputHintColor, Color.rgb(143, 154, 171));
+        final int inputBgColor = colorOr(cfg == null ? null : cfg.composerInputBackgroundColor, Color.WHITE);
+        final int inputBorderColor = colorOr(cfg == null ? null : cfg.composerInputBorderColor, Color.rgb(211, 221, 234));
+        final int cancelTextColor = colorOr(cfg == null ? null : cfg.composerCancelTextColor, Color.rgb(62, 76, 96));
+        final int cancelBgColor = colorOr(cfg == null ? null : cfg.composerCancelBackgroundColor, Color.rgb(246, 248, 252));
+        final int cancelBorderColor = colorOr(cfg == null ? null : cfg.composerCancelBorderColor, Color.rgb(220, 228, 238));
+        final int sendTextColor = colorOr(cfg == null ? null : cfg.composerSendTextColor, Color.rgb(35, 28, 21));
+        final int sendStart = colorOr(cfg == null ? null : cfg.composerSendGradientStartColor, Color.rgb(238, 197, 119));
+        final int sendEnd = colorOr(cfg == null ? null : cfg.composerSendGradientEndColor, Color.rgb(188, 126, 47));
+        final int sendBorder = colorOr(cfg == null ? null : cfg.composerSendBorderColor, Color.rgb(239, 202, 128));
+        final int radius = dp(cfg == null ? 16 : Math.max(0, Math.min(40, cfg.composerButtonRadiusDp > 0 ? cfg.composerButtonRadiusDp : 16)));
         final Dialog dialog = new Dialog(getContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
@@ -168,13 +203,22 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         LinearLayout sheet = new LinearLayout(getContext());
         sheet.setOrientation(LinearLayout.VERTICAL);
         sheet.setPadding(dp(20), dp(12), dp(20), dp(20));
-        GradientDrawable sheetBg = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.rgb(252, 253, 255), Color.rgb(242, 246, 251)});
+        String composerBg = cfg == null ? "#F7F9FC" : cfg.composerBackgroundColor;
+        int composerOpacity = cfg == null ? 100 : Math.max(0, Math.min(100, cfg.composerBackgroundOpacity));
+        GradientDrawable sheetBg = new GradientDrawable();
+        sheetBg.setColor(withAlpha(colorOr(composerBg, Color.rgb(247, 249, 252)), composerOpacity));
         sheetBg.setCornerRadii(new float[]{dp(30),dp(30),dp(30),dp(30),dp(0),dp(0),dp(0),dp(0)});
-        sheetBg.setStroke(dp(1), Color.rgb(224, 231, 240));
+        sheetBg.setStroke(dp(1), inputBorderColor);
         sheet.setBackground(sheetBg);
         sheet.setElevation(dp(24));
+        FrameLayout sheetRoot = new FrameLayout(getContext());
+        ImageView composerBackground = new ImageView(getContext());
+        composerBackground.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        composerBackground.setAlpha(composerOpacity / 100f);
+        sheetRoot.addView(composerBackground, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        sheet.setBackgroundColor(Color.TRANSPARENT);
+        sheetRoot.addView(sheet, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        loadRemoteImage(composerBackground, cfg == null ? "" : cfg.composerBackgroundImage);
 
         View grabber = new View(getContext());
         grabber.setBackground(roundRect(Color.rgb(198, 207, 220), dp(8), Color.rgb(198, 207, 220)));
@@ -218,7 +262,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         heading.addView(eyebrow);
         TextView title = new TextView(getContext());
         title.setText("إرسال إعلان عام");
-        title.setTextColor(Color.rgb(25, 34, 49));
+        title.setTextColor(dark);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
@@ -227,7 +271,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         heading.addView(title, titleLp);
         TextView subtitle = new TextView(getContext());
         subtitle.setText("رسالتك ستصل إلى جميع الغرف");
-        subtitle.setTextColor(Color.rgb(103, 116, 135));
+        subtitle.setTextColor(muted);
         subtitle.setTextSize(11);
         LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -289,21 +333,21 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         sheet.addView(fieldHeader, fieldHeaderLp);
         TextView fieldLabel = new TextView(getContext());
         fieldLabel.setText("نص الإعلان");
-        fieldLabel.setTextColor(Color.rgb(25, 35, 51));
+        fieldLabel.setTextColor(dark);
         fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView fieldHint = new TextView(getContext());
         fieldHint.setText("الأسطر المتعددة تظهر متتابعة بفاصلة");
-        fieldHint.setTextColor(Color.rgb(221, 184, 121));
+        fieldHint.setTextColor(muted);
         fieldHint.setTextSize(10);
         fieldHeader.addView(fieldHint);
 
         FrameLayout editorFrame = new FrameLayout(getContext());
         GradientDrawable editorBg = new GradientDrawable();
-        editorBg.setColor(Color.rgb(255, 255, 255));
+        editorBg.setColor(inputBgColor);
         editorBg.setCornerRadius(dp(18));
-        editorBg.setStroke(dp(1), Color.rgb(211, 221, 234));
+        editorBg.setStroke(dp(1), inputBorderColor);
         editorFrame.setBackground(editorBg);
         LinearLayout.LayoutParams editorFrameLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, dp(150));
@@ -313,8 +357,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         EditText input = new EditText(getContext());
         input.setHint("اكتب إعلاناً واضحاً ومختصراً ليصل إلى جميع أعضاء JEHO...");
         input.setTextSize(15);
-        input.setTextColor(Color.rgb(17, 24, 39));
-        input.setHintTextColor(Color.rgb(143, 154, 171));
+        input.setTextColor(inputTextColor);
+        input.setHintTextColor(inputHintColor);
         input.setSingleLine(false);
         input.setMinLines(4);
         input.setMaxLines(6);
@@ -336,8 +380,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         sheet.addView(meta, metaLp);
         TextView quota = new TextView(getContext());
-        quota.setText("●  المتبقي اليوم  " + remaining + " إعلان");
-        quota.setTextColor(Color.rgb(232, 192, 120));
+        quota.setText(remaining < 0 ? "●  التحقق من الحد اليومي…" : "●  المتبقي اليوم  " + remaining + " إعلان");
+        quota.setTextColor(sendStart);
         quota.setTextSize(11);
         quota.setTypeface(Typeface.DEFAULT_BOLD);
         meta.addView(quota, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
@@ -359,7 +403,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         });
 
         View separator = new View(getContext());
-        separator.setBackgroundColor(Color.rgb(54, 63, 81));
+        separator.setBackgroundColor(inputBorderColor);
         LinearLayout.LayoutParams separatorLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, dp(1));
         separatorLp.topMargin = dp(19);
@@ -374,7 +418,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
-        cancel.setTextColor(Color.rgb(62, 76, 96));
+        cancel.setTextColor(cancelTextColor);
         cancel.setTextSize(13);
         cancel.setGravity(Gravity.CENTER);
         cancel.setBackground(roundRect(Color.rgb(246, 248, 252), dp(16), Color.rgb(220, 228, 238)));
@@ -382,7 +426,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView send = new TextView(getContext());
         send.setText("إرسال الإعلان  ✦");
-        send.setTextColor(Color.rgb(35, 28, 21));
+        send.setTextColor(sendTextColor);
         send.setTextSize(14);
         send.setTypeface(Typeface.DEFAULT_BOLD);
         send.setGravity(Gravity.CENTER);
@@ -426,7 +470,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         scroll.setClipToPadding(false);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.addView(sheet, new android.widget.ScrollView.LayoutParams(
+        scroll.addView(sheetRoot, new android.widget.ScrollView.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         dialog.setContentView(scroll);
 
@@ -463,11 +507,41 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         return d;
     }
 
-    private GradientDrawable roundRectGradient(int[] colors, int radius) {
+    private GradientDrawable roundRectGradient(int[] colors, int radius) { return roundRectGradient(colors, radius, Color.rgb(239, 202, 128)); }
+
+    private GradientDrawable roundRectGradient(int[] colors, int radius, int strokeColor) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, colors);
         d.setCornerRadius(radius);
-        d.setStroke(dp(1), Color.rgb(239, 202, 128));
+        d.setStroke(dp(1), strokeColor);
         return d;
+    }
+
+    private int colorOr(String value, int fallback) {
+        try { return value == null || value.trim().isEmpty() ? fallback : Color.parseColor(value.trim()); }
+        catch (Exception ignored) { return fallback; }
+    }
+
+    private int withAlpha(int color, int percent) {
+        int a = Math.max(0, Math.min(100, percent));
+        return Color.argb(Math.round(255f * a / 100f), Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    private void loadRemoteImage(ImageView target, String rawUrl) {
+        String url = rawUrl == null ? "" : rawUrl.trim();
+        if (url.isEmpty()) return;
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(5000); conn.setReadTimeout(8000); conn.setInstanceFollowRedirects(true);
+                conn.setUseCaches(true);
+                try (InputStream in = conn.getInputStream()) {
+                    Bitmap bitmap = BitmapFactory.decodeStream(in);
+                    if (bitmap != null) target.post(() -> target.setImageBitmap(bitmap));
+                }
+            } catch (Exception ignored) {}
+            finally { if (conn != null) conn.disconnect(); }
+        }, "jeho-ad-composer-image").start();
     }
 
     private void submit(String text, Dialog dialog, TextView send, TextView cancel) {
