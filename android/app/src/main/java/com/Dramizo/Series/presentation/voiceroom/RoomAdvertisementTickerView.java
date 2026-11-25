@@ -468,10 +468,12 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             long textMotionDuration = calculateTextMotionDuration(
                     configuredTextMode, viewportWidth, completeTextWidth, cfg, budget);
             addElementMotion(text, configuredTextMode, viewportWidth, textMotionDuration, animations);
+            // Keep the whole ticker lifecycle tied to the text crossing the bar.
+            // No avatar/name animation may keep an already-finished message visible.
             addElementMotion(name, cfg == null ? "static" : cfg.nameMotion,
-                    Math.max(1, getWidth()), budget, animations);
+                    Math.max(1, getWidth()), textMotionDuration, animations);
             addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
-                    Math.max(1, getWidth()), budget, animations);
+                    Math.max(1, getWidth()), textMotionDuration, animations);
             if (animations.isEmpty()) {
                 postDelayed(() -> {
                     if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
