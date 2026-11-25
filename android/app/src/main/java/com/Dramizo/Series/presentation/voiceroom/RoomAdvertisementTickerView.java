@@ -297,6 +297,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         int fullTextWidth = Math.max(dp(1), (int) Math.ceil(text.getPaint().measureText(fullMessage))
                 + text.getCompoundPaddingLeft() + text.getCompoundPaddingRight() + dp(8));
         text.setWidth(fullTextWidth);
+        FrameLayout.LayoutParams fullTextParams = (FrameLayout.LayoutParams) text.getLayoutParams();
+        fullTextParams.width = fullTextWidth;
+        text.setLayoutParams(fullTextParams);
         if (config != null) applyConfiguredGradients(config);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
             com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(this).load(ad.senderImageUrl).centerCrop()
