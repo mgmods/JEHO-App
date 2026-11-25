@@ -164,7 +164,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             remaining = ev.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
         }
         final long remainingMs = remaining;
-        if (remainingMs > 0L) post(() -> showAdvertisement(ev.advertisement, ev.config, remainingMs));
+        if (remainingMs > 0L) post(() -> {
+            if (!attached.get()) return;
+            showAdvertisement(ev.advertisement, ev.config, remainingMs);
+        });
     }
 
     @Override public void onConnected() { refreshCurrent(); }
@@ -189,11 +192,20 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                         remaining = current.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
                     } catch (Exception ignored) {}
                     final long remainingMs = remaining;
-                    if (remainingMs > 0L) post(() -> showAdvertisement(current.advertisement, current.config, remainingMs));
-                    else post(RoomAdvertisementTickerView.this::hideAdvertisement);
+                    if (remainingMs > 0L) post(() -> {
+                        if (!attached.get()) return;
+                        showAdvertisement(current.advertisement, current.config, remainingMs);
+                    });
+                    else post(() -> {
+                        if (!attached.get()) return;
+                        hideAdvertisement();
+                    });
                 } else {
                     // No globally active advertisement: remove the entire row, not just its contents.
-                    post(RoomAdvertisementTickerView.this::hideAdvertisement);
+                    post(() -> {
+                        if (!attached.get()) return;
+                        hideAdvertisement();
+                    });
                 }
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
@@ -208,7 +220,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.animate().cancel();
     }
 
+    private void clearGlide(Object target) {
+        if (target == null) return;
+        try {
+            Glide.with(getContext().getApplicationContext()).clear(target);
+        } catch (Exception ignored) {
+            // Activity may already be destroyed; dropping the target reference is enough.
+        }
+    }
+
     private void hideAdvertisement() {
+        if (!attached.get()) return;
         cancelActiveAnimator();
         currentAdId = "";
         needsResume = false;
@@ -216,7 +238,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setText("");
         text.setTranslationX(0f);
         text.setAlpha(1f);
-        Glide.with(this).clear(backgroundImage);
+        clearGlide(backgroundImage);
         backgroundImage.setVisibility(GONE);
         setVisibility(GONE);
     }
@@ -335,7 +357,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             face = customTypeface != null ? customTypeface : Typeface.DEFAULT;
             loadCustomTypeface(cfg);
         } else {
-            if (customFontTarget != null) { Glide.with(this).clear(customFontTarget); customFontTarget = null; }
+            if (customFontTarget != null) {
+                clearGlide(customFontTarget);
+                customFontTarget = null;
+            }
             loadedCustomFontUrl = "";
             customTypeface = null;
             face = "serif".equalsIgnoreCase(family) ? Typeface.SERIF
@@ -350,7 +375,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         final String url = resolvedCustomFontUrl(cfg);
         if (url.isEmpty() || url.equals(loadedCustomFontUrl)) return;
         loadedCustomFontUrl = url;
-        if (customFontTarget != null) Glide.with(this).clear(customFontTarget);
+        if (customFontTarget != null) clearGlide(customFontTarget);
         customFontTarget = new CustomTarget<File>() {
             @Override public void onResourceReady(File resource, Transition<? super File> transition) {
                 if (config == null || !url.equals(resolvedCustomFontUrl(config))) return;
@@ -428,8 +453,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     (int) Math.ceil(text.getPaint().measureText(text.getText().toString())));
             // A long message must still travel through the viewport even when the
             // dashboard's selected mode is static/fade; otherwise some words stay clipped.
-            if (completeTextWidth > viewportWidth
-                    && ("static".equalsIgnoreCase(configuredTextMode) || "fade".equalsIgnoreCase(configuredTextMode))) {
+            if ("static".equalsIgnoreCase(configuredTextMode) || "fade".equalsIgnoreCase(configuredTextMode)
+                    || configuredTextMode.isEmpty()) {
                 configuredTextMode = legacyTextMode;
             }
             addElementMotion(text, configuredTextMode, viewportWidth, budget, animations);
@@ -470,7 +495,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             return;
         }
         int width = Math.max(1, target.getWidth());
-        float distance = viewport + width;
+        float distance = Math.max(viewport, 1) + Math.max(width, 1);
         boolean fromRight = "right-to-left".equals(mode) || "rtl".equals(mode);
         boolean fromLeft = "left-to-right".equals(mode) || "ltr".equals(mode);
         if (!fromRight && !fromLeft) return;
