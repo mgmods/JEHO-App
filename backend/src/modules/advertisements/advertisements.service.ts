@@ -26,7 +26,11 @@ const DEFAULT_CONFIG: any = {
   composerInputTextColor: '#111827', composerInputHintColor: '#9AA7B8', composerInputBackgroundColor: '#FFFFFF', composerInputBorderColor: '#D8E0EA',
   composerCancelTextColor: '#43536A', composerCancelBackgroundColor: '#F4F7FB', composerCancelBorderColor: '#DCE4EE',
   composerSendTextColor: '#241C14', composerSendGradientStartColor: '#EEC577', composerSendGradientEndColor: '#BC7E2F', composerSendBorderColor: '#EFC981',
-  composerButtonRadiusDp: 16, composerIconSizeDp: 42,
+  composerButtonRadiusDp: 24, composerIconSizeDp: 42,
+  composerButtonText: '✦  إعلان عام', composerButtonTextColor: '#FFFFFF',
+  composerButtonBackgroundStartColor: '#694117', composerButtonBackgroundEndColor: '#E5B85B',
+  composerButtonBorderColor: '#EFC981', composerButtonBorderWidthDp: 1,
+  composerButtonHeightDp: 46, composerButtonTextSizeSp: 13,
 };
 
 @Injectable()
