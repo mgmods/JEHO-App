@@ -295,6 +295,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTranslationX(0f);
         name.setTranslationX(0f);
         avatar.setTranslationX(0f);
+        setTranslationY(0f);
+        setAlpha(1f);
         text.setAlpha(1f);
         name.setAlpha(1f);
         avatar.setAlpha(1f);
@@ -511,6 +513,22 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         postOnAnimation(() -> {
             if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
             ArrayList<Animator> animations = new ArrayList<>();
+            // Apply the dashboard's overall transition independently of per-element motion.
+            String transition = cfg == null || cfg.transitionType == null ? "slide" : cfg.transitionType;
+            if ("fade".equalsIgnoreCase(transition)) {
+                setAlpha(0f);
+                ObjectAnimator barFade = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f);
+                barFade.setDuration(260L);
+                barFade.setInterpolator(new LinearInterpolator());
+                animations.add(barFade);
+            } else {
+                float slideDistance = dp(12);
+                setTranslationY(slideDistance);
+                ObjectAnimator barSlide = ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, slideDistance, 0f);
+                barSlide.setDuration(220L);
+                barSlide.setInterpolator(new LinearInterpolator());
+                animations.add(barSlide);
+            }
             String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
                     ? "right-to-left" : "left-to-right";
             String configuredTextMode = cfg == null || cfg.textMotion == null
@@ -547,6 +565,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                         text.setTranslationX(0f);
                         name.setTranslationX(0f);
                         avatar.setTranslationX(0f);
+                        setTranslationY(0f);
+                        setAlpha(1f);
                         text.setAlpha(1f);
                         name.setAlpha(1f);
                         avatar.setAlpha(1f);
