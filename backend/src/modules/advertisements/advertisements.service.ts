@@ -201,7 +201,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (existing) {
       await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة بنفس معرّف الطلب');
       if (existing.senderId !== userId || existing.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
-      return {duplicate:true, advertisement:this.publicAd(existing), remaining:await this.remainingForUser(userId)};
+      let remaining: any = null;
+      try { remaining = await this.remainingForUser(userId); }
+      catch (quotaError) { this.log.warn('Duplicate advertisement confirmed but quota refresh failed: ' + String((quotaError as any)?.message || quotaError)); }
+      return {duplicate:true, advertisement:this.publicAd(existing), remaining};
     }
 
     // The transaction serializes all queue mutations so maxQueueSize and queueOrder
@@ -224,7 +227,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         await qr.commitTransaction();
         await this.recordRejected(userId, text, 'duplicate', 'محاولة إرسال مكررة بنفس معرّف الطلب');
         if (duplicate.senderId !== userId || duplicate.text !== text) throw new ConflictException('معرّف الطلب مستخدم مسبقاً مع بيانات مختلفة');
-        return {duplicate:true, advertisement:this.publicAd(duplicate), remaining:await this.remainingForUser(userId)};
+        let remaining: any = null;
+        try { remaining = await this.remainingForUser(userId); }
+        catch (quotaError) { this.log.warn('Duplicate advertisement confirmed but quota refresh failed: ' + String((quotaError as any)?.message || quotaError)); }
+        return {duplicate:true, advertisement:this.publicAd(duplicate), remaining};
       }
       const start = await this.resetStartFromDb(c.resetTimezone);
       const count = Number((await qr.query('SELECT COUNT(*)::int AS count FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" IN ($3,$4,$5,$6)',[userId,start,AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED,AdvertisementStatus.REMOVED]))?.[0]?.count || 0);
