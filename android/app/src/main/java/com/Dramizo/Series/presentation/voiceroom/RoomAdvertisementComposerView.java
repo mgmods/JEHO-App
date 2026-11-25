@@ -419,7 +419,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     if (message == null || message.trim().isEmpty()) {
                         message = "رفض الخادم طلب الإعلان. " + diagnostic;
                     } else if (!message.contains("HTTP ")) {
-                        message = message + "\\n" + diagnostic;
+                        message = message + "\n" + diagnostic;
                     }
                     showResultDialog(false, "تعذّر إرسال الإعلان", message);
                     refreshQuota();
