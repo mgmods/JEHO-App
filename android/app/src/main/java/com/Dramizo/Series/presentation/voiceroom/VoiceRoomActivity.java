@@ -1686,12 +1686,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
             lastBoundCoverUrl = room.coverUrl;
             if (binding.imgRoomBannerCover != null) {
-                Glide.with(this)
-                        .load(AssetCatalog.absoluteUrl(room.coverUrl))
-                        .centerCrop()
-                        .placeholder(R.drawable.placeholder_cover)
-                        .error(R.drawable.placeholder_cover)
-                        .into(binding.imgRoomBannerCover);
+                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                        binding.imgRoomBannerCover, room.coverUrl, R.drawable.placeholder_cover);
             }
             lastBoundHostStageKey = null;
         }
@@ -11154,24 +11150,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (url == null || url.isEmpty()) {
             String themeBg = com.Dramizo.Series.util.RemoteTheme.roomDefaultBackgroundUrl(this);
             if (themeBg != null && !themeBg.isEmpty()) {
-                // Keep XML android:src as fallback (hams_background).
-                com.Dramizo.Series.util.RemoteTheme.loadInto(binding.imgRoomBg, themeBg, 0);
+                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                        binding.imgRoomBg, themeBg, R.drawable.voice_room_bg);
+            } else {
+                try { Glide.with(binding.imgRoomBg).clear(binding.imgRoomBg); } catch (Exception ignored) {}
+                binding.imgRoomBg.setImageResource(R.drawable.voice_room_bg);
             }
-            // else leave activity_voice_room.xml android:src
             return;
         }
         if (url.startsWith("drawable://")) {
+            try { Glide.with(binding.imgRoomBg).clear(binding.imgRoomBg); } catch (Exception ignored) {}
+            binding.imgRoomBg.setTag(R.id.tag_image_url, null);
+            binding.imgRoomBg.setTag(R.id.tag_image_loaded, Boolean.FALSE);
             String name = url.substring("drawable://".length());
             int resId = getResources().getIdentifier(name, "drawable", getPackageName());
             if (resId != 0) binding.imgRoomBg.setImageResource(resId);
+            else binding.imgRoomBg.setImageResource(R.drawable.voice_room_bg);
             return;
         }
-        Glide.with(this)
-                .load(AssetCatalog.absoluteUrl(url))
-                .placeholder(binding.imgRoomBg.getDrawable())
-                .error(binding.imgRoomBg.getDrawable())
-                .centerCrop()
-                .into(binding.imgRoomBg);
+        com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                binding.imgRoomBg, url, R.drawable.voice_room_bg);
     }
 
     private void showRoomBackgroundPicker() {
