@@ -83,7 +83,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
                 LayoutParams.WRAP_CONTENT, dp(46), Gravity.CENTER);
         addView(openButton, buttonLp);
-        openButton.setOnClickListener(v -> openComposer());
+        openButton.setOnClickListener(v -> showComposer());
+        openButton.setVisibility(GONE);
         setVisibility(GONE);
     }
 
@@ -111,11 +112,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
             publishDelaySeconds = next.publishDelayMs > 0 ? Math.max(1, next.publishDelayMs / 1000) : 10;
             composerConfig = next;
-            if (!featureEnabled) {
-                post(() -> setVisibility(GONE));
-            } else {
-                refreshRemaining();
-            }
+            if (featureEnabled) refreshRemaining();
         } catch (Exception ignored) {}
     }
 
@@ -125,7 +122,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Config>> call,
                                              Response<ApiResponse<AdvertisementDtos.Config>> response) {
                 AdvertisementDtos.Config cfg = response.body() == null ? null : response.body().data;
-                if (cfg == null) { post(() -> setVisibility(GONE)); return; }
+                if (cfg == null) return;
                 featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
@@ -136,7 +133,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 refreshRemaining();
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
-                post(() -> setVisibility(GONE));
+                featureEnabled = false;
             }
         });
     }
@@ -147,28 +144,60 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Remaining>> call,
                                              Response<ApiResponse<AdvertisementDtos.Remaining>> response) {
                 AdvertisementDtos.Remaining data = response.body() == null ? null : response.body().data;
-                if (data == null) { remaining = -1; post(() -> {
-                    setVisibility(featureEnabled ? VISIBLE : GONE);
-                    openButton.setEnabled(featureEnabled && !loading.get());
-                    openButton.setAlpha(.78f);
-                    openButton.setText("✦  إعلان عام  ·  التحقق من الحصة");
-                }); return; }
+                if (data == null) { remaining = -1; return; }
                 remaining = Math.max(0, data.remaining);
-                post(() -> {
-                    setVisibility(featureEnabled ? VISIBLE : GONE);
-                    openButton.setEnabled(remaining != 0 && !loading.get());
-                    openButton.setAlpha(remaining > 0 ? 1f : (remaining < 0 ? .82f : .55f));
-                    openButton.setText(remaining > 0 ? "✦  إعلان عام  ·  " + remaining : (remaining < 0 ? "✦  إعلان عام  ·  التحقق من الحصة" : "اكتملت حصة اليوم"));
-                });
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
                 remaining = -1;
-                post(() -> {
-                    setVisibility(featureEnabled ? VISIBLE : GONE);
-                    openButton.setEnabled(featureEnabled && !loading.get());
-                    openButton.setAlpha(.78f);
-                    openButton.setText("✦  إعلان عام  ·  تعذر قراءة الحصة — اضغط لإعادة المحاولة");
+                remaining = -1;
+            }
+        });
+    }
+
+    /** Opened from the room-settings header action; refreshes the server quota before showing the composer. */
+    public void showComposer() {
+        if (loading.get()) return;
+        ContainerProvider.from(getContext()).getRoomApi().advertisementConfig()
+                .enqueue(new Callback<ApiResponse<AdvertisementDtos.Config>>() {
+            @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Config>> call,
+                                             Response<ApiResponse<AdvertisementDtos.Config>> response) {
+                AdvertisementDtos.Config cfg = response.body() == null ? null : response.body().data;
+                if (cfg == null) {
+                    Toast.makeText(getContext(), "تعذر التحقق من إعدادات الإعلان، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
+                maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
+                maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
+                composerConfig = cfg.ticker;
+                if (!featureEnabled) {
+                    Toast.makeText(getContext(), "الإعلانات العامة غير مفعّلة حالياً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ContainerProvider.from(getContext()).getRoomApi().advertisementRemaining()
+                        .enqueue(new Callback<ApiResponse<AdvertisementDtos.Remaining>>() {
+                    @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Remaining>> call,
+                                                     Response<ApiResponse<AdvertisementDtos.Remaining>> response) {
+                        AdvertisementDtos.Remaining data = response.body() == null ? null : response.body().data;
+                        if (data == null) {
+                            remaining = -1;
+                            Toast.makeText(getContext(), "تعذر التحقق من الحد اليومي، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        remaining = Math.max(0, data.remaining);
+                        if (remaining == 0) {
+                            Toast.makeText(getContext(), "انتهى الحد اليومي للإعلانات", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        post(() -> openComposer());
+                    }
+                    @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
+                        Toast.makeText(getContext(), "تعذر التحقق من الحد اليومي، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                    }
                 });
+            }
+            @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
+                Toast.makeText(getContext(), "تعذر الاتصال للتحقق من الإعلانات", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -202,7 +231,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         // summary, spacious editor, live quota and a dedicated fixed action area.
         LinearLayout sheet = new LinearLayout(getContext());
         sheet.setOrientation(LinearLayout.VERTICAL);
-        sheet.setPadding(dp(20), dp(12), dp(20), dp(20));
+        sheet.setPadding(dp(16), dp(9), dp(16), dp(14));
         String composerBg = cfg == null ? "#F7F9FC" : cfg.composerBackgroundColor;
         int composerOpacity = cfg == null ? 100 : Math.max(0, Math.min(100, cfg.composerBackgroundOpacity));
         GradientDrawable sheetBg = new GradientDrawable();
@@ -225,7 +254,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         grabber.setBackground(roundRect(Color.rgb(198, 207, 220), dp(8), Color.rgb(198, 207, 220)));
         LinearLayout.LayoutParams grabLp = new LinearLayout.LayoutParams(dp(44), dp(5));
         grabLp.gravity = Gravity.CENTER_HORIZONTAL;
-        grabLp.bottomMargin = dp(17);
+        grabLp.bottomMargin = dp(10);
         sheet.addView(grabber, grabLp);
 
         LinearLayout top = new LinearLayout(getContext());
@@ -233,7 +262,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         top.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams topLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        topLp.bottomMargin = dp(17);
+        topLp.bottomMargin = dp(10);
         sheet.addView(top, topLp);
 
         LinearLayout brandMark = new LinearLayout(getContext());
@@ -257,7 +286,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             mark.setTextSize(25);
             mark.setTypeface(Typeface.DEFAULT_BOLD);
             mark.setGravity(Gravity.CENTER);
-            brandMark.addView(mark, new LinearLayout.LayoutParams(dp(48), dp(48)));
+            brandMark.addView(mark, new LinearLayout.LayoutParams(dp(40), dp(40)));
         }
         top.addView(brandMark);
 
@@ -274,20 +303,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         TextView title = new TextView(getContext());
         title.setText("إرسال إعلان عام");
         title.setTextColor(dark);
-        title.setTextSize(20);
+        title.setTextSize(17);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         titleLp.topMargin = dp(3);
         heading.addView(title, titleLp);
-        TextView subtitle = new TextView(getContext());
-        subtitle.setText("رسالتك ستصل إلى جميع الغرف");
-        subtitle.setTextColor(muted);
-        subtitle.setTextSize(11);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        subtitleLp.topMargin = dp(3);
-        heading.addView(subtitle, subtitleLp);
         top.addView(heading, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         TextView close = new TextView(getContext());
@@ -296,51 +317,13 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         close.setTextSize(25);
         close.setGravity(Gravity.CENTER);
         close.setBackground(roundRect(Color.rgb(244, 247, 251), dp(14), Color.rgb(220, 228, 238)));
-        top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
-
-        LinearLayout reachCard = new LinearLayout(getContext());
-        reachCard.setOrientation(LinearLayout.HORIZONTAL);
-        reachCard.setGravity(Gravity.CENTER_VERTICAL);
-        reachCard.setPadding(dp(14), dp(13), dp(14), dp(13));
-        GradientDrawable reachBg = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(238, 245, 253), Color.rgb(250, 245, 235)});
-        reachBg.setCornerRadius(dp(18));
-        reachBg.setStroke(dp(1), Color.rgb(221, 229, 239));
-        reachCard.setBackground(reachBg);
-        sheet.addView(reachCard, new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-
-        TextView reachIcon = new TextView(getContext());
-        reachIcon.setText("◎");
-        reachIcon.setTextColor(Color.rgb(239, 195, 116));
-        reachIcon.setTextSize(25);
-        reachIcon.setGravity(Gravity.CENTER);
-        reachCard.addView(reachIcon, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        LinearLayout reachText = new LinearLayout(getContext());
-        reachText.setOrientation(LinearLayout.VERTICAL);
-        reachText.setPadding(dp(10), 0, 0, 0);
-        TextView reachTitle = new TextView(getContext());
-        reachTitle.setText("نطاق البث");
-        reachTitle.setTextColor(Color.rgb(29, 42, 61));
-        reachTitle.setTextSize(12);
-        reachTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        reachText.addView(reachTitle);
-        TextView reachDesc = new TextView(getContext());
-        reachDesc.setText("كل الغرف الحالية والجديدة  •  يبدأ بعد " + publishDelaySeconds + " ثوانٍ");
-        reachDesc.setTextColor(Color.rgb(102, 116, 136));
-        reachDesc.setTextSize(10);
-        LinearLayout.LayoutParams reachDescLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        reachDescLp.topMargin = dp(4);
-        reachText.addView(reachDesc, reachDescLp);
-        reachCard.addView(reachText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(close, new LinearLayout.LayoutParams(dp(34), dp(34)));
 
         LinearLayout fieldHeader = new LinearLayout(getContext());
         fieldHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams fieldHeaderLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        fieldHeaderLp.topMargin = dp(22);
+        fieldHeaderLp.topMargin = dp(7);
         sheet.addView(fieldHeader, fieldHeaderLp);
         TextView fieldLabel = new TextView(getContext());
         fieldLabel.setText("نص الإعلان");
@@ -348,11 +331,6 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        TextView fieldHint = new TextView(getContext());
-        fieldHint.setText("الأسطر المتعددة تظهر متتابعة بفاصلة");
-        fieldHint.setTextColor(muted);
-        fieldHint.setTextSize(10);
-        fieldHeader.addView(fieldHint);
 
         FrameLayout editorFrame = new FrameLayout(getContext());
         GradientDrawable editorBg = new GradientDrawable();
@@ -361,7 +339,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         editorBg.setStroke(dp(1), inputBorderColor);
         editorFrame.setBackground(editorBg);
         LinearLayout.LayoutParams editorFrameLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, dp(150));
+                LayoutParams.MATCH_PARENT, dp(112));
         editorFrameLp.topMargin = dp(10);
         sheet.addView(editorFrame, editorFrameLp);
 
@@ -386,7 +364,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         LinearLayout meta = new LinearLayout(getContext());
         meta.setGravity(Gravity.CENTER_VERTICAL);
-        meta.setPadding(dp(3), dp(10), dp(3), 0);
+        meta.setPadding(dp(3), dp(6), dp(3), 0);
         LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         sheet.addView(meta, metaLp);
@@ -417,20 +395,20 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         separator.setBackgroundColor(inputBorderColor);
         LinearLayout.LayoutParams separatorLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, dp(1));
-        separatorLp.topMargin = dp(19);
-        separatorLp.bottomMargin = dp(16);
+        separatorLp.topMargin = dp(11);
+        separatorLp.bottomMargin = dp(10);
         sheet.addView(separator, separatorLp);
 
         LinearLayout actions = new LinearLayout(getContext());
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         sheet.addView(actions, new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, dp(56)));
+                LayoutParams.MATCH_PARENT, dp(44)));
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
         cancel.setTextColor(cancelTextColor);
-        cancel.setTextSize(13);
+        cancel.setTextSize(12);
         cancel.setGravity(Gravity.CENTER);
         cancel.setBackground(roundRect(Color.rgb(246, 248, 252), dp(16), Color.rgb(220, 228, 238)));
         actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, .78f));
@@ -438,7 +416,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         TextView send = new TextView(getContext());
         send.setText("إرسال الإعلان  ✦");
         send.setTextColor(sendTextColor);
-        send.setTextSize(14);
+        send.setTextSize(13);
         send.setTypeface(Typeface.DEFAULT_BOLD);
         send.setGravity(Gravity.CENTER);
         send.setBackground(roundRectGradient(
@@ -494,8 +472,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
             WindowManager.LayoutParams p = new WindowManager.LayoutParams();
             p.copyFrom(window.getAttributes());
-            p.width = (int) (getResources().getDisplayMetrics().widthPixels * .96f);
-            p.height = (int) (getResources().getDisplayMetrics().heightPixels * .88f);
+            p.width = (int) (getResources().getDisplayMetrics().widthPixels * .94f);
+            p.height = (int) (getResources().getDisplayMetrics().heightPixels * .82f);
             p.dimAmount = .66f;
             p.y = dp(6);
             window.setAttributes(p);
@@ -504,8 +482,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         dialog.show();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * .96f),
-                    (int) (getResources().getDisplayMetrics().heightPixels * .88f));
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * .94f),
+                    (int) (getResources().getDisplayMetrics().heightPixels * .82f));
             window.setGravity(Gravity.BOTTOM);
         }
     }
