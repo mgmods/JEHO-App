@@ -64,6 +64,25 @@ public final class AdvertisementDtos {
         public int textWidthDp;
         public int positionXPercent;
         public int positionYPercent;
+        public String composerBackgroundImage;
+        public int composerBackgroundOpacity;
+        public String composerBackgroundColor;
+        public String composerIconUrl;
+        public String composerTitleColor;
+        public String composerSubtitleColor;
+        public String composerInputTextColor;
+        public String composerInputHintColor;
+        public String composerInputBackgroundColor;
+        public String composerInputBorderColor;
+        public String composerCancelTextColor;
+        public String composerCancelBackgroundColor;
+        public String composerCancelBorderColor;
+        public String composerSendTextColor;
+        public String composerSendGradientStartColor;
+        public String composerSendGradientEndColor;
+        public String composerSendBorderColor;
+        public int composerButtonRadiusDp;
+        public int composerIconSizeDp;
     }
 
     public static class Remaining {
