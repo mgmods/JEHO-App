@@ -41,9 +41,54 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
+    // Production deployments may already have a populated JEHO schema, so the
+    // first-install seed is intentionally skipped. Provision this feature's
+    // table idempotently at runtime; otherwise POST /advertisements fails with
+    // PostgreSQL 42P01 on existing installations that predate the ads module.
+    await this.ensureSchema();
     await this.ensureConfig();
     this.timer = setInterval(() => void this.tick(), 1000);
     void this.tick();
+  }
+
+  private async ensureSchema() {
+    await this.db.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS "jeho_own"."room_advertisements" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "senderId" uuid NOT NULL REFERENCES "jeho_own"."users"("id") ON DELETE CASCADE,
+        "senderName" varchar(128) NOT NULL,
+        "senderImageUrl" varchar(512),
+        "text" varchar(500) NOT NULL,
+        "status" varchar(16) NOT NULL DEFAULT 'queued',
+        "queueOrder" bigint NOT NULL DEFAULT 0,
+        "startedAt" timestamptz,
+        "completedAt" timestamptz,
+        "nextEligibleAt" timestamptz,
+        "rejectionCode" varchar(64),
+        "rejectionReason" varchar(255),
+        "idempotencyKey" varchar(128),
+        "displayTemplateId" varchar(64),
+        "displayDurationMs" integer NOT NULL DEFAULT 9000,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "updatedAt" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await this.db.query(`
+      ALTER TABLE "jeho_own"."room_advertisements"
+        ADD COLUMN IF NOT EXISTS "senderImageUrl" varchar(512),
+        ADD COLUMN IF NOT EXISTS "nextEligibleAt" timestamptz,
+        ADD COLUMN IF NOT EXISTS "rejectionCode" varchar(64),
+        ADD COLUMN IF NOT EXISTS "rejectionReason" varchar(255),
+        ADD COLUMN IF NOT EXISTS "idempotencyKey" varchar(128),
+        ADD COLUMN IF NOT EXISTS "displayTemplateId" varchar(64),
+        ADD COLUMN IF NOT EXISTS "displayDurationMs" integer NOT NULL DEFAULT 9000,
+        ADD COLUMN IF NOT EXISTS "createdAt" timestamptz NOT NULL DEFAULT now(),
+        ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz NOT NULL DEFAULT now()
+    `);
+    await this.db.query('CREATE INDEX IF NOT EXISTS "idx_room_ads_queue" ON "jeho_own"."room_advertisements" ("status","queueOrder","createdAt")');
+    await this.db.query('CREATE INDEX IF NOT EXISTS "idx_room_ads_sender_day" ON "jeho_own"."room_advertisements" ("senderId","createdAt")');
+    await this.db.query('CREATE UNIQUE INDEX IF NOT EXISTS "uq_room_ads_idempotency" ON "jeho_own"."room_advertisements" ("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL');
   }
 
   async onModuleDestroy() {
