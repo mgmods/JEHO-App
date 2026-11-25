@@ -90,40 +90,47 @@ public final class AvatarImageLoader {
         }
         view.setTag(R.id.tag_image_url, requestKey);
         view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
-        var req = Glide.with(view)
-                .load(abs)
-                .override(size, size)
-                .diskCacheStrategy(animated
-                        ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
-                        : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
-                .error(ImagePlaceholder.avatar())
-                .listener(new RequestListener<Drawable>() {
-                    @Override
-                    public boolean onLoadFailed(
-                            @Nullable GlideException e, Object model,
-                            Target<Drawable> target, boolean isFirstResource) {
-                        if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
-                            view.setTag(R.id.tag_image_url, null);
-                            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+        try {
+            var req = Glide.with(view)
+                    .load(abs)
+                    .override(size, size)
+                    .diskCacheStrategy(animated
+                            ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
+                            : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                    .error(ImagePlaceholder.avatar())
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                @Nullable GlideException e, Object model,
+                                Target<Drawable> target, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_url, null);
+                                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                            }
+                            return false;
                         }
-                        return false;
-                    }
 
-                    @Override
-                    public boolean onResourceReady(
-                            Drawable resource, Object model, Target<Drawable> target,
-                            DataSource dataSource, boolean isFirstResource) {
-                        if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
-                            view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                        @Override
+                        public boolean onResourceReady(
+                                Drawable resource, Object model, Target<Drawable> target,
+                                DataSource dataSource, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                            }
+                            return false;
                         }
-                        return false;
-                    }
-                });
-        if (view.getDrawable() == null) req = req.placeholder(ImagePlaceholder.avatar());
-        // Do not bitmap-transform animated frames; static art gets a tiny preview.
-        if (!animated) req = req.centerCrop().dontAnimate().thumbnail(0.2f);
-        else req = req.dontTransform();
-        req.into(view);
+                    });
+            if (view.getDrawable() == null) req = req.placeholder(ImagePlaceholder.avatar());
+            // Do not bitmap-transform animated frames; static art gets a tiny preview.
+            if (!animated) req = req.centerCrop().dontAnimate().thumbnail(0.2f);
+            else req = req.dontTransform();
+            req.into(view);
+        } catch (Exception ignored) {
+            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                view.setTag(R.id.tag_image_url, null);
+                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            }
+        }
     }
 
     /**
