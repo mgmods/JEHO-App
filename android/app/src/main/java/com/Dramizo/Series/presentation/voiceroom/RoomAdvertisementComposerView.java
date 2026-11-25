@@ -151,207 +151,270 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             return;
         }
 
-        final int ink = Color.rgb(25, 32, 45);
-        final int muted = Color.rgb(112, 121, 136);
-        final int gold = Color.rgb(173, 119, 35);
+        final int gold = Color.rgb(191, 139, 57);
+        final int muted = Color.rgb(115, 125, 145);
+        final int dark = Color.rgb(19, 24, 39);
         final Dialog dialog = new Dialog(getContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-        // Premium composer sheet: a deliberately different layout from the old basic alert.
+        // Rebuilt as a true broadcast composer: structured header, clear delivery
+        // summary, spacious editor, live quota and a dedicated fixed action area.
         LinearLayout sheet = new LinearLayout(getContext());
         sheet.setOrientation(LinearLayout.VERTICAL);
-        sheet.setPadding(dp(20), dp(12), dp(20), dp(22));
-        GradientDrawable sheetBg = new GradientDrawable();
-        sheetBg.setColor(Color.rgb(18, 24, 39));
-        sheetBg.setCornerRadius(dp(28));
-        sheetBg.setStroke(dp(1), Color.rgb(119, 91, 53));
+        sheet.setPadding(dp(20), dp(12), dp(20), dp(20));
+        GradientDrawable sheetBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.rgb(30, 35, 54), Color.rgb(15, 20, 34)});
+        sheetBg.setCornerRadii(new float[]{dp(30),dp(30),dp(30),dp(30),dp(0),dp(0),dp(0),dp(0)});
+        sheetBg.setStroke(dp(1), Color.rgb(105, 83, 58));
         sheet.setBackground(sheetBg);
-        sheet.setElevation(dp(22));
+        sheet.setElevation(dp(24));
 
         View grabber = new View(getContext());
-        GradientDrawable grabBg = new GradientDrawable();
-        grabBg.setColor(Color.rgb(210, 214, 220));
-        grabBg.setCornerRadius(dp(8));
-        grabber.setBackground(grabBg);
-        LinearLayout.LayoutParams grabLp = new LinearLayout.LayoutParams(dp(42), dp(5));
+        grabber.setBackground(roundRect(Color.rgb(119, 126, 143), dp(8), Color.rgb(119, 126, 143)));
+        LinearLayout.LayoutParams grabLp = new LinearLayout.LayoutParams(dp(44), dp(5));
         grabLp.gravity = Gravity.CENTER_HORIZONTAL;
-        grabLp.bottomMargin = dp(18);
+        grabLp.bottomMargin = dp(17);
         sheet.addView(grabber, grabLp);
 
-        LinearLayout hero = new LinearLayout(getContext());
-        hero.setOrientation(LinearLayout.HORIZONTAL);
-        hero.setGravity(Gravity.CENTER_VERTICAL);
-        hero.setPadding(dp(16), dp(16), dp(14), dp(16));
-        GradientDrawable heroBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(29, 28, 53), Color.rgb(67, 39, 82)});
-        heroBg.setCornerRadius(dp(20));
-        heroBg.setStroke(dp(1), Color.rgb(133, 100, 53));
-        hero.setBackground(heroBg);
+        LinearLayout top = new LinearLayout(getContext());
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams topLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        topLp.bottomMargin = dp(17);
+        sheet.addView(top, topLp);
 
-        LinearLayout heroText = new LinearLayout(getContext());
-        heroText.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout brandMark = new LinearLayout(getContext());
+        brandMark.setGravity(Gravity.CENTER);
+        GradientDrawable markBg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(242, 201, 112), Color.rgb(164, 102, 35)});
+        markBg.setCornerRadius(dp(17));
+        brandMark.setBackground(markBg);
+        TextView mark = new TextView(getContext());
+        mark.setText("✦");
+        mark.setTextColor(Color.rgb(37, 29, 24));
+        mark.setTextSize(25);
+        mark.setTypeface(Typeface.DEFAULT_BOLD);
+        brandMark.addView(mark, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        top.addView(brandMark);
+
+        LinearLayout heading = new LinearLayout(getContext());
+        heading.setOrientation(LinearLayout.VERTICAL);
+        heading.setPadding(dp(12), 0, 0, 0);
         TextView eyebrow = new TextView(getContext());
-        eyebrow.setText("JEHO  •  ROOM BROADCAST");
-        eyebrow.setTextColor(Color.rgb(236, 202, 137));
+        eyebrow.setText("JEHO  /  BROADCAST CENTER");
+        eyebrow.setTextColor(Color.rgb(224, 184, 112));
         eyebrow.setTextSize(9);
-        eyebrow.setLetterSpacing(0.12f);
+        eyebrow.setLetterSpacing(.13f);
         eyebrow.setTypeface(Typeface.DEFAULT_BOLD);
-        heroText.addView(eyebrow);
-
+        heading.addView(eyebrow);
         TextView title = new TextView(getContext());
-        title.setText("إعلان يصل للجميع");
+        title.setText("إرسال إعلان عام");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(21);
+        title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        titleLp.topMargin = dp(5);
-        heroText.addView(title, titleLp);
-
+        titleLp.topMargin = dp(3);
+        heading.addView(title, titleLp);
         TextView subtitle = new TextView(getContext());
-        subtitle.setText("رسالة واحدة • جميع الغرف • في نفس التوقيت");
-        subtitle.setTextColor(Color.rgb(218, 222, 230));
+        subtitle.setText("رسالتك ستصل إلى جميع الغرف");
+        subtitle.setTextColor(Color.rgb(174, 183, 199));
         subtitle.setTextSize(11);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        subLp.topMargin = dp(4);
-        heroText.addView(subtitle, subLp);
-        hero.addView(heroText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        subtitleLp.topMargin = dp(3);
+        heading.addView(subtitle, subtitleLp);
+        top.addView(heading, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         TextView close = new TextView(getContext());
         close.setText("×");
-        close.setTextColor(Color.WHITE);
-        close.setTextSize(26);
+        close.setTextColor(Color.rgb(222, 228, 238));
+        close.setTextSize(25);
         close.setGravity(Gravity.CENTER);
-        close.setBackground(roundRect(Color.rgb(86, 94, 109), dp(14), Color.rgb(112, 119, 132)));
-        hero.addView(close, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        sheet.addView(hero);
+        close.setBackground(roundRect(Color.rgb(42, 49, 66), dp(14), Color.rgb(75, 84, 104)));
+        top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        LinearLayout delivery = new LinearLayout(getContext());
-        delivery.setGravity(Gravity.CENTER_VERTICAL);
-        delivery.setPadding(dp(13), dp(12), dp(13), dp(12));
-        delivery.setBackground(roundRect(Color.rgb(34, 34, 51), dp(15), Color.rgb(91, 76, 63)));
-        LinearLayout.LayoutParams deliveryLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        deliveryLp.topMargin = dp(14);
-        sheet.addView(delivery, deliveryLp);
+        LinearLayout reachCard = new LinearLayout(getContext());
+        reachCard.setOrientation(LinearLayout.HORIZONTAL);
+        reachCard.setGravity(Gravity.CENTER_VERTICAL);
+        reachCard.setPadding(dp(14), dp(13), dp(14), dp(13));
+        GradientDrawable reachBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(40, 43, 65), Color.rgb(48, 35, 62)});
+        reachBg.setCornerRadius(dp(18));
+        reachBg.setStroke(dp(1), Color.rgb(103, 82, 65));
+        reachCard.setBackground(reachBg);
+        sheet.addView(reachCard, new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        TextView deliveryIcon = new TextView(getContext());
-        deliveryIcon.setText("◷");
-        deliveryIcon.setTextColor(gold);
-        deliveryIcon.setTextSize(22);
-        deliveryIcon.setGravity(Gravity.CENTER);
-        delivery.addView(deliveryIcon, new LinearLayout.LayoutParams(dp(34), dp(34)));
-        LinearLayout deliveryText = new LinearLayout(getContext());
-        deliveryText.setOrientation(LinearLayout.VERTICAL);
-        deliveryText.setPadding(dp(9), 0, 0, 0);
-        TextView deliveryTitle = new TextView(getContext());
-        deliveryTitle.setText("موعد الظهور");
-        deliveryTitle.setTextColor(Color.WHITE);
-        deliveryTitle.setTextSize(12);
-        deliveryTitle.setTypeface(Typeface.DEFAULT_BOLD);
-        deliveryText.addView(deliveryTitle);
-        TextView deliveryDesc = new TextView(getContext());
-        deliveryDesc.setText("يبدأ بعد 10 ثوانٍ من قبول الطلب، ثم يُبث في كل الغرف.");
-        deliveryDesc.setTextColor(Color.rgb(220, 198, 158));
-        deliveryDesc.setTextSize(11);
-        LinearLayout.LayoutParams deliveryDescLp = new LinearLayout.LayoutParams(
+        TextView reachIcon = new TextView(getContext());
+        reachIcon.setText("◎");
+        reachIcon.setTextColor(Color.rgb(239, 195, 116));
+        reachIcon.setTextSize(25);
+        reachIcon.setGravity(Gravity.CENTER);
+        reachCard.addView(reachIcon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        LinearLayout reachText = new LinearLayout(getContext());
+        reachText.setOrientation(LinearLayout.VERTICAL);
+        reachText.setPadding(dp(10), 0, 0, 0);
+        TextView reachTitle = new TextView(getContext());
+        reachTitle.setText("نطاق البث");
+        reachTitle.setTextColor(Color.WHITE);
+        reachTitle.setTextSize(12);
+        reachTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        reachText.addView(reachTitle);
+        TextView reachDesc = new TextView(getContext());
+        reachDesc.setText("كل الغرف الحالية والجديدة  •  يبدأ بعد 10 ثوانٍ");
+        reachDesc.setTextColor(Color.rgb(199, 190, 177));
+        reachDesc.setTextSize(10);
+        LinearLayout.LayoutParams reachDescLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        deliveryDescLp.topMargin = dp(3);
-        deliveryText.addView(deliveryDesc, deliveryDescLp);
-        delivery.addView(deliveryText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        reachDescLp.topMargin = dp(4);
+        reachText.addView(reachDesc, reachDescLp);
+        reachCard.addView(reachText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         LinearLayout fieldHeader = new LinearLayout(getContext());
         fieldHeader.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams fieldHeaderLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        fieldHeaderLp.topMargin = dp(21);
+        fieldHeaderLp.topMargin = dp(22);
         sheet.addView(fieldHeader, fieldHeaderLp);
-
         TextView fieldLabel = new TextView(getContext());
-        fieldLabel.setText("محتوى الإعلان");
+        fieldLabel.setText("نص الإعلان");
         fieldLabel.setTextColor(Color.WHITE);
         fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-
         TextView fieldHint = new TextView(getContext());
-        fieldHint.setText("رسالة عامة");
-        fieldHint.setTextColor(Color.rgb(224, 190, 128));
+        fieldHint.setText("اكتب رسالتك");
+        fieldHint.setTextColor(Color.rgb(221, 184, 121));
         fieldHint.setTextSize(10);
         fieldHeader.addView(fieldHint);
 
+        FrameLayout editorFrame = new FrameLayout(getContext());
+        GradientDrawable editorBg = new GradientDrawable();
+        editorBg.setColor(Color.rgb(27, 34, 51));
+        editorBg.setCornerRadius(dp(18));
+        editorBg.setStroke(dp(1), Color.rgb(83, 96, 119));
+        editorFrame.setBackground(editorBg);
+        LinearLayout.LayoutParams editorFrameLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, dp(150));
+        editorFrameLp.topMargin = dp(10);
+        sheet.addView(editorFrame, editorFrameLp);
+
         EditText input = new EditText(getContext());
-        input.setHint("اكتب إعلانك بوضوح ليصل إلى جميع الموجودين...");
+        input.setHint("اكتب إعلاناً واضحاً ومختصراً ليصل إلى جميع أعضاء JEHO...");
         input.setTextSize(15);
         input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(145, 153, 170));
+        input.setHintTextColor(Color.rgb(132, 145, 166));
         input.setSingleLine(false);
         input.setMinLines(4);
-        input.setMaxLines(5);
+        input.setMaxLines(6);
         input.setGravity(Gravity.TOP | Gravity.RIGHT);
         input.setTextDirection(View.TEXT_DIRECTION_RTL);
-        input.setPadding(dp(15), dp(14), dp(15), dp(14));
-        input.setLineSpacing(dp(3), 1f);
-        input.setBackground(roundRect(Color.rgb(29, 36, 54), dp(16), Color.rgb(83, 91, 112)));
-        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, dp(132));
-        inputLp.topMargin = dp(9);
-        sheet.addView(input, inputLp);
+        input.setPadding(dp(16), dp(15), dp(16), dp(15));
+        input.setLineSpacing(dp(4), 1f);
+        input.setBackgroundColor(Color.TRANSPARENT);
+        input.setSelectAllOnFocus(false);
+        input.setVerticalScrollBarEnabled(true);
+        FrameLayout.LayoutParams inputLp = new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+        editorFrame.addView(input, inputLp);
 
-        LinearLayout footerMeta = new LinearLayout(getContext());
-        footerMeta.setGravity(Gravity.CENTER_VERTICAL);
-        footerMeta.setPadding(dp(2), dp(10), dp(2), 0);
+        LinearLayout meta = new LinearLayout(getContext());
+        meta.setGravity(Gravity.CENTER_VERTICAL);
+        meta.setPadding(dp(3), dp(10), dp(3), 0);
+        LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        sheet.addView(meta, metaLp);
         TextView quota = new TextView(getContext());
-        quota.setText("●  المتبقي اليوم: " + remaining + " إعلان");
-        quota.setTextColor(gold);
+        quota.setText("●  المتبقي اليوم  " + remaining + " إعلان");
+        quota.setTextColor(Color.rgb(232, 192, 120));
         quota.setTextSize(11);
         quota.setTypeface(Typeface.DEFAULT_BOLD);
-        footerMeta.addView(quota, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        meta.addView(quota, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView counter = new TextView(getContext());
         counter.setText("0 / " + maxLength);
         counter.setTextColor(muted);
         counter.setTextSize(11);
-        footerMeta.addView(counter);
-        sheet.addView(footerMeta);
+        meta.addView(counter);
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 counter.setText(s.length() + " / " + maxLength);
-                counter.setTextColor(s.length() > maxLength ? Color.rgb(196, 55, 55) : muted);
+                counter.setTextColor(s.length() >= maxLength ? Color.rgb(255, 126, 126) : muted);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
 
+        View separator = new View(getContext());
+        separator.setBackgroundColor(Color.rgb(54, 63, 81));
+        LinearLayout.LayoutParams separatorLp = new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, dp(1));
+        separatorLp.topMargin = dp(19);
+        separatorLp.bottomMargin = dp(16);
+        sheet.addView(separator, separatorLp);
+
         LinearLayout actions = new LinearLayout(getContext());
+        actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, dp(54));
-        actionsLp.topMargin = dp(20);
+        sheet.addView(actions, new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, dp(56)));
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
-        cancel.setTextColor(Color.rgb(226, 229, 237));
+        cancel.setTextColor(Color.rgb(207, 215, 228));
         cancel.setTextSize(13);
         cancel.setGravity(Gravity.CENTER);
-        cancel.setBackground(roundRect(Color.rgb(38, 45, 63), dp(15), Color.rgb(76, 84, 103)));
-        actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.78f));
+        cancel.setBackground(roundRect(Color.rgb(39, 47, 65), dp(16), Color.rgb(75, 87, 108)));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, .78f));
 
         TextView send = new TextView(getContext());
-        send.setText("إرسال إلى جميع الغرف  ✦");
-        send.setTextColor(Color.WHITE);
+        send.setText("إرسال الإعلان  ✦");
+        send.setTextColor(Color.rgb(35, 28, 21));
         send.setTextSize(14);
         send.setTypeface(Typeface.DEFAULT_BOLD);
         send.setGravity(Gravity.CENTER);
-        send.setBackground(roundRectGradient(new int[]{Color.rgb(131, 73, 27), Color.rgb(221, 168, 79)}, dp(15)));
-        send.setElevation(dp(4));
+        send.setBackground(roundRectGradient(
+                new int[]{Color.rgb(238, 197, 119), Color.rgb(188, 126, 47)}, dp(16)));
+        send.setElevation(dp(5));
         LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.22f);
         sendLp.leftMargin = dp(10);
         actions.addView(send, sendLp);
-        sheet.addView(actions, actionsLp);
 
-        dialog.setContentView(sheet);
+        close.setOnClickListener(v -> dialog.dismiss());
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        send.setOnClickListener(v -> {
+            String message = input.getText() == null ? "" : input.getText().toString().trim();
+            if (message.isEmpty()) {
+                input.setError("اكتب نص الإعلان أولاً");
+                input.requestFocus();
+                return;
+            }
+            if (message.length() > maxLength) {
+                input.setError("الحد الأقصى " + maxLength + " حرف");
+                input.requestFocus();
+                return;
+            }
+            send.setEnabled(false);
+            cancel.setEnabled(false);
+            send.setText("جارٍ إرسال الإعلان...");
+            send.setAlpha(.72f);
+            submit(message, dialog, send);
+        });
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(getContext());
+        scroll.setFillViewport(false);
+        scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.addView(sheet, new android.widget.ScrollView.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        dialog.setContentView(scroll);
+
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
@@ -361,33 +424,19 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
             WindowManager.LayoutParams p = new WindowManager.LayoutParams();
             p.copyFrom(window.getAttributes());
-            p.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.96f);
-            p.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            p.dimAmount = 0.58f;
-            p.y = dp(8);
+            p.width = (int) (getResources().getDisplayMetrics().widthPixels * .96f);
+            p.height = (int) (getResources().getDisplayMetrics().heightPixels * .88f);
+            p.dimAmount = .66f;
+            p.y = dp(6);
             window.setAttributes(p);
         }
-
-        close.setOnClickListener(v -> dialog.dismiss());
-        cancel.setOnClickListener(v -> dialog.dismiss());
-        send.setOnClickListener(v -> {
-            String message = input.getText() == null ? "" : input.getText().toString().trim();
-            if (message.isEmpty()) { input.setError("اكتب نص الإعلان أولاً"); input.requestFocus(); return; }
-            if (message.length() > maxLength) { input.setError("الحد الأقصى " + maxLength + " حرف"); input.requestFocus(); return; }
-            send.setEnabled(false);
-            cancel.setEnabled(false);
-            send.setText("جارٍ إرسال إعلانك...");
-            submit(message, dialog, send);
-        });
 
         dialog.show();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.96f),
-                    WindowManager.LayoutParams.WRAP_CONTENT);
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * .96f),
+                    (int) (getResources().getDisplayMetrics().heightPixels * .88f));
             window.setGravity(Gravity.BOTTOM);
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         }
     }
 
