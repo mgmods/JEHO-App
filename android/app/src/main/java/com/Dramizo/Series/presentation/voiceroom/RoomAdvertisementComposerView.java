@@ -12,6 +12,7 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.util.AttributeSet;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -112,8 +113,32 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
             publishDelaySeconds = next.publishDelayMs > 0 ? Math.max(1, next.publishDelayMs / 1000) : 10;
             composerConfig = next;
+            applyOpenButtonConfig(next);
             if (featureEnabled) refreshRemaining();
         } catch (Exception ignored) {}
+    }
+
+    private void applyOpenButtonConfig(AdvertisementDtos.Ticker cfg) {
+        if (cfg == null || openButton == null) return;
+        String label = cfg.composerButtonText == null || cfg.composerButtonText.trim().isEmpty()
+                ? "✦  إعلان عام" : cfg.composerButtonText.trim();
+        openButton.setText(label);
+        openButton.setTextColor(colorOr(cfg.composerButtonTextColor, Color.WHITE));
+        openButton.setTextSize(Math.max(9, cfg.composerButtonTextSizeSp > 0 ? cfg.composerButtonTextSizeSp : 13));
+        int radius = dp(Math.max(0, cfg.composerButtonRadiusDp > 0 ? cfg.composerButtonRadiusDp : 24));
+        int borderWidth = dp(Math.max(0, cfg.composerButtonBorderWidthDp));
+        int borderColor = colorOr(cfg.composerButtonBorderColor, Color.rgb(239, 201, 129));
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{colorOr(cfg.composerButtonBackgroundStartColor, Color.rgb(105,65,23)),
+                        colorOr(cfg.composerButtonBackgroundEndColor, Color.rgb(229,184,91))});
+        bg.setCornerRadius(radius);
+        if (borderWidth > 0) bg.setStroke(borderWidth, borderColor);
+        openButton.setBackground(bg);
+        int height = dp(Math.max(32, cfg.composerButtonHeightDp > 0 ? cfg.composerButtonHeightDp : 46));
+        ViewGroup.LayoutParams lp = openButton.getLayoutParams();
+        if (lp != null && lp.height != height) { lp.height = height; openButton.setLayoutParams(lp); }
+        openButton.setMinHeight(height);
+        openButton.setContentDescription(label);
     }
 
     private void refreshQuota() {
@@ -128,6 +153,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 if (cfg.ticker != null) {
                     composerConfig = cfg.ticker;
+                    applyOpenButtonConfig(cfg.ticker);
                     if (cfg.ticker.publishDelayMs > 0) publishDelaySeconds = Math.max(1, cfg.ticker.publishDelayMs / 1000);
                 }
                 refreshRemaining();
@@ -170,6 +196,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 composerConfig = cfg.ticker;
+                applyOpenButtonConfig(cfg.ticker);
                 if (!featureEnabled) {
                     Toast.makeText(getContext(), "الإعلانات العامة غير مفعّلة حالياً", Toast.LENGTH_SHORT).show();
                     return;
