@@ -6,7 +6,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const DEFAULT_CONFIG: any = {
-  enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180, maxWords: 30,
+  enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180, maxWords: 30, publishDelayMs: 10000,
   resetTimezone: 'UTC', displayDurationMs: 9000, gapMs: 1800,
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
   textMotion: 'right-to-left', nameMotion: 'static', avatarMotion: 'static',
@@ -128,7 +128,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async create(userId: string, rawText: string, key: string) {
     const c = await this.config();
     if (c.enabled !== true || c.sendButtonEnabled !== true) throw new ConflictException('إرسال الإعلانات غير متاح حالياً');
-    const text = String(rawText || '').trim();
+    const text = String(rawText || '').replace(/(?:\\r\\n|\\r|\\n)+/g, ', ').replace(/[ \\t]+/g, ' ').replace(/\\s*,\\s*/g, ', ').trim();
     const max = this.bound(c.maxTextLength, 1, 500, 180);
     if (!text) throw new BadRequestException('اكتب نص الإعلان أولاً');
     if (text.length > max) throw new BadRequestException('تجاوزت الحد الأقصى لعدد الأحرف (' + max + ')');
@@ -254,8 +254,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         if(playing){await qr.commitTransaction();return;}
         const next=await qr.manager.createQueryBuilder(Advertisement,'a')
           .where('a.status=:s',{s:AdvertisementStatus.QUEUED})
-          // Give every accepted ad a fixed 10-second preparation window before global broadcast.
-          .andWhere('a.createdAt <= :eligibleAt',{eligibleAt:new Date(Date.now()-10000)})
+          // Wait the dashboard-configured preparation window before global broadcast.
+          .andWhere('a.createdAt <= :eligibleAt',{eligibleAt:new Date(Date.now()-this.bound(c.publishDelayMs,1000,60000,10000))})
           .orderBy('a.queueOrder','ASC').addOrderBy('a.createdAt','ASC')
           .setLock('pessimistic_write').setOnLocked('skip_locked').getOne();
         if(!next){await qr.commitTransaction();return;}
@@ -271,7 +271,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',1000,60000],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
