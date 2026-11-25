@@ -44,7 +44,7 @@ import retrofit2.Response;
 /** Room-wide advertisement composer. All quota and permission decisions remain server-authoritative. */
 public final class RoomAdvertisementComposerView extends FrameLayout implements RealtimeClient.UserListener {
     private final AtomicBoolean loading = new AtomicBoolean(false);
-    private TextView openButton;
+    private TextView settingsButton;
     private int remaining = -1;
     private int maxLength = 180;
     private int maxWords = 30;
@@ -62,30 +62,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         super(context);
         setClipChildren(false);
         setClipToPadding(false);
-        openButton = new TextView(context);
-        openButton.setGravity(Gravity.CENTER);
-        openButton.setIncludeFontPadding(false);
-        openButton.setClickable(true);
-        openButton.setFocusable(true);
-        openButton.setText("✦  إعلان عام");
-        openButton.setTextColor(Color.WHITE);
-        openButton.setTextSize(13);
-        openButton.setTypeface(Typeface.DEFAULT_BOLD);
-        openButton.setGravity(Gravity.CENTER);
-        openButton.setMinWidth(dp(142));
-        openButton.setMinHeight(dp(46));
-        openButton.setBackground(roundRectGradient(
-                new int[]{Color.rgb(105, 65, 23), Color.rgb(184, 126, 38), Color.rgb(229, 184, 91)},
-                dp(24)));
-        openButton.setElevation(dp(9));
-        openButton.setPadding(dp(19), 0, dp(19), 0);
-        openButton.setLetterSpacing(0.015f);
-        openButton.setContentDescription("فتح نافذة إرسال إعلان عام إلى جميع الغرف");
-        FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
-                LayoutParams.WRAP_CONTENT, dp(46), Gravity.CENTER);
-        addView(openButton, buttonLp);
-        openButton.setOnClickListener(v -> showComposer());
-        openButton.setVisibility(GONE);
+// Hidden controller only; the settings-panel action is the sole entry point.
         setVisibility(GONE);
     }
 
@@ -121,19 +98,28 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         } catch (Exception ignored) {}
     }
 
+    /** Bind the existing wide action above the room/tool/challenge tabs to this composer. */
+    public void bindSettingsButton(TextView button) {
+        settingsButton = button;
+        if (settingsButton == null) return;
+        settingsButton.setOnClickListener(v -> showComposer());
+        settingsButton.setVisibility(featureEnabled ? VISIBLE : GONE);
+        if (composerConfig != null) applyOpenButtonConfig(composerConfig);
+    }
+
     private void updateFeatureVisibility() {
-        boolean visible = featureEnabled && getWindowToken() != null;
-        if (openButton != null) openButton.setVisibility(visible ? VISIBLE : GONE);
-        setVisibility(visible ? VISIBLE : GONE);
+        // Never render a second floating button in the room.
+        setVisibility(GONE);
+        if (settingsButton != null) settingsButton.setVisibility(featureEnabled ? VISIBLE : GONE);
     }
 
     private void applyOpenButtonConfig(AdvertisementDtos.Ticker cfg) {
-        if (cfg == null || openButton == null) return;
+        if (cfg == null || settingsButton == null) return;
         String label = cfg.composerButtonText == null || cfg.composerButtonText.trim().isEmpty()
                 ? "✦  إعلان عام" : cfg.composerButtonText.trim();
-        openButton.setText(label);
-        openButton.setTextColor(colorOr(cfg.composerButtonTextColor, Color.WHITE));
-        openButton.setTextSize(Math.max(9, cfg.composerButtonTextSizeSp > 0 ? cfg.composerButtonTextSizeSp : 13));
+        settingsButton.setText(label);
+        settingsButton.setTextColor(colorOr(cfg.composerButtonTextColor, Color.WHITE));
+        settingsButton.setTextSize(Math.max(9, cfg.composerButtonTextSizeSp > 0 ? cfg.composerButtonTextSizeSp : 13));
         int radius = dp(Math.max(0, cfg.composerButtonRadiusDp));
         int borderWidth = dp(Math.max(0, cfg.composerButtonBorderWidthDp));
         int borderColor = colorOr(cfg.composerButtonBorderColor, Color.rgb(239, 201, 129));
@@ -142,12 +128,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         colorOr(cfg.composerButtonBackgroundEndColor, Color.rgb(229,184,91))});
         bg.setCornerRadius(radius);
         if (borderWidth > 0) bg.setStroke(borderWidth, borderColor);
-        openButton.setBackground(bg);
+        settingsButton.setBackground(bg);
         int height = dp(Math.max(32, cfg.composerButtonHeightDp > 0 ? cfg.composerButtonHeightDp : 46));
-        ViewGroup.LayoutParams lp = openButton.getLayoutParams();
-        if (lp != null && lp.height != height) { lp.height = height; openButton.setLayoutParams(lp); }
-        openButton.setMinHeight(height);
-        openButton.setContentDescription(label);
+        ViewGroup.LayoutParams lp = settingsButton.getLayoutParams();
+        if (lp != null && lp.height != height) { lp.height = height; settingsButton.setLayoutParams(lp); }
+        settingsButton.setMinHeight(height);
+        settingsButton.setContentDescription(label);
     }
 
     private void refreshQuota() {
@@ -578,7 +564,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
     private void submit(String text, Dialog dialog, TextView send, TextView cancel) {
         if (!loading.compareAndSet(false, true)) return;
-        openButton.setEnabled(false);
+        send.setEnabled(false);
         Map<String, String> body = new HashMap<>();
         body.put("text", text);
         if (pendingIdempotencyKey == null || !text.equals(pendingIdempotencyText)) {

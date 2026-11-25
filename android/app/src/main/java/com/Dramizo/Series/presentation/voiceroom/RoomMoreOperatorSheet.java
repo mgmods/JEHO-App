@@ -140,21 +140,19 @@ final class RoomMoreOperatorSheet {
         ImageView ivEffect = sheet.findViewById(R.id.iv_effect);
         ViewPager pager = sheet.findViewById(R.id.viewPager);
         TextView advertisementAction = sheet.findViewById(R.id.btnRoomAdvertisement);
-        advertisementAction.setVisibility(RoomAdvertisementTickerView.SEND_BUTTON_ENABLED ? View.VISIBLE : View.GONE);
-        advertisementAction.setOnClickListener(v -> {
-            dialog.dismiss();
-            if (ctx instanceof Activity) {
-                View contentRoot = ((Activity) ctx).findViewById(android.R.id.content);
-                RoomAdvertisementComposerView composer = findAdvertisementComposer(contentRoot);
-                if (composer != null) {
-                    composer.showComposer();
-                } else {
-                    Toast.makeText(ctx, "نافذة الإعلان غير موجودة في تصميم الروم", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
-            }
-        });
+        advertisementAction.setVisibility(View.GONE);
+        RoomAdvertisementComposerView advertisementComposer = null;
+        if (ctx instanceof Activity) {
+            View contentRoot = ((Activity) ctx).findViewById(android.R.id.content);
+            advertisementComposer = findAdvertisementComposer(contentRoot);
+        }
+        if (advertisementComposer != null && RoomAdvertisementTickerView.SEND_BUTTON_ENABLED) {
+            advertisementComposer.bindSettingsButton(advertisementAction);
+            advertisementAction.setOnClickListener(v -> {
+                dialog.dismiss();
+                advertisementComposer.showComposer();
+            });
+        }
 
         boolean staff = host.isStaff();
         List<List<Item>> pages = new ArrayList<>();
