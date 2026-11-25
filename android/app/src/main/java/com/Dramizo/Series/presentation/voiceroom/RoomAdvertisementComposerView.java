@@ -434,11 +434,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     send.setEnabled(true);
                     send.setText("إرسال للجميع");
                     String message = "تعذّر إرسال الإعلان. تحقق من البيانات وحاول مرة أخرى.";
+                    String rawDetails = "";
                     try {
                         if (response.errorBody() != null) {
-                            String raw = response.errorBody().string();
+                            rawDetails = response.errorBody().string();
                             try {
-                                org.json.JSONObject json = new org.json.JSONObject(raw);
+                                org.json.JSONObject json = new org.json.JSONObject(rawDetails);
                                 Object apiMessage = json.opt("message");
                                 if (apiMessage instanceof org.json.JSONArray) {
                                     org.json.JSONArray messages = (org.json.JSONArray) apiMessage;
@@ -446,8 +447,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                                 } else if (apiMessage instanceof String && !((String) apiMessage).trim().isEmpty()) {
                                     message = (String) apiMessage;
                                 }
+                                String apiError = json.optString("error", "");
+                                if (!apiError.trim().isEmpty() && !message.contains(apiError)) message += "\n" + apiError;
                             } catch (Exception ignored) {
-                                if (!raw.trim().isEmpty() && !raw.trim().startsWith("{")) message = raw;
+                                if (!rawDetails.trim().isEmpty()) message = rawDetails;
                             }
                         }
                     } catch (Exception ignored) {}
@@ -457,10 +460,14 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         pendingIdempotencyText = null;
                     }
                     String diagnostic = "رمز الاستجابة: HTTP " + response.code();
-                    if (message == null || message.trim().isEmpty()) {
-                        message = "رفض الخادم طلب الإعلان. " + diagnostic;
-                    } else if (!message.contains("HTTP ")) {
-                        message = message + "\n" + diagnostic;
+                    if (message == null || message.trim().isEmpty()) message = "رفض الخادم طلب الإعلان.";
+                    if (!message.contains("HTTP ")) message += "\n" + diagnostic;
+                    // If the server only returns the same generic phrase, show its actual payload too.
+                    if (rawDetails != null && !rawDetails.trim().isEmpty()
+                            && (message.trim().length() < 24 || "تعذّر إرسال الإعلان".equals(message.trim()))) {
+                        String payload = rawDetails.trim();
+                        if (payload.length() > 700) payload = payload.substring(0, 700) + "…";
+                        message += "\nتفاصيل ردّ الخادم: " + payload;
                     }
                     showResultDialog(false, "تعذّر إرسال الإعلان", message);
                     refreshQuota();
