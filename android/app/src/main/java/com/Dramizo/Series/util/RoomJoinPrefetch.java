@@ -44,6 +44,11 @@ public final class RoomJoinPrefetch {
 
     private RoomJoinPrefetch() {}
 
+    /** Run every room-join HTTP call on the priority pool, never behind feed/media work. */
+    public static void executeJoin(Runnable task) {
+        if (task != null) JOIN_EXECUTOR.execute(task);
+    }
+
     /** Fire-and-forget join on IO — safe from home list / search / launchers. */
     public static void begin(@Nullable Context context, @Nullable String roomId,
                              @Nullable String password) {
