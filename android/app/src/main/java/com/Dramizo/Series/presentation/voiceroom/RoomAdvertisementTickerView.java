@@ -287,7 +287,16 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void bindAd(AdvertisementDtos.Advertisement ad) {
         name.setText(ad.senderName == null ? "عضو" : ad.senderName);
-        text.setText(ad.text == null ? "" : ad.text);
+        String fullMessage = ad.text == null ? "" : ad.text;
+        text.setText(fullMessage);
+        // Measure the complete message independently of the room's current width.
+        // The viewport clips the moving ticker, never the TextView's actual content.
+        text.setSingleLine(true);
+        text.setHorizontallyScrolling(true);
+        text.setEllipsize(null);
+        int fullTextWidth = Math.max(dp(1), (int) Math.ceil(text.getPaint().measureText(fullMessage))
+                + text.getCompoundPaddingLeft() + text.getCompoundPaddingRight() + dp(8));
+        text.setWidth(fullTextWidth);
         if (config != null) applyConfiguredGradients(config);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
             com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(this).load(ad.senderImageUrl).centerCrop()
@@ -396,8 +405,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             ArrayList<Animator> animations = new ArrayList<>();
             String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
                     ? "right-to-left" : "left-to-right";
-            addElementMotion(text, cfg == null || cfg.textMotion == null ? legacyTextMode : cfg.textMotion,
-                    Math.max(1, textViewport.getWidth()), budget, animations);
+            String configuredTextMode = cfg == null || cfg.textMotion == null ? legacyTextMode : cfg.textMotion;
+            int viewportWidth = Math.max(1, textViewport.getWidth());
+            int completeTextWidth = Math.max(text.getWidth(),
+                    (int) Math.ceil(text.getPaint().measureText(text.getText().toString())));
+            // A long message must still travel through the viewport even when the
+            // dashboard's selected mode is static/fade; otherwise some words stay clipped.
+            if (completeTextWidth > viewportWidth
+                    && ("static".equalsIgnoreCase(configuredTextMode) || "fade".equalsIgnoreCase(configuredTextMode))) {
+                configuredTextMode = legacyTextMode;
+            }
+            addElementMotion(text, configuredTextMode, viewportWidth, budget, animations);
             addElementMotion(name, cfg == null ? "static" : cfg.nameMotion,
                     Math.max(1, getWidth()), budget, animations);
             addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
