@@ -504,6 +504,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTranslationX(0f);
         name.setTranslationX(0f);
         avatar.setTranslationX(0f);
+        setTranslationY(0f);
+        setAlpha(1f);
         final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
             // The independent expiry callback owns the lifecycle, including reduced-motion mode.
