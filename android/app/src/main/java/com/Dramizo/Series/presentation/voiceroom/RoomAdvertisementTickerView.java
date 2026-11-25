@@ -396,8 +396,13 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float end = rtl ? -distance : distance;
             text.setTranslationX(start);
             float density = getResources().getDisplayMetrics().density;
-            float entrySpeed = safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120) * density;
-            float exitSpeed = safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120) * density;
+            // Use one shared speed for the complete pass. The slower configured leg wins,
+            // so a slow setting never accelerates at the entry/exit boundary.
+            float uniformSpeed = Math.min(
+                    safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120),
+                    safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120)) * density;
+            float entrySpeed = uniformSpeed;
+            float exitSpeed = uniformSpeed;
             long requestedEntry = Math.max(250L, (long) ((distance / Math.max(1f, entrySpeed)) * 1000L));
             long requestedExit = Math.max(250L, (long) ((distance / Math.max(1f, exitSpeed)) * 1000L));
             long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : (cfg != null ? cfg.displayDurationMs : 9000));
