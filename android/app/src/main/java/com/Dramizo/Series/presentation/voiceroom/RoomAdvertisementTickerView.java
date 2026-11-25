@@ -208,7 +208,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 if (!attached.get() || requestGeneration != refreshGeneration) return;
                 AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
                 if (current != null && current.config != null) {
-                    SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled;
+                    SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled && !current.config.paused;
                     config = current.config;
                 }
                 if (current != null && current.advertisement != null && current.config != null && current.config.enabled && !current.config.paused) {
