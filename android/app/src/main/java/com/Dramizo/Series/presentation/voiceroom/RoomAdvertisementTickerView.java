@@ -66,6 +66,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private long animationGeneration = 0L;
     private volatile long serverClockOffsetMs = 0L;
     private volatile boolean serverClockKnown = false;
+    private Runnable expiryRunnable;
+    private long refreshGeneration = 0L;
     private CustomTarget<File> customFontTarget;
     private volatile String loadedCustomFontUrl = "";
     private volatile Typeface customTypeface;
@@ -151,22 +153,41 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!"room:advertisement".equals(event) || payload == null) return;
         if (!payload.has("advertisement") || !payload.get("advertisement").isJsonObject()) return;
         AdvertisementDtos.RealtimeEvent ev = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.RealtimeEvent.class);
-        if (ev == null || ev.advertisement == null || !"start".equals(ev.type)) return;
+        if (ev == null || ev.advertisement == null) return;
+        if ("end".equalsIgnoreCase(ev.type) || "completed".equalsIgnoreCase(ev.type)
+                || "stop".equalsIgnoreCase(ev.type) || "expired".equalsIgnoreCase(ev.type)) {
+            refreshGeneration++;
+            post(() -> {
+                if (!attached.get()) return;
+                if (ev.advertisement.id != null && ev.advertisement.id.equals(currentAdId)) hideAdvertisement();
+                refreshCurrent();
+            });
+            return;
+        }
+        if (!"start".equalsIgnoreCase(ev.type)) return;
+        // A realtime start event is newer than any current-ad request already in flight.
+        refreshGeneration++;
         if (ev.serverNow != null) {
             long eventServerNow = parseIsoUtc(ev.serverNow, System.currentTimeMillis());
             serverClockOffsetMs = eventServerNow - System.currentTimeMillis();
             serverClockKnown = true;
         }
-        long remaining = ev.advertisement.displayDurationMs;
-        if (serverClockKnown && ev.at != null) {
-            long serverNow = System.currentTimeMillis() + serverClockOffsetMs;
+        long remaining = Math.max(0L, ev.advertisement.displayDurationMs);
+        long serverNow = serverClockKnown
+                ? System.currentTimeMillis() + serverClockOffsetMs : System.currentTimeMillis();
+        if (ev.at != null) {
             long startedAt = parseIsoUtc(ev.at, serverNow);
             remaining = ev.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
         }
         final long remainingMs = remaining;
-        if (remainingMs > 0L) post(() -> {
+        final AdvertisementDtos.Ticker eventConfig = ev.config != null ? ev.config : config;
+        post(() -> {
             if (!attached.get()) return;
-            showAdvertisement(ev.advertisement, ev.config, remainingMs);
+            if (remainingMs <= 0L) {
+                refreshCurrent();
+                return;
+            }
+            showAdvertisement(ev.advertisement, eventConfig, remainingMs);
         });
     }
 
@@ -175,8 +196,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void refreshCurrent() {
         if (!attached.get()) return;
+        final long requestGeneration = ++refreshGeneration;
         ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
+                if (!attached.get() || requestGeneration != refreshGeneration) return;
                 AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
                 if (current != null && current.config != null) {
                     SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled;
@@ -208,11 +231,32 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     });
                 }
             }
-            @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {}
+            @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Current>> call, Throwable t) {
+                // Keep the current display governed by its already scheduled server-time expiry.
+            }
         });
     }
 
+    private void scheduleExpiry(String adId, long remainingMs, long generation) {
+        if (expiryRunnable != null) removeCallbacks(expiryRunnable);
+        if (remainingMs <= 0L) {
+            if (adId != null && adId.equals(currentAdId)) hideAdvertisement();
+            return;
+        }
+        expiryRunnable = () -> {
+            if (!attached.get() || generation != animationGeneration || !adId.equals(currentAdId)) return;
+            hideAdvertisement();
+            // The server may already have promoted the next queued advertisement.
+            refreshCurrent();
+        };
+        postDelayed(expiryRunnable, remainingMs);
+    }
+
     private void cancelActiveAnimator() {
+        if (expiryRunnable != null) {
+            removeCallbacks(expiryRunnable);
+            expiryRunnable = null;
+        }
         AnimatorSet animator = activeAnimator;
         activeAnimator = null;
         animationGeneration++;
@@ -245,10 +289,19 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         needsResume = false;
         currentDisplayBudgetMs = 0L;
         text.setText("");
+        name.setText("");
         text.setTranslationX(0f);
+        name.setTranslationX(0f);
+        avatar.setTranslationX(0f);
         text.setAlpha(1f);
+        name.setAlpha(1f);
+        avatar.setAlpha(1f);
         clearGlide(backgroundImage);
+        clearGlide(avatar);
+        backgroundImage.setImageDrawable(null);
+        avatar.setImageDrawable(null);
         backgroundImage.setVisibility(GONE);
+        setBackground(null);
         setVisibility(GONE);
     }
 
@@ -258,19 +311,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long remainingMs) {
         if (ad == null || ad.id == null) return;
+        if (remainingMs <= 0L) {
+            if (ad.id.equals(currentAdId)) hideAdvertisement();
+            return;
+        }
         boolean sameAd = ad.id.equals(currentAdId);
         if (sameAd && !needsResume) {
             config = cfg;
+            currentDisplayBudgetMs = remainingMs;
             bindConfig(cfg);
+            scheduleExpiry(ad.id, remainingMs, animationGeneration);
             return;
         }
         cancelActiveAnimator();
         currentAdId = ad.id;
         needsResume = false;
-        currentDisplayBudgetMs = Math.max(250L, remainingMs);
+        currentDisplayBudgetMs = remainingMs;
         config = cfg;
         bindConfig(cfg);
         bindAd(ad);
+        scheduleExpiry(ad.id, remainingMs, animationGeneration);
         animateTextIn(ad, cfg, animationGeneration);
     }
 
@@ -445,9 +505,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         avatar.setTranslationX(0f);
         final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
-            postDelayed(() -> {
-                if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
-            }, budget);
+            // The independent expiry callback owns the lifecycle, including reduced-motion mode.
             return;
         }
         // Begin the ticker motion on the very next frame after its content is laid out.
@@ -475,9 +533,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
                     Math.max(1, getWidth()), textMotionDuration, animations);
             if (animations.isEmpty()) {
-                postDelayed(() -> {
-                    if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
-                }, budget);
+                // Static mode remains visible until the authoritative expiry callback fires.
                 return;
             }
             AnimatorSet set = new AnimatorSet();
@@ -486,7 +542,16 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             set.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == set) activeAnimator = null;
-                    if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
+                    if (generation == animationGeneration && ad.id.equals(currentAdId)) {
+                        // Keep the complete message readable after its entrance/marquee pass;
+                        // the server-time expiry callback removes the whole row on schedule.
+                        text.setTranslationX(0f);
+                        name.setTranslationX(0f);
+                        avatar.setTranslationX(0f);
+                        text.setAlpha(1f);
+                        name.setAlpha(1f);
+                        avatar.setAlpha(1f);
+                    }
                 }
             });
             set.start();
