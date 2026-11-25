@@ -1,5 +1,6 @@
 package com.Dramizo.Series.presentation.voiceroom;
 
+import android.app.Activity;
 import android.app.Dialog;
 import android.app.AlertDialog;
 import android.text.Editable;
@@ -138,6 +139,19 @@ final class RoomMoreOperatorSheet {
         ImageView ivTool = sheet.findViewById(R.id.iv_tool);
         ImageView ivEffect = sheet.findViewById(R.id.iv_effect);
         ViewPager pager = sheet.findViewById(R.id.viewPager);
+        TextView advertisementAction = sheet.findViewById(R.id.btnRoomAdvertisement);
+        advertisementAction.setVisibility(RoomAdvertisementTickerView.SEND_BUTTON_ENABLED ? View.VISIBLE : View.GONE);
+        advertisementAction.setOnClickListener(v -> {
+            dialog.dismiss();
+            if (ctx instanceof Activity) {
+                RoomAdvertisementComposerView composer =
+                        ((Activity) ctx).findViewById(R.id.roomAdvertisementComposer);
+                if (composer != null) composer.showComposer();
+                else Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         boolean staff = host.isStaff();
         List<List<Item>> pages = new ArrayList<>();
@@ -163,12 +177,8 @@ final class RoomMoreOperatorSheet {
         }
 
         MorePagerAdapter adapter = new MorePagerAdapter(pages, item -> {
-            if ("send_advertisement".equals(item.action)) {
-                showAdvertisementDialog(host);
-            } else {
-                dialog.dismiss();
-                host.onMoreAction(item.action);
-            }
+            dialog.dismiss();
+            host.onMoreAction(item.action);
         });
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(Math.max(1, pages.size()));
@@ -269,9 +279,6 @@ final class RoomMoreOperatorSheet {
 
     private static List<Item> buildToolItems(Host host) {
         List<Item> list = new ArrayList<>();
-        if (RoomAdvertisementTickerView.SEND_BUTTON_ENABLED) {
-            list.add(item(R.drawable.ic_asset_notice, "📢 إرسال إعلان", "send_advertisement"));
-        }
         boolean muted = host.roomSpeakerMuted();
         list.add(item(
                 muted ? R.drawable.mute_close : R.drawable.mute_open,
