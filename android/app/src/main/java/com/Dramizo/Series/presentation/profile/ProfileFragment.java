@@ -95,7 +95,9 @@ public class ProfileFragment extends Fragment {
                 requireContext(), "profile");
         if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
             binding.imgThemeBg.setVisibility(View.VISIBLE);
-            com.Dramizo.Series.util.RemoteTheme.loadInto(
+            // Decode the dashboard wallpaper at the visible surface size and keep
+            // GIF/WebP playback alive without reloading it on profile rebinds.
+            com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
                     binding.imgThemeBg, sectionWallpaper, R.drawable.bg_mikoo_page);
         } else {
             binding.imgThemeBg.setVisibility(View.GONE);
