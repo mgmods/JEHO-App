@@ -144,8 +144,11 @@ final class RoomMoreOperatorSheet {
         advertisementAction.setOnClickListener(v -> {
             dialog.dismiss();
             if (ctx instanceof Activity) {
-                RoomAdvertisementComposerView composer =
-                        ((Activity) ctx).findViewById(R.id.roomAdvertisementComposer);
+                int composerId = ctx.getResources().getIdentifier(
+                        "roomAdvertisementComposer", "id", ctx.getPackageName());
+                RoomAdvertisementComposerView composer = composerId != 0
+                        ? ((Activity) ctx).findViewById(composerId)
+                        : null;
                 if (composer != null) composer.showComposer();
                 else Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
             } else {
