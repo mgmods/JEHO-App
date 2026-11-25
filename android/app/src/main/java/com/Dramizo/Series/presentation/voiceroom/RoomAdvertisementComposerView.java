@@ -170,14 +170,14 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         sheet.setPadding(dp(20), dp(12), dp(20), dp(20));
         GradientDrawable sheetBg = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.rgb(30, 35, 54), Color.rgb(15, 20, 34)});
+                new int[]{Color.rgb(252, 253, 255), Color.rgb(242, 246, 251)});
         sheetBg.setCornerRadii(new float[]{dp(30),dp(30),dp(30),dp(30),dp(0),dp(0),dp(0),dp(0)});
-        sheetBg.setStroke(dp(1), Color.rgb(105, 83, 58));
+        sheetBg.setStroke(dp(1), Color.rgb(224, 231, 240));
         sheet.setBackground(sheetBg);
         sheet.setElevation(dp(24));
 
         View grabber = new View(getContext());
-        grabber.setBackground(roundRect(Color.rgb(119, 126, 143), dp(8), Color.rgb(119, 126, 143)));
+        grabber.setBackground(roundRect(Color.rgb(198, 207, 220), dp(8), Color.rgb(198, 207, 220)));
         LinearLayout.LayoutParams grabLp = new LinearLayout.LayoutParams(dp(44), dp(5));
         grabLp.gravity = Gravity.CENTER_HORIZONTAL;
         grabLp.bottomMargin = dp(17);
@@ -218,7 +218,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         heading.addView(eyebrow);
         TextView title = new TextView(getContext());
         title.setText("إرسال إعلان عام");
-        title.setTextColor(Color.WHITE);
+        title.setTextColor(Color.rgb(25, 34, 49));
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
@@ -227,7 +227,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         heading.addView(title, titleLp);
         TextView subtitle = new TextView(getContext());
         subtitle.setText("رسالتك ستصل إلى جميع الغرف");
-        subtitle.setTextColor(Color.rgb(174, 183, 199));
+        subtitle.setTextColor(Color.rgb(103, 116, 135));
         subtitle.setTextSize(11);
         LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -237,10 +237,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView close = new TextView(getContext());
         close.setText("×");
-        close.setTextColor(Color.rgb(222, 228, 238));
+        close.setTextColor(Color.rgb(75, 88, 108));
         close.setTextSize(25);
         close.setGravity(Gravity.CENTER);
-        close.setBackground(roundRect(Color.rgb(42, 49, 66), dp(14), Color.rgb(75, 84, 104)));
+        close.setBackground(roundRect(Color.rgb(244, 247, 251), dp(14), Color.rgb(220, 228, 238)));
         top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
         LinearLayout reachCard = new LinearLayout(getContext());
@@ -249,9 +249,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         reachCard.setPadding(dp(14), dp(13), dp(14), dp(13));
         GradientDrawable reachBg = new GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(40, 43, 65), Color.rgb(48, 35, 62)});
+                new int[]{Color.rgb(238, 245, 253), Color.rgb(250, 245, 235)});
         reachBg.setCornerRadius(dp(18));
-        reachBg.setStroke(dp(1), Color.rgb(103, 82, 65));
+        reachBg.setStroke(dp(1), Color.rgb(221, 229, 239));
         reachCard.setBackground(reachBg);
         sheet.addView(reachCard, new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -267,13 +267,13 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         reachText.setPadding(dp(10), 0, 0, 0);
         TextView reachTitle = new TextView(getContext());
         reachTitle.setText("نطاق البث");
-        reachTitle.setTextColor(Color.WHITE);
+        reachTitle.setTextColor(Color.rgb(29, 42, 61));
         reachTitle.setTextSize(12);
         reachTitle.setTypeface(Typeface.DEFAULT_BOLD);
         reachText.addView(reachTitle);
         TextView reachDesc = new TextView(getContext());
         reachDesc.setText("كل الغرف الحالية والجديدة  •  يبدأ بعد " + publishDelaySeconds + " ثوانٍ");
-        reachDesc.setTextColor(Color.rgb(199, 190, 177));
+        reachDesc.setTextColor(Color.rgb(102, 116, 136));
         reachDesc.setTextSize(10);
         LinearLayout.LayoutParams reachDescLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -289,7 +289,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         sheet.addView(fieldHeader, fieldHeaderLp);
         TextView fieldLabel = new TextView(getContext());
         fieldLabel.setText("نص الإعلان");
-        fieldLabel.setTextColor(Color.WHITE);
+        fieldLabel.setTextColor(Color.rgb(25, 35, 51));
         fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
@@ -301,9 +301,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         FrameLayout editorFrame = new FrameLayout(getContext());
         GradientDrawable editorBg = new GradientDrawable();
-        editorBg.setColor(Color.rgb(27, 34, 51));
+        editorBg.setColor(Color.rgb(255, 255, 255));
         editorBg.setCornerRadius(dp(18));
-        editorBg.setStroke(dp(1), Color.rgb(83, 96, 119));
+        editorBg.setStroke(dp(1), Color.rgb(211, 221, 234));
         editorFrame.setBackground(editorBg);
         LinearLayout.LayoutParams editorFrameLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, dp(150));
@@ -313,8 +313,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         EditText input = new EditText(getContext());
         input.setHint("اكتب إعلاناً واضحاً ومختصراً ليصل إلى جميع أعضاء JEHO...");
         input.setTextSize(15);
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(132, 145, 166));
+        input.setTextColor(Color.rgb(17, 24, 39));
+        input.setHintTextColor(Color.rgb(143, 154, 171));
         input.setSingleLine(false);
         input.setMinLines(4);
         input.setMaxLines(6);
@@ -374,10 +374,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
-        cancel.setTextColor(Color.rgb(207, 215, 228));
+        cancel.setTextColor(Color.rgb(62, 76, 96));
         cancel.setTextSize(13);
         cancel.setGravity(Gravity.CENTER);
-        cancel.setBackground(roundRect(Color.rgb(39, 47, 65), dp(16), Color.rgb(75, 87, 108)));
+        cancel.setBackground(roundRect(Color.rgb(246, 248, 252), dp(16), Color.rgb(220, 228, 238)));
         actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, .78f));
 
         TextView send = new TextView(getContext());
