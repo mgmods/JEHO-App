@@ -177,11 +177,19 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c = await this.config();
     const limit = Math.max(0, Math.floor(Number(c.dailyLimit) || 0));
     const start = await this.resetStartFromDb(c.resetTimezone);
-    const used = await this.ads.createQueryBuilder('a')
-      .where('a.senderId=:userId',{userId})
-      .andWhere('a.createdAt>=:start',{start})
-      .andWhere('a.status IN (:...statuses)',{statuses:[AdvertisementStatus.QUEUED,AdvertisementStatus.PLAYING,AdvertisementStatus.COMPLETED,AdvertisementStatus.REMOVED]})
-      .getCount();
+    // Use the explicitly-owned JEHO schema here instead of TypeORM's entity
+    // query builder. The live table is provisioned in jeho_own by ensureSchema;
+    // a metadata/search_path mismatch must never make the quota endpoint fail.
+    const rows = await this.db.query(
+      'SELECT COUNT(*)::int AS "used" FROM "jeho_own"."room_advertisements" WHERE "senderId"=$1 AND "createdAt">=$2 AND "status" = ANY($3::varchar[])',
+      [userId, start, [
+        AdvertisementStatus.QUEUED,
+        AdvertisementStatus.PLAYING,
+        AdvertisementStatus.COMPLETED,
+        AdvertisementStatus.REMOVED,
+      ]],
+    );
+    const used = Math.max(0, Number(rows?.[0]?.used || 0));
     return { limit, used, remaining: Math.max(0, limit-used) };
   }
 
