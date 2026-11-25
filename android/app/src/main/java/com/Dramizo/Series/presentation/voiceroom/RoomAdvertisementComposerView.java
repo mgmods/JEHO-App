@@ -148,20 +148,21 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             return;
         }
 
-        final int ink = Color.rgb(36, 39, 47);
-        final int muted = Color.rgb(133, 139, 151);
-        final int gold = Color.rgb(196, 139, 45);
-        final int surface = Color.rgb(250, 249, 246);
+        final int ink = Color.rgb(27, 35, 49);
+        final int muted = Color.rgb(111, 122, 139);
+        final int gold = Color.rgb(171, 119, 35);
+        final int surface = Color.rgb(255, 255, 255);
         final Dialog dialog = new Dialog(getContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(22), dp(22), dp(22));
+        root.setPadding(dp(24), dp(23), dp(24), dp(22));
+        root.setMinimumWidth(dp(300));
         GradientDrawable card = new GradientDrawable();
         card.setColor(surface);
         card.setCornerRadius(dp(28));
-        card.setStroke(dp(1), Color.rgb(239, 228, 207));
+        card.setStroke(dp(1), Color.rgb(226, 213, 188));
         root.setBackground(card);
         root.setElevation(dp(16));
 
@@ -175,7 +176,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         emblem.setIncludeFontPadding(false);
         emblem.setGravity(Gravity.CENTER);
         GradientDrawable emblemBg = new GradientDrawable();
-        emblemBg.setColor(Color.rgb(255, 241, 211));
+        emblemBg.setColor(Color.rgb(255, 244, 220));
+        emblemBg.setStroke(dp(1), Color.rgb(242, 220, 174));
         emblemBg.setCornerRadius(dp(15));
         emblem.setBackground(emblemBg);
         header.addView(emblem, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -186,14 +188,14 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         TextView title = new TextView(getContext());
         title.setText("إعلان عام لكل الغرف");
         title.setTextColor(ink);
-        title.setTextSize(19);
+        title.setTextSize(20);
         title.setLetterSpacing(-0.01f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         heading.addView(title);
         TextView subtitle = new TextView(getContext());
         subtitle.setText("إعلان موحّد يصل إلى جميع الغرف");
         subtitle.setTextColor(muted);
-        subtitle.setTextSize(11);
+        subtitle.setTextSize(12);
         LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         subParams.topMargin = dp(3);
         heading.addView(subtitle, subParams);
@@ -207,14 +209,21 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         header.addView(close, new LinearLayout.LayoutParams(dp(34), dp(40)));
         root.addView(header);
 
+        View headerDivider = new View(getContext());
+        headerDivider.setBackgroundColor(Color.rgb(238, 229, 210));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(1));
+        dividerParams.topMargin = dp(17);
+        root.addView(headerDivider, dividerParams);
+
         TextView info = new TextView(getContext());
         info.setText("سيبدأ الإعلان بعد 10 ثوانٍ، ثم يظهر في جميع الغرف النشطة.");
         info.setTextColor(Color.rgb(111, 83, 35));
-        info.setTextSize(12);
+        info.setTextSize(13);
         info.setLineSpacing(dp(2), 1f);
-        info.setPadding(dp(12), dp(11), dp(12), dp(11));
+        info.setPadding(dp(14), dp(13), dp(14), dp(13));
         GradientDrawable infoBg = new GradientDrawable();
-        infoBg.setColor(Color.rgb(255, 246, 226));
+        infoBg.setColor(Color.rgb(255, 248, 232));
+        infoBg.setStroke(dp(1), Color.rgb(244, 229, 198));
         infoBg.setCornerRadius(dp(13));
         info.setBackground(infoBg);
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -224,7 +233,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         TextView fieldLabel = new TextView(getContext());
         fieldLabel.setText("نص الإعلان");
         fieldLabel.setTextColor(ink);
-        fieldLabel.setTextSize(13);
+        fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         labelParams.topMargin = dp(17);
@@ -232,11 +241,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         EditText input = new EditText(getContext());
         input.setHint("اكتب رسالتك التي تريد إيصالها للجميع...");
-        input.setTextSize(14);
+        input.setTextSize(15);
         input.setTextColor(ink);
         input.setHintTextColor(Color.rgb(165, 169, 177));
         input.setSingleLine(false);
         input.setMinLines(4);
+        input.setLineSpacing(dp(3), 1f);
         input.setMaxLines(5);
         input.setGravity(Gravity.TOP | Gravity.RIGHT);
         input.setTextDirection(View.TEXT_DIRECTION_RTL);
@@ -244,9 +254,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(Color.WHITE);
         inputBg.setCornerRadius(dp(14));
-        inputBg.setStroke(dp(1), Color.rgb(229, 226, 219));
+        inputBg.setStroke(dp(1), Color.rgb(214, 219, 226));
         input.setBackground(inputBg);
-        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(124));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(138));
         inputParams.topMargin = dp(8);
         root.addView(input, inputParams);
 
@@ -278,8 +288,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         LinearLayout actions = new LinearLayout(getContext());
         actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(48));
-        actionsParams.topMargin = dp(18);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(54));
+        actionsParams.topMargin = dp(20);
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
@@ -291,7 +301,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         cancel.setTextColor(Color.rgb(91, 96, 106));
         GradientDrawable cancelBg = new GradientDrawable();
         cancelBg.setColor(Color.rgb(238, 239, 241));
-        cancelBg.setCornerRadius(dp(13));
+        cancelBg.setCornerRadius(dp(16));
         cancelBg.setStroke(dp(1), Color.rgb(224, 226, 230));
         cancel.setBackground(cancelBg);
         actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.8f));
@@ -307,7 +317,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         send.setTextColor(Color.WHITE);
         GradientDrawable sendBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{Color.rgb(157, 99, 25), Color.rgb(218, 163, 66)});
-        sendBg.setCornerRadius(dp(13));
+        sendBg.setCornerRadius(dp(16));
         sendBg.setStroke(dp(1), Color.rgb(236, 197, 119));
         send.setBackground(sendBg);
         send.setElevation(dp(3));
@@ -324,7 +334,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
             lp.copyFrom(window.getAttributes());
-            lp.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90f);
+            lp.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.93f);
             lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
             lp.dimAmount = 0.62f;
             window.setAttributes(lp);
@@ -343,7 +353,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         dialog.show();
         if (window != null) {
             window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.93f),
                     WindowManager.LayoutParams.WRAP_CONTENT);
         }
     }
@@ -405,7 +415,13 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         pendingIdempotencyKey = null;
                         pendingIdempotencyText = null;
                     }
-                    showResultDialog(false, "لم يتم إرسال الإعلان", message);
+                    String diagnostic = "رمز الاستجابة: HTTP " + response.code();
+                    if (message == null || message.trim().isEmpty()) {
+                        message = "رفض الخادم طلب الإعلان. " + diagnostic;
+                    } else if (!message.contains("HTTP ")) {
+                        message = message + "\\n" + diagnostic;
+                    }
+                    showResultDialog(false, "تعذّر إرسال الإعلان", message);
                     refreshQuota();
                 }
             }
