@@ -283,10 +283,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setBackground(buildBackground(cfg.background, cfg.backgroundOpacity, cfg.radiusDp));
         backgroundImage.setAlpha(Math.max(0, Math.min(100, cfg.backgroundOpacity)) / 100f);
         if (cfg.backgroundImage != null && (cfg.backgroundImage.startsWith("https://") || cfg.backgroundImage.startsWith("http://"))) {
-            Glide.with(this).load(cfg.backgroundImage).centerCrop().into(backgroundImage);
+            Glide.with(getContext().getApplicationContext()).load(cfg.backgroundImage).centerCrop().into(backgroundImage);
             backgroundImage.setVisibility(VISIBLE);
         } else {
-            Glide.with(this).clear(backgroundImage);
+            Glide.with(getContext().getApplicationContext()).clear(backgroundImage);
             backgroundImage.setVisibility(GONE);
         }
         applySafePlacement(cfg.position, cfg.customOffsetDp, cfg.positionXPercent, cfg.positionYPercent);
@@ -343,7 +343,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setLayoutParams(fullTextParams);
         if (config != null) applyConfiguredGradients(config);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
-            com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(this).load(ad.senderImageUrl).centerCrop()
+            com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(getContext().getApplicationContext()).load(ad.senderImageUrl).centerCrop()
                     .placeholder(R.drawable.ic_default_avatar).error(R.drawable.ic_default_avatar);
             if (config != null && "circle".equalsIgnoreCase(config.avatarShape)) request = request.circleCrop();
             request.into(avatar);
@@ -403,7 +403,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 customTypeface = null;
             }
         };
-        Glide.with(this).asFile().load(url).into(customFontTarget);
+        Glide.with(getContext().getApplicationContext()).asFile().load(url).into(customFontTarget);
     }
 
     private void applyConfiguredGradients(AdvertisementDtos.Ticker cfg) {

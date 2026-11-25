@@ -108,7 +108,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         try {
             AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
             if (next == null) return;
-            featureEnabled = next.enabled && next.sendButtonEnabled;
+            featureEnabled = next.enabled && next.sendButtonEnabled && !next.paused;
             maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
             publishDelaySeconds = Math.max(0, next.publishDelayMs / 1000);
@@ -157,7 +157,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                                              Response<ApiResponse<AdvertisementDtos.Config>> response) {
                 AdvertisementDtos.Config cfg = response.body() == null ? null : response.body().data;
                 if (cfg == null) return;
-                featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
+                featureEnabled = cfg.enabled && cfg.sendButtonEnabled && !cfg.paused;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 if (cfg.ticker != null) {

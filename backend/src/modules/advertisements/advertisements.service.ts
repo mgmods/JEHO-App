@@ -177,7 +177,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async getPublicConfig() {
     const c = await this.config();
-    return { enabled: c.enabled === true, sendButtonEnabled: c.sendButtonEnabled === true, maxTextLength: this.bound(c.maxTextLength, 1, 500, 180), maxWords: this.bound(c.maxWords, 1, 200, 30), ticker: c };
+    return { enabled: c.enabled === true, sendButtonEnabled: c.sendButtonEnabled === true, paused: c.paused === true, maxTextLength: this.bound(c.maxTextLength, 1, 500, 180), maxWords: this.bound(c.maxWords, 1, 200, 30), ticker: c };
   }
 
   async remainingForUser(userId: string) {
@@ -203,6 +203,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async create(userId: string, rawText: string, key: string) {
     const c = await this.config();
     if (c.enabled !== true || c.sendButtonEnabled !== true) throw new ConflictException('إرسال الإعلانات غير متاح حالياً');
+    if (c.paused === true) throw new ConflictException('الإعلانات متوقفة مؤقتاً من لوحة التحكم؛ أعد تفعيلها ثم أرسل الإعلان');
     const text = String(rawText || '').replace(/(?:\r\n|\r|\n)+/g, ', ').replace(/[ \t]+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
     const max = this.bound(c.maxTextLength, 1, 500, 180);
     if (!text) throw new BadRequestException('اكتب نص الإعلان أولاً');

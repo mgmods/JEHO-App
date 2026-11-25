@@ -8,6 +8,7 @@ public final class AdvertisementDtos {
     public static class Config {
         public boolean enabled;
         public boolean sendButtonEnabled;
+        public boolean paused;
         public int maxTextLength;
         public int maxWords;
         public Ticker ticker;
@@ -16,6 +17,7 @@ public final class AdvertisementDtos {
     public static class Ticker {
         public boolean enabled;
         public boolean sendButtonEnabled;
+        public boolean paused;
         public int dailyLimit;
         public int maxTextLength;
         public int maxWords;
