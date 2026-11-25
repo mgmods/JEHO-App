@@ -67,6 +67,11 @@
               <input v-model.number="form.maxTextLength" type="number" min="1" max="500" class="form-control">
             </div>
             <div class="col-md-3">
+              <label class="form-label small">مدة الانتظار قبل نشر الإعلان (ثانية)</label>
+              <input v-model.number="form.publishDelayMs" type="number" min="1" max="60" step="1" class="form-control">
+              <div class="form-text">من ثانية واحدة إلى دقيقة، قبل ظهوره في جميع الرومات.</div>
+            </div>
+            <div class="col-md-3">
               <label class="form-label small">الحد الأقصى للكلمات</label>
               <input v-model.number="form.maxWords" type="number" min="1" max="200" class="form-control">
               <div class="form-text">أي إعلان يتجاوز هذا العدد يُرفض قبل دخوله الطابور.</div>
