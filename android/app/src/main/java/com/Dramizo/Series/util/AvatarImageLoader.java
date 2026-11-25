@@ -130,20 +130,86 @@ public final class AvatarImageLoader {
         req.into(view);
     }
 
-    /** Load profile covers without rasterizing every animation frame. */
+    /**
+     * Load profile / room covers at the actual view size while preserving GIF/WebP.
+     * Repeated room/profile refreshes must not restart an already-running animation.
+     */
     public static void loadMedia(@Nullable ImageView view, @Nullable String mediaUrl, int placeholder) {
         if (view == null) return;
         view.setScaleType(ImageView.ScaleType.CENTER_CROP);
         if (mediaUrl == null || mediaUrl.trim().isEmpty()) {
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            try { Glide.with(view).clear(view); } catch (Exception ignored) {}
             view.setImageResource(placeholder);
             return;
         }
-        String abs = AssetCatalog.absoluteUrl(mediaUrl);
-        var request = Glide.with(view).load(abs)
-                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                .error(placeholder);
-        if (view.getDrawable() == null) request = request.placeholder(placeholder);
-        request.dontTransform().into(view);
+
+        String abs = AssetCatalog.absoluteUrl(mediaUrl.trim());
+        if (abs == null || abs.isEmpty()) {
+            view.setImageResource(placeholder);
+            return;
+        }
+        int width = view.getWidth() > 0 ? view.getWidth() : 1024;
+        int height = view.getHeight() > 0 ? view.getHeight() : 512;
+        // Avoid decoding a full-resolution upload into a small profile/room surface.
+        width = Math.max(96, Math.min(width, 2048));
+        height = Math.max(96, Math.min(height, 2048));
+        String requestKey = abs + "#media:" + width + "x" + height;
+        Object previous = view.getTag(R.id.tag_image_url);
+        Object state = view.getTag(R.id.tag_image_loaded);
+        if (requestKey.equals(previous) && state instanceof Boolean) {
+            // TRUE = already decoded; FALSE = request still in flight. Failed requests
+            // clear the key in the listener below, so a later bind can retry.
+            return;
+        }
+
+        view.setTag(R.id.tag_image_url, requestKey);
+        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+        boolean animated = isAnimatedMediaUrl(abs);
+        try {
+            var request = Glide.with(view).load(abs)
+                    .override(width, height)
+                    .diskCacheStrategy(animated
+                            ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
+                            : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                    .error(placeholder)
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                @Nullable GlideException e, Object model,
+                                Target<Drawable> target, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_url, null);
+                                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                            }
+                            return false;
+                        }
+
+                        @Override
+                        public boolean onResourceReady(
+                                Drawable resource, Object model, Target<Drawable> target,
+                                DataSource dataSource, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                            }
+                            return false;
+                        }
+                    });
+            if (view.getDrawable() == null) request = request.placeholder(placeholder);
+            // Do not bitmap-transform animated frames; static art gets a tiny preview
+            // while the correctly sized final resource is decoded.
+            if (animated) {
+                request = request.dontTransform();
+            } else {
+                request = request.centerCrop().dontAnimate().thumbnail(0.15f);
+            }
+            request.into(view);
+        } catch (Exception ignored) {
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            if (view.getDrawable() == null) view.setImageResource(placeholder);
+        }
     }
 
     /** Local cover preview (gallery Uri) — keep the original animated drawable. */
