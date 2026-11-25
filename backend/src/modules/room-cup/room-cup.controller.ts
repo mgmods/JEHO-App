@@ -16,6 +16,8 @@ import { UserVip } from '../../database/entities/user-vip.entity';
 import { Public } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 @ApiTags('Room Cup')
 @Controller('room-cup')
@@ -31,6 +33,7 @@ export class RoomCupController implements OnModuleInit {
     private readonly txRepo: Repository<WalletTransaction>,
     @InjectRepository(VipPlan) private readonly vipPlansRepo: Repository<VipPlan>,
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -124,6 +127,12 @@ export class RoomCupController implements OnModuleInit {
       prizes = [];
     }
     const seasonKey = board.seasonKey;
+    const period = board.period || (await this.setting('room_cup.period', 'weekly'));
+    // Make closing a season idempotent: retries must never grant prizes twice.
+    const lastClosedSeason = await this.setting('room_cup.season_key', '');
+    if (lastClosedSeason === seasonKey) {
+      return { closed: true, alreadyClosed: true, seasonKey, winners: board.items.slice(0, 3) };
+    }
     // Clear previous badges
     await this.roomsRepo
       .createQueryBuilder()
@@ -182,6 +191,27 @@ export class RoomCupController implements OnModuleInit {
           );
         }
       }
+      // Notify the room owner in the app's existing Notifications inbox after the award is processed.
+      const prizeParts: string[] = [];
+      if (coins > 0) prizeParts.push(`${coins.toLocaleString('en-US')} عملة`);
+      if (diamonds > 0) prizeParts.push(`${diamonds.toLocaleString('en-US')} ألماس`);
+      const prizeLabel = prizeParts.length ? prizeParts.join(' و') : 'شارة كأس الروم';
+      await this.notifications.notifyUser(
+        hostId,
+        NotificationType.SYSTEM,
+        'مبروك! ربحت في كأس الروم 🏆',
+        `حقق رومك المركز ${rank} في كأس الروم ${period === 'monthly' ? 'الشهري' : 'الأسبوعي'}، وربحت ${prizeLabel}.`,
+        {
+          kind: 'room_cup_award',
+          roomId: room.id,
+          roomTitle: room.title,
+          seasonKey,
+          rank,
+          coins,
+          diamonds,
+          period,
+        },
+      );
       // VIP is purchase-only — ignore vipLevel / vipPlanId prizes from room cup.
     }
 
