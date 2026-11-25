@@ -19,7 +19,6 @@ import android.widget.TextView;
 import android.widget.ImageView;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.PorterDuff;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -45,7 +44,7 @@ import retrofit2.Response;
 public final class RoomAdvertisementComposerView extends FrameLayout implements RealtimeClient.UserListener {
     private final AtomicBoolean loading = new AtomicBoolean(false);
     private TextView openButton;
-    private int remaining = 0;
+    private int remaining = -1;
     private int maxLength = 180;
     private int maxWords = 30;
     private int publishDelaySeconds = 10;
@@ -148,7 +147,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Remaining>> call,
                                              Response<ApiResponse<AdvertisementDtos.Remaining>> response) {
                 AdvertisementDtos.Remaining data = response.body() == null ? null : response.body().data;
-                if (data == null) { post(() -> {
+                if (data == null) { remaining = -1; post(() -> {
                     setVisibility(featureEnabled ? VISIBLE : GONE);
                     openButton.setEnabled(featureEnabled && !loading.get());
                     openButton.setAlpha(.78f);
@@ -157,12 +156,13 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 remaining = Math.max(0, data.remaining);
                 post(() -> {
                     setVisibility(featureEnabled ? VISIBLE : GONE);
-                    openButton.setEnabled(remaining > 0 && !loading.get());
-                    openButton.setAlpha(remaining > 0 ? 1f : .55f);
-                    openButton.setText(remaining > 0 ? "✦  إعلان عام  ·  " + remaining : "اكتملت حصة اليوم");
+                    openButton.setEnabled(remaining != 0 && !loading.get());
+                    openButton.setAlpha(remaining > 0 ? 1f : (remaining < 0 ? .82f : .55f));
+                    openButton.setText(remaining > 0 ? "✦  إعلان عام  ·  " + remaining : (remaining < 0 ? "✦  إعلان عام  ·  التحقق من الحصة" : "اكتملت حصة اليوم"));
                 });
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
+                remaining = -1;
                 post(() -> {
                     setVisibility(featureEnabled ? VISIBLE : GONE);
                     openButton.setEnabled(featureEnabled && !loading.get());
@@ -215,6 +215,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         ImageView composerBackground = new ImageView(getContext());
         composerBackground.setScaleType(ImageView.ScaleType.CENTER_CROP);
         composerBackground.setAlpha(composerOpacity / 100f);
+        composerBackground.setBackgroundColor(colorOr(composerBg, Color.rgb(247, 249, 252)));
         sheetRoot.addView(composerBackground, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         sheet.setBackgroundColor(Color.TRANSPARENT);
         sheetRoot.addView(sheet, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -242,12 +243,19 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 new int[]{Color.rgb(242, 201, 112), Color.rgb(164, 102, 35)});
         markBg.setCornerRadius(dp(17));
         brandMark.setBackground(markBg);
-        TextView mark = new TextView(getContext());
-        mark.setText("✦");
-        mark.setTextColor(Color.rgb(37, 29, 24));
-        mark.setTextSize(25);
-        mark.setTypeface(Typeface.DEFAULT_BOLD);
-        brandMark.addView(mark, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        ImageView mark = new ImageView(getContext());
+        mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int iconSize = dp(cfg == null || cfg.composerIconSizeDp <= 0 ? 42 : Math.min(80, cfg.composerIconSizeDp));
+        mark.setImageDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        brandMark.addView(mark, new LinearLayout.LayoutParams(iconSize, iconSize));
+        loadRemoteImage(mark, cfg == null ? "" : cfg.composerIconUrl);
+        if (cfg == null || cfg.composerIconUrl == null || cfg.composerIconUrl.trim().isEmpty()) {
+            android.graphics.drawable.GradientDrawable fallbackIcon = new android.graphics.drawable.GradientDrawable();
+            fallbackIcon.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            fallbackIcon.setColor(Color.TRANSPARENT);
+            mark.setImageDrawable(fallbackIcon);
+            mark.setContentDescription("إعلان عام");
+        }
         top.addView(brandMark);
 
         LinearLayout heading = new LinearLayout(getContext());
