@@ -243,18 +243,21 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 new int[]{Color.rgb(242, 201, 112), Color.rgb(164, 102, 35)});
         markBg.setCornerRadius(dp(17));
         brandMark.setBackground(markBg);
-        ImageView mark = new ImageView(getContext());
-        mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int iconSize = dp(cfg == null || cfg.composerIconSizeDp <= 0 ? 42 : Math.min(80, cfg.composerIconSizeDp));
-        mark.setImageDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
-        brandMark.addView(mark, new LinearLayout.LayoutParams(iconSize, iconSize));
-        loadRemoteImage(mark, cfg == null ? "" : cfg.composerIconUrl);
-        if (cfg == null || cfg.composerIconUrl == null || cfg.composerIconUrl.trim().isEmpty()) {
-            android.graphics.drawable.GradientDrawable fallbackIcon = new android.graphics.drawable.GradientDrawable();
-            fallbackIcon.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            fallbackIcon.setColor(Color.TRANSPARENT);
-            mark.setImageDrawable(fallbackIcon);
-            mark.setContentDescription("إعلان عام");
+        String iconUrl = cfg == null ? "" : String.valueOf(cfg.composerIconUrl == null ? "" : cfg.composerIconUrl).trim();
+        if (!iconUrl.isEmpty()) {
+            ImageView mark = new ImageView(getContext());
+            mark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            int iconSize = dp(cfg == null || cfg.composerIconSizeDp <= 0 ? 42 : Math.min(80, cfg.composerIconSizeDp));
+            brandMark.addView(mark, new LinearLayout.LayoutParams(iconSize, iconSize));
+            loadRemoteImage(mark, iconUrl);
+        } else {
+            TextView mark = new TextView(getContext());
+            mark.setText("✦");
+            mark.setTextColor(Color.rgb(37, 29, 24));
+            mark.setTextSize(25);
+            mark.setTypeface(Typeface.DEFAULT_BOLD);
+            mark.setGravity(Gravity.CENTER);
+            brandMark.addView(mark, new LinearLayout.LayoutParams(dp(48), dp(48)));
         }
         top.addView(brandMark);
 
