@@ -492,6 +492,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Full room presence (host + seated + listeners) for the viewers sheet. */
     private final List<JsonObject> roomMembersAll = new ArrayList<>();
     private final List<JsonObject> roomAudience = new ArrayList<>();
+    /** Drops stale member-list parses when newer realtime snapshots arrive first. */
+    private int roomMembersBindSeq;
     private RoomDtos.SupportersResult latestSupporters;
     private RoomEffectQueue effectQueue;
     private android.app.Dialog roomJoinLoading;
@@ -14182,77 +14184,95 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomMembers(String rid, com.google.gson.JsonArray members) {
                 if (rid == null || roomId == null || !roomId.equals(rid)) return;
+                // Snapshot the small, UI-owned state first, then parse/normalize the full
+                // member payload away from the main thread. Large rooms must not block frames.
                 handler.post(() -> {
-                    roomAudience.clear();
-                    roomMembersAll.clear();
-                    List<RecentJoinersAdapter.Joiner> audienceRows = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> framedFirst = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> seatedNext = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> others = new ArrayList<>();
-                    Set<String> seenAudience = new HashSet<>();
-                    Set<String> seenAll = new HashSet<>();
-                    if (members != null) {
-                        for (int i = 0; i < members.size(); i++) {
-                            if (!members.get(i).isJsonObject()) continue;
-                            JsonObject member = members.get(i).getAsJsonObject();
-                            String uid = memberStr(member, "userId");
-                            if (uid == null || uid.isEmpty()) continue;
-                            String normalizedUid = normalizeUserId(uid);
-                            if (normalizedUid.isEmpty()) continue;
-                            if (seenAll.add(normalizedUid)) {
-                                roomMembersAll.add(member);
-                            }
-                            if (!seenAudience.add(normalizedUid)) continue;
-                            if (sameUser(uid, myUserId)) continue;
-                            boolean seated = sameUser(uid, roomHostId)
-                                    || sameUser(uid, roomCohostId)
-                                    || isUserSeated(uid);
-                            if (!seated) {
-                                roomAudience.add(member);
-                            }
-                            String displayName = memberStr(member, "displayName");
-                            if (displayName == null || displayName.isEmpty()) {
-                                displayName = memberStr(member, "username");
-                            }
-                            int vip = Math.max(0, memberInt(member, "vipLevel", 0));
-                            int level = Math.max(1, memberInt(member, "userLevel", 1));
-                            String hostFrame = memberStr(member, "hostBadgeUrl");
-                            String vipFrame = memberStr(member, "vipBadgeUrl");
-                            String frame = isAgencyRoom ? hostFrame : vipFrame;
-                            RecentJoinersAdapter.Joiner row = new RecentJoinersAdapter.Joiner(
-                                    uid,
-                                    displayName != null ? displayName : "مستخدم",
-                                    memberStr(member, "avatarUrl"),
-                                    hostFrame,
-                                    vipFrame,
-                                    vip,
-                                    level);
-                            if (frame != null && !frame.trim().isEmpty()) {
-                                framedFirst.add(row);
-                            } else if (seated) {
-                                seatedNext.add(row);
-                            } else {
-                                others.add(row);
+                    if (exiting || isFinishing() || isDestroyed() || binding == null
+                            || !rid.equals(roomId)) return;
+                    final int sequence = ++roomMembersBindSeq;
+                    final String hostIdSnapshot = roomHostId;
+                    final String cohostIdSnapshot = roomCohostId;
+                    final boolean agencySnapshot = isAgencyRoom;
+                    final Set<String> seatedIds = new HashSet<>();
+                    if (currentSeats != null) {
+                        for (RoomDtos.SeatDto seat : currentSeats) {
+                            if (seat == null) continue;
+                            String seatedId = normalizeUserId(seatUserId(seat));
+                            if (!seatedId.isEmpty()) seatedIds.add(seatedId);
+                        }
+                    }
+                    final com.google.gson.JsonArray payload = members;
+                    ContainerProvider.from(VoiceRoomActivity.this).getIoExecutor().execute(() -> {
+                        List<JsonObject> allRows = new ArrayList<>();
+                        List<JsonObject> audience = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> framedFirst = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> seatedNext = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> others = new ArrayList<>();
+                        Set<String> seenAudience = new HashSet<>();
+                        Set<String> seenAll = new HashSet<>();
+                        int payloadCount = payload != null ? payload.size() : 0;
+                        if (payload != null) {
+                            for (int i = 0; i < payload.size(); i++) {
+                                if (!payload.get(i).isJsonObject()) continue;
+                                JsonObject member = payload.get(i).getAsJsonObject();
+                                String uid = memberStr(member, "userId");
+                                if (uid == null || uid.isEmpty()) continue;
+                                String normalizedUid = normalizeUserId(uid);
+                                if (normalizedUid.isEmpty()) continue;
+                                if (seenAll.add(normalizedUid)) allRows.add(member);
+                                if (!seenAudience.add(normalizedUid) || sameUser(uid, myUserId)) continue;
+                                boolean seated = sameUser(uid, hostIdSnapshot)
+                                        || sameUser(uid, cohostIdSnapshot)
+                                        || seatedIds.contains(normalizedUid);
+                                if (!seated) audience.add(member);
+                                String displayName = memberStr(member, "displayName");
+                                if (displayName == null || displayName.isEmpty()) {
+                                    displayName = memberStr(member, "username");
+                                }
+                                int vip = Math.max(0, memberInt(member, "vipLevel", 0));
+                                int level = Math.max(1, memberInt(member, "userLevel", 1));
+                                String hostFrame = memberStr(member, "hostBadgeUrl");
+                                String vipFrame = memberStr(member, "vipBadgeUrl");
+                                String frame = agencySnapshot ? hostFrame : vipFrame;
+                                RecentJoinersAdapter.Joiner row = new RecentJoinersAdapter.Joiner(
+                                        uid, displayName != null ? displayName : "مستخدم",
+                                        memberStr(member, "avatarUrl"), hostFrame, vipFrame, vip, level);
+                                if (frame != null && !frame.trim().isEmpty()) framedFirst.add(row);
+                                else if (seated) seatedNext.add(row);
+                                else others.add(row);
                             }
                         }
-                        setRoomViewerCount(Math.max(1, members.size()));
-                    }
-                    audienceRows.addAll(framedFirst);
-                    audienceRows.addAll(seatedNext);
-                    audienceRows.addAll(others);
-                    if (audienceRows.size() > 10) {
-                        audienceRows = new ArrayList<>(audienceRows.subList(0, 10));
-                    }
-                    updateViewerStack(roomAudience);
-                    if (audienceAdapter != null) audienceAdapter.submit(audienceRows);
-                    binding.recyclerRecentJoiners.setVisibility(
-                            audienceRows.isEmpty() ? View.GONE : View.VISIBLE);
-                    if (binding.rowAudienceStrip != null) {
-                        binding.rowAudienceStrip.setVisibility(View.VISIBLE);
-                    }
+                        List<RecentJoinersAdapter.Joiner> audienceRows = new ArrayList<>(
+                                framedFirst.size() + seatedNext.size() + others.size());
+                        audienceRows.addAll(framedFirst);
+                        audienceRows.addAll(seatedNext);
+                        audienceRows.addAll(others);
+                        if (audienceRows.size() > 10) {
+                            audienceRows = new ArrayList<>(audienceRows.subList(0, 10));
+                        }
+                        final List<JsonObject> allResult = allRows;
+                        final List<JsonObject> audienceResult = audience;
+                        final List<RecentJoinersAdapter.Joiner> visibleRows = audienceRows;
+                        final int viewerCount = Math.max(1, payloadCount);
+                        handler.post(() -> {
+                            if (sequence != roomMembersBindSeq || exiting || isFinishing()
+                                    || isDestroyed() || binding == null || !rid.equals(roomId)) return;
+                            roomMembersAll.clear();
+                            roomMembersAll.addAll(allResult);
+                            roomAudience.clear();
+                            roomAudience.addAll(audienceResult);
+                            setRoomViewerCount(viewerCount);
+                            updateViewerStack(roomAudience);
+                            if (audienceAdapter != null) audienceAdapter.submit(visibleRows);
+                            binding.recyclerRecentJoiners.setVisibility(
+                                    visibleRows.isEmpty() ? View.GONE : View.VISIBLE);
+                            if (binding.rowAudienceStrip != null) {
+                                binding.rowAudienceStrip.setVisibility(View.VISIBLE);
+                            }
+                        });
+                    });
                 });
             }
-
             @Override
             public void onConnected() {
                 connectRealtimeRoom();
