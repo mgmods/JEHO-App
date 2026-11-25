@@ -12,4 +12,5 @@
     <item name="tag_vip_name_animator" type="id" />
     <item name="tag_vip_name_style_config" type="id" />
     <item name="tag_vip_name_default_color" type="id" />
+    <item name="roomAdvertisementComposer" type="id" />
 </resources>
