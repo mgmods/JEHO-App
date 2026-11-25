@@ -6,7 +6,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const DEFAULT_CONFIG: any = {
-  enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180,
+  enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180, maxWords: 30,
   resetTimezone: 'UTC', displayDurationMs: 9000, gapMs: 1800,
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
   textMotion: 'right-to-left', nameMotion: 'static', avatarMotion: 'static',
@@ -110,7 +110,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async getPublicConfig() {
     const c = await this.config();
-    return { enabled: c.enabled === true, sendButtonEnabled: c.sendButtonEnabled === true, maxTextLength: this.bound(c.maxTextLength, 1, 500, 180), ticker: c };
+    return { enabled: c.enabled === true, sendButtonEnabled: c.sendButtonEnabled === true, maxTextLength: this.bound(c.maxTextLength, 1, 500, 180), maxWords: this.bound(c.maxWords, 1, 200, 30), ticker: c };
   }
 
   async remainingForUser(userId: string) {
@@ -131,7 +131,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const text = String(rawText || '').trim();
     const max = this.bound(c.maxTextLength, 1, 500, 180);
     if (!text) throw new BadRequestException('اكتب نص الإعلان أولاً');
-    if (text.length > max) throw new BadRequestException('تجاوزت الحد الأقصى لعدد الأحرف');
+    if (text.length > max) throw new BadRequestException('تجاوزت الحد الأقصى لعدد الأحرف (' + max + ')');
+    const maxWords = this.bound(c.maxWords, 1, 200, 30);
+    const wordCount = text.split(/\\s+/u).filter(Boolean).length;
+    if (wordCount > maxWords) throw new BadRequestException('الإعلان يحتوي على ' + wordCount + ' كلمة، والحد المسموح ' + maxWords + ' كلمة');
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
     const existing = await this.ads.findOne({where:{idempotencyKey:key}});
@@ -183,7 +186,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
-        displayDurationMs:this.bound(c.displayDurationMs,1000,120000,9000),
+        displayDurationMs:Math.min(120000, Math.max(this.bound(c.displayDurationMs,1000,120000,9000), Math.ceil(((text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)) + 1200) / this.bound(c.entrySpeedPxPerSec, 20, 800, 120) * 1000)),
       });
       await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
       return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
@@ -268,7 +271,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
