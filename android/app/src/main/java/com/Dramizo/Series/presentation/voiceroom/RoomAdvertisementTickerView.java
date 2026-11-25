@@ -118,7 +118,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (attached.compareAndSet(true, false)) {
             RealtimeClient.getInstance().removeUserListener(this);
             cancelActiveAnimator();
-            if (customFontTarget != null) { Glide.with(this).clear(customFontTarget); customFontTarget = null; }
+            if (customFontTarget != null) {
+                // The View can be detached while its Activity is already being destroyed.
+                // Never ask Glide.with(View) for a RequestManager from this lifecycle callback.
+                try {
+                    Glide.with(getContext().getApplicationContext()).clear(customFontTarget);
+                } catch (Exception ignored) {
+                    // Glide owns the request lifecycle; dropping our reference is sufficient
+                    // when the Activity/View hierarchy is already being torn down.
+                }
+                customFontTarget = null;
+            }
             if (!movingForPlacement) needsResume = true;
         }
         super.onDetachedFromWindow();
