@@ -39,6 +39,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     private TextView openButton;
     private int remaining = 0;
     private int maxLength = 180;
+    private int maxWords = 30;
     private boolean featureEnabled = false;
     // Reuse this key whenever the request outcome is uncertain; the backend deduplicates it.
     private String pendingIdempotencyKey;
@@ -98,6 +99,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             if (next == null) return;
             featureEnabled = next.enabled && next.sendButtonEnabled;
             maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
+            maxWords = next.maxWords > 0 ? next.maxWords : 30;
             if (!featureEnabled) {
                 post(() -> setVisibility(GONE));
             } else {
@@ -115,6 +117,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 if (cfg == null) { post(() -> setVisibility(GONE)); return; }
                 featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
+                maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 refreshRemaining();
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
@@ -336,7 +339,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         quota.setTypeface(Typeface.DEFAULT_BOLD);
         meta.addView(quota, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView counter = new TextView(getContext());
-        counter.setText("0 / " + maxLength);
+        counter.setText("0 / " + maxLength + " حرف  •  0 / " + maxWords + " كلمة");
         counter.setTextColor(muted);
         counter.setTextSize(11);
         meta.addView(counter);
@@ -344,8 +347,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                counter.setText(s.length() + " / " + maxLength);
-                counter.setTextColor(s.length() >= maxLength ? Color.rgb(255, 126, 126) : muted);
+                String current = s.toString().trim();
+                int words = current.isEmpty() ? 0 : current.split("\\s+").length;
+                counter.setText(s.length() + " / " + maxLength + " حرف  •  " + words + " / " + maxWords + " كلمة");
+                counter.setTextColor(s.length() > maxLength || words > maxWords ? Color.rgb(255, 126, 126) : muted);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -396,6 +401,12 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             }
             if (message.length() > maxLength) {
                 input.setError("الحد الأقصى " + maxLength + " حرف");
+                input.requestFocus();
+                return;
+            }
+            int wordCount = message.trim().isEmpty() ? 0 : message.trim().split("\\s+").length;
+            if (wordCount > maxWords) {
+                input.setError("الإعلان يحتوي على " + wordCount + " كلمة، والحد المسموح " + maxWords + " كلمة");
                 input.requestFocus();
                 return;
             }
