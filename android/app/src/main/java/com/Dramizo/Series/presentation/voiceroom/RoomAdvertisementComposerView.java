@@ -350,7 +350,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String current = s.toString().replaceAll("\\r\\n|\\r|\\n", ", ").trim();
+                String current = s.toString().replaceAll("\\r\\n|\\r|\\n", ", ").replaceAll("[ \\t]+", " ").replaceAll("\\s*,\\s*", ", ").trim();
                 int words = current.isEmpty() ? 0 : current.split("\\s+").length;
                 counter.setText(current.length() + " / " + maxLength + " حرف  •  " + words + " / " + maxWords + " كلمة");
                 counter.setTextColor(current.length() > maxLength || words > maxWords ? Color.rgb(255, 126, 126) : muted);
@@ -402,7 +402,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 input.requestFocus();
                 return;
             }
-            String normalizedMessage = message.replaceAll("\\r\\n|\\r|\\n", ", ").trim();
+            String normalizedMessage = message.replaceAll("\\r\\n|\\r|\\n", ", ").replaceAll("[ \\t]+", " ").replaceAll("\\s*,\\s*", ", ").trim();
             if (normalizedMessage.length() > maxLength) {
                 input.setError("بعد جمع الأسطر، الحد الأقصى " + maxLength + " حرف");
                 input.requestFocus();
