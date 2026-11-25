@@ -271,7 +271,30 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
-        displayDurationMs:Math.min(120000, Math.max(this.bound(c.displayDurationMs,1000,120000,9000), Math.ceil(((text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)) + 1200) / this.bound(c.entrySpeedPxPerSec, 20, 800, 120) * 1000))),
+        // The client animates the ticker in two separate legs (enter + exit).
+        // The previous estimate used only text width / entry speed, so slow exit
+        // speeds or a long message could be cut off by the server expiry timer.
+        displayDurationMs: (() => {
+          const mode = String(c.textMotion || 'right-to-left').toLowerCase();
+          const moving = ['right-to-left', 'rtl', 'left-to-right', 'ltr'].includes(mode);
+          const textWidthPx = Math.max(1, Math.ceil(text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62) * 3));
+          // Conservative full-width phone viewport estimate; actual measured text
+          // width is used on-device. This keeps both animation legs inside expiry.
+          const viewportWidthPx = 1080;
+          const fromRight = mode === 'right-to-left' || mode === 'rtl';
+          const entryDistancePx = fromRight ? viewportWidthPx : textWidthPx;
+          const exitDistancePx = fromRight ? textWidthPx : viewportWidthPx;
+          const entrySpeed = this.bound(c.entrySpeedPxPerSec, 20, 800, 120);
+          const exitSpeed = this.bound(c.exitSpeedPxPerSec, 20, 800, 120);
+          const motionBudget = moving
+            ? Math.ceil(entryDistancePx * 1000 / entrySpeed)
+              + Math.ceil(exitDistancePx * 1000 / exitSpeed) + 400
+            : 0;
+          return Math.min(120000, Math.max(
+            this.bound(c.displayDurationMs, 1000, 120000, 9000),
+            motionBudget,
+          ));
+        })(),
       });
       await qr.manager.save(ad);
       // Commit is the authoritative success point. Never turn a committed
