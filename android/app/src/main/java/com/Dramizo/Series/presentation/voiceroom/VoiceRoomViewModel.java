@@ -10,6 +10,8 @@ import com.Dramizo.Series.domain.model.Result;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.Dramizo.Series.util.RoomJoinPrefetch;
 
 public class VoiceRoomViewModel extends ViewModel {
     private final AppContainer c;
@@ -22,6 +24,8 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<Boolean> seatRequestsLoading = new MutableLiveData<>();
     private final MutableLiveData<RoomDtos.SupportersResult> supporters = new MutableLiveData<>();
     private final MutableLiveData<String> info = new MutableLiveData<>();
+    private final AtomicInteger joinGeneration = new AtomicInteger();
+    private final AtomicInteger refreshGeneration = new AtomicInteger();
 
     public VoiceRoomViewModel(AppContainer c) { this.c = c; }
 
@@ -39,28 +43,58 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void join(String roomId, String password) {
-        c.getIoExecutor().execute(() -> {
-            Result<RoomDtos.JoinRoomResult> r = c.joinRoomUseCase.execute(roomId, password);
-            if (r.success) {
+        final String requestedRoomId = roomId;
+        final int generation = joinGeneration.incrementAndGet();
+        // A join result supersedes any older room refresh; stale network responses
+        // must never paint the previous room after a quick room switch.
+        refreshGeneration.incrementAndGet();
+        RoomJoinPrefetch.executeJoin(() -> {
+            Result<RoomDtos.JoinRoomResult> r;
+            try {
+                r = c.joinRoomUseCase.execute(requestedRoomId, password);
+            } catch (Exception e) {
+                r = Result.err(e.getMessage() != null ? e.getMessage() : "join failed");
+            }
+            if (generation != joinGeneration.get()) return;
+            if (r != null && r.success && r.data != null) {
                 session.postValue(r.data);
-                if (r.data != null && r.data.room != null) room.postValue(r.data.room);
-            } else error.postValue(r.error);
+                if (r.data.room != null
+                        && (requestedRoomId == null || requestedRoomId.equals(r.data.room.id))) {
+                    room.postValue(r.data.room);
+                }
+            } else {
+                error.postValue(r != null && r.error != null ? r.error : "تعذر دخول الغرفة");
+            }
         });
     }
 
     /** Restore UI from an in-process minimized session — no network join. */
     public void restoreLocalSession(RoomDtos.JoinRoomResult join, RoomDtos.RoomDto latest) {
         if (join == null) return;
+        joinGeneration.incrementAndGet();
+        refreshGeneration.incrementAndGet();
         session.setValue(join);
         if (latest != null) room.setValue(latest);
         else if (join.room != null) room.setValue(join.room);
     }
 
     public void refresh(String roomId) {
+        final String requestedRoomId = roomId;
+        final int generation = refreshGeneration.incrementAndGet();
         c.getIoExecutor().execute(() -> {
-            Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(roomId);
-            if (r.success) room.postValue(r.data);
-            else error.postValue(r.error);
+            Result<RoomDtos.RoomDto> r;
+            try {
+                r = c.getRoomUseCase.execute(requestedRoomId);
+            } catch (Exception e) {
+                r = Result.err(e.getMessage() != null ? e.getMessage() : "refresh failed");
+            }
+            if (generation != refreshGeneration.get()) return;
+            if (r != null && r.success && r.data != null
+                    && (requestedRoomId == null || requestedRoomId.equals(r.data.id))) {
+                room.postValue(r.data);
+            } else if (r != null && !r.success) {
+                error.postValue(r.error);
+            }
         });
     }
 
