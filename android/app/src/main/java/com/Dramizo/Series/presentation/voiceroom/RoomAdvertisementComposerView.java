@@ -203,7 +203,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     Toast.makeText(getContext(), "تعذر التحقق من إعدادات الإعلان، حاول مجدداً", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
+                featureEnabled = cfg.enabled && cfg.sendButtonEnabled && !cfg.paused;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 composerConfig = cfg.ticker;
