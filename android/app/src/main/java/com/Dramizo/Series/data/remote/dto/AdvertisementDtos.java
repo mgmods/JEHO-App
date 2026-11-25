@@ -19,6 +19,7 @@ public final class AdvertisementDtos {
         public int dailyLimit;
         public int maxTextLength;
         public int maxWords;
+        public int publishDelayMs;
         public int displayDurationMs;
         public int gapMs;
         public int entrySpeedPxPerSec;
