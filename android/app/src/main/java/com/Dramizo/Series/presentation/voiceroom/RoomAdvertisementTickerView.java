@@ -143,8 +143,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             try {
                 AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
                 config = next;
-                if (next != null) SEND_BUTTON_ENABLED = next.enabled && next.sendButtonEnabled;
-                if (next != null && !next.enabled) {
+                if (next != null) SEND_BUTTON_ENABLED = next.enabled && next.sendButtonEnabled && !next.paused;
+                if (next != null && (!next.enabled || next.paused)) {
                     post(this::hideAdvertisement);
                 } else if (next != null) {
                     refreshCurrent();
@@ -183,6 +183,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         }
         final long remainingMs = remaining;
         final AdvertisementDtos.Ticker eventConfig = ev.config != null ? ev.config : config;
+        if (eventConfig != null && (!eventConfig.enabled || eventConfig.paused)) {
+            post(this::hideAdvertisement);
+            return;
+        }
         post(() -> {
             if (!attached.get()) return;
             if (remainingMs <= 0L) {
@@ -207,7 +211,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled;
                     config = current.config;
                 }
-                if (current != null && current.advertisement != null && current.config != null && current.config.enabled) {
+                if (current != null && current.advertisement != null && current.config != null && current.config.enabled && !current.config.paused) {
                     long remaining = Math.max(0L, current.advertisement.displayDurationMs);
                     try {
                         long serverNow = parseIsoUtc(current.serverNow, System.currentTimeMillis());
