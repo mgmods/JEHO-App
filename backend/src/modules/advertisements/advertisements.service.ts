@@ -173,10 +173,14 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       const user = await qr.manager.getRepository(User).findOne({where:{id:userId}});
       if (!user) throw new BadRequestException('الحساب غير موجود');
       const maxOrder = Number((await qr.query('SELECT COALESCE(MAX("queueOrder"),0)::bigint AS max FROM "jeho_own"."room_advertisements" WHERE "status"=$1',[AdvertisementStatus.QUEUED]))?.[0]?.max || 0);
+      const avatarUrl = String((user as any).avatarUrl || '').trim();
+      const safeAvatarUrl = avatarUrl.length > 0 && avatarUrl.length <= 512 ? avatarUrl : null;
       const ad = qr.manager.create(Advertisement,{
         senderId:userId,
         senderName:String((user as any).displayName || (user as any).username || 'عضو').slice(0,128),
-        senderImageUrl:String((user as any).avatarUrl || '').trim() || null,
+        // The DB column is varchar(512). Never let an unusually long CDN/signed
+        // avatar URL reject the entire advertisement insert.
+        senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
         displayDurationMs:this.bound(c.displayDurationMs,1000,120000,9000),
@@ -184,10 +188,27 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
       return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
     } catch(e) {
-      this.log.error('Advertisement create failed: '+String((e as any)?.message || e));
+      const failure = e as any;
+      const message = String(failure?.message || e || 'Unknown advertisement error');
+      this.log.error('Advertisement create failed: ' + JSON.stringify({
+        message,
+        code: failure?.code || failure?.driverError?.code || null,
+        constraint: failure?.constraint || failure?.driverError?.constraint || null,
+        detail: failure?.detail || failure?.driverError?.detail || null,
+        table: failure?.table || failure?.driverError?.table || null,
+      }));
       await qr.rollbackTransaction();
       if (e instanceof ConflictException && /الحد اليومي|الطابور ممتلئ/.test(e.message)) {
         await this.recordRejected(userId, text, e.message.includes('الحد اليومي') ? 'daily_limit' : 'queue_full', e.message);
+      } else if (!(e instanceof BadRequestException) && !(e instanceof ConflictException)) {
+        // Keep an admin-visible failure record for unexpected DB/runtime errors,
+        // so "send failed" can be traced to the real backend cause after deploy.
+        try {
+          const reason = (message + (failure?.code ? ' [' + failure.code + ']' : '')).slice(0, 255);
+          await this.recordRejected(userId, text, 'server_error', reason);
+        } catch (recordError) {
+          this.log.error('Could not persist advertisement failure audit: ' + String((recordError as any)?.message || recordError));
+        }
       }
       throw e;
     } finally { await qr.release(); }
