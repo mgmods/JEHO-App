@@ -488,7 +488,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                             "تم قبول إعلانك وإضافته إلى قائمة الإعلانات العامة. سيبدأ عرضه حسب توقيت النظام.");
                 } else {
                     send.setEnabled(true);
-                    send.setText("إرسال للجميع");
+                    send.setAlpha(1f);
+                    cancel.setEnabled(true);
+                    send.setText("إعادة المحاولة");
                     String message = "تعذّر إرسال الإعلان. تحقق من البيانات وحاول مرة أخرى.";
                     String rawDetails = "";
                     try {
@@ -532,6 +534,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.CreateResponse>> call, Throwable t) {
                 loading.set(false);
                 send.setEnabled(true);
+                send.setAlpha(1f);
+                cancel.setEnabled(true);
                 send.setText("إعادة المحاولة");
                 // The server may have committed before the connection dropped.
                 // Keep the same key so a retry returns the original ad instead of creating another.
