@@ -70,8 +70,6 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         openButton.setPadding(dp(19), 0, dp(19), 0);
         openButton.setLetterSpacing(0.015f);
         openButton.setContentDescription("فتح نافذة إرسال إعلان عام إلى جميع الغرف");
-        openButton.setStateListAnimator(android.animation.AnimatorInflater.loadStateListAnimator(
-                context, android.R.animator.button_state_list_animator));
         FrameLayout.LayoutParams buttonLp = new FrameLayout.LayoutParams(
                 LayoutParams.WRAP_CONTENT, dp(46), Gravity.CENTER);
         addView(openButton, buttonLp);
