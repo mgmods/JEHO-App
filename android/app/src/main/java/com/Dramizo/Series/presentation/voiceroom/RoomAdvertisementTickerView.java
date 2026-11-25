@@ -67,7 +67,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile long serverClockOffsetMs = 0L;
     private volatile boolean serverClockKnown = false;
     private Runnable expiryRunnable;
-    private long refreshGeneration = 0L;
+    private volatile long refreshGeneration = 0L;
     private CustomTarget<File> customFontTarget;
     private volatile String loadedCustomFontUrl = "";
     private volatile Typeface customTypeface;
@@ -138,6 +138,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     @Override public void onUserEvent(String event, JsonObject payload) {
         if ("room:advertisement:config".equals(event)) {
+            // Invalidate any older current-ad response before applying new dashboard state.
+            refreshGeneration++;
             try {
                 AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
                 config = next;
