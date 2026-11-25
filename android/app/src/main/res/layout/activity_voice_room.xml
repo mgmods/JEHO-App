@@ -2117,7 +2117,6 @@
     <!-- Global room advertisement composer; quota and availability are loaded from the API. -->
     <!-- Deliberately no view ID: optional composer must not become a required ActivityViewBinding field. -->
     <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementComposerView
-        android:id="@+id/roomAdvertisementComposer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="12dp"
