@@ -111,11 +111,20 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             featureEnabled = next.enabled && next.sendButtonEnabled;
             maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
-            publishDelaySeconds = next.publishDelayMs > 0 ? Math.max(1, next.publishDelayMs / 1000) : 10;
+            publishDelaySeconds = Math.max(0, next.publishDelayMs / 1000);
             composerConfig = next;
-            applyOpenButtonConfig(next);
+            post(() -> {
+                applyOpenButtonConfig(next);
+                updateFeatureVisibility();
+            });
             if (featureEnabled) refreshRemaining();
         } catch (Exception ignored) {}
+    }
+
+    private void updateFeatureVisibility() {
+        boolean visible = featureEnabled && getWindowToken() != null;
+        if (openButton != null) openButton.setVisibility(visible ? VISIBLE : GONE);
+        setVisibility(visible ? VISIBLE : GONE);
     }
 
     private void applyOpenButtonConfig(AdvertisementDtos.Ticker cfg) {
@@ -125,7 +134,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         openButton.setText(label);
         openButton.setTextColor(colorOr(cfg.composerButtonTextColor, Color.WHITE));
         openButton.setTextSize(Math.max(9, cfg.composerButtonTextSizeSp > 0 ? cfg.composerButtonTextSizeSp : 13));
-        int radius = dp(Math.max(0, cfg.composerButtonRadiusDp > 0 ? cfg.composerButtonRadiusDp : 24));
+        int radius = dp(Math.max(0, cfg.composerButtonRadiusDp));
         int borderWidth = dp(Math.max(0, cfg.composerButtonBorderWidthDp));
         int borderColor = colorOr(cfg.composerButtonBorderColor, Color.rgb(239, 201, 129));
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
@@ -154,12 +163,14 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 if (cfg.ticker != null) {
                     composerConfig = cfg.ticker;
                     applyOpenButtonConfig(cfg.ticker);
-                    if (cfg.ticker.publishDelayMs > 0) publishDelaySeconds = Math.max(1, cfg.ticker.publishDelayMs / 1000);
+                    publishDelaySeconds = Math.max(0, cfg.ticker.publishDelayMs / 1000);
                 }
+                updateFeatureVisibility();
                 refreshRemaining();
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
                 featureEnabled = false;
+                post(RoomAdvertisementComposerView.this::updateFeatureVisibility);
             }
         });
     }
@@ -197,6 +208,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
                 composerConfig = cfg.ticker;
                 applyOpenButtonConfig(cfg.ticker);
+                updateFeatureVisibility();
                 if (!featureEnabled) {
                     Toast.makeText(getContext(), "الإعلانات العامة غير مفعّلة حالياً", Toast.LENGTH_SHORT).show();
                     return;
