@@ -408,7 +408,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 input.requestFocus();
                 return;
             }
-            int wordCount = message.trim().isEmpty() ? 0 : message.trim().split("\\s+").length;
+            int wordCount = normalizedMessage.isEmpty() ? 0 : normalizedMessage.split("\\s+").length;
             if (wordCount > maxWords) {
                 input.setError("الإعلان يحتوي على " + wordCount + " كلمة، والحد المسموح " + maxWords + " كلمة");
                 input.requestFocus();
@@ -418,7 +418,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             cancel.setEnabled(false);
             send.setText("جارٍ إرسال الإعلان...");
             send.setAlpha(.72f);
-            submit(message, dialog, send);
+            submit(normalizedMessage, dialog, send, cancel);
         });
 
         android.widget.ScrollView scroll = new android.widget.ScrollView(getContext());
@@ -470,7 +470,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         return d;
     }
 
-    private void submit(String text, Dialog dialog, TextView send) {
+    private void submit(String text, Dialog dialog, TextView send, TextView cancel) {
         if (!loading.compareAndSet(false, true)) return;
         openButton.setEnabled(false);
         Map<String, String> body = new HashMap<>();
