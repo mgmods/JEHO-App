@@ -25,6 +25,9 @@ public final class AdvertisementDtos {
         public String template;
         public String position;
         public String direction;
+        public String textMotion;
+        public String nameMotion;
+        public String avatarMotion;
         public String transitionType;
         public String fontFamily;
         public String background;
