@@ -9,6 +9,7 @@ public final class AdvertisementDtos {
         public boolean enabled;
         public boolean sendButtonEnabled;
         public int maxTextLength;
+        public int maxWords;
         public Ticker ticker;
     }
 
@@ -17,6 +18,7 @@ public final class AdvertisementDtos {
         public boolean sendButtonEnabled;
         public int dailyLimit;
         public int maxTextLength;
+        public int maxWords;
         public int displayDurationMs;
         public int gapMs;
         public int entrySpeedPxPerSec;
