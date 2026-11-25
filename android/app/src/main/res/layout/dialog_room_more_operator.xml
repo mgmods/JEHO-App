@@ -20,11 +20,30 @@
         android:paddingBottom="12dp">
 
         <TextView
+            android:id="@+id/btnRoomAdvertisement"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_room_dialog_item"
+            android:gravity="center"
+            android:text="✦ إعلان عام  ·  التحقق من المنصة"
+            android:textColor="#FFE1AD"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:elevation="3dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
             android:id="@+id/tv_room"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dp_32"
-            android:layout_marginTop="@dimen/dp_16"
+            android:layout_marginTop="52dp"
             android:text="@string/room"
             android:textColor="#ffffffff"
             android:textSize="18sp"
@@ -47,7 +66,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/dp_35"
-            android:layout_marginTop="@dimen/dp_16"
+            android:layout_marginTop="52dp"
             android:text="@string/tool"
             android:textColor="#4dffffff"
             android:textSize="18sp"
@@ -93,8 +112,8 @@
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/viewPager"
             android:layout_width="0dp"
-            android:layout_height="360dp"
-            android:layout_marginTop="52dp"
+            android:layout_height="330dp"
+            android:layout_marginTop="88dp"
             android:clipToPadding="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
