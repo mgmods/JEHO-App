@@ -366,11 +366,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (cfg == null) return;
         applyGradient(name, cfg.nameGradientEnabled, cfg.nameGradientStartColor,
                 cfg.nameGradientEndColor, cfg.nameColor);
-        // Advertisement copy is intentionally near-black for reliable contrast
-        // across the light premium ticker surface; admin color presets cannot
-        // accidentally turn the announcement unreadable.
+        // Keep advertisement text color controlled by the Dashboard.
+        // Fall back to a readable dark color only when the dashboard value is missing/invalid.
         text.getPaint().setShader(null);
-        text.setTextColor(Color.rgb(17, 24, 39));
+        text.setTextColor(safeColor(cfg.textColor, Color.rgb(17, 24, 39)));
         text.invalidate();
     }
 
