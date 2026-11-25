@@ -584,8 +584,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                     pendingIdempotencyText = null;
                     dialog.dismiss();
                     refreshQuota();
-                    showResultDialog(true, "تم إرسال الإعلان بنجاح",
-                            "تم قبول إعلانك وإضافته إلى قائمة الإعلانات العامة. سيبدأ عرضه حسب توقيت النظام.");
+                    showResultDialog(true, "تم إرسال إعلانك", "");
                 } else {
                     send.setEnabled(true);
                     send.setAlpha(1f);
@@ -684,7 +683,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         panel.addView(title, titleLp);
 
         TextView message = new TextView(getContext());
-        message.setText(messageText);
+        message.setText(messageText == null ? "" : messageText);
+        message.setVisibility(messageText == null || messageText.trim().isEmpty() ? GONE : VISIBLE);
         message.setTextColor(Color.rgb(111, 117, 128));
         message.setTextSize(13);
         message.setGravity(Gravity.CENTER);
