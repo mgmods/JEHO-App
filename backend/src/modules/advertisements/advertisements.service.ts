@@ -9,6 +9,7 @@ const DEFAULT_CONFIG: any = {
   enabled: true, sendButtonEnabled: true, paused: false, dailyLimit: 1, maxQueueSize: 500, maxTextLength: 180,
   resetTimezone: 'UTC', displayDurationMs: 9000, gapMs: 1800,
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
+  textMotion: 'right-to-left', nameMotion: 'static', avatarMotion: 'static',
   template: 'premium-v1', position: 'safe-bottom', direction: 'rtl', transitionType: 'slide', fontFamily: 'default',
   background: 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))',
   backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
@@ -183,6 +184,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
       return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
     } catch(e) {
+      this.log.error('Advertisement create failed: '+String((e as any)?.message || e));
       await qr.rollbackTransaction();
       if (e instanceof ConflictException && /الحد اليومي|الطابور ممتلئ/.test(e.message)) {
         await this.recordRejected(userId, text, e.message.includes('الحد اليومي') ? 'daily_limit' : 'queue_full', e.message);
@@ -247,7 +249,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
     [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
-    ['resetTimezone','template','position','direction','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
     if (!['default','sans','serif','mono','custom'].includes(merged.fontFamily)) merged.fontFamily='default';
     merged.customFontUrl=String(merged.customFontUrl||'').slice(0,2048);
@@ -259,6 +261,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!['circle','square'].includes(merged.avatarShape)) merged.avatarShape='circle';
     if (!['safe-top','safe-bottom','custom-safe','free'].includes(merged.position)) merged.position='safe-bottom';
     if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
+    const motions=['right-to-left','left-to-right','static','fade'];
+    if (!motions.includes(merged.textMotion)) merged.textMotion=merged.direction==='ltr'?'left-to-right':'right-to-left';
+    if (!motions.includes(merged.nameMotion)) merged.nameMotion='static';
+    if (!motions.includes(merged.avatarMotion)) merged.avatarMotion='static';
     try { new Intl.DateTimeFormat('en-US',{timeZone:merged.resetTimezone || 'UTC'}).format(new Date()); }
     catch { throw new BadRequestException('منطقة التوقيت غير صالحة؛ استخدم اسم IANA مثل Asia/Riyadh'); }
     if (merged.backgroundImage && !/^https?:\/\//i.test(merged.backgroundImage)) merged.backgroundImage='';
@@ -302,7 +308,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const term=String(search||'').trim();
     if(term) qb.andWhere('(CAST(a.id AS text)=:id OR a.senderName ILIKE :term OR a.text ILIKE :term OR CAST(a.senderId AS text)=:id)',{id:term,term:'%'+term+'%'});
     const [items,total]=await qb.orderBy('a.status','ASC').addOrderBy('a.queueOrder','ASC').addOrderBy('a.createdAt','DESC').take(limit).getManyAndCount();
-    return{total,items:items.map(a=>this.publicAd(a))};
+    return{total,items:items.map(a=>({...this.publicAd(a),rejectionCode:a.rejectionCode,rejectionReason:a.rejectionReason}))};
   }
 
   async adminStats(days=7){
