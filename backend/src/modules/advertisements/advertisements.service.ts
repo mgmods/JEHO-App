@@ -11,10 +11,10 @@ const DEFAULT_CONFIG: any = {
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
   textMotion: 'right-to-left', nameMotion: 'static', avatarMotion: 'static',
   template: 'premium-v1', position: 'safe-bottom', direction: 'rtl', transitionType: 'slide', fontFamily: 'default',
-  background: 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))',
+  background: 'linear-gradient(90deg,#F8FAFC,#E8EEF6)',
   backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
   avatarDp: 34, avatarShape: 'circle', nameSp: 12, textSp: 13, customOffsetDp: 0,
-  nameColor: '#FFD98A', textColor: '#FFFFFF',
+  nameColor: '#9A681F', textColor: '#111827',
   nameGradientEnabled: false, nameGradientStartColor: '#FFD98A', nameGradientEndColor: '#FF6B9D',
   textGradientEnabled: false, textGradientStartColor: '#FFFFFF', textGradientEndColor: '#9EDCFF',
   customFontUrl: '', customFontName: '', spacingDp: 8,
@@ -132,7 +132,16 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1', ['voice_room_ads_config']);
     let value: any = {};
     try { value = rows?.[0]?.value ? JSON.parse(rows[0].value) : {}; } catch {}
-    return { ...DEFAULT_CONFIG, ...(value || {}) };
+    const merged = { ...DEFAULT_CONFIG, ...(value || {}) };
+    // Upgrade only the original built-in dark/white preset. Preserve any
+    // administrator-customized ticker background and name styling.
+    if (String(value?.background || '') === 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))') {
+      merged.background = DEFAULT_CONFIG.background;
+    }
+    if (String(value?.textColor || '').toUpperCase() === '#FFFFFF' && value?.textGradientEnabled !== true) {
+      merged.textColor = '#111827';
+    }
+    return merged;
   }
 
   private async ensureConfig() {
