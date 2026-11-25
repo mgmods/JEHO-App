@@ -341,7 +341,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         bindConfig(cfg);
         bindAd(ad);
         scheduleExpiry(ad.id, remainingMs, animationGeneration);
-        animateTextIn(ad, cfg, animationGeneration);
+        animateTextIn(ad, cfg, animationGeneration, Math.max(0L, ad.displayDurationMs - remainingMs));
     }
 
     private void bindConfig(AdvertisementDtos.Ticker cfg) {
@@ -517,7 +517,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         });
     }
 
-    private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long generation) {
+    private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long generation, long elapsedSinceServerStartMs) {
         text.clearAnimation();
         text.setAlpha(1f);
         name.setAlpha(1f);
@@ -583,20 +583,20 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == set) activeAnimator = null;
                     if (generation == animationGeneration && ad.id.equals(currentAdId)) {
-                        // Keep the complete message readable after its entrance/marquee pass;
-                        // the server-time expiry callback removes the whole row on schedule.
-                        text.setTranslationX(0f);
-                        name.setTranslationX(0f);
-                        avatar.setTranslationX(0f);
-                        setTranslationY(0f);
-                        setAlpha(1f);
-                        text.setAlpha(1f);
-                        name.setAlpha(1f);
-                        avatar.setAlpha(1f);
+                        // Do not reset the completed ticker to translationX(0):
+                        // that made the already-exited message reappear until expiry.
+                        // Keep the text at its final off-screen position; the shared
+                        // server-time expiry removes the complete row and its background.
                     }
                 }
             });
             set.start();
+            // Reconstruct the same animation phase on every room/device from the
+            // server start timestamp instead of restarting at local event-receive time.
+            // Late socket delivery therefore catches up rather than shifting the ticker.
+            if (elapsedSinceServerStartMs > 0L) {
+                try { set.setCurrentPlayTime(elapsedSinceServerStartMs); } catch (Exception ignored) {}
+            }
         });
     }
 
