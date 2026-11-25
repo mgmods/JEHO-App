@@ -104,7 +104,18 @@
             <div class="col-4"><label class="form-label small">حركة الصورة</label><select v-model="form.avatarMotion" class="form-select"><option value="right-to-left">من اليمين لليسار</option><option value="left-to-right">من اليسار لليمين</option><option value="static">ثابتة</option><option value="fade">تلاشي</option></select></div>
             <div class="col-6"><label class="form-label small">قالب الشريط</label><select v-model="form.template" class="form-select" @change="applyTemplate"><option value="premium-v1">فاخر</option><option value="compact">مختصر</option><option value="gold">ذهبي</option></select></div>
             <div class="col-6"><label class="form-label small">مدة العرض ms</label><input v-model.number="form.displayDurationMs" type="number" min="1000" max="120000" class="form-control"></div>
-            <div class="col-6"><label class="form-label small">الفاصل ms</label><input v-model.number="form.gapMs" type="number" min="0" max="120000" class="form-control"></div>
+            <div class="col-6">
+              <label class="form-label small">الفاصل بين الإعلانات</label>
+              <div class="input-group">
+                <input v-model.number="form.gapValue" type="number" min="0" :max="form.gapUnit==='hours'?24:form.gapUnit==='minutes'?1440:86400" step="0.1" class="form-control">
+                <select v-model="form.gapUnit" class="form-select" style="max-width:112px">
+                  <option value="seconds">ثانية</option>
+                  <option value="minutes">دقيقة</option>
+                  <option value="hours">ساعة</option>
+                </select>
+              </div>
+              <div class="form-text">مدة انتظار بعد اختفاء الإعلان الحالي وقبل بدء الإعلان التالي في جميع الرومات. صفر = دون فاصل.</div>
+            </div>
             <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="form.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
             <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="form.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
           </div>
@@ -250,8 +261,18 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false)
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,maxWords:30,publishDelayMs:0,position:'free',positionXPercent:50,positionYPercent:52,composerBackgroundImage:'',composerBackgroundOpacity:100,composerBackgroundColor:'#F7F9FC',composerIconUrl:'',composerTitleColor:'#172033',composerSubtitleColor:'#66758B',composerInputTextColor:'#111827',composerInputHintColor:'#9AA7B8',composerInputBackgroundColor:'#FFFFFF',composerInputBorderColor:'#D8E0EA',composerCancelTextColor:'#43536A',composerCancelBackgroundColor:'#F4F7FB',composerCancelBorderColor:'#DCE4EE',composerSendTextColor:'#241C14',composerSendGradientStartColor:'#EEC577',composerSendGradientEndColor:'#BC7E2F',composerSendBorderColor:'#EFC981',composerButtonRadiusDp:24,composerIconSizeDp:42,composerButtonText:'✦  إعلان عام',composerButtonTextColor:'#FFFFFF',composerButtonBackgroundStartColor:'#694117',composerButtonBackgroundEndColor:'#E5B85B',composerButtonBorderColor:'#EFC981',composerButtonBorderWidthDp:1,composerButtonHeightDp:46,composerButtonTextSizeSp:13,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#9A681F',textColor:'#111827',background:'linear-gradient(90deg,#F8FAFC,#E8EEF6)',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
-function apply(data){ Object.assign(form,data||{}); form.publishDelayMs=Math.round(Math.max(0,Number(form.publishDelayMs)||0)/1000); if(form.positionXPercent==null)form.positionXPercent=50; if(form.positionYPercent==null)form.positionYPercent=52; }
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,maxWords:30,publishDelayMs:0,position:'free',positionXPercent:50,positionYPercent:52,composerBackgroundImage:'',composerBackgroundOpacity:100,composerBackgroundColor:'#F7F9FC',composerIconUrl:'',composerTitleColor:'#172033',composerSubtitleColor:'#66758B',composerInputTextColor:'#111827',composerInputHintColor:'#9AA7B8',composerInputBackgroundColor:'#FFFFFF',composerInputBorderColor:'#D8E0EA',composerCancelTextColor:'#43536A',composerCancelBackgroundColor:'#F4F7FB',composerCancelBorderColor:'#DCE4EE',composerSendTextColor:'#241C14',composerSendGradientStartColor:'#EEC577',composerSendGradientEndColor:'#BC7E2F',composerSendBorderColor:'#EFC981',composerButtonRadiusDp:24,composerIconSizeDp:42,composerButtonText:'✦  إعلان عام',composerButtonTextColor:'#FFFFFF',composerButtonBackgroundStartColor:'#694117',composerButtonBackgroundEndColor:'#E5B85B',composerButtonBorderColor:'#EFC981',composerButtonBorderWidthDp:1,composerButtonHeightDp:46,composerButtonTextSizeSp:13,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapValue:1.8,gapUnit:'seconds',entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#9A681F',textColor:'#111827',background:'linear-gradient(90deg,#F8FAFC,#E8EEF6)',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
+function apply(data){
+  Object.assign(form,data||{});
+  const gapMs=Math.max(0,Number(data?.gapMs ?? form.gapMs ?? 1800)||0);
+  if(gapMs>=3600000){form.gapUnit='hours';form.gapValue=Number((gapMs/3600000).toFixed(3))}
+  else if(gapMs>=60000){form.gapUnit='minutes';form.gapValue=Number((gapMs/60000).toFixed(3))}
+  else {form.gapUnit='seconds';form.gapValue=Number((gapMs/1000).toFixed(3))}
+  delete form.gapMs;
+  form.publishDelayMs=Math.round(Math.max(0,Number(form.publishDelayMs)||0)/1000);
+  if(form.positionXPercent==null)form.positionXPercent=50;
+  if(form.positionYPercent==null)form.positionYPercent=52;
+}
 function startDrag(event){dragging.value=true;event.currentTarget.setPointerCapture?.(event.pointerId);form.position='free';moveDrag(event)}
 function moveDrag(event){if(!dragging.value)return;const stage=event.currentTarget.closest('.room-preview-stage');if(!stage)return;const rect=stage.getBoundingClientRect();form.positionXPercent=Math.max(2,Math.min(98,Math.round(((event.clientX-rect.left)/rect.width)*100)));form.positionYPercent=Math.max(6,Math.min(94,Math.round(((event.clientY-rect.top)/rect.height)*100)))}
 function stopDrag(){dragging.value=false}
@@ -275,7 +296,18 @@ async function load(){
 async function uploadFont(event){const file=event.target.files?.[0];event.target.value='';if(!file)return;const ext=file.name.toLowerCase().split('.').pop();if(!['ttf','otf'].includes(ext)){error.value='يرجى اختيار ملف خط TTF أو OTF';return}fontUploading.value=true;const r=await uploadsApi.upload(file);fontUploading.value=false;if(r.error){error.value=r.error.message||String(r.error);return}const data=r.data?.data??r.data;const url=data?.url||data?.path;if(!url){error.value='تم رفع الملف لكن لم يصل رابط الخط من الخادم';return}form.customFontUrl=url;form.customFontName=file.name;form.fontFamily='custom';applyPreviewFont();success.value='تم رفع الخط. اضغط حفظ الإعدادات لتطبيقه على الرومات'}
 function applyPreviewFont(){if(typeof document==='undefined')return;let style=document.getElementById('jeho-ad-preview-font');const url=String(form.customFontUrl||'').replace(/["\\)]/g,'');if(!url){style?.remove();return}if(!style){style=document.createElement('style');style.id='jeho-ad-preview-font';document.head.appendChild(style)}const format=url.toLowerCase().endsWith('.otf')?'opentype':'truetype';style.textContent='@font-face{font-family:JEHOAdvertisementCustom;src:url("'+url+'") format("'+format+'");font-display:swap;}'}
 function clearFont(){form.customFontUrl='';form.customFontName='';if(form.fontFamily==='custom')form.fontFamily='default';applyPreviewFont()}
-async function save(){saving.value=true;const r=await advertisementsApi.saveConfig({...form,publishDelayMs:Math.max(0,Math.min(60000,Number(form.publishDelayMs)||0)*1000)});saving.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ إعدادات الإعلانات';apply(r.data?.data??r.data)}
+async function save(){
+  saving.value=true;
+  const unitMultiplier=form.gapUnit==='hours'?3600000:form.gapUnit==='minutes'?60000:1000;
+  const gapMs=Math.max(0,Math.min(86400000,(Number(form.gapValue)||0)*unitMultiplier));
+  const payload={...form,gapMs,publishDelayMs:Math.max(0,Math.min(60000,Number(form.publishDelayMs)||0)*1000)};
+  delete payload.gapValue; delete payload.gapUnit;
+  const r=await advertisementsApi.saveConfig(payload);
+  saving.value=false;
+  if(r.error){error.value=r.error.message||String(r.error);return}
+  success.value='تم حفظ إعدادات الإعلانات';
+  apply(r.data?.data??r.data)
+}
 async function saveWords(){savingWords.value=true;const r=await advertisementsApi.saveBannedWords(bannedWords.value);savingWords.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ الكلمات المحظورة'}
 async function loadQueue(){const r=await advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value});if(!r.error)queue.value=r.data?.items||r.data?.data?.items||[]}
 async function loadStats(){const r=await advertisementsApi.stats({days:statsDays.value});if(!r.error)stats.value=r.data?.data??r.data??{}}
