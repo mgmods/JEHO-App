@@ -141,10 +141,12 @@ final class RoomMoreOperatorSheet {
         ViewPager pager = sheet.findViewById(R.id.viewPager);
         TextView advertisementAction = sheet.findViewById(R.id.btnRoomAdvertisement);
         advertisementAction.setVisibility(View.GONE);
-        RoomAdvertisementComposerView advertisementComposer = null;
+        final RoomAdvertisementComposerView advertisementComposer;
         if (ctx instanceof Activity) {
             View contentRoot = ((Activity) ctx).findViewById(android.R.id.content);
             advertisementComposer = findAdvertisementComposer(contentRoot);
+        } else {
+            advertisementComposer = null;
         }
         if (advertisementComposer != null && RoomAdvertisementTickerView.SEND_BUTTON_ENABLED) {
             advertisementComposer.bindSettingsButton(advertisementAction);
