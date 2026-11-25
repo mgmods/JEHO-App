@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: any = {
   composerInputTextColor: '#111827', composerInputHintColor: '#9AA7B8', composerInputBackgroundColor: '#FFFFFF', composerInputBorderColor: '#D8E0EA',
   composerCancelTextColor: '#43536A', composerCancelBackgroundColor: '#F4F7FB', composerCancelBorderColor: '#DCE4EE',
   composerSendTextColor: '#241C14', composerSendGradientStartColor: '#EEC577', composerSendGradientEndColor: '#BC7E2F', composerSendBorderColor: '#EFC981',
-  composerButtonRadiusDp: 24, composerIconSizeDp: 42,
+  composerButtonRadiusDp: 24, composerButtonWidthDp: 0, composerButtonHorizontalPaddingDp: 20, composerIconSizeDp: 42,
   composerButtonText: '✦  إعلان عام', composerButtonTextColor: '#FFFFFF',
   composerButtonBackgroundStartColor: '#694117', composerButtonBackgroundEndColor: '#E5B85B',
   composerButtonBorderColor: '#EFC981', composerButtonBorderWidthDp: 1,
@@ -321,7 +321,6 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     this.busy=true;
     try {
       const c=await this.config();
-      if(c.enabled!==true)return;
       if(this.leaderJustAcquired){
         this.leaderJustAcquired=false;
         const recovered=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
@@ -331,7 +330,6 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
           if(remaining>0)this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:c,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true});
         }
       }
-      if(c.paused===true)return;
       const now=Date.now();
       const current=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
       if(current){
@@ -356,7 +354,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         [AdvertisementStatus.COMPLETED],
       );
       const nextEligibleAt=gateRows?.[0]?.nextAt ? new Date(gateRows[0].nextAt).getTime() : 0;
-      if(nextEligibleAt > now) return;
+      if(nextEligibleAt > now || c.enabled !== true || c.paused === true) return;
       const qr=this.db.createQueryRunner(); await qr.connect(); await qr.startTransaction();
       try{
         await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-room-ad-queue']);
@@ -381,7 +379,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,86400000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,86400000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerButtonWidthDp',0,600],['composerButtonHorizontalPaddingDp',0,80],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily','composerBackgroundImage','composerBackgroundColor','composerIconUrl','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor','composerButtonText','composerButtonTextColor','composerButtonBackgroundStartColor','composerButtonBackgroundEndColor','composerButtonBorderColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';

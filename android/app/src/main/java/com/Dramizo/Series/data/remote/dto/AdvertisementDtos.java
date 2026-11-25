@@ -84,6 +84,8 @@ public final class AdvertisementDtos {
         public String composerSendGradientEndColor;
         public String composerSendBorderColor;
         public int composerButtonRadiusDp;
+        public int composerButtonWidthDp;
+        public int composerButtonHorizontalPaddingDp;
         public int composerIconSizeDp;
         public String composerButtonText;
         public String composerButtonTextColor;
