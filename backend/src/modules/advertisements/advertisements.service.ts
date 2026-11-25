@@ -21,6 +21,12 @@ const DEFAULT_CONFIG: any = {
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
   textOffsetXDp: 0, textOffsetYDp: 0, textWidthDp: 0,
   positionXPercent: 50, positionYPercent: 52,
+  composerBackgroundImage: '', composerBackgroundOpacity: 100, composerBackgroundColor: '#F7F9FC',
+  composerIconUrl: '', composerTitleColor: '#172033', composerSubtitleColor: '#66758B',
+  composerInputTextColor: '#111827', composerInputHintColor: '#9AA7B8', composerInputBackgroundColor: '#FFFFFF', composerInputBorderColor: '#D8E0EA',
+  composerCancelTextColor: '#43536A', composerCancelBackgroundColor: '#F4F7FB', composerCancelBorderColor: '#DCE4EE',
+  composerSendTextColor: '#241C14', composerSendGradientStartColor: '#EEC577', composerSendGradientEndColor: '#BC7E2F', composerSendBorderColor: '#EFC981',
+  composerButtonRadiusDp: 16, composerIconSizeDp: 42,
 };
 
 @Injectable()
@@ -325,9 +331,9 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',1000,60000],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['radiusDp',0,40],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',1000,60000],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerIconSizeDp',20,80],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
-    ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily','composerBackgroundImage','composerBackgroundColor','composerIconUrl','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
     if (!['default','sans','serif','mono','custom'].includes(merged.fontFamily)) merged.fontFamily='default';
     merged.customFontUrl=String(merged.customFontUrl||'').slice(0,2048);
@@ -347,6 +353,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     catch { throw new BadRequestException('منطقة التوقيت غير صالحة؛ استخدم اسم IANA مثل Asia/Riyadh'); }
     if (merged.backgroundImage && !/^https?:\/\//i.test(merged.backgroundImage)) merged.backgroundImage='';
     merged.backgroundImage=String(merged.backgroundImage||'').slice(0,2048);
+    const composerUrls=['composerBackgroundImage','composerIconUrl'];
+    for (const k of composerUrls) { if (merged[k] && !/^https?:\/\//i.test(merged[k])) merged[k]=''; merged[k]=String(merged[k]||'').slice(0,2048); }
+    const composerColors=['composerBackgroundColor','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor'];
+    for (const k of composerColors) { const v=String(merged[k]||''); if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) && !/^rgba?\\(/i.test(v)) merged[k]=DEFAULT_CONFIG[k]; }
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
     return merged;
