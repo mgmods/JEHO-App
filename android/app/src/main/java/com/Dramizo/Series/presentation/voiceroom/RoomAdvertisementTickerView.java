@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.voiceroom;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.view.animation.LinearInterpolator;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -409,6 +410,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
             activeAnimator = in;
             in.setDuration(entryDuration);
+            in.setInterpolator(new LinearInterpolator());
             if (fade) text.animate().alpha(1f).setDuration(Math.min(450L, entryDuration)).start();
             in.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
@@ -428,6 +430,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
         activeAnimator = out;
         out.setDuration(Math.max(250L, exitDuration));
+        out.setInterpolator(new LinearInterpolator());
         if (cfg != null && "fade".equalsIgnoreCase(cfg.transitionType)) text.animate().alpha(0f).setDuration(Math.min(450L, exitDuration)).start();
         out.addListener(new AnimatorListenerAdapter() {
             @Override public void onAnimationEnd(Animator animation) {
