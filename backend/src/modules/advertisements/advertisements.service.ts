@@ -128,7 +128,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async create(userId: string, rawText: string, key: string) {
     const c = await this.config();
     if (c.enabled !== true || c.sendButtonEnabled !== true) throw new ConflictException('إرسال الإعلانات غير متاح حالياً');
-    const text = String(rawText || '').replace(/(?:\\r\\n|\\r|\\n)+/g, ', ').replace(/[ \\t]+/g, ' ').replace(/\\s*,\\s*/g, ', ').trim();
+    const text = String(rawText || '').replace(/(?:\r\n|\r|\n)+/g, ', ').replace(/[ \t]+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
     const max = this.bound(c.maxTextLength, 1, 500, 180);
     if (!text) throw new BadRequestException('اكتب نص الإعلان أولاً');
     if (text.length > max) throw new BadRequestException('تجاوزت الحد الأقصى لعدد الأحرف (' + max + ')');
