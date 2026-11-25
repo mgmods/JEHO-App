@@ -366,8 +366,12 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (cfg == null) return;
         applyGradient(name, cfg.nameGradientEnabled, cfg.nameGradientStartColor,
                 cfg.nameGradientEndColor, cfg.nameColor);
-        applyGradient(text, cfg.textGradientEnabled, cfg.textGradientStartColor,
-                cfg.textGradientEndColor, cfg.textColor);
+        // Advertisement copy is intentionally near-black for reliable contrast
+        // across the light premium ticker surface; admin color presets cannot
+        // accidentally turn the announcement unreadable.
+        text.getPaint().setShader(null);
+        text.setTextColor(Color.rgb(17, 24, 39));
+        text.invalidate();
     }
 
     private void applyGradient(TextView target, boolean enabled, String startColor,
