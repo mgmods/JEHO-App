@@ -22,6 +22,7 @@ concurrency:
   group: jeho-ghaymah-candidate-publish-recovery-20261112
   cancel-in-progress: true
 
+# Force a fresh candidate build from the current MG-JEHO head.
 jobs:
   checks:
     runs-on: ubuntu-24.04
@@ -126,10 +127,7 @@ jobs:
 
           # Read the existing app first. Never create an app or change its
           # resources, ports, environment, networking, or attached services.
-          status="$(curl --silent --show-error --output "$tmp/apps.json" --write-out '%{http_code}' \
-            --header "Authorization: Bearer $GHAYMAH_API_TOKEN" \
-            --header "Accept: application/json" \
-            https://api.cumin.dev/apps)"
+          status="$(curl --silent --show-error --output "$tmp/apps.json" --write-out '%{http_code}'             --header "Authorization: Bearer $GHAYMAH_API_TOKEN"             --header "Accept: application/json"             https://api.cumin.dev/apps)"
           if [[ "$status" != "200" ]]; then
             if [[ "$status" == "401" ]]; then
               echo "::error::Cumin returned 401 Unauthorized. Refresh the GHAYMAH_API_TOKEN GitHub Actions secret; no app or image was changed."
@@ -154,26 +152,17 @@ jobs:
             exit 1
           fi
 
-          jq -e '.[0] | select((.id | type) == "string" and (.id | length) > 0)' \
-            "$tmp/matches.json" > "$tmp/current-app.json"
+          jq -e '.[0] | select((.id | type) == "string" and (.id | length) > 0)'             "$tmp/matches.json" > "$tmp/current-app.json"
 
           current_image="$(jq -r '.[0].image // ""' "$tmp/matches.json")"
           echo "Target confirmed: jeho-own. Current image: ${current_image:-unknown}"
 
           # Preserve the complete app object returned by Ghaymah and change
           # only its image field. Refuse unexpected response formats.
-          jq --arg image "$IMAGE" '.[0] | .image = $image' \
-            "$tmp/matches.json" > "$tmp/update.json"
-          jq -e 'has("id") and .name == "jeho-own" and .image == env.IMAGE' \
-            "$tmp/update.json" >/dev/null
+          jq --arg image "$IMAGE" '.[0] | .image = $image'             "$tmp/matches.json" > "$tmp/update.json"
+          jq -e 'has("id") and .name == "jeho-own" and .image == env.IMAGE'             "$tmp/update.json" >/dev/null
 
-          status="$(curl --silent --show-error --output "$tmp/update-response.json" --write-out '%{http_code}' \
-            --request PUT \
-            --header "Authorization: Bearer $GHAYMAH_API_TOKEN" \
-            --header "Content-Type: application/json" \
-            --header "Accept: application/json" \
-            --data-binary @"$tmp/update.json" \
-            https://api.cumin.dev/apps)"
+          status="$(curl --silent --show-error --output "$tmp/update-response.json" --write-out '%{http_code}'             --request PUT             --header "Authorization: Bearer $GHAYMAH_API_TOKEN"             --header "Content-Type: application/json"             --header "Accept: application/json"             --data-binary @"$tmp/update.json"             https://api.cumin.dev/apps)"
           if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
             echo "::error::Cumin image update failed (HTTP $status). No retry or app creation was attempted."
             exit 1
