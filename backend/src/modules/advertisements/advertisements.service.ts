@@ -171,7 +171,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async current() {
     const config = await this.config();
-    const ad = await this.ads.findOne({ where: { status: AdvertisementStatus.PLAYING }, order: { startedAt: 'ASC' } });
+    // Do not resurrect a stale active row while publishing is disabled or paused.
+    const ad = config.enabled === true && config.paused !== true
+      ? await this.ads.findOne({ where: { status: AdvertisementStatus.PLAYING }, order: { startedAt: 'ASC' } })
+      : null;
     return { advertisement: ad ? this.publicAd(ad) : null, config, serverNow: new Date().toISOString() };
   }
 
@@ -323,25 +326,29 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     try {
       if (!(await this.ensureWorkerLeadership())) return;
       const c=await this.config();
+      const now=Date.now();
       if(this.leaderJustAcquired){
         this.leaderJustAcquired=false;
-        const recovered=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
-        if(recovered){
-          const serverNow=new Date();
-          const remaining=this.bound(recovered.displayDurationMs,1000,120000,9000)-(serverNow.getTime()-(recovered.startedAt?.getTime()||serverNow.getTime()));
-          if(remaining>0)this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:c,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true});
+        if(c.enabled===true && c.paused!==true){
+          const recovered=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
+          if(recovered){
+            const serverNow=new Date();
+            const remaining=this.bound(recovered.displayDurationMs,1000,120000,9000)-(serverNow.getTime()-(recovered.startedAt?.getTime()||serverNow.getTime()));
+            if(remaining>0)this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:c,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true});
+          }
         }
       }
-      const now=Date.now();
       const current=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
       if(current){
         const done=(current.startedAt?.getTime()||now)+this.bound(current.displayDurationMs,1000,120000,9000);
-        // End and clear the visible ad exactly when its display window ends.
-        // The configured gap is a separate quiet period before the next ad starts.
-        if(now < done) return;
+        // A pause/disable must also close the active DB row; otherwise it remains
+        // PLAYING and permanently blocks the global queue after re-enabling.
+        const forceClose=c.enabled!==true || c.paused===true;
+        if(!forceClose && now < done) return;
+        const completedAt=forceClose ? new Date(now) : new Date(done);
         current.status=AdvertisementStatus.COMPLETED;
-        current.completedAt=new Date(done);
-        current.nextEligibleAt=new Date(done+Math.max(0,Number(c.gapMs)||0));
+        current.completedAt=completedAt;
+        current.nextEligibleAt=new Date(completedAt.getTime()+(forceClose?0:Math.max(0,Number(c.gapMs)||0)));
         await this.ads.save(current);
         this.realtime.server.to('rooms:all').emit('room:advertisement', {
           type: 'end', advertisement: this.publicAd(current), config: c,
