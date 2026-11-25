@@ -590,13 +590,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         boolean moving = "right-to-left".equals(mode) || "rtl".equals(mode)
                 || "left-to-right".equals(mode) || "ltr".equals(mode);
         if (!moving) return displayBudget;
-        int speed = cfg == null ? 120 : cfg.entrySpeedPxPerSec;
-        speed = Math.max(20, Math.min(800, speed > 0 ? speed : 120));
-        long distancePx = Math.max(1L, (long) Math.max(1, viewportWidth) + Math.max(1, textWidth));
-        long motionMs = (distancePx * 1000L + speed - 1L) / speed;
-        // The backend already guarantees enough display time for the message.
-        // Keep a tiny tail so the last glyph is fully visible before the row hides.
-        return Math.max(1000L, Math.min(120000L, motionMs + 140L));
+        int entrySpeed = cfg == null ? 120 : cfg.entrySpeedPxPerSec;
+        int exitSpeed = cfg == null ? 120 : cfg.exitSpeedPxPerSec;
+        entrySpeed = Math.max(20, Math.min(800, entrySpeed > 0 ? entrySpeed : 120));
+        exitSpeed = Math.max(20, Math.min(800, exitSpeed > 0 ? exitSpeed : 120));
+        boolean fromRight = "right-to-left".equals(mode) || "rtl".equals(mode);
+        long entryDistance = fromRight ? Math.max(1, viewportWidth) : Math.max(1, textWidth);
+        long exitDistance = fromRight ? Math.max(1, textWidth) : Math.max(1, viewportWidth);
+        long entryMs = (entryDistance * 1000L + entrySpeed - 1L) / entrySpeed;
+        long exitMs = (exitDistance * 1000L + exitSpeed - 1L) / exitSpeed;
+        // Enter and leave at their separately configured dashboard speeds.
+        return Math.max(1000L, Math.min(120000L, entryMs + exitMs + 140L));
     }
 
     private void addElementMotion(View target, String rawMode, int viewport, long duration,
@@ -624,11 +628,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         float start = fromRight ? visibleWidth : -width;
         float finish = fromRight ? -width : visibleWidth;
         float travel = Math.abs(finish - start);
-        int speed = 120;
-        if (target == text && config != null && config.entrySpeedPxPerSec > 0) {
-            speed = Math.max(20, Math.min(800, config.entrySpeedPxPerSec));
+        if (target == text && config != null) {
+            int entrySpeed = Math.max(20, Math.min(800,
+                    config.entrySpeedPxPerSec > 0 ? config.entrySpeedPxPerSec : 120));
+            int exitSpeed = Math.max(20, Math.min(800,
+                    config.exitSpeedPxPerSec > 0 ? config.exitSpeedPxPerSec : 120));
+            float entryPoint = 0f;
+            float entryDistance = Math.abs(entryPoint - start);
+            float exitDistance = Math.abs(finish - entryPoint);
+            ObjectAnimator enter = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, start, entryPoint);
+            enter.setDuration(Math.max(1L, Math.round((entryDistance / entrySpeed) * 1000f)));
+            enter.setInterpolator(new LinearInterpolator());
+            ObjectAnimator exit = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, entryPoint, finish);
+            exit.setDuration(Math.max(1L, Math.round((exitDistance / exitSpeed) * 1000f)));
+            exit.setInterpolator(new LinearInterpolator());
+            AnimatorSet textMotion = new AnimatorSet();
+            textMotion.playSequentially(enter, exit);
+            animations.add(textMotion);
+            return;
         }
-        long computedDuration = Math.max(1L, Math.round((travel / speed) * 1000f));
+        long computedDuration = Math.max(1L, Math.round((travel / 120f) * 1000f));
         long safeDuration = Math.max(1000L, duration > 0L ? Math.min(duration, computedDuration + 140L) : computedDuration + 140L);
         ObjectAnimator movement = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, start, finish);
         movement.setDuration(safeDuration);
