@@ -220,12 +220,21 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.animate().cancel();
     }
 
-    private void clearGlide(Object target) {
+    private void clearGlide(ImageView target) {
         if (target == null) return;
         try {
             Glide.with(getContext().getApplicationContext()).clear(target);
         } catch (Exception ignored) {
-            // Activity may already be destroyed; dropping the target reference is enough.
+            // Activity may already be destroyed.
+        }
+    }
+
+    private void clearGlide(CustomTarget<File> target) {
+        if (target == null) return;
+        try {
+            Glide.with(getContext().getApplicationContext()).clear(target);
+        } catch (Exception ignored) {
+            // Activity may already be destroyed.
         }
     }
 
