@@ -367,7 +367,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const composerUrls=['composerBackgroundImage','composerIconUrl'];
     for (const k of composerUrls) { if (merged[k] && !/^https?:\/\//i.test(merged[k])) merged[k]=''; merged[k]=String(merged[k]||'').slice(0,2048); }
     const composerColors=['composerBackgroundColor','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor'];
-    for (const k of composerColors) { const v=String(merged[k]||''); if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) && !/^rgba?\\(/i.test(v)) merged[k]=DEFAULT_CONFIG[k]; }
+    for (const k of composerColors) { const v=String(merged[k]||''); if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) && !/^rgba?\(/i.test(v)) merged[k]=DEFAULT_CONFIG[k]; }
     await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
     return merged;
