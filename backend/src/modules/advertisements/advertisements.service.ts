@@ -339,6 +339,12 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         if(now < done + Math.max(0,Number(c.gapMs)||0)) return;
         current.status=AdvertisementStatus.COMPLETED; current.completedAt=new Date(); current.nextEligibleAt=new Date(done+Math.max(0,Number(c.gapMs)||0));
         await this.ads.save(current);
+        // Explicitly tell every connected room to clear this ad. The Android ticker
+        // also keeps its own server-time expiry as a safety net if this event is missed.
+        this.realtime.server.to('rooms:all').emit('room:advertisement', {
+          type: 'end', advertisement: this.publicAd(current), config: c,
+          at: current.completedAt.toISOString(), serverNow: new Date().toISOString(),
+        });
       }
       const qr=this.db.createQueryRunner(); await qr.connect(); await qr.startTransaction();
       try{
