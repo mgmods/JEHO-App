@@ -5,6 +5,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.DiffUtil;
 
 import com.Dramizo.Series.databinding.ItemRoomRecentJoinerBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
@@ -59,9 +60,34 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
     }
 
     public void submit(List<Joiner> members) {
+        List<Joiner> next = members != null ? new ArrayList<>(members) : new ArrayList<>();
+        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return items.size(); }
+            @Override public int getNewListSize() { return next.size(); }
+
+            @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                Joiner oldItem = items.get(oldPosition);
+                Joiner newItem = next.get(newPosition);
+                return oldItem != null && newItem != null
+                        && !oldItem.userId.isEmpty()
+                        && oldItem.userId.equals(newItem.userId);
+            }
+
+            @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                Joiner a = items.get(oldPosition);
+                Joiner b = next.get(newPosition);
+                return a == b || (a != null && b != null
+                        && a.displayName.equals(b.displayName)
+                        && java.util.Objects.equals(a.avatarUrl, b.avatarUrl)
+                        && java.util.Objects.equals(a.hostBadgeUrl, b.hostBadgeUrl)
+                        && java.util.Objects.equals(a.vipBadgeUrl, b.vipBadgeUrl)
+                        && a.vipLevel == b.vipLevel
+                        && a.userLevel == b.userLevel);
+            }
+        }, false);
         items.clear();
-        if (members != null) items.addAll(members);
-        notifyDataSetChanged();
+        items.addAll(next);
+        diff.dispatchUpdatesTo(this);
     }
 
     public boolean isEmpty() {
