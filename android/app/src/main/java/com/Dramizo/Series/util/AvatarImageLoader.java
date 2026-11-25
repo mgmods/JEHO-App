@@ -71,62 +71,58 @@ public final class AvatarImageLoader {
         if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
             view.setTag(R.id.tag_image_url, null);
             view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            try { Glide.with(view).clear(view); } catch (Exception ignored) {}
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
-        String abs = AssetCatalog.absoluteUrl(avatarUrl);
-        Object prev = view.getTag(R.id.tag_image_url);
-        boolean loadedOk = Boolean.TRUE.equals(view.getTag(R.id.tag_image_loaded));
-        // Only skip when the same URL already decoded — never lock on placeholder/error drawable.
-        if (prev instanceof String && abs != null && abs.equals(prev)
-                && loadedOk && view.getDrawable() != null) {
-            return;
-        }
-        view.setTag(R.id.tag_image_url, abs);
-        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+        String abs = AssetCatalog.absoluteUrl(avatarUrl.trim());
+        if (abs == null || abs.isEmpty()) return;
         boolean animated = isAnimatedMediaUrl(abs);
         int size = Math.max(96, Math.min(
                 view.getWidth() > 0 ? view.getWidth() : 256, 512));
+        String requestKey = abs + "#avatar:" + size;
+        Object previous = view.getTag(R.id.tag_image_url);
+        Object state = view.getTag(R.id.tag_image_loaded);
+        if (requestKey.equals(previous) && state instanceof Boolean) {
+            // FALSE means the same request is already in flight; TRUE means decoded.
+            // Failed requests clear the key below, so a later bind can retry.
+            return;
+        }
+        view.setTag(R.id.tag_image_url, requestKey);
+        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
         var req = Glide.with(view)
                 .load(abs)
                 .override(size, size)
-                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                .diskCacheStrategy(animated
+                        ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
+                        : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                 .error(ImagePlaceholder.avatar())
                 .listener(new RequestListener<Drawable>() {
                     @Override
                     public boolean onLoadFailed(
-                            @Nullable GlideException e,
-                            Object model,
-                            Target<Drawable> target,
-                            boolean isFirstResource) {
-                        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                            @Nullable GlideException e, Object model,
+                            Target<Drawable> target, boolean isFirstResource) {
+                        if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                            view.setTag(R.id.tag_image_url, null);
+                            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                        }
                         return false;
                     }
 
                     @Override
                     public boolean onResourceReady(
-                            Drawable resource,
-                            Object model,
-                            Target<Drawable> target,
-                            DataSource dataSource,
-                            boolean isFirstResource) {
-                        view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                            Drawable resource, Object model, Target<Drawable> target,
+                            DataSource dataSource, boolean isFirstResource) {
+                        if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                            view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                        }
                         return false;
                     }
                 });
-        // Placeholder only on cold first paint (no current drawable).
-        if (view.getDrawable() == null) {
-            req = req.placeholder(ImagePlaceholder.avatar());
-        }
-        // Let ImageView's CENTER_CROP scale type do the clipping. Applying a
-        // bitmap transform to every GIF/WebP frame is expensive and can stutter.
-        // Static photos can use a small thumbnail; animated media starts its real
-        // decoder directly so it never appears as a frozen preview.
-        if (!animated) {
-            req = req.centerCrop().dontAnimate().thumbnail(0.2f);
-        } else {
-            req = req.dontTransform();
-        }
+        if (view.getDrawable() == null) req = req.placeholder(ImagePlaceholder.avatar());
+        // Do not bitmap-transform animated frames; static art gets a tiny preview.
+        if (!animated) req = req.centerCrop().dontAnimate().thumbnail(0.2f);
+        else req = req.dontTransform();
         req.into(view);
     }
 
