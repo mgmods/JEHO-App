@@ -66,6 +66,11 @@
               <label class="form-label small">الحد الأقصى للأحرف</label>
               <input v-model.number="form.maxTextLength" type="number" min="1" max="500" class="form-control">
             </div>
+            <div class="col-md-3">
+              <label class="form-label small">الحد الأقصى للكلمات</label>
+              <input v-model.number="form.maxWords" type="number" min="1" max="200" class="form-control">
+              <div class="form-text">أي إعلان يتجاوز هذا العدد يُرفض قبل دخوله الطابور.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -192,7 +197,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false)
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,position:'free',positionXPercent:50,positionYPercent:52,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#FFFFFF',textGradientEndColor:'#9EDCFF',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,maxWords:30,position:'free',positionXPercent:50,positionYPercent:52,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapMs:1800,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#FFD98A',textColor:'#FFFFFF',background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#FFFFFF',textGradientEndColor:'#9EDCFF',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
 function apply(data){ Object.assign(form,data||{}); if(form.positionXPercent==null)form.positionXPercent=50; if(form.positionYPercent==null)form.positionYPercent=52; }
 function startDrag(event){dragging.value=true;event.currentTarget.setPointerCapture?.(event.pointerId);form.position='free';moveDrag(event)}
 function moveDrag(event){if(!dragging.value)return;const stage=event.currentTarget.closest('.room-preview-stage');if(!stage)return;const rect=stage.getBoundingClientRect();form.positionXPercent=Math.max(2,Math.min(98,Math.round(((event.clientX-rect.left)/rect.width)*100)));form.positionYPercent=Math.max(6,Math.min(94,Math.round(((event.clientY-rect.top)/rect.height)*100)))}
