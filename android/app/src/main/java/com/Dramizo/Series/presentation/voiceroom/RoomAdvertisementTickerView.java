@@ -456,17 +456,18 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             ArrayList<Animator> animations = new ArrayList<>();
             String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
                     ? "right-to-left" : "left-to-right";
-            String configuredTextMode = cfg == null || cfg.textMotion == null ? legacyTextMode : cfg.textMotion;
+            String configuredTextMode = cfg == null || cfg.textMotion == null
+                    ? legacyTextMode : cfg.textMotion;
             int viewportWidth = Math.max(1, textViewport.getWidth());
             int completeTextWidth = Math.max(text.getWidth(),
                     (int) Math.ceil(text.getPaint().measureText(text.getText().toString())));
-            // A long message must still travel through the viewport even when the
-            // dashboard's selected mode is static/fade; otherwise some words stay clipped.
-            if ("static".equalsIgnoreCase(configuredTextMode) || "fade".equalsIgnoreCase(configuredTextMode)
-                    || configuredTextMode.isEmpty()) {
-                configuredTextMode = legacyTextMode;
-            }
-            addElementMotion(text, configuredTextMode, viewportWidth, budget, animations);
+            // The dashboard controls the motion mode. Never replace its setting with
+            // another mode: static means static and fade means fade.
+            // For a moving ticker, use the configured pixel speed so the complete
+            // message crosses the viewport before the ad is removed.
+            long textMotionDuration = calculateTextMotionDuration(
+                    configuredTextMode, viewportWidth, completeTextWidth, cfg, budget);
+            addElementMotion(text, configuredTextMode, viewportWidth, textMotionDuration, animations);
             addElementMotion(name, cfg == null ? "static" : cfg.nameMotion,
                     Math.max(1, getWidth()), budget, animations);
             addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
@@ -490,6 +491,22 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         });
     }
 
+    private long calculateTextMotionDuration(String rawMode, int viewportWidth, int textWidth,
+                                             AdvertisementDtos.Ticker cfg, long displayBudget) {
+        String mode = rawMode == null ? "static" : rawMode.toLowerCase(Locale.ROOT);
+        if ("static".equals(mode) || mode.isEmpty() || "fade".equals(mode)) return displayBudget;
+        boolean moving = "right-to-left".equals(mode) || "rtl".equals(mode)
+                || "left-to-right".equals(mode) || "ltr".equals(mode);
+        if (!moving) return displayBudget;
+        int speed = cfg == null ? 120 : cfg.entrySpeedPxPerSec;
+        speed = Math.max(20, Math.min(800, speed > 0 ? speed : 120));
+        long distancePx = Math.max(1L, (long) Math.max(1, viewportWidth) + Math.max(1, textWidth));
+        long motionMs = (distancePx * 1000L + speed - 1L) / speed;
+        // The backend already guarantees enough display time for the message.
+        // Keep a tiny tail so the last glyph is fully visible before the row hides.
+        return Math.max(1000L, Math.min(120000L, motionMs + 140L));
+    }
+
     private void addElementMotion(View target, String rawMode, int viewport, long duration,
                                   ArrayList<Animator> animations) {
         String mode = rawMode == null ? "static" : rawMode.toLowerCase(Locale.ROOT);
@@ -504,14 +521,25 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             return;
         }
         int width = Math.max(1, target.getWidth());
-        float distance = Math.max(viewport, 1) + Math.max(width, 1);
+        int visibleWidth = Math.max(1, viewport);
         boolean fromRight = "right-to-left".equals(mode) || "rtl".equals(mode);
         boolean fromLeft = "left-to-right".equals(mode) || "ltr".equals(mode);
         if (!fromRight && !fromLeft) return;
-        float start = fromRight ? distance : -distance;
-        float finish = fromRight ? -distance : distance;
+
+        // Start just outside the viewport and finish immediately after the complete
+        // text leaves the opposite edge. This prevents the first/last words from
+        // being clipped and avoids wasting time on an unnecessary second viewport.
+        float start = fromRight ? visibleWidth : -width;
+        float finish = fromRight ? -width : visibleWidth;
+        float travel = Math.abs(finish - start);
+        int speed = 120;
+        if (target == text && config != null && config.entrySpeedPxPerSec > 0) {
+            speed = Math.max(20, Math.min(800, config.entrySpeedPxPerSec));
+        }
+        long computedDuration = Math.max(1L, Math.round((travel / speed) * 1000f));
+        long safeDuration = Math.max(1000L, duration > 0L ? Math.min(duration, computedDuration + 140L) : computedDuration + 140L);
         ObjectAnimator movement = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, start, finish);
-        movement.setDuration(duration);
+        movement.setDuration(safeDuration);
         movement.setInterpolator(new LinearInterpolator());
         animations.add(movement);
     }
