@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, OnModuleInit, Logger } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Room } from '../../database/entities/room.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
@@ -21,6 +21,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 @Controller('room-cup')
 export class RoomCupController implements OnModuleInit {
   private readonly logger = new Logger(RoomCupController.name);
+  private roomCupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(GiftSend) private readonly giftsRepo: Repository<GiftSend>,
@@ -31,6 +32,7 @@ export class RoomCupController implements OnModuleInit {
     private readonly txRepo: Repository<WalletTransaction>,
     @InjectRepository(VipPlan) private readonly vipPlansRepo: Repository<VipPlan>,
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
@@ -41,6 +43,20 @@ export class RoomCupController implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`cupBadgeSeason ensure failed: ${(err as Error).message}`);
     }
+    // A lightweight UTC boundary checker: no extra dependency and no request needed.
+    await this.checkSeasonRollover().catch((err) =>
+      this.logger.error(`Initial room-cup rollover check failed: ${(err as Error).message}`),
+    );
+    this.roomCupTimer = setInterval(() => {
+      void this.checkSeasonRollover().catch((err) =>
+        this.logger.error(`Room-cup automatic rewards failed: ${(err as Error).message}`),
+      );
+    }, 60_000);
+    this.roomCupTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.roomCupTimer) clearInterval(this.roomCupTimer);
   }
 
   private async setting(key: string, fallback = '') {
@@ -48,22 +64,72 @@ export class RoomCupController implements OnModuleInit {
     return row?.value ?? fallback;
   }
 
-  private seasonBounds(period: string) {
-    const now = new Date();
+  private seasonBounds(period: string, at = new Date()) {
+    let start: Date;
     if (period === 'monthly') {
-      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const key = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-      return { start, key };
+      start = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1));
+    } else {
+      const day = at.getUTCDay() || 7;
+      start = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() - (day - 1)));
     }
-    // weekly ISO-ish: Monday UTC
-    const day = now.getUTCDay() || 7;
-    const start = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (day - 1)),
-    );
-    const oneJan = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-    const week = Math.ceil(((start.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
-    const key = `${now.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
-    return { start, key };
+    return this.boundsForStart(period, start);
+  }
+
+  private boundsForStart(period: string, start: Date) {
+    const end = period === 'monthly'
+      ? new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1))
+      : new Date(start.getTime() + 7 * 86400000);
+    let key: string;
+    if (period === 'monthly') {
+      key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, '0')}`;
+    } else {
+      const oneJan = new Date(Date.UTC(start.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((start.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
+      key = `${start.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+    }
+    return { start, end, key };
+  }
+
+  private async checkSeasonRollover() {
+    if ((await this.setting('room_cup.enabled', 'true')) === 'false') return;
+    const period = (await this.setting('room_cup.period', 'weekly')) || 'weekly';
+    const current = this.seasonBounds(period);
+    const checkpointKey = 'room_cup.auto_next_start';
+    const checkpoint = await this.settingsRepo.findOne({ where: { key: checkpointKey } });
+    // First boot establishes a baseline; never pay out historical seasons by surprise.
+    if (!checkpoint?.value) {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: checkpointKey, value: current.start.toISOString(),
+        description: 'Next room-cup season start to process automatically',
+      }));
+      return;
+    }
+    let cursor = new Date(checkpoint.value);
+    if (Number.isNaN(cursor.getTime())) {
+      cursor = current.start;
+      checkpoint.value = cursor.toISOString();
+      await this.settingsRepo.save(checkpoint);
+      return;
+    }
+    // Catch up every missed season after a sleep/restart, one at a time.
+    let guard = 0;
+    while (cursor.getTime() < current.start.getTime() && guard++ < 24) {
+      const season = this.boundsForStart(period, cursor);
+      const board = await this.leaderboardForRange(period, season.start, season.end, season.key);
+      await this.endSeason(board, season.key);
+      cursor = season.end;
+      const latest = await this.settingsRepo.findOne({ where: { key: checkpointKey } });
+      if (latest) {
+        latest.value = cursor.toISOString();
+        await this.settingsRepo.save(latest);
+      } else {
+        await this.settingsRepo.save(this.settingsRepo.create({
+          key: checkpointKey, value: cursor.toISOString(),
+          description: 'Next room-cup season start to process automatically',
+        }));
+      }
+      this.logger.log(`Automatically awarded room cup season ${season.key}`);
+    }
   }
 
   @Public()
@@ -76,22 +142,24 @@ export class RoomCupController implements OnModuleInit {
     if (!enabled) {
       return { enabled: false, period, seasonKey: key, items: [] };
     }
+    const bounds = this.seasonBounds(period);
+    return this.leaderboardForRange(period, bounds.start, bounds.end, key);
+  }
+
+  private async leaderboardForRange(period: string, start: Date, end: Date, key: string) {
     const rows = await this.giftsRepo
       .createQueryBuilder('g')
       .select('g.roomId', 'roomId')
       .addSelect('COALESCE(SUM(g.diamondsAwarded), 0)', 'score')
       .where('g.roomId IS NOT NULL')
-      .andWhere('g.createdAt >= :start', { start })
+      .andWhere('g.createdAt >= :start AND g.createdAt < :end', { start, end })
       .groupBy('g.roomId')
       .orderBy('score', 'DESC')
       .limit(50)
       .getRawMany();
     const ids = rows.map((r) => r.roomId).filter(Boolean);
     const rooms = ids.length
-      ? await this.roomsRepo.find({
-          where: { id: In(ids) },
-          relations: ['host'],
-        })
+      ? await this.roomsRepo.find({ where: { id: In(ids) }, relations: ['host'] })
       : [];
     const byId = new Map(rooms.map((r) => [r.id, r]));
     const items = rows.map((r, i) => {
@@ -111,19 +179,57 @@ export class RoomCupController implements OnModuleInit {
     return { enabled: true, period, seasonKey: key, periodStart: start.toISOString(), items };
   }
 
+  private async grantCurrencyPrize(
+    hostId: string,
+    seasonKey: string,
+    rank: number,
+    currency: CurrencyType,
+    amount: number,
+  ) {
+    const referenceId = `${seasonKey}:r${rank}:${currency}`;
+    await this.dataSource.transaction(async (manager) => {
+      // Serialize grants for this host and keep balance + ledger in one transaction.
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId: hostId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) {
+        wallet = manager.create(Wallet, { userId: hostId });
+        wallet = await manager.save(Wallet, wallet);
+      }
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId: hostId, referenceType: 'room_cup', referenceId },
+      });
+      if (existing) return;
+      if (currency === CurrencyType.COINS) wallet.coins = Number(wallet.coins) + amount;
+      else wallet.diamonds = Number(wallet.diamonds) + amount;
+      await manager.save(Wallet, wallet);
+      await manager.save(WalletTransaction, manager.create(WalletTransaction, {
+        userId: hostId,
+        type: TransactionType.LUCKY_REWARD,
+        currency,
+        amount,
+        balanceAfter: currency === CurrencyType.COINS ? Number(wallet.coins) : Number(wallet.diamonds),
+        referenceType: 'room_cup',
+        referenceId,
+        description: `جائزة كأس الروم #${rank}`,
+      }));
+    });
+  }
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('admin/end-season')
   @ApiOperation({ summary: 'Award prizes, set winner badges, reset for next season' })
-  async endSeason() {
-    const board = await this.leaderboard();
+  async endSeason(boardOverride?: any, seasonKeyOverride?: string) {
+    const board = boardOverride || await this.leaderboard();
     let prizes: any[] = [];
     try {
       prizes = JSON.parse(await this.setting('room_cup.prizes', '[]'));
     } catch {
       prizes = [];
     }
-    const seasonKey = board.seasonKey;
+    const seasonKey = seasonKeyOverride || board.seasonKey;
     // Clear previous badges
     await this.roomsRepo
       .createQueryBuilder()
@@ -150,36 +256,10 @@ export class RoomCupController implements OnModuleInit {
           wallet = await this.walletsRepo.save(this.walletsRepo.create({ userId: hostId }));
         }
         if (coins > 0) {
-          wallet.coins = Number(wallet.coins) + coins;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.COINS,
-              amount: coins,
-              balanceAfter: Number(wallet.coins),
-              referenceType: 'room_cup',
-              referenceId: `${seasonKey}:r${rank}:coins`,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
+          await this.grantCurrencyPrize(hostId, seasonKey, rank, CurrencyType.COINS, coins);
         }
         if (diamonds > 0) {
-          wallet.diamonds = Number(wallet.diamonds) + diamonds;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.DIAMONDS,
-              amount: diamonds,
-              balanceAfter: Number(wallet.diamonds),
-              referenceType: 'room_cup',
-              referenceId: `${seasonKey}:r${rank}:diamonds`,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
+          await this.grantCurrencyPrize(hostId, seasonKey, rank, CurrencyType.DIAMONDS, diamonds);
         }
       }
       // VIP is purchase-only — ignore vipLevel / vipPlanId prizes from room cup.
