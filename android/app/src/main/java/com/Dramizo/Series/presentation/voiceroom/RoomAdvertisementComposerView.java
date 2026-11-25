@@ -130,8 +130,20 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         if (borderWidth > 0) bg.setStroke(borderWidth, borderColor);
         settingsButton.setBackground(bg);
         int height = dp(Math.max(32, cfg.composerButtonHeightDp > 0 ? cfg.composerButtonHeightDp : 46));
+        int width = cfg.composerButtonWidthDp > 0
+                ? dp(Math.max(80, Math.min(600, cfg.composerButtonWidthDp)))
+                : ViewGroup.LayoutParams.MATCH_PARENT;
+        int horizontalPadding = dp(Math.max(0, Math.min(80, cfg.composerButtonHorizontalPaddingDp)));
         ViewGroup.LayoutParams lp = settingsButton.getLayoutParams();
-        if (lp != null && lp.height != height) { lp.height = height; settingsButton.setLayoutParams(lp); }
+        if (lp != null && (lp.height != height || lp.width != width)) {
+            lp.width = width;
+            lp.height = height;
+            if (lp instanceof FrameLayout.LayoutParams) ((FrameLayout.LayoutParams) lp).gravity = Gravity.CENTER_HORIZONTAL;
+            if (lp instanceof LinearLayout.LayoutParams) ((LinearLayout.LayoutParams) lp).gravity = Gravity.CENTER_HORIZONTAL;
+            settingsButton.setLayoutParams(lp);
+        }
+        settingsButton.setPadding(horizontalPadding, settingsButton.getPaddingTop(), horizontalPadding, settingsButton.getPaddingBottom());
+        settingsButton.setGravity(Gravity.CENTER);
         settingsButton.setMinHeight(height);
         settingsButton.setContentDescription(label);
     }
