@@ -152,7 +152,6 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestsActivity" android:exported="false" 
             android:screenOrientation="portrait" />
-            android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestDetailActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.agency.AgencyActivity" android:exported="false"
