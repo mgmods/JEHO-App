@@ -3,6 +3,8 @@ package com.Dramizo.Series.presentation.voiceroom;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.AnimatorSet;
+import java.util.ArrayList;
 import android.view.animation.LinearInterpolator;
 import android.content.Context;
 import android.graphics.Color;
@@ -57,7 +59,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private final AtomicBoolean attached = new AtomicBoolean(false);
     private volatile AdvertisementDtos.Ticker config;
     private volatile String currentAdId = "";
-    private ObjectAnimator activeAnimator;
+    private AnimatorSet activeAnimator;
     private volatile boolean needsResume = false;
     private boolean movingForPlacement = false;
     private long currentDisplayBudgetMs = 9000L;
@@ -189,7 +191,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     private void cancelActiveAnimator() {
-        ObjectAnimator animator = activeAnimator;
+        AnimatorSet animator = activeAnimator;
         activeAnimator = null;
         animationGeneration++;
         if (animator != null) animator.cancel();
@@ -377,75 +379,72 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void animateTextIn(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, long generation) {
         text.clearAnimation();
         text.setAlpha(1f);
+        name.setAlpha(1f);
+        avatar.setAlpha(1f);
         text.setTranslationX(0f);
+        name.setTranslationX(0f);
+        avatar.setTranslationX(0f);
+        final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
-            text.setText(text.getText());
-            long visibleFor = Math.max(1000L, currentDisplayBudgetMs);
             postDelayed(() -> {
                 if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
-            }, visibleFor);
+            }, budget);
             return;
         }
         text.post(() -> {
             if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
-            int viewport = Math.max(1, textViewport.getWidth());
-            int width = Math.max(1, text.getWidth());
-            int distance = viewport + width;
-            boolean rtl = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction);
-            float start = rtl ? distance : -distance;
-            float end = rtl ? -distance : distance;
-            text.setTranslationX(start);
-            float density = getResources().getDisplayMetrics().density;
-            // Use one shared speed for the complete pass. The slower configured leg wins,
-            // so a slow setting never accelerates at the entry/exit boundary.
-            float uniformSpeed = Math.min(
-                    safe(cfg != null ? cfg.entrySpeedPxPerSec : 120, 120),
-                    safe(cfg != null ? cfg.exitSpeedPxPerSec : 120, 120)) * density;
-            float entrySpeed = uniformSpeed;
-            float exitSpeed = uniformSpeed;
-            long requestedEntry = Math.max(250L, (long) ((distance / Math.max(1f, entrySpeed)) * 1000L));
-            long requestedExit = Math.max(250L, (long) ((distance / Math.max(1f, exitSpeed)) * 1000L));
-            long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : (cfg != null ? cfg.displayDurationMs : 9000));
-            long requestedTotal = requestedEntry + requestedExit;
-            long entryDuration = requestedTotal > budget ? Math.max(250L, budget * requestedEntry / requestedTotal) : requestedEntry;
-            long exitDuration = Math.max(250L, budget - entryDuration);
-            if (entryDuration + exitDuration > budget) entryDuration = Math.max(250L, budget - exitDuration);
-            boolean fade = cfg != null && "fade".equalsIgnoreCase(cfg.transitionType);
-            text.setAlpha(fade ? 0f : 1f);
-            ObjectAnimator in = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, start, 0f);
-            activeAnimator = in;
-            in.setDuration(entryDuration);
-            in.setInterpolator(new LinearInterpolator());
-            if (fade) text.animate().alpha(1f).setDuration(Math.min(450L, entryDuration)).start();
-            in.addListener(new AnimatorListenerAdapter() {
+            ArrayList<Animator> animations = new ArrayList<>();
+            String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
+                    ? "right-to-left" : "left-to-right";
+            addElementMotion(text, cfg == null || cfg.textMotion == null ? legacyTextMode : cfg.textMotion,
+                    Math.max(1, textViewport.getWidth()), budget, animations);
+            addElementMotion(name, cfg == null ? "static" : cfg.nameMotion,
+                    Math.max(1, getWidth()), budget, animations);
+            addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
+                    Math.max(1, getWidth()), budget, animations);
+            if (animations.isEmpty()) {
+                postDelayed(() -> {
+                    if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
+                }, budget);
+                return;
+            }
+            AnimatorSet set = new AnimatorSet();
+            set.playTogether(animations);
+            activeAnimator = set;
+            set.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
-                    if (activeAnimator == in) activeAnimator = null;
-                    if (generation == animationGeneration && ad.id.equals(currentAdId)) animateTextAcross(ad, cfg, viewport, exitDuration, generation);
+                    if (activeAnimator == set) activeAnimator = null;
+                    if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
                 }
             });
-            in.start();
+            set.start();
         });
     }
 
-    private void animateTextAcross(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg, int viewport, long exitDuration, long generation) {
-        if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
-        int width = Math.max(1, text.getWidth());
-        boolean rtl = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction);
-        float end = rtl ? -(viewport + width) : (viewport + width);
-        ObjectAnimator out = ObjectAnimator.ofFloat(text, View.TRANSLATION_X, 0f, end);
-        activeAnimator = out;
-        out.setDuration(Math.max(250L, exitDuration));
-        out.setInterpolator(new LinearInterpolator());
-        if (cfg != null && "fade".equalsIgnoreCase(cfg.transitionType)) text.animate().alpha(0f).setDuration(Math.min(450L, exitDuration)).start();
-        out.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
-                if (activeAnimator == out) activeAnimator = null;
-                if (generation == animationGeneration && ad.id.equals(currentAdId)) {
-                    hideAdvertisement();
-                }
-            }
-        });
-        out.start();
+    private void addElementMotion(View target, String rawMode, int viewport, long duration,
+                                  ArrayList<Animator> animations) {
+        String mode = rawMode == null ? "static" : rawMode.toLowerCase(Locale.ROOT);
+        target.setTranslationX(0f);
+        target.setAlpha(1f);
+        if ("static".equals(mode) || mode.isEmpty()) return;
+        if ("fade".equals(mode)) {
+            ObjectAnimator fade = ObjectAnimator.ofFloat(target, View.ALPHA, 0f, 1f);
+            fade.setDuration(Math.min(700L, duration));
+            fade.setInterpolator(new LinearInterpolator());
+            animations.add(fade);
+            return;
+        }
+        int width = Math.max(1, target.getWidth());
+        float distance = viewport + width;
+        boolean fromRight = "right-to-left".equals(mode) || "rtl".equals(mode);
+        boolean fromLeft = "left-to-right".equals(mode) || "ltr".equals(mode);
+        if (!fromRight && !fromLeft) return;
+        float start = fromRight ? distance : -distance;
+        float finish = fromRight ? -distance : distance;
+        ObjectAnimator movement = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, start, finish);
+        movement.setDuration(duration);
+        movement.setInterpolator(new LinearInterpolator());
+        animations.add(movement);
     }
 
     private void applySafePlacement(String position, int customOffsetDp, int xPercent, int yPercent) {
