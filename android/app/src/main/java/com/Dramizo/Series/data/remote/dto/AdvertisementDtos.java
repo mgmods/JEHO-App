@@ -83,6 +83,14 @@ public final class AdvertisementDtos {
         public String composerSendBorderColor;
         public int composerButtonRadiusDp;
         public int composerIconSizeDp;
+        public String composerButtonText;
+        public String composerButtonTextColor;
+        public String composerButtonBackgroundStartColor;
+        public String composerButtonBackgroundEndColor;
+        public String composerButtonBorderColor;
+        public int composerButtonBorderWidthDp;
+        public int composerButtonHeightDp;
+        public int composerButtonTextSizeSp;
     }
 
     public static class Remaining {
