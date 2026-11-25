@@ -317,9 +317,11 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   private async tick() {
     if(this.busy)return;
-    if (!(await this.ensureWorkerLeadership())) return;
+    // Claim the in-process worker slot before awaiting database leadership;
+    // otherwise overlapping 500ms ticks can both pass the initial busy check.
     this.busy=true;
     try {
+      if (!(await this.ensureWorkerLeadership())) return;
       const c=await this.config();
       if(this.leaderJustAcquired){
         this.leaderJustAcquired=false;

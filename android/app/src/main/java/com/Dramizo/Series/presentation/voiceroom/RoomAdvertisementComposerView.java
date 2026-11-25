@@ -45,7 +45,6 @@ import retrofit2.Response;
 public final class RoomAdvertisementComposerView extends FrameLayout implements RealtimeClient.UserListener {
     private final AtomicBoolean loading = new AtomicBoolean(false);
     private TextView settingsButton;
-    private int defaultSettingsButtonWidth = ViewGroup.LayoutParams.MATCH_PARENT;
     private int remaining = -1;
     private int maxLength = 180;
     private int maxWords = 30;
@@ -103,8 +102,6 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     public void bindSettingsButton(TextView button) {
         settingsButton = button;
         if (settingsButton == null) return;
-        ViewGroup.LayoutParams initialParams = settingsButton.getLayoutParams();
-        if (initialParams != null) defaultSettingsButtonWidth = initialParams.width;
         settingsButton.setOnClickListener(v -> showComposer());
         settingsButton.setVisibility(featureEnabled ? VISIBLE : GONE);
         if (composerConfig != null) applyOpenButtonConfig(composerConfig);
@@ -133,16 +130,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         if (borderWidth > 0) bg.setStroke(borderWidth, borderColor);
         settingsButton.setBackground(bg);
         int height = dp(Math.max(32, cfg.composerButtonHeightDp > 0 ? cfg.composerButtonHeightDp : 46));
-        int width = cfg.composerButtonWidthDp > 0
-                ? dp(Math.min(600, cfg.composerButtonWidthDp)) : defaultSettingsButtonWidth;
-        int horizontalPadding = dp(Math.max(0, Math.min(80, cfg.composerButtonHorizontalPaddingDp)));
         ViewGroup.LayoutParams lp = settingsButton.getLayoutParams();
-        if (lp != null && (lp.height != height || lp.width != width)) {
-            lp.height = height;
-            lp.width = width;
-            settingsButton.setLayoutParams(lp);
-        }
-        settingsButton.setPadding(horizontalPadding, dp(6), horizontalPadding, dp(6));
+        if (lp != null && lp.height != height) { lp.height = height; settingsButton.setLayoutParams(lp); }
         settingsButton.setMinHeight(height);
         settingsButton.setContentDescription(label);
     }
