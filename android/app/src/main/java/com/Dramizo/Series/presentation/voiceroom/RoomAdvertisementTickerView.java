@@ -406,7 +406,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }, budget);
             return;
         }
-        text.post(() -> {
+        // Begin the ticker motion on the very next frame after its content is laid out.
+        postOnAnimation(() -> {
             if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
             ArrayList<Animator> animations = new ArrayList<>();
             String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
