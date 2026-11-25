@@ -144,13 +144,13 @@ final class RoomMoreOperatorSheet {
         advertisementAction.setOnClickListener(v -> {
             dialog.dismiss();
             if (ctx instanceof Activity) {
-                int composerId = ctx.getResources().getIdentifier(
-                        "roomAdvertisementComposer", "id", ctx.getPackageName());
-                RoomAdvertisementComposerView composer = composerId != 0
-                        ? ((Activity) ctx).findViewById(composerId)
-                        : null;
-                if (composer != null) composer.showComposer();
-                else Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
+                View contentRoot = ((Activity) ctx).findViewById(android.R.id.content);
+                RoomAdvertisementComposerView composer = findAdvertisementComposer(contentRoot);
+                if (composer != null) {
+                    composer.showComposer();
+                } else {
+                    Toast.makeText(ctx, "نافذة الإعلان غير موجودة في تصميم الروم", Toast.LENGTH_SHORT).show();
+                }
             } else {
                 Toast.makeText(ctx, "تعذر فتح نافذة الإعلان", Toast.LENGTH_SHORT).show();
             }
@@ -307,6 +307,26 @@ final class RoomMoreOperatorSheet {
                 R.string.room_more_low_gift,
                 "low_gift"));
         return list;
+    }
+
+    /**
+     * Finds the composer by its view type instead of a resource ID. The composer
+     * intentionally has no ID so ViewBinding does not make it a required field.
+     */
+    @Nullable
+    private static RoomAdvertisementComposerView findAdvertisementComposer(@Nullable View root) {
+        if (root instanceof RoomAdvertisementComposerView) {
+            return (RoomAdvertisementComposerView) root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                RoomAdvertisementComposerView found =
+                        findAdvertisementComposer(group.getChildAt(i));
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static void showAdvertisementDialog(@NonNull Host host) {
