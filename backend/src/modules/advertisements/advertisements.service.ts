@@ -248,8 +248,19 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         displayTemplateId:String(c.template||'premium-v1'),
         displayDurationMs:Math.min(120000, Math.max(this.bound(c.displayDurationMs,1000,120000,9000), Math.ceil(((text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)) + 1200) / this.bound(c.entrySpeedPxPerSec, 20, 800, 120) * 1000))),
       });
-      await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
-      return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
+      await qr.manager.save(ad);
+      // Commit is the authoritative success point. Never turn a committed
+      // advertisement into an HTTP error because the post-commit quota lookup
+      // or worker wake-up fails.
+      await qr.commitTransaction();
+      let remaining: any = null;
+      try {
+        remaining = await this.remainingForUser(userId);
+      } catch (quotaError) {
+        this.log.warn('Advertisement committed but quota refresh failed: ' + String((quotaError as any)?.message || quotaError));
+      }
+      void this.tick();
+      return {duplicate:false,advertisement:this.publicAd(ad),remaining};
     } catch(e) {
       const failure = e as any;
       const message = String(failure?.message || e || 'Unknown advertisement error');
