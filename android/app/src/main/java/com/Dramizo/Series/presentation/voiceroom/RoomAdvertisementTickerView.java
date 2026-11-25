@@ -594,7 +594,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             // Reconstruct the same animation phase on every room/device from the
             // server start timestamp instead of restarting at local event-receive time.
             // Late socket delivery therefore catches up rather than shifting the ticker.
-            if (elapsedSinceServerStartMs > 0L) {
+            if (elapsedSinceServerStartMs > 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try { set.setCurrentPlayTime(elapsedSinceServerStartMs); } catch (Exception ignored) {}
             }
         });
