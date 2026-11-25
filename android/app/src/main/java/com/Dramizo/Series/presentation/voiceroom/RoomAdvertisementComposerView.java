@@ -180,8 +180,11 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                                                      Response<ApiResponse<AdvertisementDtos.Remaining>> response) {
                         AdvertisementDtos.Remaining data = response.body() == null ? null : response.body().data;
                         if (data == null) {
+                            // Quota display is advisory only. The create endpoint
+                            // enforces the daily limit transactionally, so do not
+                            // block the user from composing when this read fails.
                             remaining = -1;
-                            Toast.makeText(getContext(), "تعذر التحقق من الحد اليومي، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                            post(() -> openComposer());
                             return;
                         }
                         remaining = Math.max(0, data.remaining);
@@ -192,7 +195,8 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                         post(() -> openComposer());
                     }
                     @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
-                        Toast.makeText(getContext(), "تعذر التحقق من الحد اليومي، حاول مجدداً", Toast.LENGTH_SHORT).show();
+                        remaining = -1;
+                        post(() -> openComposer());
                     }
                 });
             }
@@ -369,7 +373,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         sheet.addView(meta, metaLp);
         TextView quota = new TextView(getContext());
-        quota.setText(remaining < 0 ? "●  التحقق من الحد اليومي…" : "●  المتبقي اليوم  " + remaining + " إعلان");
+        quota.setText(remaining < 0 ? "●  سيتم التحقق من الحد عند الإرسال" : "●  المتبقي اليوم  " + remaining + " إعلان");
         quota.setTextColor(sendStart);
         quota.setTextSize(11);
         quota.setTypeface(Typeface.DEFAULT_BOLD);
