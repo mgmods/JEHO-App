@@ -1685,7 +1685,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void bindDeferredRoomChrome(
             @NonNull RoomDtos.RoomDto room, @Nullable List<RoomDtos.SeatDto> seats) {
         if (binding == null) return;
-        if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
+        boolean coverChanged = !Objects.equals(lastBoundCoverUrl, room.coverUrl);
+        boolean coverNeedsRetry = room.coverUrl != null && !room.coverUrl.isEmpty()
+                && binding.imgRoomBannerCover != null
+                && !(binding.imgRoomBannerCover.getTag(R.id.tag_image_url) instanceof String);
+        if (coverChanged || coverNeedsRetry) {
             lastBoundCoverUrl = room.coverUrl;
             if (binding.imgRoomBannerCover != null) {
                 com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
@@ -11146,16 +11150,27 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void applyRoomBackground(String url) {
-        String backgroundKey = url != null ? url : "";
-        if (Objects.equals(lastBoundBackgroundUrl, backgroundKey)) return;
+        String themeBg = (url == null || url.isEmpty())
+                ? com.Dramizo.Series.util.RemoteTheme.roomDefaultBackgroundUrl(this) : null;
+        String backgroundKey = (url == null || url.isEmpty())
+                ? "default:" + (themeBg != null ? themeBg : "") : url;
+        boolean sameBackground = Objects.equals(lastBoundBackgroundUrl, backgroundKey);
+        if (sameBackground) {
+            if (url != null && url.startsWith("drawable://")) return;
+            if (binding.imgRoomBg != null
+                    && binding.imgRoomBg.getTag(R.id.tag_image_url) instanceof String) return;
+            if ((url == null || url.isEmpty()) && (themeBg == null || themeBg.isEmpty())) return;
+        }
         lastBoundBackgroundUrl = backgroundKey;
+
         if (url == null || url.isEmpty()) {
-            String themeBg = com.Dramizo.Series.util.RemoteTheme.roomDefaultBackgroundUrl(this);
             if (themeBg != null && !themeBg.isEmpty()) {
                 com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
                         binding.imgRoomBg, themeBg, R.drawable.voice_room_bg);
             } else {
                 try { Glide.with(binding.imgRoomBg).clear(binding.imgRoomBg); } catch (Exception ignored) {}
+                binding.imgRoomBg.setTag(R.id.tag_image_url, null);
+                binding.imgRoomBg.setTag(R.id.tag_image_loaded, Boolean.FALSE);
                 binding.imgRoomBg.setImageResource(R.drawable.voice_room_bg);
             }
             return;
@@ -11166,14 +11181,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.imgRoomBg.setTag(R.id.tag_image_loaded, Boolean.FALSE);
             String name = url.substring("drawable://".length());
             int resId = getResources().getIdentifier(name, "drawable", getPackageName());
-            if (resId != 0) binding.imgRoomBg.setImageResource(resId);
-            else binding.imgRoomBg.setImageResource(R.drawable.voice_room_bg);
+            binding.imgRoomBg.setImageResource(resId != 0 ? resId : R.drawable.voice_room_bg);
             return;
         }
         com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
                 binding.imgRoomBg, url, R.drawable.voice_room_bg);
     }
-
     private void showRoomBackgroundPicker() {
         showRoomCosmeticPicker("room_background", false, false);
     }
