@@ -133,7 +133,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (!text) throw new BadRequestException('اكتب نص الإعلان أولاً');
     if (text.length > max) throw new BadRequestException('تجاوزت الحد الأقصى لعدد الأحرف (' + max + ')');
     const maxWords = this.bound(c.maxWords, 1, 200, 30);
-    const wordCount = text.split(/\\s+/u).filter(Boolean).length;
+    const wordCount = text.split(/\s+/u).filter(Boolean).length;
     if (wordCount > maxWords) throw new BadRequestException('الإعلان يحتوي على ' + wordCount + ' كلمة، والحد المسموح ' + maxWords + ' كلمة');
     if (!key || key.length < 8 || key.length > 128) throw new BadRequestException('معرّف الطلب غير صالح');
 
@@ -186,7 +186,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
-        displayDurationMs:Math.min(120000, Math.max(this.bound(c.displayDurationMs,1000,120000,9000), Math.ceil(((text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)) + 1200) / this.bound(c.entrySpeedPxPerSec, 20, 800, 120) * 1000)),
+        displayDurationMs:Math.min(120000, Math.max(this.bound(c.displayDurationMs,1000,120000,9000), Math.ceil(((text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)) + 1200) / this.bound(c.entrySpeedPxPerSec, 20, 800, 120) * 1000))),
       });
       await qr.manager.save(ad); await qr.commitTransaction(); void this.tick();
       return {duplicate:false,advertisement:this.publicAd(ad),remaining:await this.remainingForUser(userId)};
