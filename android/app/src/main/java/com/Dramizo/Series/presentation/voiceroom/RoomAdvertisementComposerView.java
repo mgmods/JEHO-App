@@ -162,9 +162,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         sheet.setOrientation(LinearLayout.VERTICAL);
         sheet.setPadding(dp(20), dp(12), dp(20), dp(22));
         GradientDrawable sheetBg = new GradientDrawable();
-        sheetBg.setColor(Color.WHITE);
+        sheetBg.setColor(Color.rgb(18, 24, 39));
         sheetBg.setCornerRadius(dp(28));
-        sheetBg.setStroke(dp(1), Color.rgb(232, 224, 209));
+        sheetBg.setStroke(dp(1), Color.rgb(119, 91, 53));
         sheet.setBackground(sheetBg);
         sheet.setElevation(dp(22));
 
@@ -183,8 +183,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         hero.setGravity(Gravity.CENTER_VERTICAL);
         hero.setPadding(dp(16), dp(16), dp(14), dp(16));
         GradientDrawable heroBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.rgb(35, 43, 60), Color.rgb(67, 75, 91)});
+                new int[]{Color.rgb(29, 28, 53), Color.rgb(67, 39, 82)});
         heroBg.setCornerRadius(dp(20));
+        heroBg.setStroke(dp(1), Color.rgb(133, 100, 53));
         hero.setBackground(heroBg);
 
         LinearLayout heroText = new LinearLayout(getContext());
@@ -229,7 +230,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         LinearLayout delivery = new LinearLayout(getContext());
         delivery.setGravity(Gravity.CENTER_VERTICAL);
         delivery.setPadding(dp(13), dp(12), dp(13), dp(12));
-        delivery.setBackground(roundRect(Color.rgb(255, 249, 237), dp(15), Color.rgb(244, 229, 199)));
+        delivery.setBackground(roundRect(Color.rgb(34, 34, 51), dp(15), Color.rgb(91, 76, 63)));
         LinearLayout.LayoutParams deliveryLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         deliveryLp.topMargin = dp(14);
@@ -246,13 +247,13 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         deliveryText.setPadding(dp(9), 0, 0, 0);
         TextView deliveryTitle = new TextView(getContext());
         deliveryTitle.setText("موعد الظهور");
-        deliveryTitle.setTextColor(ink);
+        deliveryTitle.setTextColor(Color.WHITE);
         deliveryTitle.setTextSize(12);
         deliveryTitle.setTypeface(Typeface.DEFAULT_BOLD);
         deliveryText.addView(deliveryTitle);
         TextView deliveryDesc = new TextView(getContext());
         deliveryDesc.setText("يبدأ بعد 10 ثوانٍ من قبول الطلب، ثم يُبث في كل الغرف.");
-        deliveryDesc.setTextColor(Color.rgb(117, 99, 66));
+        deliveryDesc.setTextColor(Color.rgb(220, 198, 158));
         deliveryDesc.setTextSize(11);
         LinearLayout.LayoutParams deliveryDescLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -269,22 +270,22 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView fieldLabel = new TextView(getContext());
         fieldLabel.setText("محتوى الإعلان");
-        fieldLabel.setTextColor(ink);
+        fieldLabel.setTextColor(Color.WHITE);
         fieldLabel.setTextSize(14);
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         TextView fieldHint = new TextView(getContext());
         fieldHint.setText("رسالة عامة");
-        fieldHint.setTextColor(muted);
+        fieldHint.setTextColor(Color.rgb(224, 190, 128));
         fieldHint.setTextSize(10);
         fieldHeader.addView(fieldHint);
 
         EditText input = new EditText(getContext());
         input.setHint("اكتب إعلانك بوضوح ليصل إلى جميع الموجودين...");
         input.setTextSize(15);
-        input.setTextColor(ink);
-        input.setHintTextColor(Color.rgb(157, 164, 174));
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.rgb(145, 153, 170));
         input.setSingleLine(false);
         input.setMinLines(4);
         input.setMaxLines(5);
@@ -292,7 +293,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         input.setTextDirection(View.TEXT_DIRECTION_RTL);
         input.setPadding(dp(15), dp(14), dp(15), dp(14));
         input.setLineSpacing(dp(3), 1f);
-        input.setBackground(roundRect(Color.rgb(249, 250, 252), dp(16), Color.rgb(218, 223, 231)));
+        input.setBackground(roundRect(Color.rgb(29, 36, 54), dp(16), Color.rgb(83, 91, 112)));
         LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, dp(132));
         inputLp.topMargin = dp(9);
@@ -331,19 +332,19 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
 
         TextView cancel = new TextView(getContext());
         cancel.setText("إلغاء");
-        cancel.setTextColor(Color.rgb(88, 96, 109));
+        cancel.setTextColor(Color.rgb(226, 229, 237));
         cancel.setTextSize(13);
         cancel.setGravity(Gravity.CENTER);
-        cancel.setBackground(roundRect(Color.rgb(241, 243, 246), dp(15), Color.rgb(228, 231, 236)));
+        cancel.setBackground(roundRect(Color.rgb(38, 45, 63), dp(15), Color.rgb(76, 84, 103)));
         actions.addView(cancel, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.78f));
 
         TextView send = new TextView(getContext());
-        send.setText("إرسال الإعلان  ➊");
+        send.setText("إرسال إلى جميع الغرف  ✦");
         send.setTextColor(Color.WHITE);
         send.setTextSize(14);
         send.setTypeface(Typeface.DEFAULT_BOLD);
         send.setGravity(Gravity.CENTER);
-        send.setBackground(roundRectGradient(new int[]{Color.rgb(151, 96, 26), Color.rgb(218, 164, 67)}, dp(15)));
+        send.setBackground(roundRectGradient(new int[]{Color.rgb(131, 73, 27), Color.rgb(221, 168, 79)}, dp(15)));
         send.setElevation(dp(4));
         LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.22f);
         sendLp.leftMargin = dp(10);
