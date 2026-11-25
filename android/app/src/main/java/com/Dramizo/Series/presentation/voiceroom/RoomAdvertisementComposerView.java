@@ -40,6 +40,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
     private int remaining = 0;
     private int maxLength = 180;
     private int maxWords = 30;
+    private int publishDelaySeconds = 10;
     private boolean featureEnabled = false;
     // Reuse this key whenever the request outcome is uncertain; the backend deduplicates it.
     private String pendingIdempotencyKey;
@@ -100,6 +101,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
             featureEnabled = next.enabled && next.sendButtonEnabled;
             maxLength = next.maxTextLength > 0 ? next.maxTextLength : 180;
             maxWords = next.maxWords > 0 ? next.maxWords : 30;
+            publishDelaySeconds = next.publishDelayMs > 0 ? Math.max(1, next.publishDelayMs / 1000) : 10;
             if (!featureEnabled) {
                 post(() -> setVisibility(GONE));
             } else {
@@ -118,6 +120,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 featureEnabled = cfg.enabled && cfg.sendButtonEnabled;
                 maxLength = cfg.maxTextLength > 0 ? cfg.maxTextLength : 180;
                 maxWords = cfg.maxWords > 0 ? cfg.maxWords : 30;
+                if (cfg.ticker != null && cfg.ticker.publishDelayMs > 0) publishDelaySeconds = Math.max(1, cfg.ticker.publishDelayMs / 1000);
                 refreshRemaining();
             }
             @Override public void onFailure(Call<ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {
@@ -269,7 +272,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         reachTitle.setTypeface(Typeface.DEFAULT_BOLD);
         reachText.addView(reachTitle);
         TextView reachDesc = new TextView(getContext());
-        reachDesc.setText("كل الغرف الحالية والجديدة  •  يبدأ بعد 10 ثوانٍ");
+        reachDesc.setText("كل الغرف الحالية والجديدة  •  يبدأ بعد " + publishDelaySeconds + " ثوانٍ");
         reachDesc.setTextColor(Color.rgb(199, 190, 177));
         reachDesc.setTextSize(10);
         LinearLayout.LayoutParams reachDescLp = new LinearLayout.LayoutParams(
@@ -291,7 +294,7 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         fieldLabel.setTypeface(Typeface.DEFAULT_BOLD);
         fieldHeader.addView(fieldLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView fieldHint = new TextView(getContext());
-        fieldHint.setText("اكتب رسالتك");
+        fieldHint.setText("الأسطر المتعددة تظهر متتابعة بفاصلة");
         fieldHint.setTextColor(Color.rgb(221, 184, 121));
         fieldHint.setTextSize(10);
         fieldHeader.addView(fieldHint);
@@ -347,10 +350,10 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String current = s.toString().trim();
+                String current = s.toString().replaceAll("\\r\\n|\\r|\\n", ", ").trim();
                 int words = current.isEmpty() ? 0 : current.split("\\s+").length;
-                counter.setText(s.length() + " / " + maxLength + " حرف  •  " + words + " / " + maxWords + " كلمة");
-                counter.setTextColor(s.length() > maxLength || words > maxWords ? Color.rgb(255, 126, 126) : muted);
+                counter.setText(current.length() + " / " + maxLength + " حرف  •  " + words + " / " + maxWords + " كلمة");
+                counter.setTextColor(current.length() > maxLength || words > maxWords ? Color.rgb(255, 126, 126) : muted);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -399,8 +402,9 @@ public final class RoomAdvertisementComposerView extends FrameLayout implements 
                 input.requestFocus();
                 return;
             }
-            if (message.length() > maxLength) {
-                input.setError("الحد الأقصى " + maxLength + " حرف");
+            String normalizedMessage = message.replaceAll("\\r\\n|\\r|\\n", ", ").trim();
+            if (normalizedMessage.length() > maxLength) {
+                input.setError("بعد جمع الأسطر، الحد الأقصى " + maxLength + " حرف");
                 input.requestFocus();
                 return;
             }
