@@ -336,16 +336,27 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       const current=await this.ads.findOne({where:{status:AdvertisementStatus.PLAYING},order:{startedAt:'ASC'}});
       if(current){
         const done=(current.startedAt?.getTime()||now)+this.bound(current.displayDurationMs,1000,120000,9000);
-        if(now < done + Math.max(0,Number(c.gapMs)||0)) return;
-        current.status=AdvertisementStatus.COMPLETED; current.completedAt=new Date(); current.nextEligibleAt=new Date(done+Math.max(0,Number(c.gapMs)||0));
+        // End and clear the visible ad exactly when its display window ends.
+        // The configured gap is a separate quiet period before the next ad starts.
+        if(now < done) return;
+        current.status=AdvertisementStatus.COMPLETED;
+        current.completedAt=new Date(done);
+        current.nextEligibleAt=new Date(done+Math.max(0,Number(c.gapMs)||0));
         await this.ads.save(current);
-        // Explicitly tell every connected room to clear this ad. The Android ticker
-        // also keeps its own server-time expiry as a safety net if this event is missed.
         this.realtime.server.to('rooms:all').emit('room:advertisement', {
           type: 'end', advertisement: this.publicAd(current), config: c,
           at: current.completedAt.toISOString(), serverNow: new Date().toISOString(),
         });
       }
+      // Persisted global gate: survives API restarts and the tiny window between
+      // completing one ad and promoting the next queued ad. This guarantees a
+      // single global ad followed by the configured quiet interval in every room.
+      const gateRows=await this.db.query(
+        'SELECT MAX("nextEligibleAt") AS "nextAt" FROM "jeho_own"."room_advertisements" WHERE "status"=$1 AND "nextEligibleAt" IS NOT NULL',
+        [AdvertisementStatus.COMPLETED],
+      );
+      const nextEligibleAt=gateRows?.[0]?.nextAt ? new Date(gateRows[0].nextAt).getTime() : 0;
+      if(nextEligibleAt > now) return;
       const qr=this.db.createQueryRunner(); await qr.connect(); await qr.startTransaction();
       try{
         await qr.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['voice-room-ad-queue']);
@@ -370,7 +381,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,120000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,86400000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
     ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily','composerBackgroundImage','composerBackgroundColor','composerIconUrl','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor','composerButtonText','composerButtonTextColor','composerButtonBackgroundStartColor','composerButtonBackgroundEndColor','composerButtonBorderColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
