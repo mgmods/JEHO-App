@@ -222,13 +222,20 @@ export class RankingService {
 
     if (category === RankingCategory.ROOM) {
       const rows = await this.roomsRepo.find({
-        order: { viewerCount: 'DESC' },
+        where: { status: 'open' as any, isPublic: true },
+        order: { viewerCount: 'DESC', updatedAt: 'DESC' },
         take: limit,
       });
       return rows.map((r) => ({
         targetId: r.id,
         targetName: r.title,
         score: r.viewerCount,
+        meta: {
+          publicId: r.publicId,
+          coverUrl: r.coverUrl,
+          roomStatus: r.status,
+          hostId: r.hostId,
+        },
       }));
     }
 
