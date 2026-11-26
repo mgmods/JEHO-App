@@ -532,20 +532,19 @@ export class BadgesService {
         profile.displayedMedalIds = [badge!.id, ...displayed.filter((id) => id !== badge!.id)].slice(0, 5);
         await manager.save(profile);
       }
-      // Start a fresh progress cycle so the next award requires completing the
-      // configured task again after this timed medal eventually expires.
-      const progressKey = `room_support_medal_progress:${roomId}:${userId}:${role}:${highest.index}`;
-      const progressRow = await manager.findOne(AppSetting, {
-        where: { key: progressKey }, lock: { mode: 'pessimistic_write' },
-      });
-      if (progressRow) {
-        let progress: any = { current: 0, awarded: false };
-        try { if (progressRow.value) progress = { ...progress, ...JSON.parse(progressRow.value) }; } catch {}
-        progress.current = 0;
-        progress.awarded = false;
-        progressRow.value = JSON.stringify(progress);
-        await manager.save(progressRow);
+      // A medal is the completion of the current room/role task cycle.
+      // Reset every configured tier in this same cycle so a lower threshold
+      // cannot be granted immediately after the highest threshold was awarded.
+      const progressRows = await manager.createQueryBuilder(AppSetting, 'setting')
+        .setLock('pessimistic_write')
+        .where('setting.key LIKE :pattern', {
+          pattern: `room_support_medal_progress:${roomId}:${userId}:${role}:%`,
+        })
+        .getMany();
+      for (const progressRow of progressRows) {
+        progressRow.value = JSON.stringify({ current: 0, awarded: false });
       }
+      if (progressRows.length) await manager.save(progressRows);
     });
     if (!newlyGranted) return null;
     if (newlyGranted) {
