@@ -26,7 +26,7 @@
            @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag">
         <div class="toast-canvas" :style="canvasStyle" @pointerdown.stop="startDrag('toast', $event)">
           <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
-          <div class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
+          <div v-if="activeTab !== 'luckyWinHighRoom'" class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
           <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : activeTab === 'luckyReturn' ? 'مردود الهدية' : 'الفائز المحظوظ' }}</strong>
           <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : activeTab === 'luckyReturn' ? 'مردود جزئي · +250 كوين' : (activeTab.startsWith('luckyWinHigh') ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
           <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab.startsWith('luckyWinHigh') ? '×25' : '×3') }}</span>
@@ -224,8 +224,8 @@ const canvasStyle = computed(() => ({
   transform: 'translate(-50%, -50%)',
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
-const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
-const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%', fontSize: (Number(currentStyle.value.bodySizeSp) || 12) + 'px' }))
+const titlePreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWinHighRoom' ? 8 : currentStyle.value.textX) + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
+const bodyPreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWinHighRoom' ? 8 : currentStyle.value.bodyX) + '%', top: currentStyle.value.bodyY + '%', fontSize: (Number(currentStyle.value.bodySizeSp) || 12) + 'px' }))
 const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%', fontSize: (Number(currentStyle.value.countSizeSp) || 12) + 'px' }))
 const canvasRef = ref(null)
 const dragTarget = ref('')
