@@ -447,10 +447,17 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const storedDirect=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
     const directExpiry=storedDirect?.expiresAt ? new Date(storedDirect.expiresAt).getTime() : Number.POSITIVE_INFINITY;
     const direct=directExpiry>Date.now()?storedDirect:{};
+    // Empty strings in a user-specific policy mean "inherit the main dashboard value".
+    // This prevents an unspecific saved policy from accidentally erasing the main
+    // ticker background, font, colors or motion settings for that user.
+    const directOverlay:any={};
+    for (const [k,v] of Object.entries(direct)) {
+      if (v !== undefined && v !== null && !(typeof v === 'string' && v.trim()==='')) directOverlay[k]=v;
+    }
     const vipOverlay:any={};
     if(vip) for(const [k,v] of Object.entries(vipPolicy)) if(v!==undefined && v!==null && !(typeof v==='string' && v.trim()==='')) vipOverlay[k]=v;
     delete vipOverlay.durationDays;
-    const merged={...base,...vipOverlay,...direct};
+    const merged={...base,...vipOverlay,...directOverlay};
     if(vip&&direct?.dailyLimit===undefined) merged.dailyLimit=this.bound(vipPolicy.dailyLimit??base.vipDailyLimit??base.dailyLimit,0,1000,base.dailyLimit);
     return merged;
   }
