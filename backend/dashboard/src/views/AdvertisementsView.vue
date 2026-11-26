@@ -263,6 +263,16 @@
                   <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="vipPolicy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="vipPolicy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="vipPolicy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="vipPolicy.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
+                  <div class="col-6"><label class="form-label small">تباعد العناصر dp</label><input v-model.number="vipPolicy.spacingDp" type="number" min="0" max="40" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">عرض الاسم dp</label><input v-model.number="vipPolicy.nameWidthDp" type="number" min="24" max="260" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">عرض النص dp</label><input v-model.number="vipPolicy.textWidthDp" type="number" min="0" max="1000" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">تدرج الاسم</label><select v-model="vipPolicy.nameGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
+                  <div class="col-6"><label class="form-label small">تدرج النص</label><select v-model="vipPolicy.textGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
+                  <div class="col-6"><label class="form-label small">بداية تدرج الاسم</label><input v-model="vipPolicy.nameGradientStartColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">نهاية تدرج الاسم</label><input v-model="vipPolicy.nameGradientEndColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">بداية تدرج النص</label><input v-model="vipPolicy.textGradientStartColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">نهاية تدرج النص</label><input v-model="vipPolicy.textGradientEndColor" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-12"><button class="btn btn-aurora btn-sm" :disabled="policySaving" @click="saveVipPolicy">حفظ سياسة VIP</button></div>
                 </div>
               </div>
@@ -302,6 +312,16 @@
                   <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="policy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="policy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="policy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="policy.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
+                  <div class="col-6"><label class="form-label small">تباعد العناصر dp</label><input v-model.number="policy.spacingDp" type="number" min="0" max="40" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">عرض الاسم dp</label><input v-model.number="policy.nameWidthDp" type="number" min="24" max="260" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">عرض النص dp</label><input v-model.number="policy.textWidthDp" type="number" min="0" max="1000" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">تدرج الاسم</label><select v-model="policy.nameGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
+                  <div class="col-6"><label class="form-label small">تدرج النص</label><select v-model="policy.textGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
+                  <div class="col-6"><label class="form-label small">بداية تدرج الاسم</label><input v-model="policy.nameGradientStartColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">نهاية تدرج الاسم</label><input v-model="policy.nameGradientEndColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">بداية تدرج النص</label><input v-model="policy.textGradientStartColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">نهاية تدرج النص</label><input v-model="policy.textGradientEndColor" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-12"><button class="btn btn-outline-light btn-sm" :disabled="policySaving" @click="saveUserPolicy">حفظ صلاحية المستخدم</button></div>
                 </div>
               </div>
