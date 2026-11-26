@@ -29,6 +29,7 @@ type RankingBoardItem = {
     vipBadgeUrl: string | null;
     frameUrl: string | null;
     followersCount: number;
+    countryCode: string | null;
     totalReceivedDiamonds: number;
     nameStyle: Record<string, unknown> | null;
   } | null;
@@ -365,6 +366,7 @@ export class RankingService {
           vipBadgeUrl: user.profile?.vipBadgeUrl || null,
           frameUrl: user.profile?.hostBadgeUrl || user.profile?.vipBadgeUrl || null,
           followersCount: user.profile?.followersCount || 0,
+          countryCode: user.profile?.country || null,
           totalReceivedDiamonds: Number(user.profile?.totalReceivedDiamonds) || 0,
           totalSentCoins: Number(user.profile?.totalSentCoins) || 0,
           nameStyle,
