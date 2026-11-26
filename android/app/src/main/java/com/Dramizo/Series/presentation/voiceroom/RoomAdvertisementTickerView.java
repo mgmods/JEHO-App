@@ -55,7 +55,6 @@ import java.util.TimeZone;
 public final class RoomAdvertisementTickerView extends FrameLayout implements RealtimeClient.UserListener {
     public static volatile boolean SEND_BUTTON_ENABLED = true;
     private final ImageView backgroundImage;
-    private final View glowOverlay;
     private final ImageView avatar;
     private final TextView name;
     private final TextView text;
@@ -93,10 +92,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         backgroundImage = new ImageView(context);
         backgroundImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
         addView(backgroundImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        glowOverlay = new View(context);
-        glowOverlay.setClickable(false);
-        glowOverlay.setAlpha(0f);
-        addView(glowOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         avatar = new ImageView(context);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
         name = new TextView(context);
@@ -383,9 +378,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setText("");
         text.setTranslationX(0f);
         name.setTranslationX(0f);
-        glowOverlay.setAlpha(0f);
-        glowOverlay.setScaleX(1f);
-        glowOverlay.setScaleY(1f);
         avatar.setTranslationX(0f);
         setTranslationY(0f);
         setAlpha(1f);
@@ -400,24 +392,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         backgroundImage.setVisibility(GONE);
         setBackground(null);
         setVisibility(GONE);
-    }
-
-    private void applyGlowConfig(AdvertisementDtos.Ticker cfg) {
-        if (cfg == null || cfg.glowType == null || "none".equalsIgnoreCase(cfg.glowType) || cfg.glowIntensity <= 0) {
-            glowOverlay.setAlpha(0f); return;
-        }
-        int base = safeColor(cfg.glowColor, Color.parseColor("#FFD66B"));
-        int intensity = Math.max(0, Math.min(100, cfg.glowIntensity));
-        int alpha = intensity * 180 / 100;
-        GradientDrawable g = new GradientDrawable();
-        // Keep the configured glow visible for the whole ad lifecycle. The
-        // entry/exit animation may add a short animated pulse on top of it.
-        g.setColor(Color.argb(Math.max(18, alpha / 5), Color.red(base), Color.green(base), Color.blue(base)));
-        g.setCornerRadius(dp(Math.max(0, cfg.radiusDp)));
-        g.setStroke(Math.max(1, dp(1)), Color.argb(Math.max(24, alpha), Color.red(base), Color.green(base), Color.blue(base)));
-        glowOverlay.setBackground(g);
-        glowOverlay.setElevation(dp(6));
-        glowOverlay.setAlpha(Math.max(0.10f, intensity / 100f * 0.55f));
     }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
@@ -479,8 +453,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         ViewGroup.LayoutParams own = getLayoutParams();
         if (own != null && own.height != h) { own.height = h; setLayoutParams(own); }
         setMinimumHeight(h);
-        setBackground(buildBackground(cfg.background, cfg.backgroundOpacity, cfg.radiusDp));
-        backgroundImage.setAlpha(Math.max(0, Math.min(100, cfg.backgroundOpacity)) / 100f);
+        // The uploaded transparent PNG is the entire ticker frame. Never paint a bar, fill, border or shadow behind it.
+        setBackground(null);
+        setElevation(0f);
+        backgroundImage.setAlpha(1f);
         String rawBackgroundUrl = cfg.backgroundImage == null ? "" : cfg.backgroundImage.trim();
         String backgroundUrl = rawBackgroundUrl.startsWith("/") ? ApiOrigin.origin() + rawBackgroundUrl : rawBackgroundUrl;
         if ((backgroundUrl.startsWith("https://") || backgroundUrl.startsWith("http://"))) {
@@ -515,7 +491,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTextColor(safeColor(cfg.textColor, Color.WHITE));
         applyConfiguredTypeface(cfg);
         applyConfiguredGradients(cfg);
-        applyGlowConfig(cfg);
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
@@ -783,7 +758,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private Animator buildBarTransition(String mode, boolean entering) {
         String m = mode == null ? "slide-right" : mode.toLowerCase(Locale.ROOT);
-        long d = m.contains("fire") ? 360L : (m.contains("gold") ? 320L : 240L);
+        long d = 240L;
         d = Math.min(420L, Math.max(160L, d));
         ArrayList<Animator> a = new ArrayList<>();
         float distance = dp(22);
@@ -792,8 +767,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         else if (m.contains("right")) setTranslationX(entering ? distance : 0f);
         else if (m.contains("left")) setTranslationX(entering ? -distance : 0f);
         else { setTranslationX(0f); setTranslationY(0f); }
-        if (m.contains("zoom") || m.contains("fire") || m.contains("gold")) { setScaleX(entering ? 0.94f : 1f); setScaleY(entering ? 0.94f : 1f); }
-        if (m.contains("fade") || m.contains("fire") || m.contains("gold")) setAlpha(entering ? 0f : 1f);
+        if (m.contains("zoom")) { setScaleX(entering ? 0.94f : 1f); setScaleY(entering ? 0.94f : 1f); }
+        if (m.contains("fade")) setAlpha(entering ? 0f : 1f);
         if (entering) {
             a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_X, getTranslationX(), 0f));
             a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, getTranslationY(), 0f));
@@ -809,14 +784,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             if (m.contains("fade") || m.contains("fire") || m.contains("gold")) a.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 0f));
         }
         AnimatorSet set = new AnimatorSet(); set.playTogether(a); set.setDuration(d); set.setInterpolator(new LinearInterpolator());
-        if (m.contains("fire") || m.contains("gold")) {
-            glowOverlay.setAlpha(entering ? Math.max(0.15f, (cfgGlowIntensity()) / 100f) : glowOverlay.getAlpha());
-            glowOverlay.animate().alpha(entering ? 0.8f : 0f).scaleX(entering ? 1.02f : 1.08f).scaleY(entering ? 1.02f : 1.08f).setDuration(d).start();
-        }
         return set;
     }
 
-    private float cfgGlowIntensity() { return config == null ? 55f : Math.max(0, Math.min(100, config.glowIntensity)); }
 
     private long calculateTextMotionDuration(String rawMode, int viewportWidth, int textWidth,
                                              AdvertisementDtos.Ticker cfg, long displayBudget) {
