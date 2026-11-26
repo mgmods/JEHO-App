@@ -89,7 +89,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setVisibility(GONE);
 
         backgroundImage = new ImageView(context);
-        backgroundImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        backgroundImage.setScaleType(ImageView.ScaleType.FIT_XY);
         addView(backgroundImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         avatar = new ImageView(context);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
