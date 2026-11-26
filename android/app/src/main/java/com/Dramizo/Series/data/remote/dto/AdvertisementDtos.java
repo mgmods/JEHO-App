@@ -58,6 +58,7 @@ public final class AdvertisementDtos {
         public String glowColor;
         public int glowIntensity;
         public int vipDailyLimit;
+        public int displayDurationSeconds;
         public String customFontUrl;
         public String customFontName;
         public int spacingDp;
