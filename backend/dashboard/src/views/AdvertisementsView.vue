@@ -245,6 +245,24 @@
                   <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="vipPolicy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">الخلفية/التدرج</label><input v-model="vipPolicy.background" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-6"><label class="form-label small">اتجاه الشريط</label><select v-model="vipPolicy.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
+                  <div class="col-6"><label class="form-label small">ارتفاع الشريط dp</label><input v-model.number="vipPolicy.heightDp" type="number" min="32" max="140" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم الصورة dp</label><input v-model.number="vipPolicy.avatarDp" type="number" min="20" max="80" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم اسم المرسل sp</label><input v-model.number="vipPolicy.nameSp" type="number" min="8" max="32" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم نص الإعلان sp</label><input v-model.number="vipPolicy.textSp" type="number" min="9" max="36" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="vipPolicy.glowColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="vipPolicy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="vipPolicy.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="vipPolicy.radiusDp" type="number" min="0" max="40" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">لون اسم VIP</label><input v-model="vipPolicy.nameColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">لون نص VIP</label><input v-model="vipPolicy.textColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-12"><label class="form-label small">رفع خلفية شريط VIP</label><div class="d-flex gap-2"><input type="file" accept="image/*" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,vipPolicy,'backgroundImage')"><input v-model="vipPolicy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخلفية"></div></div>
+                  <div class="col-12"><label class="form-label small">رفع خط VIP</label><div class="d-flex gap-2"><input type="file" accept=".ttf,.otf" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,vipPolicy,'customFontUrl',true)"><input v-model="vipPolicy.customFontUrl" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخط"></div></div>
+                  <div class="col-6"><label class="form-label small">X موضع الشريط %</label><input v-model.number="vipPolicy.positionXPercent" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">Y موضع الشريط %</label><input v-model.number="vipPolicy.positionYPercent" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">إزاحة النص X dp</label><input v-model.number="vipPolicy.textOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="vipPolicy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="vipPolicy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="vipPolicy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
                   <div class="col-12"><button class="btn btn-aurora btn-sm" :disabled="policySaving" @click="saveVipPolicy">حفظ سياسة VIP</button></div>
                 </div>
               </div>
@@ -266,6 +284,24 @@
                   <div class="col-6"><label class="form-label small">لون النص</label><input v-model="policy.textColor" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-6"><label class="form-label small">الخط</label><select v-model="policy.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="custom">مخصص</option></select></div>
                   <div class="col-6"><label class="form-label small">حركة النص</label><select v-model="policy.textMotion" class="form-select"><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="static">ثابت</option></select></div>
+                  <div class="col-6"><label class="form-label small">ارتفاع الشريط dp</label><input v-model.number="policy.heightDp" type="number" min="32" max="140" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم الصورة dp</label><input v-model.number="policy.avatarDp" type="number" min="20" max="80" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم اسم المرسل sp</label><input v-model.number="policy.nameSp" type="number" min="8" max="32" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">حجم نص الإعلان sp</label><input v-model.number="policy.textSp" type="number" min="9" max="36" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="policy.glowColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="policy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="policy.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="policy.radiusDp" type="number" min="0" max="40" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">لون الاسم</label><input v-model="policy.nameColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">لون النص</label><input v-model="policy.textColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-12"><label class="form-label small">رفع خلفية المستخدم المخصص</label><div class="d-flex gap-2"><input type="file" accept="image/*" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,policy,'backgroundImage')"><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخلفية"></div></div>
+                  <div class="col-12"><label class="form-label small">رفع خط المستخدم المخصص</label><div class="d-flex gap-2"><input type="file" accept=".ttf,.otf" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,policy,'customFontUrl',true)"><input v-model="policy.customFontUrl" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخط"></div></div>
+                  <div class="col-6"><label class="form-label small">X موضع الشريط %</label><input v-model.number="policy.positionXPercent" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">Y موضع الشريط %</label><input v-model.number="policy.positionYPercent" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">إزاحة النص X dp</label><input v-model.number="policy.textOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="policy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="policy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="policy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
                   <div class="col-12"><button class="btn btn-outline-light btn-sm" :disabled="policySaving" @click="saveUserPolicy">حفظ صلاحية المستخدم</button></div>
                 </div>
               </div>
@@ -323,7 +359,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
-const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false), policyLoading=ref(false), policySaving=ref(false), policyRef=ref(''), policyUser=ref(null)
+const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), policyAssetUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false), policyLoading=ref(false), policySaving=ref(false), policyRef=ref(''), policyUser=ref(null)
 const policy=reactive({durationDays:7,displayDurationSeconds:9,dailyLimit:0,background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,heightDp:48,avatarDp:34,avatarShape:'circle',nameSp:12,textSp:13,nameColor:'',textColor:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',spacingDp:8,fontFamily:'default',customFontUrl:'',customFontName:'',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',entryAnimation:'gold',exitAnimation:'gold',glowType:'gold',glowColor:'#FFD66B',glowIntensity:55,transitionType:'slide',direction:'rtl',position:'safe-bottom',positionXPercent:50,positionYPercent:52,customOffsetDp:0,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120})
 const vipPolicy=reactive({durationDays:0,displayDurationSeconds:9,dailyLimit:5,background:'',backgroundImage:'',backgroundOpacity:92,radiusDp:18,heightDp:48,avatarDp:34,avatarShape:'circle',nameSp:12,textSp:13,nameColor:'',textColor:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',spacingDp:8,fontFamily:'default',customFontUrl:'',customFontName:'',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',entryAnimation:'gold',exitAnimation:'gold',glowType:'gold',glowColor:'#FFD66B',glowIntensity:55,transitionType:'slide',direction:'rtl',position:'safe-bottom',positionXPercent:50,positionYPercent:52,customOffsetDp:0,entrySpeedPxPerSec:120,exitSpeedPxPerSec:120})
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
@@ -364,6 +400,19 @@ async function load(){
 async function uploadFont(event){const file=event.target.files?.[0];event.target.value='';if(!file)return;const ext=file.name.toLowerCase().split('.').pop();if(!['ttf','otf'].includes(ext)){error.value='يرجى اختيار ملف خط TTF أو OTF';return}fontUploading.value=true;const r=await uploadsApi.upload(file);fontUploading.value=false;if(r.error){error.value=r.error.message||String(r.error);return}const data=r.data?.data??r.data;const url=data?.url||data?.path;if(!url){error.value='تم رفع الملف لكن لم يصل رابط الخط من الخادم';return}form.customFontUrl=url;form.customFontName=file.name;form.fontFamily='custom';applyPreviewFont();success.value='تم رفع الخط. اضغط حفظ الإعدادات لتطبيقه على الرومات'}
 function applyPreviewFont(){if(typeof document==='undefined')return;let style=document.getElementById('jeho-ad-preview-font');const url=String(form.customFontUrl||'').replace(/["\\)]/g,'');if(!url){style?.remove();return}if(!style){style=document.createElement('style');style.id='jeho-ad-preview-font';document.head.appendChild(style)}const format=url.toLowerCase().endsWith('.otf')?'opentype':'truetype';style.textContent='@font-face{font-family:JEHOAdvertisementCustom;src:url("'+url+'") format("'+format+'");font-display:swap;}'}
 function clearFont(){form.customFontUrl='';form.customFontName='';if(form.fontFamily==='custom')form.fontFamily='default';applyPreviewFont()}
+async function uploadPolicyAsset(event, target, field, font=false){
+  const file=event.target.files?.[0]; event.target.value=''; if(!file)return;
+  if(font && !['ttf','otf'].includes(file.name.toLowerCase().split('.').pop())){error.value='يرجى اختيار ملف خط TTF أو OTF';return}
+  policyAssetUploading.value=true;
+  const r=await uploadsApi.upload(file);
+  policyAssetUploading.value=false;
+  if(r.error){error.value=r.error.message||String(r.error);return}
+  const data=r.data?.data??r.data; const url=data?.url||data?.path;
+  if(!url){error.value='تم رفع الملف لكن لم يصل رابطه من الخادم';return}
+  target[field]=url;
+  if(font){target.customFontName=file.name;target.fontFamily='custom'}
+  success.value=font?'تم رفع الخط المخصص':'تم رفع خلفية الشريط المخصصة';
+}
 async function save(){
   saving.value=true;
   const unitMultiplier=form.gapUnit==='hours'?3600000:form.gapUnit==='minutes'?60000:1000;
