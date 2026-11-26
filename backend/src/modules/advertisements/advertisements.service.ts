@@ -277,18 +277,18 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         displayDurationMs: (() => {
           const mode = String(c.textMotion || 'right-to-left').toLowerCase();
           const moving = ['right-to-left', 'rtl', 'left-to-right', 'ltr'].includes(mode);
-          const textWidthPx = Math.max(1, Math.ceil(text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62) * 3));
-          // Conservative full-width phone viewport estimate; actual measured text
-          // width is used on-device. This keeps both animation legs inside expiry.
-          const viewportWidthPx = 1080;
+          // Dashboard motion speeds are density-independent dp/second. Estimate
+          // the ticker in dp as well, matching Android's density-normalized animator.
+          const textWidthDp = Math.max(1, Math.ceil(text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)));
+          const viewportWidthDp = 360;
           const fromRight = mode === 'right-to-left' || mode === 'rtl';
-          const entryDistancePx = fromRight ? viewportWidthPx : textWidthPx;
-          const exitDistancePx = fromRight ? textWidthPx : viewportWidthPx;
-          const entrySpeed = this.bound(c.entrySpeedPxPerSec, 20, 800, 120);
-          const exitSpeed = this.bound(c.exitSpeedPxPerSec, 20, 800, 120);
+          const entryDistanceDp = fromRight ? viewportWidthDp : textWidthDp;
+          const exitDistanceDp = fromRight ? textWidthDp : viewportWidthDp;
+          const entrySpeedDp = this.bound(c.entrySpeedPxPerSec, 20, 800, 120);
+          const exitSpeedDp = this.bound(c.exitSpeedPxPerSec, 20, 800, 120);
           const motionBudget = moving
-            ? Math.ceil(entryDistancePx * 1000 / entrySpeed)
-              + Math.ceil(exitDistancePx * 1000 / exitSpeed) + 400
+            ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
+              + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
             : 0;
           return Math.min(120000, Math.max(
             this.bound(c.displayDurationMs, 1000, 120000, 9000),
