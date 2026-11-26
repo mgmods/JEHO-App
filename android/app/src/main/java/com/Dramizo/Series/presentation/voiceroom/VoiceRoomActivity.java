@@ -17046,6 +17046,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GlobalCelebrationToast.show(
                         this, who, luckyBody, luckyAvatar, luckyBadge, luckyToastKey,
                         28, rawMultiplier, won, who, luckyToastKind, roomId);
+
+                // Every winning result also gets one clear in-room text announcement.
+                // Keep the high/center toast private to the actual winner only.
+                String roomWinLine = "مبروك " + who + " ربح "
+                        + String.format(java.util.Locale.US, "%,d", won) + " كوين"
+                        + (rawMultiplier > 0d
+                            ? " · ×" + String.format(java.util.Locale.US, "%.0f", rawMultiplier)
+                            : "");
+                if (roomBannerEnabled()) {
+                    appendGameCelebrationLine(roomWinLine, null);
+                }
+                boolean localWinner = senderId != null && myUserId != null
+                        && sameUser(senderId, myUserId);
+                if (localWinner && (won >= 1000L || rawMultiplier >= 10d)) {
+                    GlobalCelebrationToast.showRoomCenter(
+                            this, who, roomWinLine, luckyAvatar, luckyBadge, luckyToastKey,
+                            rawMultiplier, won, who, "lucky_hit_high", roomId);
+                }
                 GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
