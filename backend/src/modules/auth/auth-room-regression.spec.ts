@@ -105,6 +105,39 @@ test('realtime room join refuses a room that has already been closed', async () 
   assert.deepEqual(client.joinCalls, []);
 });
 
+test('realtime room leave retains global advertisement membership while another room remains', async () => {
+  const events: any[] = [];
+  const gateway: any = Object.create(RealtimeGateway.prototype);
+  gateway.emitRoomMembers = async () => ({ viewerCount: 1 });
+  gateway.server = {
+    to: (room: string) => ({
+      emit: (event: string, payload: any) => events.push({ room, event, payload }),
+    }),
+  };
+  const client: any = {
+    userId: 'user-1',
+    username: 'member',
+    data: {
+      roomProfiles: {
+        'room-1': { userId: 'user-1' },
+        'room-2': { userId: 'user-1' },
+      },
+    },
+    leaveCalls: [],
+    leave(room: string) { this.leaveCalls.push(room); },
+    to: (room: string) => ({
+      emit: (event: string, payload: any) => events.push({ room, event, payload }),
+    }),
+  };
+
+  const result = await gateway.onRoomLeave(client, { roomId: 'room-1' });
+
+  assert.deepEqual(result, { left: 'room-1', viewerCount: 1 });
+  assert.deepEqual(client.leaveCalls, ['room:room-1']);
+  assert.equal(client.data.roomProfiles['room-1'], undefined);
+  assert.ok(client.data.roomProfiles['room-2']);
+});
+
 test('realtime room leave removes the socket and broadcasts the updated count', async () => {
   const events: any[] = [];
   const gateway: any = Object.create(RealtimeGateway.prototype);
@@ -127,7 +160,7 @@ test('realtime room leave removes the socket and broadcasts the updated count', 
 
   const result = await gateway.onRoomLeave(client, { roomId: 'room-1' });
   assert.deepEqual(result, { left: 'room-1', viewerCount: 2 });
-  assert.deepEqual(client.leaveCalls, ['room:room-1']);
+  assert.deepEqual(client.leaveCalls, ['room:room-1', 'rooms:all']);
   assert.equal(client.data.roomProfiles['room-1'], undefined);
   assert.equal(events.length, 2);
   assert.equal(events[0].event, 'room:user_left');
