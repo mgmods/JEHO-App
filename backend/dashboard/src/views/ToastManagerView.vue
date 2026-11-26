@@ -229,12 +229,12 @@ const tabs = [
 ]
 const activeTab = ref('luckyWinNormal')
 const form = reactive({
-  giftSend: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinNormal: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyReturn: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
-  luckyWinHigh: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinHighRoom: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
-  luckyButton: { enabled: true, iconUrl: '' durationSeconds: 5, pulseEnabled: true },
+  giftSend: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinNormal: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyReturn: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
+  luckyWinHigh: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinHighRoom: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
+  luckyButton: { enabled: true, iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   highWinMinMultiplier: 10,
   highWinMinCoins: 1000,
   version: 1,
