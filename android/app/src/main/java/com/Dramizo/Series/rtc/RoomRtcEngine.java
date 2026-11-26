@@ -175,7 +175,9 @@ public final class RoomRtcEngine {
         // privacy mic indicator to flash and could interrupt music/voice routing.
         boolean current = isMicEnabled();
         if (current == enabled) {
-            RoomAudioSession.acquire(null);
+            // Idempotent no-op: a repeated room roster callback must not re-request
+            // Android audio focus or re-enter MODE_IN_COMMUNICATION. The join path
+            // already acquired the session; focus churn here can cause mic/audio flicker.
             return;
         }
 
