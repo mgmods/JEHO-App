@@ -38,6 +38,18 @@ export class AdvertisementsController {
   patchConfig(@Body() body: Record<string, unknown>) { return this.service.patchConfig(body || {}); }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
+  @Get('admin/user-policy/:userRef')
+  adminUserPolicy(@Param('userRef') userRef: string) { return this.service.adminUserPolicy(userRef); }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Patch('admin/user-policy')
+  patchUserPolicy(@Body() body: Record<string, unknown>) { return this.service.patchUserPolicy(body || {}); }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Patch('admin/vip-policy')
+  patchVipPolicy(@Body() body: Record<string, unknown>) { return this.service.patchVipPolicy(body || {}); }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @Get('admin/banned-words')
   adminBannedWords() { return this.service.adminBannedWords(); }
 
