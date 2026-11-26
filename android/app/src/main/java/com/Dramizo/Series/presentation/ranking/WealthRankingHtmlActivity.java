@@ -68,6 +68,9 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                 pageReady = true;
                 web.evaluateJavascript("window.setInitialRanking && window.setInitialRanking(" + gson.toJson(period) + "," + gson.toJson(category) + ")", null);
                 loadRanking();
+                viewModel.loadRewards();
+                refreshHandler.removeCallbacks(refreshTask);
+                refreshHandler.postDelayed(refreshTask, 30000L);
             }
         });
         web.addJavascriptInterface(new RankingBridge(), "JehoRanking");
@@ -111,6 +114,25 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
             }
             String json = gson.toJson(safeEntries);
             web.evaluateJavascript("window.renderJehoRankings(" + JSONObjectQuote(json) + ")", null);
+        });
+        viewModel.getRewardsJson().observe(this, json -> {
+            if (!pageReady || web == null || json == null) return;
+            try {
+                java.util.Map<String, Object> config = gson.fromJson(json, java.util.Map.class);
+                for (String key : new String[]{"weekly", "monthly"}) {
+                    Object value = config.get(key);
+                    if (value instanceof List) {
+                        for (Object item : (List<?>) value) {
+                            if (item instanceof java.util.Map) {
+                                java.util.Map reward = (java.util.Map) item;
+                                Object image = reward.get("imageUrl");
+                                if (image != null) reward.put("imageUrl", webImageUrl(String.valueOf(image)));
+                            }
+                        }
+                    }
+                }
+                web.evaluateJavascript("window.renderJehoRewards(" + JSONObjectQuote(gson.toJson(config)) + ")", null);
+            } catch (Exception ignored) { }
         });
         viewModel.getError().observe(this, error -> {
             if (pageReady && error != null) {
