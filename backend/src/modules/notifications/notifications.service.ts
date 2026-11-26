@@ -85,7 +85,7 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
   const explicitWinAnnouncement =
     /(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب)/i.test(copy) ||
     /\b(won|winner|winning|payout|profit)\b/i.test(copy);
-  const luckyWinWords = /(حظ\s*سعيد|صندوق\\s*الحظ|هدية\\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
+  const luckyWinWords = /(حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
   const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy + ' ' + markers);
   return hasLuckyPayout ||
     (luckyWinWords && rewardWords) ||
