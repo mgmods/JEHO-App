@@ -17390,9 +17390,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (moderatorMuted) {
                         Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
                     }
+                } else if (userChoseMute) {
+                    // A moderator lifting their restriction must not override the
+                    // user's own saved mute choice.
+                    micOn = false;
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                    syncMicUi();
+                    activateSeatAudio(currentSeats);
                 } else {
-                    // Server unmuted us — restore publish so others can hear again.
-                    userChoseMute = false;
+                    // Server unmuted us — restore publish only when the user has not
+                    // explicitly chosen to stay muted.
                     micOn = true;
                     RoomRtcEngine.getInstance().setMicEnabled(true);
                     syncMicUi();
