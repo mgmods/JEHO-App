@@ -2,6 +2,8 @@ package com.Dramizo.Series.presentation.ranking;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -35,8 +37,10 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
     private RankingViewModel viewModel;
     private final Gson gson = new Gson();
     private boolean pageReady;
-    private String period = "daily";
+    private String period = "weekly";
     private String category = "rich";
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshTask = new Runnable() { @Override public void run() { if (!isFinishing() && pageReady) { loadRanking(); if (viewModel != null) viewModel.loadRewards(); refreshHandler.postDelayed(this, 30000L); } } };
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(Bundle state) {
@@ -155,7 +159,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
     }
 
     private String safePeriod(String value) {
-        return "weekly".equals(value) || "monthly".equals(value) ? value : "daily";
+        return "weekly".equals(value) || "monthly".equals(value) ? value : "weekly";
     }
     private String safeCategory(String value) {
         for (String allowed : new String[]{"rich", "popular", "gifts", "host", "agency", "room"}) {
@@ -172,6 +176,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
 
     @Override protected void onDestroy() {
         pageReady = false;
+        refreshHandler.removeCallbacks(refreshTask);
         if (web != null) {
             web.removeJavascriptInterface("JehoRanking");
             web.stopLoading();
