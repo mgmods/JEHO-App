@@ -22,6 +22,7 @@ import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -935,7 +936,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
-                lp.topMargin = dp(68);
+                lp.topMargin = dp(68) + statusBarInsetPx();
                 lp.horizontalBias = 0.5f;
                 lp.verticalBias = 0f;
             } else {
@@ -958,10 +959,24 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
             lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
                     : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            lp.topMargin = bottom ? 0 : dp(68);
+            lp.topMargin = bottom ? 0 : dp(68) + statusBarInsetPx();
             lp.bottomMargin = bottom ? dp(76) : 0;
             setLayoutParams(lp);
         }
+    }
+
+    private int statusBarInsetPx() {
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                WindowInsets wi = getRootWindowInsets();
+                return wi == null ? 0 : wi.getInsets(WindowInsets.Type.statusBars()).top;
+            }
+            if (Build.VERSION.SDK_INT >= 23) {
+                WindowInsets wi = getRootWindowInsets();
+                return wi == null ? 0 : wi.getSystemWindowInsetTop();
+            }
+        } catch (Exception ignored) {}
+        return 0;
     }
 
     private GradientDrawable buildBackground(String value, int opacity, int radiusDp) {
