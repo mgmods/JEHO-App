@@ -531,8 +531,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setTranslationY(0f);
         setAlpha(1f);
         final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
-        if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
-            // Reduced-motion is an intentional static presentation, not a failed animation start.
+        if (isReduceMotionEnabled()) {
+            // Android's global animator scale of zero completes ObjectAnimators immediately.
+            // Keep the message readable instead of moving it instantly off-screen.
             animationInitialized = true;
             return;
         }
