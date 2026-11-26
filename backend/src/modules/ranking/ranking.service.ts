@@ -53,6 +53,50 @@ export class RankingService {
     private readonly settingsRepo: Repository<AppSetting>,
   ) {}
 
+  async getRewardConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'ranking_reward_config' } });
+    const defaults = { enabled: true, weekly: [], monthly: [] };
+    if (!row) return defaults;
+    try {
+      const parsed = JSON.parse(row.value || '{}');
+      const normalize = (items: unknown) => Array.isArray(items) ? items.slice(0, 3).map((item: any, index: number) => ({
+        rank: index + 1,
+        name: String(item?.name || '').slice(0, 80),
+        imageUrl: String(item?.imageUrl || '').slice(0, 2048),
+        description: String(item?.description || '').slice(0, 180),
+      })) : [];
+      return { enabled: parsed.enabled !== false, weekly: normalize(parsed.weekly), monthly: normalize(parsed.monthly) };
+    } catch { return defaults; }
+  }
+
+  async patchRewardConfig(input: Record<string, unknown>) {
+    const normalize = (items: unknown) => {
+      if (!Array.isArray(items)) return [];
+      return items.slice(0, 3).map((item: any, index: number) => {
+        const name = String(item?.name || '').trim().slice(0, 80);
+        const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2048);
+        const description = String(item?.description || '').trim().slice(0, 180);
+        if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
+          throw new Error('Reward image URLs must use HTTPS');
+        }
+        return { rank: index + 1, name, imageUrl, description };
+      });
+    };
+    const current = await this.getRewardConfig();
+    const next = {
+      enabled: typeof input.enabled === 'boolean' ? input.enabled : current.enabled,
+      weekly: input.weekly !== undefined ? normalize(input.weekly) : current.weekly,
+      monthly: input.monthly !== undefined ? normalize(input.monthly) : current.monthly,
+    };
+    let row = await this.settingsRepo.findOne({ where: { key: 'ranking_reward_config' } });
+    if (row) { row.value = JSON.stringify(next); await this.settingsRepo.save(row); }
+    else await this.settingsRepo.save(this.settingsRepo.create({
+      key: 'ranking_reward_config', value: JSON.stringify(next),
+      description: 'Dashboard-managed weekly and monthly ranking rewards',
+    }));
+    return next;
+  }
+
   private weekStart(date: Date): Date {
     const start = new Date(Date.UTC(
       date.getUTCFullYear(),
