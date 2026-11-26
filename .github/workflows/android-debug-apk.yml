@@ -411,3 +411,5 @@ jobs:
               echo "First upload created an Appetize app. Save its public key as the repository Actions secret APPETIZE_PUBLIC_KEY before future builds, so they update the same preview."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+# Build trigger: publish the current MG-JEHO Android sources for the verified manual-update APK.
