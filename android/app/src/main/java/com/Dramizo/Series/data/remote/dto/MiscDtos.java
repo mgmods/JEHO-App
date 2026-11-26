@@ -182,6 +182,7 @@ public final class MiscDtos {
         @SerializedName("targetName") public String targetName;
         @SerializedName("score") public long score;
         @SerializedName("user") public AuthDtos.UserDto user;
+        @SerializedName("meta") public Map<String, Object> meta;
     }
 
     public static class NotificationDto {
