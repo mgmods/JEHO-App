@@ -15,6 +15,7 @@ import android.graphics.Shader;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -68,6 +69,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private long currentDisplayBudgetMs = 9000L;
     private long animationGeneration = 0L;
     private volatile long serverClockOffsetMs = 0L;
+    private volatile long serverClockAtSyncMs = 0L;
+    private volatile long serverClockSyncElapsedMs = 0L;
     private volatile boolean serverClockKnown = false;
     private Runnable expiryRunnable;
     private volatile long refreshGeneration = 0L;
@@ -142,7 +145,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     @Override public void onUserEvent(String event, JsonObject payload) {
         if ("room:advertisement:config".equals(event)) {
-            // Invalidate any older current-ad response before applying new dashboard state.
+            // Invalidate older current-ad responses and rebind a running ticker to
+            // the new dashboard motion settings without changing the saved settings.
             refreshGeneration++;
             try {
                 AdvertisementDtos.Ticker next = new com.google.gson.Gson().fromJson(payload, AdvertisementDtos.Ticker.class);
@@ -151,6 +155,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 if (next != null && (!next.enabled || next.paused)) {
                     post(this::hideAdvertisement);
                 } else if (next != null) {
+                    if (!currentAdId.isEmpty()) {
+                        needsResume = true;
+                        animationInitialized = false;
+                    }
                     refreshCurrent();
                 }
             } catch (Exception ignored) {}
@@ -163,9 +171,20 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if ("end".equalsIgnoreCase(ev.type) || "completed".equalsIgnoreCase(ev.type)
                 || "stop".equalsIgnoreCase(ev.type) || "expired".equalsIgnoreCase(ev.type)) {
             refreshGeneration++;
+            if (!serverClockKnown && ev.serverNow != null) {
+                long eventServerNow = parseIsoUtc(ev.serverNow, System.currentTimeMillis());
+                anchorServerClock(eventServerNow, SystemClock.elapsedRealtime());
+            }
             post(() -> {
                 if (!attached.get()) return;
-                if (ev.advertisement.id != null && ev.advertisement.id.equals(currentAdId)) hideAdvertisement();
+                if (ev.advertisement.id != null && ev.advertisement.id.equals(currentAdId)) {
+                    // Socket delivery latency differs per device. Use the server's
+                    // completedAt timestamp, not event arrival, to hide in sync.
+                    long endedAt = parseIsoUtc(ev.at, System.currentTimeMillis());
+                    long remaining = endedAt - estimatedServerNowMs();
+                    if (remaining <= 0L) hideAdvertisement();
+                    else scheduleExpiry(ev.advertisement.id, remaining, animationGeneration);
+                }
                 refreshCurrent();
             });
             return;
@@ -173,14 +192,13 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!"start".equalsIgnoreCase(ev.type)) return;
         // A realtime start event is newer than any current-ad request already in flight.
         refreshGeneration++;
-        if (ev.serverNow != null) {
+        if (!serverClockKnown && ev.serverNow != null) {
             long eventServerNow = parseIsoUtc(ev.serverNow, System.currentTimeMillis());
-            serverClockOffsetMs = eventServerNow - System.currentTimeMillis();
-            serverClockKnown = true;
+            // Fallback only until the first round-trip clock sync completes.
+            anchorServerClock(eventServerNow, SystemClock.elapsedRealtime());
         }
         long remaining = Math.max(0L, ev.advertisement.displayDurationMs);
-        long serverNow = serverClockKnown
-                ? System.currentTimeMillis() + serverClockOffsetMs : System.currentTimeMillis();
+        long serverNow = estimatedServerNowMs();
         if (ev.at != null) {
             long startedAt = parseIsoUtc(ev.at, serverNow);
             remaining = ev.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
@@ -207,10 +225,28 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void refreshCurrent() {
         if (!attached.get()) return;
         final long requestGeneration = ++refreshGeneration;
+        final long requestStartedElapsed = SystemClock.elapsedRealtime();
         ContainerProvider.from(getContext()).getRoomApi().advertisementCurrent().enqueue(new Callback<ApiResponse<AdvertisementDtos.Current>>() {
             @Override public void onResponse(Call<ApiResponse<AdvertisementDtos.Current>> call, Response<ApiResponse<AdvertisementDtos.Current>> response) {
-                if (!attached.get() || requestGeneration != refreshGeneration) return;
+                final long requestFinishedElapsed = SystemClock.elapsedRealtime();
                 AdvertisementDtos.Current current = response.body() != null ? response.body().data : null;
+                if (current != null && current.serverNow != null) {
+                    long serverNow = parseIsoUtc(current.serverNow, System.currentTimeMillis());
+                    long midpointElapsed = requestStartedElapsed
+                            + Math.max(0L, requestFinishedElapsed - requestStartedElapsed) / 2L;
+                    anchorServerClock(serverNow, midpointElapsed);
+                }
+                if (!attached.get()) return;
+                if (requestGeneration != refreshGeneration) {
+                    // A realtime start may beat this HTTP response. Keep its clock
+                    // sample, then reload once so the visible ticker catches up.
+                    if (current != null && current.serverNow != null && !currentAdId.isEmpty()) {
+                        needsResume = true;
+                        animationInitialized = false;
+                        refreshCurrent();
+                    }
+                    return;
+                }
                 if (current != null && current.config != null) {
                     SEND_BUTTON_ENABLED = current.config.enabled && current.config.sendButtonEnabled && !current.config.paused;
                     config = current.config;
@@ -218,9 +254,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 if (current != null && current.advertisement != null && current.config != null && current.config.enabled && !current.config.paused) {
                     long remaining = Math.max(0L, current.advertisement.displayDurationMs);
                     try {
-                        long serverNow = parseIsoUtc(current.serverNow, System.currentTimeMillis());
-                        serverClockOffsetMs = serverNow - System.currentTimeMillis();
-                        serverClockKnown = true;
+                        long serverNow = estimatedServerNowMs();
                         long startedAt = parseIsoUtc(current.advertisement.startedAt, serverNow);
                         remaining = current.advertisement.displayDurationMs - Math.max(0L, serverNow - startedAt);
                     } catch (Exception ignored) {}
@@ -245,6 +279,21 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 // Keep the current display governed by its already scheduled server-time expiry.
             }
         });
+    }
+
+    private void anchorServerClock(long serverNowMs, long elapsedRealtimeMs) {
+        serverClockAtSyncMs = serverNowMs;
+        serverClockSyncElapsedMs = elapsedRealtimeMs;
+        serverClockOffsetMs = serverNowMs - System.currentTimeMillis();
+        serverClockKnown = true;
+    }
+
+    private long estimatedServerNowMs() {
+        if (serverClockKnown) {
+            return serverClockAtSyncMs
+                    + Math.max(0L, SystemClock.elapsedRealtime() - serverClockSyncElapsedMs);
+        }
+        return System.currentTimeMillis();
     }
 
     private void scheduleExpiry(String adId, long remainingMs, long generation) {
@@ -604,11 +653,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 }
             });
             set.start();
-            // Reconstruct the same animation phase on every room/device from the
-            // server start timestamp instead of restarting at local event-receive time.
-            // Late socket delivery therefore catches up rather than shifting the ticker.
-            if (elapsedSinceServerStartMs > 0L && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try { set.setCurrentPlayTime(elapsedSinceServerStartMs); } catch (Exception ignored) {}
+            // Reconstruct each child animator's phase from the same server timeline.
+            // AnimatorSet.setCurrentPlayTime is API 26+, but ValueAnimator supports
+            // setCurrentPlayTime on older Android versions too.
+            if (elapsedSinceServerStartMs > 0L) {
+                for (Animator child : animations) {
+                    if (child instanceof ValueAnimator) {
+                        try {
+                            ((ValueAnimator) child).setCurrentPlayTime(elapsedSinceServerStartMs);
+                        } catch (Exception ignored) {}
+                    }
+                }
             }
         });
     }
