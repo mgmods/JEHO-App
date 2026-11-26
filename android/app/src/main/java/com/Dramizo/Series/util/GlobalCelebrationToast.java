@@ -76,6 +76,7 @@ public final class GlobalCelebrationToast {
     private static volatile int remoteLuckyHighDurationSeconds = 5;
     private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
     private static volatile float remoteGiftBodyX = 25f, remoteGiftBodyY = 67f, remoteGiftCountX = 88f, remoteGiftCountY = 50f;
+    private static volatile float remoteGiftPlacementX = 50f, remoteGiftPlacementY = 16f;
     private static volatile float remoteLuckyNormalPlacementX = 50f, remoteLuckyNormalPlacementY = 16f;
     private static volatile float remoteLuckyReturnPlacementX = 50f, remoteLuckyReturnPlacementY = 32f;
     private static volatile float remoteLuckyHighPlacementX = 50f, remoteLuckyHighPlacementY = 16f;
@@ -193,12 +194,12 @@ public final class GlobalCelebrationToast {
             activeParams.width = Math.min(dp(activity, Math.max(220, Math.min(360, requestedWidthDp))), maxWidth);
             activeParams.height = dp(activity, Math.max(60, Math.min(180, requestedHeightDp)));
             active.setLayoutParams(activeParams);
-            if ((luckyHigh || luckyReturn || luckyNormal) && active.getParent() instanceof ViewGroup) {
+            if ((luckyHigh || luckyReturn || luckyNormal || giftSend) && active.getParent() instanceof ViewGroup) {
                 ViewGroup parent = (ViewGroup) active.getParent();
-                final float positionX = luckyRoomHigh ? remoteLuckyRoomHighPlacementX
+                final float positionX = giftSend ? remoteGiftPlacementX : luckyRoomHigh ? remoteLuckyRoomHighPlacementX
                         : luckyHigh ? remoteLuckyHighPlacementX
                         : luckyReturn ? remoteLuckyReturnPlacementX : remoteLuckyNormalPlacementX;
-                final float positionY = luckyRoomHigh ? remoteLuckyRoomHighPlacementY
+                final float positionY = giftSend ? remoteGiftPlacementY : luckyRoomHigh ? remoteLuckyRoomHighPlacementY
                         : luckyHigh ? remoteLuckyHighPlacementY
                         : luckyReturn ? remoteLuckyReturnPlacementY : remoteLuckyNormalPlacementY;
                 active.post(() -> {
@@ -360,6 +361,8 @@ public final class GlobalCelebrationToast {
                     remoteGiftTitleSizeSp = dimensionValue(gift.get("titleSizeSp"), 13, 8, 30);
                     remoteGiftBodySizeSp = dimensionValue(gift.get("bodySizeSp"), 12, 8, 30);
                     remoteGiftCountSizeSp = dimensionValue(gift.get("countSizeSp"), 12, 8, 30);
+                    remoteGiftPlacementX = floatValue(gift.get("placementX"), 50f);
+                    remoteGiftPlacementY = floatValue(gift.get("placementY"), 16f);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyReturnBackgroundUrl = stringValue(returned.get("backgroundUrl"), "");
                     remoteLuckyNormalPlacementX = floatValue(normal.get("placementX"), 50f);
@@ -929,12 +932,12 @@ public final class GlobalCelebrationToast {
             avatar.setClipToOutline(true);
         }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
-        if (centerPlacement || luckyWin) {
+        if (centerPlacement || luckyWin || giftSend) {
             lp.gravity = Gravity.TOP | Gravity.LEFT;
-            final float rawX = supportChest ? 50f : luckyRoomHigh ? remoteLuckyRoomHighPlacementX
+            final float rawX = supportChest ? 50f : giftSend ? remoteGiftPlacementX : luckyRoomHigh ? remoteLuckyRoomHighPlacementX
                     : luckyHigh ? remoteLuckyHighPlacementX
                     : luckyReturn ? remoteLuckyReturnPlacementX : remoteLuckyNormalPlacementX;
-            final float rawY = supportChest ? 50f : luckyRoomHigh ? remoteLuckyRoomHighPlacementY
+            final float rawY = supportChest ? 50f : giftSend ? remoteGiftPlacementY : luckyRoomHigh ? remoteLuckyRoomHighPlacementY
                     : luckyHigh ? remoteLuckyHighPlacementY
                     : luckyReturn ? remoteLuckyReturnPlacementY : remoteLuckyNormalPlacementY;
             final float placementX = Math.max(0f, Math.min(100f, rawX)) / 100f;
