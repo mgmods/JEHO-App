@@ -22,16 +22,43 @@
         </div>
         <div class="small text-secondary mt-2">الافتراضي الحالي: ×10 أو 1,000 عملة. التغيير يُطبّق على السيرفر والتطبيق معاً بعد الحفظ.</div>
       </section>
-      <div v-if="activeTab !== 'luckyButton'" ref="canvasRef" class="toast-preview-wrap mt-3 mb-3"
-           @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag">
-        <div class="toast-canvas" :style="canvasStyle" @pointerdown.stop="startDrag('toast', $event)">
-          <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
-          <div v-if="activeTab !== 'luckyWinHighRoom'" class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
-          <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : activeTab === 'luckyReturn' ? 'مردود الهدية' : 'الفائز المحظوظ' }}</strong>
-          <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : activeTab === 'luckyReturn' ? 'مردود جزئي · +250 كوين' : (activeTab.startsWith('luckyWinHigh') ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
-          <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab.startsWith('luckyWinHigh') ? '×25' : '×3') }}</span>
-          <div v-if="currentStyle.shineEnabled" class="preview-shine"></div>
+      <div v-if="activeTab !== 'luckyButton'" class="room-preview-shell mt-3 mb-3">
+        <div class="room-preview-heading">
+          <div><strong>معاينة الروم المباشرة</strong><div class="small text-secondary">اسحب التوست كاملاً إلى مكانه على شاشة الروم، أو اسحب الصورة والاسم والنص والعداد كلٌّ على حدة.</div></div>
+          <span class="room-preview-live"><i></i> معاينة</span>
         </div>
+        <div class="room-preview-stage-wrap">
+          <div ref="roomPreviewRef" class="room-preview-screen"
+               @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag">
+            <div class="room-preview-cover"></div>
+            <div class="room-preview-top">
+              <div class="room-preview-roomline"><span>JEHO ROOM</span><span>● 128</span><span>رقم الغرفة 1024</span></div>
+              <div class="room-preview-roomname">غرفة السهر والأصدقاء</div>
+              <div class="room-preview-host"><span class="room-preview-host-avatar">👑</span><span>المضيف · JEHO</span><span class="room-preview-tag">VIP</span></div>
+            </div>
+            <div class="room-preview-seats">
+              <div v-for="(seat, index) in ['👤','🧑🏻','👩🏻','🧔🏻','👩🏼','🧑🏽','👨🏻','👩🏽']" :key="index" class="room-preview-seat">
+                <span>{{ seat }}</span><small>{{ ['المضيف','عضو 2','عضو 3','عضو 4','عضو 5','عضو 6','عضو 7','عضو 8'][index] }}</small>
+              </div>
+            </div>
+            <div class="room-preview-chat">
+              <div class="room-preview-chatline"><b>JEHO</b> أهلاً وسهلاً بالجميع ❤️</div>
+              <div class="room-preview-chatline"><b>مستخدم</b> نورتوا الروم 🌹</div>
+              <div class="room-preview-chatline"><b>عضو مميز</b> مساء الخير ✨</div>
+            </div>
+            <div class="room-preview-toolbar"><span>الجميع</span><span>دردشة</span><span>هدية</span></div>
+            <div class="room-preview-input">اكتب رسالة... <span>🎁　🎙</span></div>
+            <div class="toast-canvas" :style="canvasStyle" @pointerdown.stop="startDrag('toast', $event)">
+              <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
+              <div v-if="activeTab !== 'luckyWinHighRoom'" class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
+              <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : activeTab === 'luckyReturn' ? 'مردود الهدية' : 'الفائز المحظوظ' }}</strong>
+              <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : activeTab === 'luckyReturn' ? 'مردود جزئي · +250 كوين' : (activeTab.startsWith('luckyWinHigh') ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
+              <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab.startsWith('luckyWinHigh') ? '×25' : '×3') }}</span>
+              <div v-if="currentStyle.shineEnabled" class="preview-shine"></div>
+            </div>
+          </div>
+        </div>
+        <div class="small text-secondary mt-2">الإحداثيات الأفقية والعمودية محسوبة من مساحة شاشة الروم نفسها، وليس من إطار المعاينة الخارجي.</div>
       </div>
       <div v-else class="toast-preview-wrap mt-3 mb-3">
         <div class="button-preview-wrap">
@@ -228,16 +255,16 @@ const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + 
 const titlePreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWinHighRoom' ? 8 : currentStyle.value.textX) + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
 const bodyPreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWinHighRoom' ? 8 : currentStyle.value.bodyX) + '%', top: currentStyle.value.bodyY + '%', fontSize: (Number(currentStyle.value.bodySizeSp) || 12) + 'px' }))
 const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%', fontSize: (Number(currentStyle.value.countSizeSp) || 12) + 'px' }))
-const canvasRef = ref(null)
+const roomPreviewRef = ref(null)
 const dragTarget = ref('')
 function startDrag(target, event) {
   if (activeTab.value === 'luckyButton') return
   dragTarget.value = target
-  try { (canvasRef.value || event.currentTarget).setPointerCapture(event.pointerId) } catch {}
+  try { roomPreviewRef.value?.setPointerCapture(event.pointerId) } catch {}
 }
 function moveDrag(event) {
   if (!dragTarget.value) return
-  const rect = (canvasRef.value || event.currentTarget).getBoundingClientRect()
+  const rect = (roomPreviewRef.value || event.currentTarget).getBoundingClientRect()
   if (!rect.width || !rect.height) return
   const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
   const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
@@ -404,8 +431,31 @@ onMounted(load)
 .toast-tabs{display:flex;flex-wrap:wrap;gap:8px}
 .toast-tab{border:1px solid rgba(255,211,111,.28);border-radius:10px;padding:9px 13px;background:rgba(20,18,31,.55);color:inherit;font-size:.92rem}
 .toast-tab.active{border-color:#f5ca69;background:linear-gradient(110deg,rgba(125,22,54,.8),rgba(90,43,103,.7));box-shadow:0 0 12px rgba(255,191,64,.18)}
- .toast-preview-wrap{position:relative;width:100%;height:360px;min-height:360px;padding:0;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:hidden;touch-action:none}
-.toast-canvas{position:absolute;max-width:calc(100% - 12px);min-width:220px;margin:0;border:0;border-radius:0;background:transparent;overflow:visible;color:#fff;touch-action:none;isolation:isolate}
+.toast-preview-wrap{position:relative;width:100%;min-height:140px;padding:0;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:hidden;touch-action:none}
+.room-preview-shell{padding:14px;border:1px solid rgba(255,211,111,.2);border-radius:16px;background:linear-gradient(145deg,rgba(18,20,35,.96),rgba(35,19,43,.96))}
+.room-preview-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.room-preview-live{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(72,211,151,.3);border-radius:20px;padding:5px 10px;color:#8ee4bd;font-size:12px;white-space:nowrap}
+.room-preview-live i{width:7px;height:7px;border-radius:50%;background:#48d397;box-shadow:0 0 8px #48d397}
+.room-preview-stage-wrap{display:flex;justify-content:center;overflow:auto;padding:8px 0}
+.room-preview-screen{position:relative;isolation:isolate;width:min(100%,360px);height:640px;flex:0 0 auto;overflow:hidden;border:5px solid #11131c;border-radius:28px;background:radial-gradient(ellipse at 50% 35%,rgba(107,73,125,.55),transparent 55%),linear-gradient(180deg,#30233e 0%,#171c32 48%,#101522 100%);box-shadow:0 18px 45px rgba(0,0,0,.42);touch-action:none}
+.room-preview-cover{position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.035),transparent 35%),radial-gradient(ellipse at 50% 72%,rgba(198,140,64,.13),transparent 44%);pointer-events:none}
+.room-preview-top{position:absolute;top:0;left:0;right:0;padding:16px 14px 12px;background:linear-gradient(180deg,rgba(8,10,20,.84),rgba(8,10,20,.18))}
+.room-preview-roomline{display:flex;justify-content:space-between;gap:5px;color:#e8d8ae;font-size:9px;white-space:nowrap}
+.room-preview-roomname{margin-top:13px;text-align:center;color:#fff;font-size:16px;font-weight:800;text-shadow:0 2px 8px #000}
+.room-preview-host{display:flex;justify-content:center;align-items:center;gap:7px;margin-top:12px;color:#f8e7c2;font-size:11px}
+.room-preview-host-avatar{display:grid;place-items:center;width:25px;height:25px;border:1px solid #d6b76c;border-radius:50%;background:#5b3b48}
+.room-preview-tag{padding:2px 7px;border-radius:8px;background:linear-gradient(90deg,#c59b44,#f4df9b);color:#271c17;font-size:9px;font-weight:900}
+.room-preview-seats{position:absolute;top:155px;left:10px;right:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:22px 10px}
+.room-preview-seat{display:flex;align-items:center;flex-direction:column;gap:5px;color:#f5e9d1;font-size:24px}
+.room-preview-seat>span{display:grid;place-items:center;width:49px;height:49px;border:2px solid rgba(227,190,115,.8);border-radius:50%;background:linear-gradient(145deg,#59445d,#1e2940);box-shadow:0 0 12px rgba(230,185,101,.18)}
+.room-preview-seat small{max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd4e8;font-size:8px}
+.room-preview-chat{position:absolute;left:12px;right:12px;bottom:110px;display:flex;flex-direction:column;gap:6px}
+.room-preview-chatline{width:max-content;max-width:100%;padding:5px 9px;border-radius:9px;background:rgba(5,8,18,.48);color:#f5f0e9;font-size:10px}
+.room-preview-chatline b{color:#f2d18a;margin-inline-end:5px}
+.room-preview-toolbar{position:absolute;left:12px;right:12px;bottom:57px;display:flex;justify-content:space-around;padding:9px 5px;border:1px solid rgba(226,190,120,.2);border-radius:14px;background:rgba(12,15,28,.85);color:#f4dfb4;font-size:12px;font-weight:700}
+.room-preview-input{position:absolute;left:12px;right:12px;bottom:12px;padding:9px 12px;border-radius:20px;background:rgba(255,255,255,.1);color:#bdb9c7;font-size:10px}
+.room-preview-input span{float:right;color:#f4d28d}
+.toast-canvas{position:absolute;max-width:calc(100% - 12px);min-width:220px;margin:0;border:0;border-radius:0;background:transparent;overflow:visible;color:#fff;touch-action:none;isolation:isolate;z-index:5}
 .toast-canvas-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
 .drag-item{touch-action:none;cursor:grab;user-select:none}
 .drag-item:active{cursor:grabbing}
