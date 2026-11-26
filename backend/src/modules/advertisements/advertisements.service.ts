@@ -271,30 +271,9 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
-        // The client animates the ticker in two separate legs (enter + exit).
-        // The previous estimate used only text width / entry speed, so slow exit
-        // speeds or a long message could be cut off by the server expiry timer.
-        displayDurationMs: (() => {
-          const mode = String(c.textMotion || 'right-to-left').toLowerCase();
-          const moving = ['right-to-left', 'rtl', 'left-to-right', 'ltr'].includes(mode);
-          // Dashboard motion speeds are density-independent dp/second. Estimate
-          // the ticker in dp as well, matching Android's density-normalized animator.
-          const textWidthDp = Math.max(1, Math.ceil(text.length * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)));
-          const viewportWidthDp = 360;
-          const fromRight = mode === 'right-to-left' || mode === 'rtl';
-          const entryDistanceDp = fromRight ? viewportWidthDp : textWidthDp;
-          const exitDistanceDp = fromRight ? textWidthDp : viewportWidthDp;
-          const entrySpeedDp = this.bound(c.entrySpeedPxPerSec, 20, 800, 120);
-          const exitSpeedDp = this.bound(c.exitSpeedPxPerSec, 20, 800, 120);
-          const motionBudget = moving
-            ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
-              + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
-            : 0;
-          return Math.min(120000, Math.max(
-            this.bound(c.displayDurationMs, 1000, 120000, 9000),
-            motionBudget,
-          ));
-        })(),
+        // Resolve duration from the exact dashboard settings used when this
+        // advertisement is displayed; queued ads are recalculated again at start.
+        displayDurationMs: this.resolveDisplayDuration(text, c),
       });
       await qr.manager.save(ad);
       // Commit is the authoritative success point. Never turn a committed
@@ -399,12 +378,37 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
           .orderBy('a.queueOrder','ASC').addOrderBy('a.createdAt','ASC')
           .setLock('pessimistic_write').setOnLocked('skip_locked').getOne();
         if(!next){await qr.commitTransaction();return;}
-        next.status=AdvertisementStatus.PLAYING; next.startedAt=new Date(); next.displayDurationMs=this.bound(next.displayDurationMs,1000,120000,9000);
+        next.status=AdvertisementStatus.PLAYING;
+        next.startedAt=new Date();
+        next.displayDurationMs=this.resolveDisplayDuration(next.text, c);
         await qr.manager.save(next); await qr.commitTransaction();
         this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(next),config:c,at:next.startedAt.toISOString(),serverNow:new Date().toISOString()});
       }catch(e){await qr.rollbackTransaction();this.log.error('Advertisement queue publish failed: '+String((e as any)?.message||e));}finally{await qr.release();}
     }catch(e){this.log.warn('Advertisement tick failed: '+String((e as any)?.message||e));}
     finally{this.busy=false;}
+  }
+
+  private resolveDisplayDuration(text: string, c: any): number {
+    const mode = String(c.textMotion || 'right-to-left').toLowerCase();
+    const moving = ['right-to-left', 'rtl', 'left-to-right', 'ltr'].includes(mode);
+    // Keep this canonical 360dp metric identical to the Android ticker timeline,
+    // so all devices share the same entry/exit phase boundaries.
+    const textWidthDp = Math.max(1, Math.ceil(String(text || '').length
+      * Math.max(8, this.bound(c.textSp, 9, 36, 13) * 0.62)));
+    const viewportWidthDp = 360;
+    const fromRight = mode === 'right-to-left' || mode === 'rtl';
+    const entryDistanceDp = fromRight ? viewportWidthDp : textWidthDp;
+    const exitDistanceDp = fromRight ? textWidthDp : viewportWidthDp;
+    const entrySpeedDp = this.bound(c.entrySpeedPxPerSec, 20, 800, 120);
+    const exitSpeedDp = this.bound(c.exitSpeedPxPerSec, 20, 800, 120);
+    const motionBudget = moving
+      ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
+        + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
+      : 0;
+    return Math.min(120000, Math.max(
+      this.bound(c.displayDurationMs, 1000, 120000, 9000),
+      motionBudget,
+    ));
   }
 
   async patchConfig(input:Record<string,unknown>) {
@@ -437,7 +441,25 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     for (const k of composerUrls) { if (merged[k] && !/^https?:\/\//i.test(merged[k])) merged[k]=''; merged[k]=String(merged[k]||'').slice(0,2048); }
     const composerColors=['composerButtonTextColor','composerButtonBackgroundStartColor','composerButtonBackgroundEndColor','composerButtonBorderColor','composerBackgroundColor','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor'];
     for (const k of composerColors) { const v=String(merged[k]||''); if (!/^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) && !/^rgba?\(/i.test(v)) merged[k]=DEFAULT_CONFIG[k]; }
-    await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']);
+    await this.db.transaction(async manager => {
+      await manager.query(
+        'UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',
+        [JSON.stringify(merged), 'voice_room_ads_config'],
+      );
+      // If an ad is already on air, keep its server expiry aligned with the new
+      // dashboard speed/duration settings before notifying every connected room.
+      const activeRows = await manager.query(
+        'SELECT "id","text" FROM "jeho_own"."room_advertisements" WHERE "status"=$1 ORDER BY "startedAt" ASC LIMIT 1 FOR UPDATE',
+        [AdvertisementStatus.PLAYING],
+      );
+      if (activeRows?.[0]) {
+        const duration = this.resolveDisplayDuration(String(activeRows[0].text || ''), merged);
+        await manager.query(
+          'UPDATE "jeho_own"."room_advertisements" SET "displayDurationMs"=$1,"updatedAt"=NOW() WHERE "id"=$2',
+          [duration, activeRows[0].id],
+        );
+      }
+    });
     this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged);
     return merged;
   }
