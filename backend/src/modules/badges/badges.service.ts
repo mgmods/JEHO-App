@@ -417,14 +417,8 @@ export class BadgesService {
   /** Award configured room-support medal to the supported user; progress is isolated per room. */
   async recordRoomSupportProgress(userId: string, roomId: string, role: 'supporter' | 'receiver', metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
     if (!userId || !roomId) return null;
-    // A room-support medal blocks another award only while it is active.
-    // Once its configured duration expires, the same user may earn it again.
-    const activeRoomSupportGrant = await this.userBadges.createQueryBuilder('ub')
-      .where('ub.userId = :userId', { userId })
-      .andWhere('ub.source = :source', { source: 'room_support' })
-      .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
-      .getOne();
-    if (activeRoomSupportGrant) return null;
+    // Eligibility is evaluated per configured medal below. A different active
+    // room-support role/level must not block this medal's independent task cycle.
 
     // One-time cleanup for medals granted by older builds: archive expired room-support
     // ownerships and restart this user's room task progress instead of instantly re-awarding
@@ -505,6 +499,7 @@ export class BadgesService {
       const activeRoomSupportGrant = await manager.createQueryBuilder(UserBadge, 'ub')
         .setLock('pessimistic_write')
         .where('ub.userId = :userId', { userId })
+        .andWhere('ub.badgeId = :badgeId', { badgeId: badge!.id })
         .andWhere('ub.source = :source', { source: 'room_support' })
         .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
         .getOne();
