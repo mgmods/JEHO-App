@@ -195,17 +195,13 @@ export class ToastManagerController {
     const verifyFields = [
       'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
       'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
+      'placementX', 'placementY',
     ];
     for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
       for (const field of verifyFields) {
         if (Number(stored?.[key]?.[field]) !== Number(next[key]?.[field])) {
           throw new Error(`Toast setting did not persist: ${key}.${field}`);
         }
-      }
-    }
-    for (const field of ['placementX', 'placementY']) {
-      if (Number(stored?.luckyWinHighRoom?.[field]) !== Number(next.luckyWinHighRoom?.[field])) {
-        throw new Error(`Toast setting did not persist: luckyWinHighRoom.${field}`);
       }
     }
     this.realtime.emitToAll('config:updated', {
