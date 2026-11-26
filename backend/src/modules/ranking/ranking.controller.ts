@@ -14,6 +14,13 @@ export class RankingController {
   constructor(private readonly rankingService: RankingService) {}
 
   @Public()
+  @Get('rewards/config')
+  @ApiOperation({ summary: 'Get dashboard-configured ranking rewards for the wealth page' })
+  getRewardConfig() {
+    return this.rankingService.getRewardConfig();
+  }
+
+  @Public()
   @Get(':period/:category')
   @ApiOperation({ summary: 'Get ranking board' })
   @ApiQuery({ name: 'limit', required: false })
