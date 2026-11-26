@@ -426,6 +426,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             return;
         }
         boolean sameAd = ad.id.equals(currentAdId);
+        if (ad.displayConfig != null && cfg != null) cfg = mergeDisplayConfig(cfg, ad.displayConfig);
         currentAdvertisement = ad;
         if (sameAd && !needsResume && animationInitialized) {
             config = cfg;
@@ -446,6 +447,15 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setVisibility(INVISIBLE);
         scheduleExpiry(ad.id, remainingMs, animationGeneration);
         animateTextIn(ad, cfg, animationGeneration, Math.max(0L, ad.displayDurationMs - remainingMs));
+    }
+
+    private AdvertisementDtos.Ticker mergeDisplayConfig(AdvertisementDtos.Ticker base, AdvertisementDtos.Ticker override) {
+        try {
+            JsonObject merged = new com.google.gson.Gson().toJsonTree(base).getAsJsonObject();
+            JsonObject extra = new com.google.gson.Gson().toJsonTree(override).getAsJsonObject();
+            for (java.util.Map.Entry<String, com.google.gson.JsonElement> e : extra.entrySet()) if (e.getValue() != null && !e.getValue().isJsonNull()) merged.add(e.getKey(), e.getValue());
+            return new com.google.gson.Gson().fromJson(merged, AdvertisementDtos.Ticker.class);
+        } catch (Exception ignored) { return base; }
     }
 
     private void bindConfig(AdvertisementDtos.Ticker cfg) {
