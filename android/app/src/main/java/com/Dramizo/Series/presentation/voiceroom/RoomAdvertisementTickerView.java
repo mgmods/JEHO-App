@@ -753,10 +753,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             int exitSpeedDp = Math.max(20, Math.min(800,
                     config.exitSpeedPxPerSec > 0 ? config.exitSpeedPxPerSec : 120));
             float entryPoint = 0f;
+            target.setTranslationX(start);
             // Use one canonical dp timeline for every device/room. The actual
             // viewport/text dimensions only affect the pixel positions, never the
             // shared entry/exit phase durations.
-            float textSizeSp = Math.max(9, config.textSp > 0 ? config.textSp : 13);
+            float textSizeSp = Math.min(36f, Math.max(9f, config.textSp > 0 ? config.textSp : 13));
             long canonicalTextWidthDp = Math.max(1L, (long) Math.ceil(
                     text.getText().length() * Math.max(8f, textSizeSp * 0.62f)));
             long canonicalViewportWidthDp = 360L;
