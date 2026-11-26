@@ -56,6 +56,10 @@ export class Advertisement {
   @Column({ type: 'varchar', length: 64, nullable: true })
   displayTemplateId: string | null;
 
+  /** Per-ad immutable visual/policy snapshot. This keeps VIP/user-specific styling stable while queued. */
+  @Column({ type: 'jsonb', nullable: true })
+  displayConfig: Record<string, unknown> | null;
+
   @Column({ type: 'int', default: 0 })
   displayDurationMs: number;
 
