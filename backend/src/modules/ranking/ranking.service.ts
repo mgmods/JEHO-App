@@ -128,6 +128,16 @@ export class RankingService {
 
   async getBoard(period: RankingPeriod, category: RankingCategory, limit = 50) {
     const key = this.periodKey(period);
+    // Room ranking is a live occupancy board: never serve a time-window snapshot.
+    if (category === RankingCategory.ROOM) {
+      const liveRooms = await this.compute(period, category, limit);
+      return {
+        period,
+        category,
+        periodKey: key,
+        items: liveRooms.map((item, index) => ({ ...item, rank: index + 1 })),
+      };
+    }
     const cached = await this.snapshotsRepo.find({
       where: { period, category, periodKey: key },
       order: { rank: 'ASC' },
