@@ -54,6 +54,7 @@ export class RankingService {
     private readonly settingsRepo: Repository<AppSetting>,
   ) {}
 
+  // Rewards are stored in the existing app_settings table; no schema migration is required.
   async getRewardConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'ranking_reward_config' } });
     const defaults = { enabled: true, weekly: [], monthly: [] };
