@@ -7,6 +7,10 @@
       <div class="toast-tabs" role="tablist" aria-label="أنواع التوستات">
         <button v-for="tab in tabs" :key="tab.key" type="button" class="toast-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
       </div>
+      <label class="form-check form-switch mt-3 d-inline-flex align-items-center gap-2">
+        <input class="form-check-input" type="checkbox" :checked="activeTab === 'luckyButton' ? form.luckyButton.enabled : currentStyle.enabled !== false" :disabled="!canWriteSettings" @change="activeTab === 'luckyButton' ? (form.luckyButton.enabled = $event.target.checked) : (currentStyle.enabled = $event.target.checked)" />
+        <span class="form-check-label fw-semibold">تشغيل هذا النوع من التوست بشكل مستقل</span>
+      </label>
       <section class="position-control mt-3" aria-label="حدود إعلان الربح العالي">
         <h3 class="settings-card-title">متى نعتبر الربح كبيراً ونعلنه بشكل عام؟</h3>
         <p class="small text-secondary">اختر الحد بنفسك. إذا وصل الربح إلى عدد X المحدد أو إلى عدد العملات المحدد، يظهر التوست العلوي العام بالإضافة إلى التوست الوسطي على جهاز الفائز فقط. ضع 0 لتعطيل أحد الشرطين؛ يجب إبقاء شرط واحد على الأقل فعالاً.</p>
@@ -225,12 +229,12 @@ const tabs = [
 ]
 const activeTab = ref('luckyWinNormal')
 const form = reactive({
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
-  luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+  giftSend: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinNormal: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyReturn: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
+  luckyWinHigh: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinHighRoom: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
+  luckyButton: { enabled: true, iconUrl: '' durationSeconds: 5, pulseEnabled: true },
   highWinMinMultiplier: 10,
   highWinMinCoins: 1000,
   version: 1,
@@ -289,6 +293,7 @@ async function load() {
   for (const key of ['giftSend', 'luckyWinNormal', 'luckyReturn', 'luckyWinHigh', 'luckyWinHighRoom']) {
     const incoming = cfg[key] || {}
     Object.assign(form[key], {
+      enabled: incoming.enabled !== false,
       backgroundUrl: String(incoming.backgroundUrl || ''),
       shineEnabled: incoming.shineEnabled !== false,
       frameGlowEnabled: incoming.frameGlowEnabled !== false,
@@ -314,6 +319,7 @@ async function load() {
   form.highWinMinMultiplier = Math.max(0, Math.floor(Number.isFinite(Number(cfg.highWinMinMultiplier)) ? Number(cfg.highWinMinMultiplier) : 10))
   form.highWinMinCoins = Math.max(0, Math.floor(Number.isFinite(Number(cfg.highWinMinCoins)) ? Number(cfg.highWinMinCoins) : 1000))
   Object.assign(form.luckyButton, {
+    enabled: cfg.luckyButton?.enabled !== false,
     iconUrl: String(cfg.luckyButton?.iconUrl || ''),
     durationSeconds: Math.max(1, Math.min(12, Number(cfg.luckyButton?.durationSeconds) || 5)),
     pulseEnabled: cfg.luckyButton?.pulseEnabled !== false,
@@ -397,7 +403,7 @@ async function save() {
     return
   }
   const fieldsToVerify = [
-    'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+    'enabled', 'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
     'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
     'durationSeconds', 'shineEnabled', 'frameGlowEnabled', 'backgroundUrl', 'placementX', 'placementY',
   ]
