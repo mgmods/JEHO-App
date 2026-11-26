@@ -712,13 +712,15 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         TextView chip = new TextView(holder.itemView.getContext());
         chip.setText("♛ " + roleLabel);
         chip.setTextColor(0xFF805A19);
-        chip.setTextSize(10);
+        // Slightly reduce the badge footprint without changing its row, order,
+        // alignment, or surrounding message layout.
+        chip.setTextSize(9);
         chip.setTypeface(null, android.graphics.Typeface.BOLD);
-        int horizontal = dp(holder, 9);
-        chip.setPadding(horizontal, dp(holder, 3), horizontal, dp(holder, 3));
+        int horizontal = dp(holder, 8);
+        chip.setPadding(horizontal, dp(holder, 2), horizontal, dp(holder, 2));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xFFFFF4D7);
-        bg.setCornerRadius(dp(holder, 12));
+        bg.setCornerRadius(dp(holder, 10));
         bg.setStroke(dp(holder, 1), 0xFFE6C477);
         chip.setBackground(bg);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -727,7 +729,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         row.setVisibility(View.VISIBLE);
         row.addView(chip, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(holder, 21)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(holder, 19)));
     }
 
     /** Text / meta ink for light peer, rose me, and VIP skins. */
