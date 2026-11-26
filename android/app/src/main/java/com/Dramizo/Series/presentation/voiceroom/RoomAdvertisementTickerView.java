@@ -89,6 +89,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setVisibility(GONE);
 
         backgroundImage = new ImageView(context);
+        // FIT_XY keeps the complete transparent PNG frame visible; CENTER_CROP would cut its edges.
         backgroundImage.setScaleType(ImageView.ScaleType.FIT_XY);
         addView(backgroundImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         avatar = new ImageView(context);
