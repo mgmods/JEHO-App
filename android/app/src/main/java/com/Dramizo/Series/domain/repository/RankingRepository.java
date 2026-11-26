@@ -4,5 +4,6 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.domain.model.Result;
 
 public interface RankingRepository {
+    Result<java.util.Map<String, Object>> rewards();
     Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> list(String period, String type);
 }
