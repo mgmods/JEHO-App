@@ -436,6 +436,22 @@ export class BadgesService {
         expiredRoomSupportGrantDetected = true;
         for (const expiredGrant of expiredGrants) expiredGrant.source = 'room_support_expired';
         await manager.save(expiredGrants);
+
+        // Reset every room/task progress row for this user immediately, even if
+        // the medal configuration is temporarily disabled when the expiry is seen.
+        // Otherwise a stale completed threshold could award the medal instantly
+        // when an administrator re-enables the task later.
+        const progressRows = await manager.createQueryBuilder(AppSetting, 'setting')
+          .where('setting.key LIKE :pattern', { pattern: `room_support_medal_progress:%:${userId}:%` })
+          .getMany();
+        for (const progressRow of progressRows) {
+          let progress: any = { current: 0, awarded: false };
+          try { if (progressRow.value) progress = { ...progress, ...JSON.parse(progressRow.value) }; } catch {}
+          progress.current = 0;
+          progress.awarded = false;
+          progressRow.value = JSON.stringify(progress);
+        }
+        if (progressRows.length) await manager.save(progressRows);
       }
     });
 
