@@ -148,13 +148,16 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                 if (userId != null && !userId.trim().isEmpty()) UserProfileCardSheet.show(WealthRankingHtmlActivity.this, userId);
             });
         }
-        @JavascriptInterface public void openRoom(String roomId) {
+        @JavascriptInterface public void openRoom(String roomId, String publicRoomId) {
             runOnUiThread(() -> {
                 if (roomId == null || roomId.trim().isEmpty()) return;
                 String id = roomId.trim();
                 RoomJoinPrefetch.begin(WealthRankingHtmlActivity.this, id, null);
                 Intent intent = new Intent(WealthRankingHtmlActivity.this, VoiceRoomActivity.class);
                 intent.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, id);
+                if (publicRoomId != null && !publicRoomId.trim().isEmpty()) {
+                    intent.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, publicRoomId.trim());
+                }
                 intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
             });
