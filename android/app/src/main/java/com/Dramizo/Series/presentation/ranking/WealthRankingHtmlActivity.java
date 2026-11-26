@@ -8,6 +8,9 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.content.Intent;
+import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
+import com.Dramizo.Series.util.RoomJoinPrefetch;
 import android.view.ViewGroup;
 
 import androidx.lifecycle.ViewModelProvider;
@@ -132,6 +135,17 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         @JavascriptInterface public void openProfile(String userId) {
             runOnUiThread(() -> {
                 if (userId != null && !userId.trim().isEmpty()) UserProfileCardSheet.show(WealthRankingHtmlActivity.this, userId);
+            });
+        }
+        @JavascriptInterface public void openRoom(String roomId) {
+            runOnUiThread(() -> {
+                if (roomId == null || roomId.trim().isEmpty()) return;
+                String id = roomId.trim();
+                RoomJoinPrefetch.begin(WealthRankingHtmlActivity.this, id, null);
+                Intent intent = new Intent(WealthRankingHtmlActivity.this, VoiceRoomActivity.class);
+                intent.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, id);
+                intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                startActivity(intent);
             });
         }
         @JavascriptInterface public void back() {
