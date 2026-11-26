@@ -434,7 +434,7 @@ public class HomeFragment extends Fragment {
             ((ImageView) wealth.findViewById(R.id.imgRankCover)).setImageResource(R.drawable.home_bg_wealth);
             ((android.widget.TextView) wealth.findViewById(R.id.tvRankTitle))
                     .setText(R.string.ranking_wealth);
-            wealth.setOnClickListener(v -> openInsights(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
+            wealth.setOnClickListener(v -> openRanking("rich"));
             act.rankBannerFlip.addView(wealth);
         }
         // The CP promo under the home banners opens the native CP center directly.
