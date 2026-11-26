@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -78,7 +78,7 @@ export class RankingService {
         const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2048);
         const description = String(item?.description || '').trim().slice(0, 180);
         if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
-          throw new Error('Reward image URLs must use HTTPS');
+          throw new BadRequestException('Reward image URLs must use HTTPS');
         }
         return { rank: index + 1, name, imageUrl, description };
       });
