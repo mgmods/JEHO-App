@@ -407,13 +407,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             glowOverlay.setAlpha(0f); return;
         }
         int base = safeColor(cfg.glowColor, Color.parseColor("#FFD66B"));
-        int alpha = Math.max(0, Math.min(100, cfg.glowIntensity)) * 180 / 100;
+        int intensity = Math.max(0, Math.min(100, cfg.glowIntensity));
+        int alpha = intensity * 180 / 100;
         GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.argb(Math.max(12, alpha / 4), Color.red(base), Color.green(base), Color.blue(base)));
+        // Keep the configured glow visible for the whole ad lifecycle. The
+        // entry/exit animation may add a short animated pulse on top of it.
+        g.setColor(Color.argb(Math.max(18, alpha / 5), Color.red(base), Color.green(base), Color.blue(base)));
         g.setCornerRadius(dp(Math.max(0, cfg.radiusDp)));
-        g.setStroke(Math.max(1, dp(1)), Color.argb(alpha, Color.red(base), Color.green(base), Color.blue(base)));
+        g.setStroke(Math.max(1, dp(1)), Color.argb(Math.max(24, alpha), Color.red(base), Color.green(base), Color.blue(base)));
         glowOverlay.setBackground(g);
         glowOverlay.setElevation(dp(6));
+        glowOverlay.setAlpha(Math.max(0.10f, intensity / 100f * 0.55f));
     }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
@@ -467,7 +471,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setMinimumHeight(h);
         setBackground(buildBackground(cfg.background, cfg.backgroundOpacity, cfg.radiusDp));
         backgroundImage.setAlpha(Math.max(0, Math.min(100, cfg.backgroundOpacity)) / 100f);
-        String backgroundUrl = cfg.backgroundImage == null ? "" : cfg.backgroundImage.trim();
+        String rawBackgroundUrl = cfg.backgroundImage == null ? "" : cfg.backgroundImage.trim();
+        String backgroundUrl = rawBackgroundUrl.startsWith("/") ? ApiOrigin.origin() + rawBackgroundUrl : rawBackgroundUrl;
         if ((backgroundUrl.startsWith("https://") || backgroundUrl.startsWith("http://"))) {
             // bindConfig may run again for the same active ad after a realtime refresh.
             // Re-submitting the same GIF request restarts its first frame and makes the
