@@ -52,8 +52,8 @@
 
         <ImageView
             android:id="@+id/imgCustomRankBadge"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:layout_gravity="top|end"
             android:layout_margin="1dp"
             android:contentDescription="@null"
