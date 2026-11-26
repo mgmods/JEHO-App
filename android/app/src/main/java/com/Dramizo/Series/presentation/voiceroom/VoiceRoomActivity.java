@@ -3332,7 +3332,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ImageView roleBadge = new ImageView(this);
                 roleBadge.setContentDescription(roleLabel);
                 roleBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                roleBadge.setLayoutParams(roomBadgeImageParams(116, 27, 2));
+                roleBadge.setLayoutParams(roomBadgeImageParams(108, 25, 2));
                 Glide.with(roleBadge).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(decoration.staffBadgeUrl.trim()))
                         .fitCenter().into(roleBadge);
                 addRoomChatBadge(inline, overflow, roleBadge, total++, firstLineLimit, inlineUsed,
@@ -3342,11 +3342,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roleBadge.setText(roleLabel);
                 roleBadge.setContentDescription(roleLabel);
                 roleBadge.setTextColor(Color.WHITE);
-                roleBadge.setTextSize(10f);
+                roleBadge.setTextSize(9f);
                 roleBadge.setTypeface(null, android.graphics.Typeface.BOLD);
                 roleBadge.setIncludeFontPadding(false);
                 roleBadge.setSingleLine(true);
-                roleBadge.setPadding(dp(8), dp(3), dp(8), dp(3));
+                roleBadge.setPadding(dp(7), dp(2), dp(7), dp(2));
                 GradientDrawable roleBg = new GradientDrawable();
                 roleBg.setColor("super".equals(decoration.staffRoleKey) ? 0xFF6D3CC8
                         : "admin".equals(decoration.staffRoleKey) || "manager".equals(decoration.staffRoleKey)
@@ -3364,11 +3364,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView vip = new TextView(this);
             vip.setText("VIP " + effectiveVipLevel);
             vip.setContentDescription("VIP " + effectiveVipLevel);
-            vip.setTextSize(10f);
+            vip.setTextSize(9f);
             vip.setTypeface(null, android.graphics.Typeface.BOLD);
             vip.setIncludeFontPadding(false);
             vip.setSingleLine(true);
-            vip.setPadding(dp(5), dp(2), dp(5), dp(2));
+            vip.setPadding(dp(4), dp(1), dp(4), dp(1));
             com.Dramizo.Series.util.VipStyle.applyChip(vip, effectiveVipLevel);
             vip.setTextColor(com.Dramizo.Series.util.VipStyle.chipTextColor(effectiveVipLevel));
             vip.setLayoutParams(roomBadgeTextParams(2));
@@ -3378,10 +3378,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView cp = new TextView(this);
             cp.setText("CP");
             cp.setTextColor(Color.WHITE);
-            cp.setTextSize(10f);
+            cp.setTextSize(9f);
             cp.setTypeface(null, android.graphics.Typeface.BOLD);
             cp.setIncludeFontPadding(false);
-            cp.setPadding(dp(5), dp(2), dp(5), dp(2));
+            cp.setPadding(dp(4), dp(1), dp(4), dp(1));
             cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
             cp.setLayoutParams(roomBadgeTextParams(2));
             addRoomChatBadge(inline, overflow, cp, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
@@ -3391,7 +3391,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ImageView medal = new ImageView(this);
             medal.setContentDescription("ميدالية");
             medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            medal.setLayoutParams(roomBadgeImageParams(25, 25, 1));
+            medal.setLayoutParams(roomBadgeImageParams(22, 22, 1));
             Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(medalUrl))
                     .placeholder(R.drawable.ic_medal_default)
                     .error(R.drawable.ic_medal_default)
