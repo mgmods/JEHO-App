@@ -17,6 +17,10 @@ const DEFAULT_CONFIG: any = {
   nameColor: '#9A681F', textColor: '#111827',
   nameGradientEnabled: false, nameGradientStartColor: '#FFD98A', nameGradientEndColor: '#FF6B9D',
   textGradientEnabled: false, textGradientStartColor: '#FFFFFF', textGradientEndColor: '#9EDCFF',
+  entryAnimation: 'slide-right', exitAnimation: 'slide-left', glowType: 'none', glowColor: '#FFD66B', glowIntensity: 0,
+  vipDailyLimit: 5,
+  vipPolicy: { background:'', backgroundImage:'', nameColor:'', textColor:'', fontFamily:'default', customFontUrl:'', textMotion:'right-to-left', entryAnimation:'gold', exitAnimation:'gold', glowType:'gold', glowColor:'#FFD66B', glowIntensity:55 },
+  userPolicies: {},
   customFontUrl: '', customFontName: '', spacingDp: 8,
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
   textOffsetXDp: 0, textOffsetYDp: 0, textWidthDp: 0,
@@ -92,6 +96,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         ADD COLUMN IF NOT EXISTS "rejectionReason" varchar(255),
         ADD COLUMN IF NOT EXISTS "idempotencyKey" varchar(128),
         ADD COLUMN IF NOT EXISTS "displayTemplateId" varchar(64),
+        ADD COLUMN IF NOT EXISTS "displayConfig" jsonb,
         ADD COLUMN IF NOT EXISTS "displayDurationMs" integer NOT NULL DEFAULT 9000,
         ADD COLUMN IF NOT EXISTS "createdAt" timestamptz NOT NULL DEFAULT now(),
         ADD COLUMN IF NOT EXISTS "updatedAt" timestamptz NOT NULL DEFAULT now()
@@ -167,6 +172,10 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       'INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW()) ON CONFLICT ("key") DO NOTHING',
       ['voice_room_ads_banned_words', '', 'Voice room advertising banned words, comma-separated'],
     );
+    await this.db.query(
+      'INSERT INTO "jeho_own"."app_settings" ("id","key","value","description","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,NOW(),NOW()) ON CONFLICT ("key") DO NOTHING',
+      ['voice_room_ads_user_policies', JSON.stringify({users:{}}), 'Per-user and VIP advertising policies'],
+    );
   }
 
   async current() {
@@ -184,7 +193,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async remainingForUser(userId: string) {
-    const c = await this.config();
+    const base = await this.config();
+    const c = await this.effectiveConfigForUser(userId, base);
     const limit = Math.max(0, Math.floor(Number(c.dailyLimit) || 0));
     const start = await this.resetStartFromDb(c.resetTimezone);
     // Use the explicitly-owned JEHO schema here instead of TypeORM's entity
@@ -204,7 +214,8 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async create(userId: string, rawText: string, key: string) {
-    const c = await this.config();
+    const base = await this.config();
+    const c = await this.effectiveConfigForUser(userId, base);
     if (c.enabled !== true || c.sendButtonEnabled !== true) throw new ConflictException('إرسال الإعلانات غير متاح حالياً');
     if (c.paused === true) throw new ConflictException('الإعلانات متوقفة مؤقتاً من لوحة التحكم؛ أعد تفعيلها ثم أرسل الإعلان');
     const text = String(rawText || '').replace(/(?:\r\n|\r|\n)+/g, ', ').replace(/[ \t]+/g, ' ').replace(/\s*,\s*/g, ', ').trim();
@@ -271,8 +282,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         senderImageUrl:safeAvatarUrl,
         text,status:AdvertisementStatus.QUEUED,queueOrder:maxOrder+1,idempotencyKey:key,
         displayTemplateId:String(c.template||'premium-v1'),
-        // Resolve duration from the exact dashboard settings used when this
-        // advertisement is displayed; queued ads are recalculated again at start.
+        displayConfig: this.pickDisplayConfig(c),
         displayDurationMs: this.resolveDisplayDuration(text, c),
       });
       await qr.manager.save(ad);
@@ -380,9 +390,11 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
         if(!next){await qr.commitTransaction();return;}
         next.status=AdvertisementStatus.PLAYING;
         next.startedAt=new Date();
-        next.displayDurationMs=this.resolveDisplayDuration(next.text, c);
+        const senderConfig = await this.effectiveConfigForUser(next.senderId, c);
+        next.displayConfig = this.pickDisplayConfig(senderConfig);
+        next.displayDurationMs=this.resolveDisplayDuration(next.text, senderConfig);
         await qr.manager.save(next); await qr.commitTransaction();
-        this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(next),config:c,at:next.startedAt.toISOString(),serverNow:new Date().toISOString()});
+        this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(next),config:next.displayConfig ? {...c,...next.displayConfig} : c,at:next.startedAt.toISOString(),serverNow:new Date().toISOString()});
       }catch(e){await qr.rollbackTransaction();this.log.error('Advertisement queue publish failed: '+String((e as any)?.message||e));}finally{await qr.release();}
     }catch(e){this.log.warn('Advertisement tick failed: '+String((e as any)?.message||e));}
     finally{this.busy=false;}
@@ -405,10 +417,46 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
         + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
       : 0;
-    return Math.min(120000, Math.max(
-      this.bound(c.displayDurationMs, 1000, 120000, 9000),
-      motionBudget,
-    ));
+    if (moving) return Math.min(120000, Math.max(1000, motionBudget + 300));
+    return Math.min(120000, Math.max(1000, this.bound(c.displayDurationMs, 1000, 120000, 9000)));
+  }
+
+  private pickDisplayConfig(c:any){
+    const keys=['background','backgroundImage','backgroundOpacity','radiusDp','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','fontFamily','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameOffsetXDp','nameOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity','transitionType'];
+    const out:any={}; for(const k of keys) if(c[k]!==undefined) out[k]=c[k]; return out;
+  }
+
+  private async effectiveConfigForUser(userId:string, base:any){
+    let overrides:any={};
+    try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); overrides=rows?.[0]?.value?JSON.parse(rows[0].value):{};}catch{}
+    const u=await this.users.findOne({where:{id:userId},select:['id','publicId','displayName'] as any});
+    const publicId=String((u as any)?.publicId||'').trim(); let vip=false;
+    try{const vipRows=await this.db.query('SELECT 1 FROM "jeho_own"."user_vips" WHERE "userId"=$1 AND "isActive"=true AND "startsAt"<=NOW() AND "expiresAt">NOW() LIMIT 1',[userId]); vip=vipRows?.length>0;}catch{}
+    const vipPolicy=(base.vipPolicy&&typeof base.vipPolicy==='object')?base.vipPolicy:{};
+    const direct=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
+    const merged={...base,...(vip?vipPolicy:{}),...direct};
+    if(vip&&direct?.dailyLimit===undefined) merged.dailyLimit=this.bound(vipPolicy.dailyLimit??base.vipDailyLimit??base.dailyLimit,0,1000,base.dailyLimit);
+    return merged;
+  }
+
+  async adminUserPolicy(userRef:string){
+    const base=await this.config(); let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{}
+    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any,select:['id','publicId','displayName'] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    const key=String((user as any).publicId||user.id); return {user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:all?.users?.[key]||{},vipPolicy:base.vipPolicy||{},vipDailyLimit:base.vipDailyLimit||base.dailyLimit};
+  }
+
+  async patchUserPolicy(body:any){
+    const userRef=String(body?.userId||body?.publicId||'').trim(); if(!userRef) throw new BadRequestException('أدخل ID المستخدم');
+    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any,select:['id','publicId','displayName'] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{} all.users=all.users||{};
+    const key=String((user as any).publicId||user.id); const p:any={}; for(const k of ['dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k];
+    if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,0);
+    all.users[key]=p; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(all),'voice_room_ads_user_policies']); return {ok:true,user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:p};
+  }
+
+  async patchVipPolicy(body:any){
+    const base=await this.config(); const p:any={...(base.vipPolicy||{})}; for(const k of ['dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k]; if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,5); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,55);
+    const merged={...base,vipPolicy:p,vipDailyLimit:p.dailyLimit}; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']); this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged); return {ok:true,vipPolicy:p};
   }
 
   async patchConfig(input:Record<string,unknown>) {
