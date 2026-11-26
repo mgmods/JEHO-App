@@ -69,7 +69,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private boolean animationInitialized = false;
     private long currentDisplayBudgetMs = 9000L;
     private long animationGeneration = 0L;
-    private volatile long serverClockOffsetMs = 0L;
     private volatile long serverClockAtSyncMs = 0L;
     private volatile long serverClockSyncElapsedMs = 0L;
     private volatile boolean serverClockKnown = false;
@@ -310,7 +309,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private void anchorServerClock(long serverNowMs, long elapsedRealtimeMs) {
         serverClockAtSyncMs = serverNowMs;
         serverClockSyncElapsedMs = elapsedRealtimeMs;
-        serverClockOffsetMs = serverNowMs - System.currentTimeMillis();
         serverClockKnown = true;
     }
 
@@ -654,13 +652,14 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             // message crosses the viewport before the ad is removed.
             long textMotionDuration = calculateTextMotionDuration(
                     configuredTextMode, viewportWidth, completeTextWidth, cfg, budget);
-            addElementMotion(text, configuredTextMode, viewportWidth, textMotionDuration, animations);
+            addElementMotion(text, configuredTextMode, viewportWidth, textMotionDuration,
+                    animations, elapsedSinceServerStartMs);
             // Keep the whole ticker lifecycle tied to the text crossing the bar.
             // No avatar/name animation may keep an already-finished message visible.
             addElementMotion(name, cfg == null ? "static" : cfg.nameMotion,
-                    Math.max(1, getWidth()), textMotionDuration, animations);
+                    Math.max(1, getWidth()), textMotionDuration, animations, elapsedSinceServerStartMs);
             addElementMotion(avatar, cfg == null ? "static" : cfg.avatarMotion,
-                    Math.max(1, getWidth()), textMotionDuration, animations);
+                    Math.max(1, getWidth()), textMotionDuration, animations, elapsedSinceServerStartMs);
             if (animations.isEmpty()) {
                 // Static mode remains visible until the authoritative expiry callback fires.
                 return;
@@ -723,7 +722,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     }
 
     private void addElementMotion(View target, String rawMode, int viewport, long duration,
-                                  ArrayList<Animator> animations) {
+                                  ArrayList<Animator> animations, long elapsedSinceServerStartMs) {
         String mode = rawMode == null ? "static" : rawMode.toLowerCase(Locale.ROOT);
         target.setTranslationX(0f);
         target.setAlpha(1f);
@@ -776,8 +775,16 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             ticker.setRepeatCount(ValueAnimator.INFINITE);
             ticker.setRepeatMode(ValueAnimator.RESTART);
             ticker.setInterpolator(new LinearInterpolator());
+            // Drive the ticker from monotonic elapsed time anchored to the server
+            // start timestamp. A delayed frame catches up immediately instead of
+            // freezing or accumulating drift after a busy UI frame.
+            final long tickerAnchorElapsed = SystemClock.elapsedRealtime();
+            final long tickerAnchorServerElapsed = Math.max(0L, elapsedSinceServerStartMs);
             ticker.addUpdateListener(animation -> {
-                float phase = (float) animation.getAnimatedValue();
+                long timelineElapsed = tickerAnchorServerElapsed
+                        + Math.max(0L, SystemClock.elapsedRealtime() - tickerAnchorElapsed);
+                long cyclePosition = timelineElapsed % cycleMs;
+                float phase = cyclePosition / (float) cycleMs;
                 float split = entryMs / (float) cycleMs;
                 float x;
                 if (phase <= split) {
