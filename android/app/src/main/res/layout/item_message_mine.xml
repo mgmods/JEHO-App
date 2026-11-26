@@ -84,8 +84,8 @@
 
             <ImageView
                 android:id="@+id/imgCustomRankBadge"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
                 android:layout_gravity="bottom|end"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
