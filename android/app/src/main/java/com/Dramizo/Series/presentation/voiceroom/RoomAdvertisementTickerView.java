@@ -620,8 +620,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!moving) return displayBudget;
         int entrySpeed = cfg == null ? 120 : cfg.entrySpeedPxPerSec;
         int exitSpeed = cfg == null ? 120 : cfg.exitSpeedPxPerSec;
-        entrySpeed = Math.max(20, Math.min(800, entrySpeed > 0 ? entrySpeed : 120));
-        exitSpeed = Math.max(20, Math.min(800, exitSpeed > 0 ? exitSpeed : 120));
+        entrySpeed = dp(Math.max(20, Math.min(800, entrySpeed > 0 ? entrySpeed : 120)));
+        exitSpeed = dp(Math.max(20, Math.min(800, exitSpeed > 0 ? exitSpeed : 120)));
         boolean fromRight = "right-to-left".equals(mode) || "rtl".equals(mode);
         long entryDistance = fromRight ? Math.max(1, viewportWidth) : Math.max(1, textWidth);
         long exitDistance = fromRight ? Math.max(1, textWidth) : Math.max(1, viewportWidth);
@@ -657,10 +657,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         float finish = fromRight ? -width : visibleWidth;
         float travel = Math.abs(finish - start);
         if (target == text && config != null) {
-            int entrySpeed = Math.max(20, Math.min(800,
-                    config.entrySpeedPxPerSec > 0 ? config.entrySpeedPxPerSec : 120));
-            int exitSpeed = Math.max(20, Math.min(800,
-                    config.exitSpeedPxPerSec > 0 ? config.exitSpeedPxPerSec : 120));
+            int entrySpeed = dp(Math.max(20, Math.min(800,
+                    config.entrySpeedPxPerSec > 0 ? config.entrySpeedPxPerSec : 120)));
+            int exitSpeed = dp(Math.max(20, Math.min(800,
+                    config.exitSpeedPxPerSec > 0 ? config.exitSpeedPxPerSec : 120)));
             float entryPoint = 0f;
             float entryDistance = Math.abs(entryPoint - start);
             float exitDistance = Math.abs(finish - entryPoint);
