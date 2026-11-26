@@ -417,7 +417,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
         + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
       : 0;
-    if (moving) const requestedMs = c.displayDurationSeconds !== undefined
+    const requestedMs = c.displayDurationSeconds !== undefined
       ? this.bound(Number(c.displayDurationSeconds) * 1000, 1000, 120000, 9000)
       : this.bound(c.displayDurationMs, 1000, 120000, 9000);
     if (moving) return Math.min(120000, Math.max(requestedMs, motionBudget + 300));
