@@ -60,6 +60,11 @@ public final class GlobalCelebrationToast {
     // Dashboard-controlled public announcement thresholds. Zero disables that criterion.
     private static volatile double remoteHighWinMinMultiplier = 10d;
     private static volatile long remoteHighWinMinCoins = 1000L;
+    private static volatile boolean remoteGiftSendEnabled = true;
+    private static volatile boolean remoteLuckyNormalEnabled = true;
+    private static volatile boolean remoteLuckyReturnEnabled = true;
+    private static volatile boolean remoteLuckyHighEnabled = true;
+    private static volatile boolean remoteLuckyRoomHighEnabled = true;
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
     private static volatile boolean remoteLuckyNormalShineEnabled = true;
@@ -306,6 +311,26 @@ public final class GlobalCelebrationToast {
                 || "lucky_high".equals(normalized);
     }
 
+    /** Dashboard switches are independent for normal, returned, general-high and room-high lanes. */
+    private static boolean isToastEnabled(@Nullable String kind, boolean centerPlacement,
+                                          double multiplier, long coinsWon, @Nullable String body) {
+        if (kind == null) return true;
+        String normalized = kind.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("gift_send".equals(normalized)) return remoteGiftSendEnabled;
+        if (!isLuckyToastKind(normalized)) return true;
+        boolean returned = "lucky_hit_return".equals(normalized) || "lucky_return".equals(normalized)
+                || ( !"lucky_hit_high".equals(normalized) && !"lucky_high".equals(normalized)
+                && !"lucky_hit_normal".equals(normalized)
+                && (multiplier <= 0d || (body != null && (body.contains("مردود جزئي")
+                || body.contains("مردود +") || body.contains("مردود الهدية")))));
+        if (returned) return remoteLuckyReturnEnabled;
+        boolean high = "lucky_hit_high".equals(normalized) || "lucky_high".equals(normalized)
+                || multiplier >= remoteHighWinMinMultiplier && remoteHighWinMinMultiplier > 0d
+                || coinsWon >= remoteHighWinMinCoins && remoteHighWinMinCoins > 0L;
+        if (high) return centerPlacement ? remoteLuckyRoomHighEnabled : remoteLuckyHighEnabled;
+        return remoteLuckyNormalEnabled;
+    }
+
     private static int intValue(Object value, int fallback) {
         try { return Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
@@ -343,6 +368,11 @@ public final class GlobalCelebrationToast {
                     catch (Exception ignored) { remoteHighWinMinMultiplier = 10d; }
                     try { remoteHighWinMinCoins = Math.max(0L, Long.parseLong(String.valueOf(cfg.get("highWinMinCoins")))); }
                     catch (Exception ignored) { remoteHighWinMinCoins = 1000L; }
+                    remoteGiftSendEnabled = !Boolean.FALSE.equals(gift.get("enabled"));
+                    remoteLuckyNormalEnabled = !Boolean.FALSE.equals(normal.get("enabled"));
+                    remoteLuckyReturnEnabled = !Boolean.FALSE.equals(returned.get("enabled"));
+                    remoteLuckyHighEnabled = !Boolean.FALSE.equals(high.get("enabled"));
+                    remoteLuckyRoomHighEnabled = !Boolean.FALSE.equals(roomHigh.get("enabled"));
                     remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
                     remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
