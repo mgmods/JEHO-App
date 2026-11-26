@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.voiceroom;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.animation.AnimatorSet;
 import java.util.ArrayList;
 import android.view.animation.LinearInterpolator;
@@ -665,15 +666,32 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             float entryPoint = 0f;
             float entryDistance = Math.abs(entryPoint - start);
             float exitDistance = Math.abs(finish - entryPoint);
-            ObjectAnimator enter = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, start, entryPoint);
-            enter.setDuration(Math.max(1L, Math.round((entryDistance / entrySpeed) * 1000f)));
-            enter.setInterpolator(new LinearInterpolator());
-            ObjectAnimator exit = ObjectAnimator.ofFloat(target, View.TRANSLATION_X, entryPoint, finish);
-            exit.setDuration(Math.max(1L, Math.round((exitDistance / exitSpeed) * 1000f)));
-            exit.setInterpolator(new LinearInterpolator());
-            AnimatorSet textMotion = new AnimatorSet();
-            textMotion.playSequentially(enter, exit);
-            animations.add(textMotion);
+            long entryMs = Math.max(1L, Math.round((entryDistance / (float) entrySpeed) * 1000f));
+            long exitMs = Math.max(1L, Math.round((exitDistance / (float) exitSpeed) * 1000f));
+            long cycleMs = entryMs + exitMs;
+
+            // Keep the ticker moving for the entire server-controlled ad lifetime.
+            // The reset happens only after the complete message has left the clipped
+            // viewport, so users never see a stationary message between passes.
+            ValueAnimator ticker = ValueAnimator.ofFloat(0f, 1f);
+            ticker.setDuration(Math.max(1L, cycleMs));
+            ticker.setRepeatCount(ValueAnimator.INFINITE);
+            ticker.setRepeatMode(ValueAnimator.RESTART);
+            ticker.setInterpolator(new LinearInterpolator());
+            ticker.addUpdateListener(animation -> {
+                float phase = (float) animation.getAnimatedValue();
+                float split = entryMs / (float) cycleMs;
+                float x;
+                if (phase <= split) {
+                    float leg = split <= 0f ? 1f : phase / split;
+                    x = start + (entryPoint - start) * leg;
+                } else {
+                    float leg = (phase - split) / Math.max(0.0001f, 1f - split);
+                    x = entryPoint + (finish - entryPoint) * leg;
+                }
+                target.setTranslationX(x);
+            });
+            animations.add(ticker);
             return;
         }
         long computedDuration = Math.max(1L, Math.round((travel / 120f) * 1000f));
