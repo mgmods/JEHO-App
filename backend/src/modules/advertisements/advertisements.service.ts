@@ -346,7 +346,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
           if(recovered){
             const serverNow=new Date();
             const remaining=this.bound(recovered.displayDurationMs,1000,120000,9000)-(serverNow.getTime()-(recovered.startedAt?.getTime()||serverNow.getTime()));
-            if(remaining>0)this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:c,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true});
+            if(remaining>0){ const recoveredConfig = recovered.displayConfig ? {...c,...recovered.displayConfig} : c; this.realtime.server.to('rooms:all').emit('room:advertisement',{type:'start',advertisement:this.publicAd(recovered),config:recoveredConfig,at:(recovered.startedAt||serverNow).toISOString(),serverNow:serverNow.toISOString(),recovered:true}); }
           }
         }
       }
