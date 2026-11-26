@@ -295,6 +295,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean micOn = false;
     /** True only after the user taps mute — survives refresh / WhatsApp return. */
     private boolean userChoseMute = false;
+    /** Last confirmed self-seat time; short stale-snapshot grace prevents mic publish flapping. */
+    private long lastSelfSeatConfirmedAtMs = 0L;
     private boolean locked;
     private boolean isHost;
     private boolean isOwner;
@@ -650,6 +652,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        userChoseMute = myUserId != null && getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                .getBoolean("muted:" + myUserId, false);
         refreshMysteriousManMedia();
         // Critical path: HTTP join overlaps layout inflate.
         // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
@@ -1064,6 +1068,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             micOn = !micOn;
             userChoseMute = !micOn;
+            if (myUserId != null) getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                    .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
             if (roomId != null) viewModel.setMic(roomId, !micOn);
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncVoiceAudio(currentSeats);
@@ -1476,6 +1482,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (seats == null) seats = new ArrayList<>();
             boolean wasOnSeat = isOnSeat(currentSeats);
+            // Room snapshots can briefly omit a self seat while the room API and realtime
+            // roster converge. Keep the last confirmed local seat for a short grace window;
+            // explicit room:seat_left events clear this latch immediately.
+            if (wasOnSeat && !isOnSeat(seats) && lastSelfSeatConfirmedAtMs > 0L
+                    && System.currentTimeMillis() - lastSelfSeatConfirmedAtMs < 5000L) {
+                RoomDtos.SeatDto selfSeat = findMySeat(currentSeats);
+                if (selfSeat != null) {
+                    seats = new ArrayList<>(seats);
+                    seats.add(shallowCopySeat(selfSeat));
+                }
+            }
             // On minimize/restore the new Activity starts with an empty in-memory seat list.
             // Compare against the cached room roster before deciding this is a brand-new seat;
             // otherwise the restore path can wrongly re-run new-seat mic activation and overwrite
@@ -1500,6 +1517,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 scheduleSupporterRefresh(0L);
             }
             boolean nowOnSeat = isOnSeat(seats);
+            if (nowOnSeat) lastSelfSeatConfirmedAtMs = System.currentTimeMillis();
             RoomDtos.SeatDto mySeat = findMySeat(seats);
 
             // New seat assignment: open mic unless moderator-muted or user already chose mute.
@@ -1520,7 +1538,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.makeText(this, isHost ? "أنت المبدع على المايك" : "أنت على المايك الآن", Toast.LENGTH_SHORT).show();
             } else if (!nowOnSeat && wasOnSeat) {
                 micOn = false;
-                userChoseMute = false;
+                // Keep the user's explicit mute preference across seat changes and room re-entry.
                 try {
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     RoomRtcEngine.getInstance().stopPublishing();
@@ -1641,6 +1659,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** RTC side of session observer — deferred so first room paint stays under ANR budget. */
     private void attachRtcForSession(@Nullable RoomDtos.JoinRoomResult session) {
         if (session == null || exiting || isFinishing() || zegoLoggedIn) return;
+        if (myUserId != null) {
+            userChoseMute = getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                    .getBoolean("muted:" + myUserId, userChoseMute);
+        }
         zegoLoggedIn = true;
         RoomRtcEngine.getInstance().applyJoinSession(
                 this, session, roomId, myUserId);
@@ -13600,7 +13622,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         rtcCanPublish = false;
         rtcPublishTokenExpiresAtMs = 0L;
         micOn = false;
-        userChoseMute = false;
+        // Reload the account-level mute preference when the next room session attaches.
+        userChoseMute = myUserId != null && getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                .getBoolean("muted:" + myUserId, false);
+        lastSelfSeatConfirmedAtMs = 0L;
         zegoLoggedIn = false;
         realtimeJoined = false;
         realtimeJoinInFlight = false;
@@ -17549,13 +17574,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 // A seat hop is not a request to unmute. If the user was already
                 // seated and explicitly muted, carry that choice to the new seat.
-                boolean preserveUserMute = userChoseMute && isOnSeat(currentSeats);
+                boolean preserveUserMute = userChoseMute;
                 if (preserveUserMute) {
                     micOn = false;
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     if (roomId != null) viewModel.setMic(roomId, true);
                 } else {
-                    userChoseMute = false;
                     micOn = true;
                     RoomRtcEngine.getInstance().setMicEnabled(true);
                     if (roomId != null) viewModel.setMic(roomId, false);
@@ -17580,8 +17604,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // This is an explicit server seat-left event, unlike an empty refresh snapshot.
                 restoreSeatSnapshot = null;
                 restoreSeatSnapshotUntilMs = 0L;
+                lastSelfSeatConfirmedAtMs = 0L;
                 micOn = false;
-                userChoseMute = false;
+                // Seat removal is not a request to erase the user's saved mute preference.
                 RoomRtcEngine.getInstance().setMicEnabled(false);
                 RoomRtcEngine.getInstance().stopPublishing();
                 if (forced) {
