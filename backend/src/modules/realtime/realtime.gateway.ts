@@ -685,6 +685,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!data?.roomId) return;
     if (client.data.roomProfiles) delete client.data.roomProfiles[data.roomId];
     client.leave(`room:${data.roomId}`);
+    // Keep global ad fan-out membership only while this socket is in at least
+    // one active room; a later room:join will subscribe it again automatically.
+    if (Object.keys(client.data.roomProfiles || {}).length === 0) {
+      client.leave('rooms:all');
+    }
 
     const membersPayload = await this.emitRoomMembers(data.roomId);
     const viewerCount = membersPayload?.viewerCount ?? 0;
@@ -1609,6 +1614,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     for (const socket of sockets) {
       if (socket.data.roomProfiles) delete socket.data.roomProfiles[roomId];
       await socket.leave(channel);
+      if (Object.keys(socket.data.roomProfiles || {}).length === 0) {
+        await socket.leave('rooms:all');
+      }
     }
   }
 
@@ -1619,6 +1627,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       if (socket.data.userId !== userId) continue;
       if (socket.data.roomProfiles) delete socket.data.roomProfiles[roomId];
       await socket.leave(channel);
+      if (Object.keys(socket.data.roomProfiles || {}).length === 0) {
+        await socket.leave('rooms:all');
+      }
     }
     await this.emitRoomMembers(roomId);
   }
