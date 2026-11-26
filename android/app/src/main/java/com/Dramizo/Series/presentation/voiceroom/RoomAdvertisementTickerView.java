@@ -502,12 +502,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setSingleLine(true);
         text.setHorizontallyScrolling(true);
         text.setEllipsize(null);
-        int fullTextWidth = Math.max(dp(1), (int) Math.ceil(text.getPaint().measureText(fullMessage))
-                + text.getCompoundPaddingLeft() + text.getCompoundPaddingRight() + dp(8));
-        text.setWidth(fullTextWidth);
-        FrameLayout.LayoutParams fullTextParams = (FrameLayout.LayoutParams) text.getLayoutParams();
-        fullTextParams.width = fullTextWidth;
-        text.setLayoutParams(fullTextParams);
+        updateTickerTextWidth();
         if (config != null) applyConfiguredGradients(config);
         if (ad.senderImageUrl != null && !ad.senderImageUrl.trim().isEmpty()) {
             com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(getContext().getApplicationContext()).load(ad.senderImageUrl).centerCrop()
@@ -518,6 +513,18 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             avatar.setImageResource(R.drawable.ic_default_avatar);
         }
         setVisibility(VISIBLE);
+    }
+
+    private void updateTickerTextWidth() {
+        String fullMessage = text.getText() == null ? "" : text.getText().toString();
+        int fullTextWidth = Math.max(dp(1), (int) Math.ceil(text.getPaint().measureText(fullMessage))
+                + text.getCompoundPaddingLeft() + text.getCompoundPaddingRight() + dp(8));
+        text.setWidth(fullTextWidth);
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) text.getLayoutParams();
+        if (params != null && params.width != fullTextWidth) {
+            params.width = fullTextWidth;
+            text.setLayoutParams(params);
+        }
     }
 
     private String resolvedCustomFontUrl(AdvertisementDtos.Ticker cfg) {
@@ -560,7 +567,26 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     customTypeface = loaded;
                     text.setTypeface(loaded);
                     name.setTypeface(loaded, Typeface.BOLD);
+                    updateTickerTextWidth();
                     applyConfiguredGradients(config);
+                    AdvertisementDtos.Advertisement active = currentAdvertisement;
+                    AdvertisementDtos.Ticker activeConfig = config;
+                    if (attached.get() && active != null && active.id.equals(currentAdId)) {
+                        long serverNow = estimatedServerNowMs();
+                        long startedAt = parseIsoUtc(active.startedAt, serverNow);
+                        long remaining = active.displayDurationMs - Math.max(0L, serverNow - startedAt);
+                        needsResume = true;
+                        animationInitialized = false;
+                        if (remaining > 0L) {
+                            post(() -> {
+                                if (attached.get() && active.id.equals(currentAdId)) {
+                                    showAdvertisement(active, activeConfig, remaining);
+                                }
+                            });
+                        } else {
+                            post(this::hideAdvertisement);
+                        }
+                    }
                 } catch (Exception ignored) {
                     customTypeface = null;
                 }
