@@ -20,6 +20,11 @@ public class RankingRepositoryImpl implements RankingRepository {
         return ApiCall.execute(api.list(p, category, 200));
     }
 
+    @Override
+    public Result<java.util.Map<String, Object>> rewards() {
+        return ApiCall.execute(api.rewards());
+    }
+
     private static String mapCategory(String type) {
         if (type == null) return "rich";
         switch (type.toLowerCase()) {
