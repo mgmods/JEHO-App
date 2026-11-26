@@ -506,7 +506,7 @@ public class HomeFragment extends Fragment {
                 com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.class);
         intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_CATEGORY,
                 category == null ? "rich" : category);
-        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_PERIOD, "daily");
+        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_PERIOD, "weekly");
         startActivity(intent);
     }
 
