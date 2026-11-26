@@ -447,17 +447,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const storedDirect=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
     const directExpiry=storedDirect?.expiresAt ? new Date(storedDirect.expiresAt).getTime() : Number.POSITIVE_INFINITY;
     const direct=directExpiry>Date.now()?storedDirect:{};
-    // Empty strings in a user-specific policy mean "inherit the main dashboard value".
-    // This prevents an unspecific saved policy from accidentally erasing the main
-    // ticker background, font, colors or motion settings for that user.
-    const directOverlay:any={};
-    for (const [k,v] of Object.entries(direct)) {
-      if (v !== undefined && v !== null && !(typeof v === 'string' && v.trim()==='')) directOverlay[k]=v;
-    }
-    const vipOverlay:any={};
-    if(vip) for(const [k,v] of Object.entries(vipPolicy)) if(v!==undefined && v!==null && !(typeof v==='string' && v.trim()==='')) vipOverlay[k]=v;
-    delete vipOverlay.durationDays;
-    // VIP / direct-user visual policy is intentionally limited to the background.
+    // VIP/direct-user policies intentionally inherit the normal ticker visuals.\n    // VIP / direct-user visual policy is intentionally limited to the background.
     // Position, font, text/name/avatar motion, entry/exit, glow, sizing and all other
     // ticker behavior always inherit the normal dashboard ticker. This keeps one
     // source of truth for the ticker layout and prevents VIP/ID ads from jumping to
