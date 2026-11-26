@@ -429,7 +429,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   private async effectiveConfigForUser(userId:string, base:any){
     let overrides:any={};
     try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); overrides=rows?.[0]?.value?JSON.parse(rows[0].value):{};}catch{}
-    const u=await this.users.findOne({where:{id:userId},select:['id','publicId','displayName'] as any});
+    const u=await this.users.findOne({where:{id:userId}});
     const publicId=String((u as any)?.publicId||'').trim(); let vip=false;
     try{const vipRows=await this.db.query('SELECT 1 FROM "jeho_own"."user_vips" WHERE "userId"=$1 AND "isActive"=true AND "startsAt"<=NOW() AND "expiresAt">NOW() LIMIT 1',[userId]); vip=vipRows?.length>0;}catch{}
     const vipPolicy=(base.vipPolicy&&typeof base.vipPolicy==='object')?base.vipPolicy:{};
@@ -441,13 +441,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async adminUserPolicy(userRef:string){
     const base=await this.config(); let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{}
-    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any,select:['id','publicId','displayName'] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
     const key=String((user as any).publicId||user.id); return {user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:all?.users?.[key]||{},vipPolicy:base.vipPolicy||{},vipDailyLimit:base.vipDailyLimit||base.dailyLimit};
   }
 
   async patchUserPolicy(body:any){
     const userRef=String(body?.userId||body?.publicId||'').trim(); if(!userRef) throw new BadRequestException('أدخل ID المستخدم');
-    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any,select:['id','publicId','displayName'] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
     let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{} all.users=all.users||{};
     const key=String((user as any).publicId||user.id); const p:any={}; for(const k of ['dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k];
     if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,0);
