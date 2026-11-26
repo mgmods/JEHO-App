@@ -380,6 +380,8 @@ export const dailyLoginRewardsApi = {
 export const rankingApi = {
   board: (period, category, params) =>
     safeRequest(() => api.get(`/admin/ranking/${period}/${category}`, { params })),
+  rewards: () => safeRequest(() => api.get('/admin/ranking/rewards')),
+  saveRewards: (payload) => safeRequest(() => api.patch('/admin/ranking/rewards', payload)),
 }
 
 
