@@ -93,8 +93,6 @@ jobs:
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=JEHO Ghaymah candidate (backend and dashboard)
-          cache-from: type=gha,scope=jeho-ghaymah
-          cache-to: type=gha,mode=max,scope=jeho-ghaymah
           outputs: type=image
           provenance: false
           sbom: false
