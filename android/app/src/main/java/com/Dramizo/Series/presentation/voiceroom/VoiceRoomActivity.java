@@ -12366,16 +12366,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String chat;
         if (isLucky) {
             long coins = coinsWon > 0 ? coinsWon : extractCoinsFromBody(line);
+            double eventMultiplier = suppliedMultiplier > 0d
+                    ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
+            String multiplierLabel = eventMultiplier > 0d
+                    ? " · ×" + String.format(java.util.Locale.US, "%.0f", eventMultiplier) : "";
             toastMsg = coins > 0
-                    ? ("أرسل هدايا حظ وفاز بـ " + coins)
+                    ? ("أرسل هدايا حظ وفاز بـ " + String.format(java.util.Locale.US, "%,d", coins))
                     : "أرسل هدايا حظ وفاز";
             chat = coins > 0
-                    ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
+                    ? ("مبروك " + who + " ربح " + String.format(java.util.Locale.US, "%,d", coins)
+                        + " كوين" + multiplierLabel + " · حظ")
                     : ("مبروك " + who + " · حظ");
             String toastKey = dedupeKey != null ? dedupeKey
                     : ("lucky-room-" + System.currentTimeMillis());
-            double eventMultiplier = suppliedMultiplier > 0d
-                    ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
             boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
             boolean sameTargetRoom = isSameRoom(targetRoomId);
             // The center celebration is private: require an explicit sender ID match AND
