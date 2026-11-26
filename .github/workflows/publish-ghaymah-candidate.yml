@@ -181,3 +181,5 @@ jobs:
           fi
 
           echo "Cumin accepted the exact JEHO-OWN image digest for app jeho-own: $IMAGE"
+
+# Build trigger: publish the current MG-JEHO Ghaymah candidate image for manual update.
