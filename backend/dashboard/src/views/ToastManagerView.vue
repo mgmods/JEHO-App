@@ -48,7 +48,7 @@
             </div>
             <div class="room-preview-toolbar"><span>الجميع</span><span>دردشة</span><span>هدية</span></div>
             <div class="room-preview-input">اكتب رسالة... <span>🎁　🎙</span></div>
-            <div class="toast-canvas" :style="canvasStyle" @pointerdown.stop="startDrag('toast', $event)">
+            <div ref="toastCanvasRef" class="toast-canvas" :style="canvasStyle" @pointerdown.stop="startDrag('toast', $event)">
               <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
               <div v-if="activeTab !== 'luckyWinHighRoom'" class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
               <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : activeTab === 'luckyReturn' ? 'مردود الهدية' : 'الفائز المحظوظ' }}</strong>
@@ -256,6 +256,7 @@ const titlePreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWin
 const bodyPreviewStyle = computed(() => ({ left: (activeTab.value === 'luckyWinHighRoom' ? 8 : currentStyle.value.bodyX) + '%', top: currentStyle.value.bodyY + '%', fontSize: (Number(currentStyle.value.bodySizeSp) || 12) + 'px' }))
 const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%', fontSize: (Number(currentStyle.value.countSizeSp) || 12) + 'px' }))
 const roomPreviewRef = ref(null)
+const toastCanvasRef = ref(null)
 const dragTarget = ref('')
 function startDrag(target, event) {
   if (activeTab.value === 'luckyButton') return
@@ -264,7 +265,7 @@ function startDrag(target, event) {
 }
 function moveDrag(event) {
   if (!dragTarget.value) return
-  const rect = (roomPreviewRef.value || event.currentTarget).getBoundingClientRect()
+  const rect = (dragTarget.value === 'toast' ? roomPreviewRef.value : toastCanvasRef.value)?.getBoundingClientRect()
   if (!rect.width || !rect.height) return
   const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
   const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
