@@ -818,7 +818,8 @@ public final class GlobalCelebrationToast {
                 absLeft = null;
             }
         }
-        if (avatar != null) {
+        // Winner-only center result is text-only; do not request or load any profile image.
+        if (avatar != null && !centerPlacement) {
             if (absLeft != null && !absLeft.isEmpty()) {
                 try {
                     Glide.with(activity)
