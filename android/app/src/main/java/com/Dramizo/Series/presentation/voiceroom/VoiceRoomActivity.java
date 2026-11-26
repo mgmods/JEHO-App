@@ -4989,11 +4989,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     final int nextDuration = duration;
                     final String nextIconUrl = iconUrl;
                     final boolean nextPulseEnabled = !Boolean.FALSE.equals(button.get("pulseEnabled"));
+                    final boolean nextEnabled = !Boolean.FALSE.equals(button.get("enabled"));
                     runOnUiThread(() -> {
                         if (isFinishing() || isDestroyed()) return;
                         luckyCannonDurationSeconds = nextDuration;
                         luckyCannonPulseEnabled = nextPulseEnabled;
                         luckyCannonRemoteIconUrl = nextIconUrl;
+                        if (luckyCannonLayer != null) {
+                            luckyCannonLayer.setVisibility(nextEnabled ? View.VISIBLE : View.GONE);
+                            if (!nextEnabled) stopLuckyCannonHold(false);
+                        }
                         if (luckyCannonIconView == null) return;
                         if (nextIconUrl.isEmpty()) {
                             luckyCannonIconView.setVisibility(View.GONE);
