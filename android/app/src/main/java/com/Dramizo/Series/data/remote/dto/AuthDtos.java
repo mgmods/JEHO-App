@@ -9,6 +9,7 @@ public final class AuthDtos {
         @SerializedName("email") public String email;
         @SerializedName("password") public String password;
         @SerializedName("username") public String username;
+        @SerializedName("countryCode") public String countryCode;
         @SerializedName("displayName") public String displayName;
 
         public RegisterRequest(String email, String password, String username, String displayName) {
