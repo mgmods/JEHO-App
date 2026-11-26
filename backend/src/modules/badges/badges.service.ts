@@ -425,6 +425,26 @@ export class BadgesService {
       .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
       .getOne();
     if (activeRoomSupportGrant) return null;
+
+    // One-time cleanup for medals granted by older builds: archive expired room-support
+    // ownerships and restart this user's room task progress instead of instantly re-awarding
+    // from a stale threshold that was left complete by the previous implementation.
+    let expiredRoomSupportGrantDetected = false;
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-expiry:${userId}`]);
+      const expiredGrants = await manager.createQueryBuilder(UserBadge, 'ub')
+        .setLock('pessimistic_write')
+        .where('ub.userId = :userId', { userId })
+        .andWhere('ub.source = :source', { source: 'room_support' })
+        .andWhere('ub.expiresAt IS NOT NULL AND ub.expiresAt <= NOW()')
+        .getMany();
+      if (expiredGrants.length) {
+        expiredRoomSupportGrantDetected = true;
+        for (const expiredGrant of expiredGrants) expiredGrant.source = 'room_support_expired';
+        await manager.save(expiredGrants);
+      }
+    });
+
     const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
     if (!row?.value) return null;
     let config: any; try { config = JSON.parse(row.value); } catch { return null; }
@@ -449,6 +469,7 @@ export class BadgesService {
         let stateRow = await manager.findOne(AppSetting, { where: { key }, lock: { mode: 'pessimistic_write' } });
         let state: any = { current: 0, awarded: false };
         try { if (stateRow?.value) state = { ...state, ...JSON.parse(stateRow.value) }; } catch {}
+        if (expiredRoomSupportGrantDetected) state = { current: 0, awarded: false };
         if (!state.awarded) {
           state.current = Math.min(target, Math.max(0, Number(state.current) || 0) + amount);
           reached = state.current >= target; current = state.current;
