@@ -61,6 +61,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private final AtomicBoolean attached = new AtomicBoolean(false);
     private volatile AdvertisementDtos.Ticker config;
     private volatile String currentAdId = "";
+    private volatile AdvertisementDtos.Advertisement currentAdvertisement;
     private AnimatorSet activeAnimator;
     // True once the current ad's motion has actually been initialized; a refresh must retry if layout prevented startup.
     private volatile boolean needsResume = false;
@@ -177,15 +178,25 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }
             post(() -> {
                 if (!attached.get()) return;
-                if (ev.advertisement.id != null && ev.advertisement.id.equals(currentAdId)) {
+                boolean endingVisibleAd = ev.advertisement.id != null
+                        && ev.advertisement.id.equals(currentAdId);
+                if (endingVisibleAd) {
                     // Socket delivery latency differs per device. Use the server's
                     // completedAt timestamp, not event arrival, to hide in sync.
                     long endedAt = parseIsoUtc(ev.at, System.currentTimeMillis());
                     long remaining = endedAt - estimatedServerNowMs();
-                    if (remaining <= 0L) hideAdvertisement();
-                    else scheduleExpiry(ev.advertisement.id, remaining, animationGeneration);
+                    if (remaining <= 0L) {
+                        hideAdvertisement();
+                        refreshCurrent();
+                    } else {
+                        // scheduleExpiry performs the next-current lookup at the
+                        // shared deadline; don't let an early HTTP "no active ad"
+                        // response hide this ticker ahead of the other rooms.
+                        scheduleExpiry(ev.advertisement.id, remaining, animationGeneration);
+                    }
+                } else {
+                    refreshCurrent();
                 }
-                refreshCurrent();
             });
             return;
         }
@@ -239,11 +250,21 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 if (!attached.get()) return;
                 if (requestGeneration != refreshGeneration) {
                     // A realtime start may beat this HTTP response. Keep its clock
-                    // sample, then reload once so the visible ticker catches up.
-                    if (current != null && current.serverNow != null && !currentAdId.isEmpty()) {
+                    // sample and re-phase the currently visible ad locally, without
+                    // spawning another overlapping HTTP refresh request.
+                    AdvertisementDtos.Advertisement active = currentAdvertisement;
+                    AdvertisementDtos.Ticker activeConfig = config;
+                    if (current != null && current.serverNow != null && active != null) {
                         needsResume = true;
                         animationInitialized = false;
-                        refreshCurrent();
+                        post(() -> {
+                            if (!attached.get() || !active.id.equals(currentAdId)) return;
+                            long serverNow = estimatedServerNowMs();
+                            long startedAt = parseIsoUtc(active.startedAt, serverNow);
+                            long remaining = active.displayDurationMs - Math.max(0L, serverNow - startedAt);
+                            if (remaining > 0L) showAdvertisement(active, activeConfig, remaining);
+                            else hideAdvertisement();
+                        });
                     }
                     return;
                 }
@@ -346,6 +367,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         if (!attached.get()) return;
         cancelActiveAnimator();
         currentAdId = "";
+        currentAdvertisement = null;
         needsResume = false;
         currentDisplayBudgetMs = 0L;
         text.setText("");
@@ -379,6 +401,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             return;
         }
         boolean sameAd = ad.id.equals(currentAdId);
+        currentAdvertisement = ad;
         if (sameAd && !needsResume && animationInitialized) {
             config = cfg;
             currentDisplayBudgetMs = remainingMs;
