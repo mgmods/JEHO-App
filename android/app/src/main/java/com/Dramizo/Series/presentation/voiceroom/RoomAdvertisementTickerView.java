@@ -458,7 +458,17 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         try {
             JsonObject merged = new com.google.gson.Gson().toJsonTree(base).getAsJsonObject();
             JsonObject extra = new com.google.gson.Gson().toJsonTree(override).getAsJsonObject();
-            for (java.util.Map.Entry<String, com.google.gson.JsonElement> e : extra.entrySet()) if (e.getValue() != null && !e.getValue().isJsonNull()) merged.add(e.getKey(), e.getValue());
+            // The ad snapshot may override the background, but the normal
+            // dashboard ticker remains the single source of truth for position,
+            // font, motion, entry/exit, glow and sizing. VIP/direct-user ads must
+            // never move the bar away from the normal ad position.
+            String[] allowed = {"background","backgroundImage","backgroundOpacity","displayDurationSeconds","displayDurationMs"};
+            java.util.HashSet<String> allowedSet = new java.util.HashSet<>(java.util.Arrays.asList(allowed));
+            for (java.util.Map.Entry<String, com.google.gson.JsonElement> e : extra.entrySet()) {
+                if (allowedSet.contains(e.getKey()) && e.getValue() != null && !e.getValue().isJsonNull()) {
+                    merged.add(e.getKey(), e.getValue());
+                }
+            }
             return new com.google.gson.Gson().fromJson(merged, AdvertisementDtos.Ticker.class);
         } catch (Exception ignored) { return base; }
     }
