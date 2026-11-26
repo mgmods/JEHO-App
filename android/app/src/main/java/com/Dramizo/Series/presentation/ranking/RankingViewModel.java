@@ -8,16 +8,26 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import java.util.Collections;
 import java.util.List;
+import com.google.gson.Gson;
 
 public class RankingViewModel extends ViewModel {
     private final AppContainer c;
     private final MutableLiveData<List<MiscDtos.RankingEntryDto>> entries =
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
+    private final MutableLiveData<String> rewardsJson = new MutableLiveData<>("{}");
+    private final Gson gson = new Gson();
 
     public RankingViewModel(AppContainer c) { this.c = c; }
     public LiveData<List<MiscDtos.RankingEntryDto>> getEntries() { return entries; }
     public LiveData<String> getError() { return error; }
+    public LiveData<String> getRewardsJson() { return rewardsJson; }
+    public void loadRewards() {
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> r = c.getRankingsUseCase.rewards();
+            if (r.success && r.data != null) rewardsJson.postValue(gson.toJson(r.data));
+        });
+    }
 
     public void load(String period) {
         load(period, "rich");
