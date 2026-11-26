@@ -153,7 +153,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 config = next;
                 if (next != null) SEND_BUTTON_ENABLED = next.enabled && next.sendButtonEnabled && !next.paused;
                 if (next != null && (!next.enabled || next.paused)) {
-                    post(this::hideAdvertisement);
+                    post(() -> hideAdvertisement());
                 } else if (next != null) {
                     if (!currentAdId.isEmpty()) {
                         needsResume = true;
