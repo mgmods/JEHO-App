@@ -221,7 +221,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         final long remainingMs = remaining;
         final AdvertisementDtos.Ticker eventConfig = ev.config != null ? ev.config : config;
         if (eventConfig != null && (!eventConfig.enabled || eventConfig.paused)) {
-            post(this::hideAdvertisement);
+            post(() -> RoomAdvertisementTickerView.this.hideAdvertisement());
             return;
         }
         post(() -> {
