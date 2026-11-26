@@ -200,7 +200,7 @@ export class NotificationsService {
     // Lucky/game win results are delivered only through the in-room celebration UI.
     // Do not create inbox rows, realtime notification events, or external FCM alerts
     // for the winner, friends, followers, or any other account.
-    if (isRoomRewardWinPayload(dto.data, dto.title, dto.body)) return null;
+    if (isLuckyWinNotification(dto.data, dto.title, dto.body)) return null;
 
     const notif = await this.notifRepo.save(
       this.notifRepo.create({
@@ -263,7 +263,7 @@ export class NotificationsService {
   async list(userId: string, query: PaginationDto) {
     // Legacy direct-message alerts are hidden here too; only the conversation thread owns them.
     const rows = await this.notifRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
-    const items = rows.filter((notification) => !isDirectMessageNotification(notification) && !isRoomRewardWinPayload(notification.data as any, notification.title, notification.body));
+    const items = rows.filter((notification) => !isDirectMessageNotification(notification) && !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(200, Math.max(1, query.limit || 20));
     const pageItems = items.slice((page - 1) * limit, page * limit);
@@ -589,7 +589,7 @@ export class NotificationsService {
           sendPush: pushNow,
         });
         saved += 1;
-        if (notif.fcmSent) pushed += 1;
+        if (notif?.fcmSent) pushed += 1;
 
         // Keep the normal notification/official-news entry and also place the same
         // admin broadcast in the dedicated Admin Messages inbox. Do not send a
