@@ -457,7 +457,12 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async adminUserPolicy(userRef:string){
     const base=await this.config(); let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{}
-    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    let user:any=null;
+    if(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userRef)) {
+      user=await this.users.findOne({where:{id:userRef}});
+    }
+    if(!user) user=await this.users.findOne({where:{publicId:userRef}});
+    if(!user) throw new BadRequestException('المستخدم غير موجود');
     const key=String((user as any).publicId||user.id); const saved=all?.users?.[key]||{};
     const active=saved.expiresAt ? new Date(saved.expiresAt).getTime()>Date.now() : true;
     return {user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:{...saved,active,expiresAt:saved.expiresAt||null},vipPolicy:base.vipPolicy||{},vipDailyLimit:base.vipDailyLimit||base.dailyLimit};
@@ -465,7 +470,12 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
 
   async patchUserPolicy(body:any){
     const userRef=String(body?.userId||body?.publicId||'').trim(); if(!userRef) throw new BadRequestException('أدخل ID المستخدم');
-    const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
+    let user:any=null;
+    if(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userRef)) {
+      user=await this.users.findOne({where:{id:userRef}});
+    }
+    if(!user) user=await this.users.findOne({where:{publicId:userRef}});
+    if(!user) throw new BadRequestException('المستخدم غير موجود');
     let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{} all.users=all.users||{};
     const key=String((user as any).publicId||user.id); const previous=all.users[key]||{}; const p:any={...previous}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','background','backgroundImage','backgroundOpacity','radiusDp','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','fontFamily','customFontUrl','customFontName','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameOffsetXDp','nameOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity','transitionType','direction','position','positionXPercent','positionYPercent','customOffsetDp','entrySpeedPxPerSec','exitSpeedPxPerSec']) if(body[k]!==undefined)p[k]=body[k];
     if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1);
