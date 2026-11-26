@@ -103,7 +103,6 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                     user.put("id", entry.user.id);
                     user.put("username", entry.user.username);
                     user.put("displayName", entry.user.displayName);
-                    user.put("countryCode", entry.user.countryCode);
                     user.put("avatarUrl", webImageUrl(entry.user.avatarUrl));
                     user.put("hostBadgeUrl", webImageUrl(entry.user.hostBadgeUrl));
                     user.put("vipBadgeUrl", webImageUrl(entry.user.vipBadgeUrl));
