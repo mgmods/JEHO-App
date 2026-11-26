@@ -282,6 +282,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     final long remainingMs = remaining;
                     if (remainingMs > 0L) post(() -> {
                         if (!attached.get()) return;
+                        if (current.advertisement.id != null
+                                && current.advertisement.id.equals(currentAdId)) {
+                            needsResume = true;
+                            animationInitialized = false;
+                        }
                         showAdvertisement(current.advertisement, current.config, remainingMs);
                     });
                     else post(() -> {
@@ -680,13 +685,19 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             // AnimatorSet.setCurrentPlayTime is API 26+, but ValueAnimator supports
             // setCurrentPlayTime on older Android versions too.
             if (elapsedSinceServerStartMs > 0L) {
-                for (Animator child : animations) {
-                    if (child instanceof ValueAnimator) {
-                        try {
-                            ((ValueAnimator) child).setCurrentPlayTime(elapsedSinceServerStartMs);
-                        } catch (Exception ignored) {}
+                final long phaseSyncElapsed = SystemClock.elapsedRealtime();
+                postOnAnimation(() -> {
+                    if (!attached.get() || generation != animationGeneration || activeAnimator != set) return;
+                    long synchronizedPlayTime = elapsedSinceServerStartMs
+                            + Math.max(0L, SystemClock.elapsedRealtime() - phaseSyncElapsed);
+                    for (Animator child : animations) {
+                        if (child instanceof ValueAnimator) {
+                            try {
+                                ((ValueAnimator) child).setCurrentPlayTime(synchronizedPlayTime);
+                            } catch (Exception ignored) {}
+                        }
                     }
-                }
+                });
             }
         });
     }
