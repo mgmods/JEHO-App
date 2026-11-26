@@ -2126,6 +2126,22 @@ export class AdminController {
     return this.cosmeticsService.adminDelete(id);
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('ranking/rewards')
+  @ApiOperation({ summary: 'Get weekly and monthly ranking reward settings' })
+  getRankingRewards() {
+    return this.rankingService.getRewardConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('ranking/rewards')
+  @ApiOperation({ summary: 'Save weekly and monthly ranking rewards' })
+  patchRankingRewards(@Body() body: Record<string, unknown>) {
+    return this.rankingService.patchRewardConfig(body || {});
+  }
+
   // ─── Ranking ───────────────────────────────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
