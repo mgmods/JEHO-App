@@ -19,7 +19,7 @@ const DEFAULT_CONFIG: any = {
   textGradientEnabled: false, textGradientStartColor: '#FFFFFF', textGradientEndColor: '#9EDCFF',
   entryAnimation: 'slide-right', exitAnimation: 'slide-left', glowType: 'none', glowColor: '#FFD66B', glowIntensity: 0,
   vipDailyLimit: 5,
-  vipPolicy: { background:'', backgroundImage:'', nameColor:'', textColor:'', fontFamily:'default', customFontUrl:'', textMotion:'right-to-left', entryAnimation:'gold', exitAnimation:'gold', glowType:'gold', glowColor:'#FFD66B', glowIntensity:55 },
+  vipPolicy: { durationDays:0, displayDurationSeconds:9, background:'', backgroundImage:'', nameColor:'', textColor:'', fontFamily:'default', customFontUrl:'', textMotion:'right-to-left', entryAnimation:'gold', exitAnimation:'gold', glowType:'gold', glowColor:'#FFD66B', glowIntensity:55 },
   userPolicies: {},
   customFontUrl: '', customFontName: '', spacingDp: 8,
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
@@ -417,12 +417,15 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       ? Math.ceil(entryDistanceDp * 1000 / entrySpeedDp)
         + Math.ceil(exitDistanceDp * 1000 / exitSpeedDp) + 400
       : 0;
-    if (moving) return Math.min(120000, Math.max(1000, motionBudget + 300));
-    return Math.min(120000, Math.max(1000, this.bound(c.displayDurationMs, 1000, 120000, 9000)));
+    if (moving) const requestedMs = c.displayDurationSeconds !== undefined
+      ? this.bound(Number(c.displayDurationSeconds) * 1000, 1000, 120000, 9000)
+      : this.bound(c.displayDurationMs, 1000, 120000, 9000);
+    if (moving) return Math.min(120000, Math.max(requestedMs, motionBudget + 300));
+    return Math.min(120000, Math.max(1000, requestedMs));
   }
 
   private pickDisplayConfig(c:any){
-    const keys=['background','backgroundImage','backgroundOpacity','radiusDp','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','fontFamily','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameOffsetXDp','nameOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity','transitionType'];
+    const keys=['displayDurationSeconds','background','backgroundImage','backgroundOpacity','radiusDp','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','fontFamily','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameOffsetXDp','nameOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity','transitionType'];
     const out:any={}; for(const k of keys) if(c[k]!==undefined) out[k]=c[k]; return out;
   }
 
@@ -433,9 +436,20 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const publicId=String((u as any)?.publicId||'').trim(); let vip=false;
     try{const vipRows=await this.db.query('SELECT 1 FROM "jeho_own"."user_vips" WHERE "userId"=$1 AND "isActive"=true AND "startsAt"<=NOW() AND "expiresAt">NOW() LIMIT 1',[userId]); vip=vipRows?.length>0;}catch{}
     const vipPolicy=(base.vipPolicy&&typeof base.vipPolicy==='object')?base.vipPolicy:{};
-    const direct=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
+    const configuredVipDays=this.bound(vipPolicy.durationDays,0,3650,0);
+    try {
+      const vipRows=await this.db.query(
+        'SELECT 1 FROM "jeho_own"."user_vips" WHERE "userId"=$1 AND "isActive"=true AND "startsAt"<=NOW() AND "expiresAt">NOW() AND ($2::int=0 OR NOW()<LEAST("expiresAt","startsAt"+($2::int*INTERVAL \'1 day\'))) LIMIT 1',
+        [userId,configuredVipDays]
+      );
+      vip=vipRows?.length>0;
+    } catch { vip=false; }
+    const storedDirect=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
+    const directExpiry=storedDirect?.expiresAt ? new Date(storedDirect.expiresAt).getTime() : Number.POSITIVE_INFINITY;
+    const direct=directExpiry>Date.now()?storedDirect:{};
     const vipOverlay:any={};
     if(vip) for(const [k,v] of Object.entries(vipPolicy)) if(v!==undefined && v!==null && !(typeof v==='string' && v.trim()==='')) vipOverlay[k]=v;
+    delete vipOverlay.durationDays;
     const merged={...base,...vipOverlay,...direct};
     if(vip&&direct?.dailyLimit===undefined) merged.dailyLimit=this.bound(vipPolicy.dailyLimit??base.vipDailyLimit??base.dailyLimit,0,1000,base.dailyLimit);
     return merged;
@@ -444,20 +458,32 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   async adminUserPolicy(userRef:string){
     const base=await this.config(); let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{}
     const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
-    const key=String((user as any).publicId||user.id); return {user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:all?.users?.[key]||{},vipPolicy:base.vipPolicy||{},vipDailyLimit:base.vipDailyLimit||base.dailyLimit};
+    const key=String((user as any).publicId||user.id); const saved=all?.users?.[key]||{};
+    const active=saved.expiresAt ? new Date(saved.expiresAt).getTime()>Date.now() : true;
+    return {user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:{...saved,active,expiresAt:saved.expiresAt||null},vipPolicy:base.vipPolicy||{},vipDailyLimit:base.vipDailyLimit||base.dailyLimit};
   }
 
   async patchUserPolicy(body:any){
     const userRef=String(body?.userId||body?.publicId||'').trim(); if(!userRef) throw new BadRequestException('أدخل ID المستخدم');
     const user=await this.users.findOne({where:[{id:userRef},{publicId:userRef}] as any}); if(!user) throw new BadRequestException('المستخدم غير موجود');
     let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{} all.users=all.users||{};
-    const key=String((user as any).publicId||user.id); const p:any={}; for(const k of ['dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k];
-    if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,0);
+    const key=String((user as any).publicId||user.id); const previous=all.users[key]||{}; const p:any={...previous}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k];
+    if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1);
+    if(body.durationDays!==undefined){
+      p.durationDays=this.bound(body.durationDays,1,3650,1);
+      p.activatedAt=new Date().toISOString();
+      p.expiresAt=new Date(Date.now()+p.durationDays*86400000).toISOString();
+    } else if(!p.expiresAt && p.durationDays>0){
+      p.activatedAt=new Date().toISOString();
+      p.expiresAt=new Date(Date.now()+p.durationDays*86400000).toISOString();
+    }
+    if(p.displayDurationSeconds!==undefined)p.displayDurationSeconds=this.bound(p.displayDurationSeconds,1,120,9);
+    if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,0);
     all.users[key]=p; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(all),'voice_room_ads_user_policies']); return {ok:true,user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:p};
   }
 
   async patchVipPolicy(body:any){
-    const base=await this.config(); const p:any={...(base.vipPolicy||{})}; for(const k of ['dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k]; if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,5); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,55);
+    const base=await this.config(); const p:any={...(base.vipPolicy||{})}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','background','backgroundImage','nameColor','textColor','fontFamily','customFontUrl','customFontName','textMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity']) if(body[k]!==undefined)p[k]=body[k]; if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,5); if(p.durationDays!==undefined)p.durationDays=this.bound(p.durationDays,0,3650,0); if(p.displayDurationSeconds!==undefined)p.displayDurationSeconds=this.bound(p.displayDurationSeconds,1,120,9); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,55);
     const merged={...base,vipPolicy:p,vipDailyLimit:p.dailyLimit}; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']); this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged); return {ok:true,vipPolicy:p};
   }
 
