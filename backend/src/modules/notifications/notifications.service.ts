@@ -85,8 +85,8 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
   const explicitWinAnnouncement =
     /(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب)/i.test(copy) ||
     /\b(won|winner|winning|payout|profit)\b/i.test(copy);
-  const luckyWinWords = /(حظ\\s*سعيد|صندوق\\s*الحظ|هدية\\s*المحظوظ|lucky[_\\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
-  const rewardWords = /(مبروك|حصل\\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy + ' ' + markers);
+  const luckyWinWords = /(حظ\s*سعيد|صندوق\\s*الحظ|هدية\\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
+  const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy + ' ' + markers);
   return hasLuckyPayout ||
     (luckyWinWords && rewardWords) ||
     (winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement));
@@ -197,6 +197,11 @@ export class NotificationsService {
   ) {}
 
   async create(dto: CreateNotificationDto) {
+    // Lucky/game win results are delivered only through the in-room celebration UI.
+    // Do not create inbox rows, realtime notification events, or external FCM alerts
+    // for the winner, friends, followers, or any other account.
+    if (isRoomRewardWinPayload(dto.data, dto.title, dto.body)) return null;
+
     const notif = await this.notifRepo.save(
       this.notifRepo.create({
         userId: dto.userId,
@@ -258,7 +263,7 @@ export class NotificationsService {
   async list(userId: string, query: PaginationDto) {
     // Legacy direct-message alerts are hidden here too; only the conversation thread owns them.
     const rows = await this.notifRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
-    const items = rows.filter((notification) => !isDirectMessageNotification(notification));
+    const items = rows.filter((notification) => !isDirectMessageNotification(notification) && !isRoomRewardWinPayload(notification.data as any, notification.title, notification.body));
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(200, Math.max(1, query.limit || 20));
     const pageItems = items.slice((page - 1) * limit, page * limit);
@@ -314,12 +319,14 @@ export class NotificationsService {
   /** Official News feed (system / agency / wallet / vip) — chat-style inbox. */
   async listOfficial(userId: string, query: PaginationDto) {
     const take = Math.min(query.limit || 80, 200);
-    const [items, total] = await this.notifRepo.findAndCount({
+    const rows = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES) },
-      skip: query.skip,
-      take,
       order: { createdAt: 'DESC' },
     });
+    const filtered = rows.filter((notification) =>
+      !isRoomRewardWinPayload(notification.data as any, notification.title, notification.body));
+    const items = filtered.slice(query.skip || 0, (query.skip || 0) + take);
+    const total = filtered.length;
     // Chronological for chat bubbles (oldest → newest).
     const chronological = [...items].reverse();
     return paginate(chronological, total, query.page || 1, take);
