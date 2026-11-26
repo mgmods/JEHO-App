@@ -143,7 +143,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         return "weekly".equals(value) || "monthly".equals(value) ? value : "daily";
     }
     private String safeCategory(String value) {
-        for (String allowed : new String[]{"popular", "gifts", "host", "agency", "room"}) {
+        for (String allowed : new String[]{"rich", "popular", "gifts", "host", "agency", "room"}) {
             if (allowed.equals(value)) return value;
         }
         return "popular";
