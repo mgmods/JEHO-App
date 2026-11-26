@@ -52,6 +52,12 @@ public final class AdvertisementDtos {
         public boolean textGradientEnabled;
         public String textGradientStartColor;
         public String textGradientEndColor;
+        public String entryAnimation;
+        public String exitAnimation;
+        public String glowType;
+        public String glowColor;
+        public int glowIntensity;
+        public int vipDailyLimit;
         public String customFontUrl;
         public String customFontName;
         public int spacingDp;
@@ -115,6 +121,7 @@ public final class AdvertisementDtos {
         public String startedAt;
         public String completedAt;
         public int displayDurationMs;
+        public Ticker displayConfig;
     }
 
     public static class CreateResponse {
