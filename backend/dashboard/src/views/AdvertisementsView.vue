@@ -218,111 +218,43 @@
 
       <div class="col-12">
         <div class="glass p-3">
-          <div class="d-flex align-items-center justify-content-between mb-3"><div><h3 class="h6 mb-1">صلاحيات الإعلان المتقدمة</h3><div class="small text-muted">تحكم مستقل لـ VIP أو مستخدم محدد بالـID: عدد الإعلانات، الخلفية، الخط، والحركة والتوهج.</div></div></div>
+          <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div>
+              <h3 class="h6 mb-1">صلاحيات الإعلان الخاصة</h3>
+              <div class="small text-muted">VIP والمستخدم المحدد بالـID يرثان كل إعدادات شريط الإعلان الأساسي. الاستثناء الوحيد للمظهر هو الخلفية؛ الموضع والخط والحركة والدخول والخروج والتوهج والأحجام تبقى من الإعلان الأساسي.</div>
+            </div>
+          </div>
           <div class="row g-3">
             <div class="col-lg-6">
               <div class="border rounded-3 p-3">
                 <div class="fw-semibold small mb-2">سياسة VIP</div>
                 <div class="row g-2">
-                  <div class="col-6"><label class="form-label small">مدة صلاحية ميزة VIP (أيام، 0 = تتبع انتهاء اشتراك VIP)</label><input v-model.number="vipPolicy.durationDays" type="number" min="0" max="3650" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">مدة صلاحية VIP (أيام، 0 = تتبع اشتراك VIP)</label><input v-model.number="vipPolicy.durationDays" type="number" min="0" max="3650" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">عدد الإعلانات يومياً</label><input v-model.number="vipPolicy.dailyLimit" type="number" min="0" max="1000" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">مدة الإعلان (ثانية)</label><input v-model.number="vipPolicy.displayDurationSeconds" type="number" min="1" max="120" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">نوع الدخول</label><select v-model="vipPolicy.entryAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">نوع الخروج</label><select v-model="vipPolicy.exitAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">التوهج</label><select v-model="vipPolicy.glowType" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="none">بدون</option></select></div>
-                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="vipPolicy.glowColor" type="color" class="form-control form-control-color w-100"></div>
-                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="vipPolicy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-12"><label class="form-label small">خلفية شريط VIP URL</label><input v-model="vipPolicy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://..."></div>
-                  <div class="col-6"><label class="form-label small">لون اسم VIP</label><input v-model="vipPolicy.nameColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">لون نص VIP</label><input v-model="vipPolicy.textColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">الخط</label><select v-model="vipPolicy.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="custom">مخصص</option></select></div>
-                  <div class="col-6"><label class="form-label small">حركة النص</label><select v-model="vipPolicy.textMotion" class="form-select"><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="static">ثابت</option></select></div>
+                  <div class="col-12"><label class="form-label small">خلفية شريط VIP — URL</label><input v-model="vipPolicy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://... أو /uploads/..."></div>
+                  <div class="col-12"><label class="form-label small">لون/تدرج خلفية VIP</label><input v-model="vipPolicy.background" type="text" class="form-control" dir="ltr" placeholder="linear-gradient(...) أو #..."></div>
                   <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="vipPolicy.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">الموضع</label><select v-model="vipPolicy.position" class="form-select"><option value="safe-top">أعلى آمن</option><option value="safe-bottom">أسفل آمن</option><option value="custom-safe">موضع مخصص آمن</option><option value="free">حر</option></select></div>
-                  <div class="col-6"><label class="form-label small">حركة الاسم</label><select v-model="vipPolicy.nameMotion" class="form-select"><option value="static">ثابت</option><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">حركة الصورة</label><select v-model="vipPolicy.avatarMotion" class="form-select"><option value="static">ثابتة</option><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="vipPolicy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="vipPolicy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">الخلفية/التدرج</label><input v-model="vipPolicy.background" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">اتجاه الشريط</label><select v-model="vipPolicy.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
-                  <div class="col-6"><label class="form-label small">ارتفاع الشريط dp</label><input v-model.number="vipPolicy.heightDp" type="number" min="32" max="140" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم الصورة dp</label><input v-model.number="vipPolicy.avatarDp" type="number" min="20" max="80" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم اسم المرسل sp</label><input v-model.number="vipPolicy.nameSp" type="number" min="8" max="32" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم نص الإعلان sp</label><input v-model.number="vipPolicy.textSp" type="number" min="9" max="36" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="vipPolicy.glowColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="vipPolicy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="vipPolicy.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="vipPolicy.radiusDp" type="number" min="0" max="40" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">لون اسم VIP</label><input v-model="vipPolicy.nameColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">لون نص VIP</label><input v-model="vipPolicy.textColor" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-12"><label class="form-label small">رفع خلفية شريط VIP</label><div class="d-flex gap-2"><input type="file" accept="image/*" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,vipPolicy,'backgroundImage')"><input v-model="vipPolicy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخلفية"></div></div>
-                  <div class="col-12"><label class="form-label small">رفع خط VIP</label><div class="d-flex gap-2"><input type="file" accept=".ttf,.otf" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,vipPolicy,'customFontUrl',true)"><input v-model="vipPolicy.customFontUrl" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخط"></div></div>
-                  <div class="col-6"><label class="form-label small">X موضع الشريط %</label><input v-model.number="vipPolicy.positionXPercent" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">Y موضع الشريط %</label><input v-model.number="vipPolicy.positionYPercent" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">إزاحة النص X dp</label><input v-model.number="vipPolicy.textOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="vipPolicy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="vipPolicy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="vipPolicy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="vipPolicy.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
-                  <div class="col-6"><label class="form-label small">تباعد العناصر dp</label><input v-model.number="vipPolicy.spacingDp" type="number" min="0" max="40" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">عرض الاسم dp</label><input v-model.number="vipPolicy.nameWidthDp" type="number" min="24" max="260" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">عرض النص dp</label><input v-model.number="vipPolicy.textWidthDp" type="number" min="0" max="1000" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">تدرج الاسم</label><select v-model="vipPolicy.nameGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
-                  <div class="col-6"><label class="form-label small">تدرج النص</label><select v-model="vipPolicy.textGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
-                  <div class="col-6"><label class="form-label small">بداية تدرج الاسم</label><input v-model="vipPolicy.nameGradientStartColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">نهاية تدرج الاسم</label><input v-model="vipPolicy.nameGradientEndColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">بداية تدرج النص</label><input v-model="vipPolicy.textGradientStartColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">نهاية تدرج النص</label><input v-model="vipPolicy.textGradientEndColor" type="text" class="form-control" dir="ltr"></div>
                   <div class="col-12"><button class="btn btn-aurora btn-sm" :disabled="policySaving" @click="saveVipPolicy">حفظ سياسة VIP</button></div>
                 </div>
               </div>
             </div>
             <div class="col-lg-6">
               <div class="border rounded-3 p-3">
-                <div class="fw-semibold small mb-2">صلاحية مستخدم محدد</div>
-                <div class="input-group mb-2"><input v-model="policyRef" class="form-control" dir="ltr" placeholder="Public ID أو UUID المستخدم"><button class="btn btn-outline-light" :disabled="policyLoading" @click="loadUserPolicy">جلب</button></div>
-                <div v-if="policyUser" class="small text-muted mb-2">{{ policyUser.displayName }} · {{ policyUser.publicId || policyUser.id }}</div>
+                <div class="fw-semibold small mb-2">مستخدم محدد بالـID</div>
                 <div class="row g-2">
+                  <div class="col-8"><label class="form-label small">ID المستخدم</label><input v-model="policyRef" type="text" class="form-control" dir="ltr" placeholder="Public ID أو UUID"></div>
+                  <div class="col-4 d-flex align-items-end"><button class="btn btn-outline-light w-100" :disabled="policyLoading" @click="loadUserPolicy">جلب</button></div>
+                  <div v-if="policyUser" class="col-12 small text-muted">المستخدم: {{ policyUser.displayName || policyUser.publicId || policyUser.id }}</div>
                   <div class="col-6"><label class="form-label small">مدة التفعيل (أيام)</label><input v-model.number="policy.durationDays" type="number" min="1" max="3650" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">عدد الإعلانات يومياً</label><input v-model.number="policy.dailyLimit" type="number" min="0" max="1000" class="form-control"></div>
                   <div class="col-6"><label class="form-label small">مدة الإعلان (ثانية)</label><input v-model.number="policy.displayDurationSeconds" type="number" min="1" max="120" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">الدخول</label><select v-model="policy.entryAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">الخروج</label><select v-model="policy.exitAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
-                  <div class="col-6"><label class="form-label small">التوهج</label><select v-model="policy.glowType" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="none">بدون</option></select></div>
-                  <div class="col-12"><label class="form-label small">خلفية خاصة URL</label><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://..."></div>
-                  <div class="col-6"><label class="form-label small">لون الاسم</label><input v-model="policy.nameColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">لون النص</label><input v-model="policy.textColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">الخط</label><select v-model="policy.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="custom">مخصص</option></select></div>
-                  <div class="col-6"><label class="form-label small">حركة النص</label><select v-model="policy.textMotion" class="form-select"><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="static">ثابت</option></select></div>
-                  <div class="col-6"><label class="form-label small">ارتفاع الشريط dp</label><input v-model.number="policy.heightDp" type="number" min="32" max="140" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم الصورة dp</label><input v-model.number="policy.avatarDp" type="number" min="20" max="80" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم اسم المرسل sp</label><input v-model.number="policy.nameSp" type="number" min="8" max="32" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">حجم نص الإعلان sp</label><input v-model.number="policy.textSp" type="number" min="9" max="36" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="policy.glowColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="policy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-12"><label class="form-label small">خلفية المستخدم المحدد — URL</label><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://... أو /uploads/..."></div>
+                  <div class="col-12"><label class="form-label small">لون/تدرج الخلفية</label><input v-model="policy.background" type="text" class="form-control" dir="ltr" placeholder="linear-gradient(...) أو #..."></div>
                   <div class="col-6"><label class="form-label small">شفافية الخلفية %</label><input v-model.number="policy.backgroundOpacity" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">الزوايا dp</label><input v-model.number="policy.radiusDp" type="number" min="0" max="40" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">لون الاسم</label><input v-model="policy.nameColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">لون النص</label><input v-model="policy.textColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-12"><label class="form-label small">رفع خلفية المستخدم المخصص</label><div class="d-flex gap-2"><input type="file" accept="image/*" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,policy,'backgroundImage')"><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخلفية"></div></div>
-                  <div class="col-12"><label class="form-label small">رفع خط المستخدم المخصص</label><div class="d-flex gap-2"><input type="file" accept=".ttf,.otf" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,policy,'customFontUrl',true)"><input v-model="policy.customFontUrl" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخط"></div></div>
-                  <div class="col-6"><label class="form-label small">X موضع الشريط %</label><input v-model.number="policy.positionXPercent" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">Y موضع الشريط %</label><input v-model.number="policy.positionYPercent" type="number" min="0" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">إزاحة النص X dp</label><input v-model.number="policy.textOffsetXDp" type="number" min="-300" max="300" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">إزاحة النص Y dp</label><input v-model.number="policy.textOffsetYDp" type="number" min="-100" max="100" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">سرعة الدخول px/s</label><input v-model.number="policy.entrySpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">سرعة الخروج px/s</label><input v-model.number="policy.exitSpeedPxPerSec" type="number" min="20" max="800" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">شكل الصورة</label><select v-model="policy.avatarShape" class="form-select"><option value="circle">دائرية</option><option value="square">مربعة</option></select></div>
-                  <div class="col-6"><label class="form-label small">تباعد العناصر dp</label><input v-model.number="policy.spacingDp" type="number" min="0" max="40" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">عرض الاسم dp</label><input v-model.number="policy.nameWidthDp" type="number" min="24" max="260" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">عرض النص dp</label><input v-model.number="policy.textWidthDp" type="number" min="0" max="1000" class="form-control"></div>
-                  <div class="col-6"><label class="form-label small">تدرج الاسم</label><select v-model="policy.nameGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
-                  <div class="col-6"><label class="form-label small">تدرج النص</label><select v-model="policy.textGradientEnabled" class="form-select"><option :value="false">مغلق</option><option :value="true">مفتوح</option></select></div>
-                  <div class="col-6"><label class="form-label small">بداية تدرج الاسم</label><input v-model="policy.nameGradientStartColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">نهاية تدرج الاسم</label><input v-model="policy.nameGradientEndColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">بداية تدرج النص</label><input v-model="policy.textGradientStartColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-6"><label class="form-label small">نهاية تدرج النص</label><input v-model="policy.textGradientEndColor" type="text" class="form-control" dir="ltr"></div>
-                  <div class="col-12"><button class="btn btn-outline-light btn-sm" :disabled="policySaving" @click="saveUserPolicy">حفظ صلاحية المستخدم</button></div>
+                  <div class="col-12"><label class="form-label small">رفع خلفية المستخدم المحدد</label><div class="d-flex gap-2"><input type="file" accept="image/*" class="form-control" :disabled="policyAssetUploading" @change="uploadPolicyAsset($event,policy,'backgroundImage')"><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="أو ضع URL الخلفية"></div></div>
+                  <div class="col-12"><button class="btn btn-aurora btn-sm" :disabled="policySaving" @click="saveUserPolicy">حفظ سياسة المستخدم</button></div>
                 </div>
               </div>
             </div>
