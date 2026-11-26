@@ -617,7 +617,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                                 }
                             });
                         } else {
-                            post(this::hideAdvertisement);
+                            post(() -> RoomAdvertisementTickerView.this.hideAdvertisement());
                         }
                     }
                 } catch (Exception ignored) {
