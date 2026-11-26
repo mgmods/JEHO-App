@@ -417,10 +417,14 @@ export class BadgesService {
   /** Award configured room-support medal to the supported user; progress is isolated per room. */
   async recordRoomSupportProgress(userId: string, roomId: string, role: 'supporter' | 'receiver', metrics: { coins?: number; diamonds?: number; gifts?: number }): Promise<any | null> {
     if (!userId || !roomId) return null;
-    // Room-support medals are a one-time lifetime award per person, regardless
-    // of whether the person qualifies later as supporter or receiver.
-    const priorRoomSupportGrant = await this.userBadges.findOne({ where: { userId, source: 'room_support' } });
-    if (priorRoomSupportGrant) return null;
+    // A room-support medal blocks another award only while it is active.
+    // Once its configured duration expires, the same user may earn it again.
+    const activeRoomSupportGrant = await this.userBadges.createQueryBuilder('ub')
+      .where('ub.userId = :userId', { userId })
+      .andWhere('ub.source = :source', { source: 'room_support' })
+      .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
+      .getOne();
+    if (activeRoomSupportGrant) return null;
     const row = await this.dataSource.getRepository(AppSetting).findOne({ where: { key: 'room_support_medals_config' } });
     if (!row?.value) return null;
     let config: any; try { config = JSON.parse(row.value); } catch { return null; }
@@ -477,10 +481,13 @@ export class BadgesService {
     await this.dataSource.transaction(async (manager) => {
       // Serialize all supporter/receiver grant attempts for this user, not just one badge.
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room-support-grant:${userId}`]);
-      const anyPriorRoomSupportGrant = await manager.findOne(UserBadge, {
-        where: { userId, source: 'room_support' }, lock: { mode: 'pessimistic_write' },
-      });
-      if (anyPriorRoomSupportGrant) return;
+      const activeRoomSupportGrant = await manager.createQueryBuilder(UserBadge, 'ub')
+        .setLock('pessimistic_write')
+        .where('ub.userId = :userId', { userId })
+        .andWhere('ub.source = :source', { source: 'room_support' })
+        .andWhere('(ub.expiresAt IS NULL OR ub.expiresAt > NOW())')
+        .getOne();
+      if (activeRoomSupportGrant) return;
       let owned = await manager.findOne(UserBadge, { where: { userId, badgeId: badge!.id }, lock: { mode: 'pessimistic_write' } });
       if (!owned || (owned.expiresAt && new Date(owned.expiresAt).getTime() <= Date.now())) {
         if (!owned) owned = manager.create(UserBadge, { userId, badgeId: badge!.id });
@@ -492,6 +499,20 @@ export class BadgesService {
         const displayed = Array.isArray(profile.displayedMedalIds) ? profile.displayedMedalIds : [];
         profile.displayedMedalIds = [badge!.id, ...displayed.filter((id) => id !== badge!.id)].slice(0, 5);
         await manager.save(profile);
+      }
+      // Start a fresh progress cycle so the next award requires completing the
+      // configured task again after this timed medal eventually expires.
+      const progressKey = `room_support_medal_progress:${roomId}:${userId}:${role}:${highest.index}`;
+      const progressRow = await manager.findOne(AppSetting, {
+        where: { key: progressKey }, lock: { mode: 'pessimistic_write' },
+      });
+      if (progressRow) {
+        let progress: any = { current: 0, awarded: false };
+        try { if (progressRow.value) progress = { ...progress, ...JSON.parse(progressRow.value) }; } catch {}
+        progress.current = 0;
+        progress.awarded = false;
+        progressRow.value = JSON.stringify(progress);
+        await manager.save(progressRow);
       }
     });
     if (!newlyGranted) return null;
