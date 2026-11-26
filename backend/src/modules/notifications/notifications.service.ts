@@ -87,8 +87,9 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
     /\b(won|winner|winning|payout|profit)\b/i.test(copy);
   const luckyWinWords = /(حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
   const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy + ' ' + markers);
+  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(copy + ' ' + markers);
   return hasLuckyPayout ||
-    (luckyWinWords && rewardWords) ||
+    (luckyWinWords && (rewardWords || multiplierText || explicitGameEvent)) ||
     (winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement));
 }
 
@@ -97,9 +98,10 @@ function isLuckyWinNotification(data?: Record<string, unknown>, title?: string, 
   const serialized = JSON.stringify(data || {}).toLowerCase();
   const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
   const luckyPayout = /["']?(luckyMultiplier|luckyCoinsWon|luckyReturn|luckyPayout)["']?\s*:\s*["']?(?:[1-9]\d*(?:\.\d+)?|true)/i.test(serialized);
-  const luckyEvent = /(lucky[_\s-]*(gift|win|box)|lucky_hit_(normal|high|return|high_room)|luckygift|is[_-]?lucky[_-]?win|حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ)/i.test(serialized + ' ' + copy);
+  const luckyEvent = /(lucky[_\s-]*(gift|win|box)|lucky_hit_(normal|high|return|high_room)|luckygift|luckyMultiplier|luckyCoinsWon|is[_-]?lucky[_-]?win|حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ)/i.test(serialized + ' ' + copy);
   const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy);
-  return luckyPayout || (luckyEvent && rewardWords);
+  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(copy);
+  return luckyPayout || (luckyEvent && (rewardWords || multiplierText));
 }
 
 export class CreateNotificationDto {
