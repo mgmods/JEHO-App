@@ -100,7 +100,7 @@ function isLuckyWinNotification(data?: Record<string, unknown>, title?: string, 
   const luckyPayout = /["']?(luckyMultiplier|luckyCoinsWon|luckyReturn|luckyPayout)["']?\s*:\s*["']?(?:[1-9]\d*(?:\.\d+)?|true)/i.test(serialized);
   const luckyEvent = /(lucky[_\s-]*(gift|win|box)|lucky_hit_(normal|high|return|high_room)|luckygift|luckyMultiplier|luckyCoinsWon|is[_-]?lucky[_-]?win|حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ)/i.test(serialized + ' ' + copy);
   const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy);
-  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(copy);
+  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(serialized + ' ' + copy);
   return luckyPayout || (luckyEvent && (rewardWords || multiplierText));
 }
 
