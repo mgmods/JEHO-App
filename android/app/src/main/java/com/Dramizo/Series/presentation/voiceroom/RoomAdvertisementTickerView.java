@@ -12,7 +12,6 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.SystemClock;
@@ -780,8 +779,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             if (m.contains("top")) ty=-distance; else if (m.contains("bottom")) ty=distance; else if (m.contains("right")) tx=distance; else if (m.contains("left")) tx=-distance;
             a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_X, getTranslationX(), tx));
             a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, getTranslationY(), ty));
-            if (m.contains("zoom") || m.contains("fire") || m.contains("gold")) { a.add(ObjectAnimator.ofFloat(this, View.SCALE_X, getScaleX(), 0.94f)); a.add(ObjectAnimator.ofFloat(this, View.SCALE_Y, getScaleY(), 0.94f)); }
-            if (m.contains("fade") || m.contains("fire") || m.contains("gold")) a.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 0f));
+            if (m.contains("zoom")) { a.add(ObjectAnimator.ofFloat(this, View.SCALE_X, getScaleX(), 0.94f)); a.add(ObjectAnimator.ofFloat(this, View.SCALE_Y, getScaleY(), 0.94f)); }
+            if (m.contains("fade")) a.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 0f));
         }
         AnimatorSet set = new AnimatorSet(); set.playTogether(a); set.setDuration(d); set.setInterpolator(new LinearInterpolator());
         return set;
@@ -1041,37 +1040,6 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }
         } catch (Exception ignored) {}
         return 0;
-    }
-
-    private GradientDrawable buildBackground(String value, int opacity, int radiusDp) {
-        int alpha = Math.max(0, Math.min(100, opacity)) * 255 / 100;
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?").matcher(value == null ? "" : value);
-        java.util.ArrayList<Integer> colors = new java.util.ArrayList<>();
-        while (matcher.find()) {
-            try {
-                int color = Color.parseColor(matcher.group());
-                colors.add(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)));
-            } catch (Exception ignored) {}
-        }
-        java.util.regex.Matcher rgba = java.util.regex.Pattern.compile("rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})").matcher(value == null ? "" : value);
-        while (rgba.find()) {
-            try {
-                int red = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(1))));
-                int green = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(2))));
-                int blue = Math.max(0, Math.min(255, Integer.parseInt(rgba.group(3))));
-                colors.add(Color.argb(alpha, red, green, blue));
-            } catch (Exception ignored) {}
-        }
-        GradientDrawable bg;
-        if (value != null && value.toLowerCase().contains("linear-gradient") && colors.size() >= 2) {
-            bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{colors.get(0), colors.get(colors.size() - 1)});
-        } else {
-            int color = safeColor(value, 0xFF21142D);
-            bg = new GradientDrawable();
-            bg.setColor(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)));
-        }
-        bg.setCornerRadius(dp(Math.max(0, radiusDp)));
-        return bg;
     }
 
     private static long parseIsoUtc(String value, long fallback) {
