@@ -912,6 +912,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
 
     private void applySafePlacement(String position, int customOffsetDp, int xPercent, int yPercent) {
         ViewGroup parent = (ViewGroup) getParent();
+        boolean free = "free".equalsIgnoreCase(position);
+        final float x = Math.max(0, Math.min(100, xPercent)) / 100f;
+        final float y = Math.max(0, Math.min(100, yPercent)) / 100f;
+
         if (parent instanceof ConstraintLayout) {
             ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) getLayoutParams();
             if (lp == null) return;
@@ -923,15 +927,23 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             lp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
             lp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
             lp.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
-            lp.horizontalBias = Math.max(0, Math.min(100, xPercent)) / 100f;
-            lp.verticalBias = Math.max(0, Math.min(100, yPercent)) / 100f;
-            if ("free".equalsIgnoreCase(position)) {
+            lp.horizontalBias = x;
+            lp.verticalBias = y;
+
+            if (free) {
+                // Dashboard preview uses the centre of the draggable ticker as the anchor:
+                // 50% means the ticker centre is exactly at 50% of the room width/height.
+                // Keep the same anchor on Android, but compensate when the Activity draws
+                // behind system bars so the saved Y coordinate refers to the visible room,
+                // not the status/navigation areas.
                 lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.topMargin = 0;
                 lp.bottomMargin = 0;
+                setTranslationX(freePlacementInsetOffsetX(parent, x));
+                setTranslationY(freePlacementInsetOffsetY(parent, y));
             } else if ("safe-top".equalsIgnoreCase(position)) {
                 lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
@@ -939,6 +951,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 lp.topMargin = dp(68) + statusBarInsetPx();
                 lp.horizontalBias = 0.5f;
                 lp.verticalBias = 0f;
+                setTranslationX(0f);
+                setTranslationY(0f);
             } else {
                 lp.leftToLeft = ConstraintLayout.LayoutParams.PARENT_ID;
                 lp.rightToRight = ConstraintLayout.LayoutParams.PARENT_ID;
@@ -947,21 +961,86 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                         ? dp(Math.max(0, 76 - customOffsetDp)) : dp(6);
                 lp.horizontalBias = 0.5f;
                 lp.verticalBias = 1f;
+                setTranslationX(0f);
+                setTranslationY(0f);
             }
-            setTranslationX(0f);
-            setTranslationY(0f);
             setLayoutParams(lp);
             return;
         }
+
         if (parent instanceof FrameLayout) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
             if (lp == null) return;
-            boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
-            lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
-                    : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            lp.topMargin = bottom ? 0 : dp(68) + statusBarInsetPx();
-            lp.bottomMargin = bottom ? dp(76) : 0;
-            setLayoutParams(lp);
+            if (free) {
+                // FrameLayout has no bias; place the centre at the exact dashboard
+                // percentage inside the room's usable (non-system-bar) rectangle.
+                lp.gravity = Gravity.TOP | Gravity.START;
+                lp.leftMargin = 0;
+                lp.topMargin = 0;
+                setLayoutParams(lp);
+                post(() -> {
+                    if (!attached.get() || getParent() != parent) return;
+                    float targetX = parent.getWidth() * x;
+                    float targetY = parent.getHeight() * y;
+                    setTranslationX(targetX - getWidth() / 2f + freePlacementInsetOffsetX(parent, x));
+                    setTranslationY(targetY - getHeight() / 2f + freePlacementInsetOffsetY(parent, y));
+                });
+            } else {
+                boolean bottom = "safe-bottom".equalsIgnoreCase(position) || "custom-safe".equalsIgnoreCase(position);
+                lp.gravity = bottom ? (Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
+                        : (Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                lp.topMargin = bottom ? 0 : dp(68) + statusBarInsetPx();
+                lp.bottomMargin = bottom ? dp(76) : 0;
+                setTranslationX(0f);
+                setTranslationY(0f);
+                setLayoutParams(lp);
+            }
+        }
+    }
+
+    /**
+     * Converts a dashboard percentage (whose room starts below the system bars)
+     * to the corresponding Android window coordinate. This is intentionally only
+     * used for the draggable/free placement; safe-top/safe-bottom retain their
+     * existing behaviour.
+     */
+    private float freePlacementInsetOffsetX(ViewGroup parent, float percent) {
+        if (Build.VERSION.SDK_INT < 23 || parent == null) return 0f;
+        try {
+            WindowInsets wi = getRootWindowInsets();
+            if (wi == null) return 0f;
+            int left = 0, right = 0;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets in = wi.getInsets(WindowInsets.Type.systemBars());
+                left = in.left;
+                right = in.right;
+            } else {
+                left = wi.getSystemWindowInsetLeft();
+                right = wi.getSystemWindowInsetRight();
+            }
+            return left - (left + right) * percent;
+        } catch (Exception ignored) {
+            return 0f;
+        }
+    }
+
+    private float freePlacementInsetOffsetY(ViewGroup parent, float percent) {
+        if (Build.VERSION.SDK_INT < 23 || parent == null) return 0f;
+        try {
+            WindowInsets wi = getRootWindowInsets();
+            if (wi == null) return 0f;
+            int top = 0, bottom = 0;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets in = wi.getInsets(WindowInsets.Type.systemBars());
+                top = in.top;
+                bottom = in.bottom;
+            } else {
+                top = wi.getSystemWindowInsetTop();
+                bottom = wi.getSystemWindowInsetBottom();
+            }
+            return top - (top + bottom) * percent;
+        } catch (Exception ignored) {
+            return 0f;
         }
     }
 
