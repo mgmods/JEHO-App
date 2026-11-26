@@ -89,12 +89,18 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                 row.put("targetId", entry.targetId);
                 row.put("targetName", entry.targetName);
                 row.put("score", entry.score);
-                row.put("meta", entry.meta);
+                if (entry.meta != null) {
+                    java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>(entry.meta);
+                    Object cover = meta.get("coverUrl");
+                    if (cover != null) meta.put("coverUrl", webImageUrl(String.valueOf(cover)));
+                    row.put("meta", meta);
+                } else row.put("meta", null);
                 java.util.Map<String, Object> user = new java.util.LinkedHashMap<>();
                 if (entry.user != null) {
                     user.put("id", entry.user.id);
                     user.put("username", entry.user.username);
                     user.put("displayName", entry.user.displayName);
+                    user.put("countryCode", entry.user.countryCode);
                     user.put("avatarUrl", webImageUrl(entry.user.avatarUrl));
                     user.put("hostBadgeUrl", webImageUrl(entry.user.hostBadgeUrl));
                     user.put("vipBadgeUrl", webImageUrl(entry.user.vipBadgeUrl));
