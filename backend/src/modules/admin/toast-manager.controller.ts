@@ -15,7 +15,7 @@ const DEFAULT_TOAST_STYLE = {
   version: 1,
   highWinMinMultiplier: 10,
   highWinMinCoins: 1000,
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
   luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
@@ -74,6 +74,8 @@ export class ToastManagerController {
       titleSizeSp: clampTextSize(parsed.giftSend?.titleSizeSp, 13),
       bodySizeSp: clampTextSize(parsed.giftSend?.bodySizeSp, 12),
       countSizeSp: clampTextSize(parsed.giftSend?.countSizeSp, 12),
+      placementX: clampPercent(parsed.giftSend?.placementX, 50),
+      placementY: clampPercent(parsed.giftSend?.placementY, 16),
     };
     const winDefaults = (source: any, fallback: any) => ({
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
@@ -131,6 +133,8 @@ export class ToastManagerController {
       titleSizeSp: clampTextSize(body?.giftSend?.titleSizeSp, oldGift.titleSizeSp || 13),
       bodySizeSp: clampTextSize(body?.giftSend?.bodySizeSp, oldGift.bodySizeSp || 12),
       countSizeSp: clampTextSize(body?.giftSend?.countSizeSp, oldGift.countSizeSp || 12),
+      placementX: clampPercent(body?.giftSend?.placementX, oldGift.placementX ?? 50),
+      placementY: clampPercent(body?.giftSend?.placementY, oldGift.placementY ?? 16),
     };
     const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh' | 'luckyWinHighRoom') => {
       const old = previous[key] || DEFAULT_TOAST_STYLE[key];
