@@ -60,8 +60,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
     private volatile AdvertisementDtos.Ticker config;
     private volatile String currentAdId = "";
     private AnimatorSet activeAnimator;
+    // True once the current ad's motion has actually been initialized; a refresh must retry if layout prevented startup.
     private volatile boolean needsResume = false;
     private boolean movingForPlacement = false;
+    private boolean animationInitialized = false;
     private long currentDisplayBudgetMs = 9000L;
     private long animationGeneration = 0L;
     private volatile long serverClockOffsetMs = 0L;
@@ -267,6 +269,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         AnimatorSet animator = activeAnimator;
         activeAnimator = null;
         animationGeneration++;
+        animationInitialized = false;
         if (animator != null) animator.cancel();
         text.animate().cancel();
     }
@@ -326,7 +329,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             return;
         }
         boolean sameAd = ad.id.equals(currentAdId);
-        if (sameAd && !needsResume) {
+        if (sameAd && !needsResume && animationInitialized) {
             config = cfg;
             currentDisplayBudgetMs = remainingMs;
             bindConfig(cfg);
@@ -529,12 +532,19 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setAlpha(1f);
         final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
         if (cfg != null && cfg.reducedMotionStatic && isReduceMotionEnabled()) {
-            // The independent expiry callback owns the lifecycle, including reduced-motion mode.
+            // Reduced-motion is an intentional static presentation, not a failed animation start.
+            animationInitialized = true;
             return;
         }
         // Begin the ticker motion on the very next frame after its content is laid out.
         postOnAnimation(() -> {
-            if (generation != animationGeneration || !ad.id.equals(currentAdId)) return;
+            if (generation != animationGeneration || !ad.id.equals(currentAdId) || !attached.get()) return;
+            // Room overlays can receive the realtime event before their parent has measured them.
+            // Retry after layout instead of constructing a 1px ticker that appears frozen.
+            if (textViewport.getWidth() <= dp(8) || text.getWidth() <= dp(1)) {
+                postDelayed(() -> animateTextIn(ad, cfg, generation, elapsedSinceServerStartMs), 32L);
+                return;
+            }
             ArrayList<Animator> animations = new ArrayList<>();
             // Apply the dashboard's overall transition independently of per-element motion.
             String transition = cfg == null || cfg.transitionType == null ? "slide" : cfg.transitionType;
@@ -579,6 +589,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             AnimatorSet set = new AnimatorSet();
             set.playTogether(animations);
             activeAnimator = set;
+            animationInitialized = true;
             set.addListener(new AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == set) activeAnimator = null;
