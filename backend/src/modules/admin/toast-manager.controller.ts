@@ -15,12 +15,12 @@ const DEFAULT_TOAST_STYLE = {
   version: 1,
   highWinMinMultiplier: 10,
   highWinMinCoins: 1000,
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
-  luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
-  luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+  giftSend: { enabled: true, backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinNormal: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyReturn: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
+  luckyWinHigh: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyWinHighRoom: { enabled: true, backgroundUrl: '' shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
+  luckyButton: { enabled: true, iconUrl: '' durationSeconds: 5, pulseEnabled: true },
 };
 
 function cleanUrl(value: unknown, fallback = ''): string {
@@ -58,6 +58,7 @@ export class ToastManagerController {
     const highWinMinMultiplier = Math.max(0, Math.min(1000000, Math.floor(Number.isFinite(Number(parsed.highWinMinMultiplier)) ? Number(parsed.highWinMinMultiplier) : 10)));
     const highWinMinCoins = Math.max(0, Math.min(1000000000, Math.floor(Number.isFinite(Number(parsed.highWinMinCoins)) ? Number(parsed.highWinMinCoins) : 1000)));
     const giftSend = {
+      enabled: parsed.giftSend?.enabled !== false,
       backgroundUrl: cleanUrl(parsed.giftSend?.backgroundUrl, cleanUrl(parsed.backgroundUrl)),
       shineEnabled: parsed.giftSend?.shineEnabled !== false && parsed.shineEnabled !== false,
       frameGlowEnabled: parsed.giftSend?.frameGlowEnabled !== false && parsed.frameGlowEnabled !== false,
@@ -78,6 +79,7 @@ export class ToastManagerController {
       placementY: clampPercent(parsed.giftSend?.placementY, 16),
     };
     const winDefaults = (source: any, fallback: any) => ({
+      enabled: source?.enabled !== false,
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
       shineEnabled: source?.shineEnabled !== false,
       frameGlowEnabled: source?.frameGlowEnabled !== false,
@@ -102,6 +104,7 @@ export class ToastManagerController {
     const luckyWinHigh = winDefaults(parsed.luckyWinHigh, DEFAULT_TOAST_STYLE.luckyWinHigh);
     const luckyWinHighRoom = winDefaults(parsed.luckyWinHighRoom, DEFAULT_TOAST_STYLE.luckyWinHighRoom);
     const luckyButton = {
+      enabled: parsed.luckyButton?.enabled !== false,
       iconUrl: cleanUrl(parsed.luckyButton?.iconUrl),
       durationSeconds: clampSeconds(parsed.luckyButton?.durationSeconds, 5),
       pulseEnabled: parsed.luckyButton?.pulseEnabled !== false,
@@ -117,6 +120,7 @@ export class ToastManagerController {
     const previous = await this.getConfig();
     const oldGift = previous.giftSend || previous;
     const giftSend = {
+      enabled: typeof body?.giftSend?.enabled === 'boolean' ? body.giftSend.enabled : oldGift.enabled !== false,
       backgroundUrl: cleanUrl(body?.giftSend?.backgroundUrl, cleanUrl(body?.backgroundUrl, oldGift.backgroundUrl)),
       shineEnabled: typeof body?.giftSend?.shineEnabled === 'boolean' ? body.giftSend.shineEnabled : (typeof body?.shineEnabled === 'boolean' ? body.shineEnabled : oldGift.shineEnabled),
       frameGlowEnabled: typeof body?.giftSend?.frameGlowEnabled === 'boolean' ? body.giftSend.frameGlowEnabled : oldGift.frameGlowEnabled !== false,
@@ -140,6 +144,7 @@ export class ToastManagerController {
       const old = previous[key] || DEFAULT_TOAST_STYLE[key];
       const input = body?.[key] || {};
       return {
+        enabled: typeof input.enabled === 'boolean' ? input.enabled : old.enabled !== false,
         backgroundUrl: cleanUrl(input.backgroundUrl, old.backgroundUrl),
         shineEnabled: typeof input.shineEnabled === 'boolean' ? input.shineEnabled : old.shineEnabled,
         frameGlowEnabled: typeof input.frameGlowEnabled === 'boolean' ? input.frameGlowEnabled : old.frameGlowEnabled !== false,
@@ -166,6 +171,7 @@ export class ToastManagerController {
       throw new Error('يجب تفعيل حد واحد على الأقل: عدد X أو قيمة الربح بالعملات.');
     }
     const luckyButton = {
+      enabled: typeof body?.luckyButton?.enabled === 'boolean' ? body.luckyButton.enabled : previous.luckyButton?.enabled !== false,
       iconUrl: cleanUrl(body?.luckyButton?.iconUrl, previous.luckyButton?.iconUrl || ''),
       durationSeconds: clampSeconds(body?.luckyButton?.durationSeconds, previous.luckyButton?.durationSeconds || 5),
       pulseEnabled: typeof body?.luckyButton?.pulseEnabled === 'boolean' ? body.luckyButton.pulseEnabled : previous.luckyButton?.pulseEnabled !== false,
@@ -197,7 +203,7 @@ export class ToastManagerController {
       throw new Error('High-win thresholds did not persist');
     }
     const verifyFields = [
-      'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
+      'enabled', 'avatarX', 'avatarY', 'textX', 'textY', 'bodyX', 'bodyY', 'countX', 'countY',
       'widthDp', 'heightDp', 'avatarSizeDp', 'titleSizeSp', 'bodySizeSp', 'countSizeSp',
       'placementX', 'placementY',
     ];
