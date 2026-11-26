@@ -635,6 +635,7 @@ public final class GlobalCelebrationToast {
         } catch (Exception ignored) {
         }
         if (isLuckyToastKind(kind)) refreshToastStyle(activity);
+        if (!isToastEnabled(kind, centerPlacement, multiplier, coinsWon, body)) return;
         long now = System.currentTimeMillis();
         // One high-win event may intentionally have two placements on the sender device:
         // the shared top banner and the sender-only center celebration. Permit that paired
