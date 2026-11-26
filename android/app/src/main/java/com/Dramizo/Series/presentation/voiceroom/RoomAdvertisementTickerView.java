@@ -54,6 +54,7 @@ import java.util.TimeZone;
 public final class RoomAdvertisementTickerView extends FrameLayout implements RealtimeClient.UserListener {
     public static volatile boolean SEND_BUTTON_ENABLED = true;
     private final ImageView backgroundImage;
+    private final View glowOverlay;
     private final ImageView avatar;
     private final TextView name;
     private final TextView text;
@@ -91,6 +92,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         backgroundImage = new ImageView(context);
         backgroundImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
         addView(backgroundImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        glowOverlay = new View(context);
+        glowOverlay.setClickable(false);
+        glowOverlay.setAlpha(0f);
+        addView(glowOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         avatar = new ImageView(context);
         avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
         name = new TextView(context);
@@ -377,6 +382,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         name.setText("");
         text.setTranslationX(0f);
         name.setTranslationX(0f);
+        glowOverlay.setAlpha(0f);
+        glowOverlay.setScaleX(1f);
+        glowOverlay.setScaleY(1f);
         avatar.setTranslationX(0f);
         setTranslationY(0f);
         setAlpha(1f);
@@ -391,6 +399,20 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         backgroundImage.setVisibility(GONE);
         setBackground(null);
         setVisibility(GONE);
+    }
+
+    private void applyGlowConfig(AdvertisementDtos.Ticker cfg) {
+        if (cfg == null || cfg.glowType == null || "none".equalsIgnoreCase(cfg.glowType) || cfg.glowIntensity <= 0) {
+            glowOverlay.setAlpha(0f); return;
+        }
+        int base = safeColor(cfg.glowColor, Color.parseColor("#FFD66B"));
+        int alpha = Math.max(0, Math.min(100, cfg.glowIntensity)) * 180 / 100;
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.argb(Math.max(12, alpha / 4), Color.red(base), Color.green(base), Color.blue(base)));
+        g.setCornerRadius(dp(Math.max(0, cfg.radiusDp)));
+        g.setStroke(Math.max(1, dp(1)), Color.argb(alpha, Color.red(base), Color.green(base), Color.blue(base)));
+        glowOverlay.setBackground(g);
+        glowOverlay.setElevation(dp(6));
     }
 
     private void showAdvertisement(AdvertisementDtos.Advertisement ad, AdvertisementDtos.Ticker cfg) {
@@ -467,6 +489,7 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         text.setTextColor(safeColor(cfg.textColor, Color.WHITE));
         applyConfiguredTypeface(cfg);
         applyConfiguredGradients(cfg);
+        applyGlowConfig(cfg);
         int spacing = dp(Math.max(0, cfg.spacingDp));
         FrameLayout.LayoutParams av = (FrameLayout.LayoutParams) avatar.getLayoutParams();
         av.gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL;
@@ -652,22 +675,11 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 return;
             }
             ArrayList<Animator> animations = new ArrayList<>();
-            // Apply the dashboard's overall transition independently of per-element motion.
-            String transition = cfg == null || cfg.transitionType == null ? "slide" : cfg.transitionType;
-            if ("fade".equalsIgnoreCase(transition)) {
-                setAlpha(0f);
-                ObjectAnimator barFade = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f);
-                barFade.setDuration(260L);
-                barFade.setInterpolator(new LinearInterpolator());
-                animations.add(barFade);
-            } else {
-                float slideDistance = dp(12);
-                setTranslationY(slideDistance);
-                ObjectAnimator barSlide = ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, slideDistance, 0f);
-                barSlide.setDuration(220L);
-                barSlide.setInterpolator(new LinearInterpolator());
-                animations.add(barSlide);
-            }
+            // Professional dashboard-controlled bar entrance. The text ticker remains
+            // independently synchronized, while the whole pill gets a polished entrance.
+            String entry = cfg == null || cfg.entryAnimation == null ? "slide-right" : cfg.entryAnimation.toLowerCase(Locale.ROOT);
+            Animator entryAnimator = buildBarTransition(entry, true);
+            if (entryAnimator != null) animations.add(entryAnimator);
             String legacyTextMode = cfg == null || !"ltr".equalsIgnoreCase(cfg.direction)
                     ? "right-to-left" : "left-to-right";
             String configuredTextMode = cfg == null || cfg.textMotion == null
@@ -703,10 +715,21 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                 @Override public void onAnimationEnd(Animator animation) {
                     if (activeAnimator == set) activeAnimator = null;
                     if (generation == animationGeneration && ad.id.equals(currentAdId)) {
-                        // Do not reset the completed ticker to translationX(0):
-                        // that made the already-exited message reappear until expiry.
-                        // Keep the text at its final off-screen position; the shared
-                        // server-time expiry removes the complete row and its background.
+                        // Start the selected professional exit immediately after the
+                        // final word has crossed the edge. Never leave the finished bar visible.
+                        Animator exit = buildBarTransition(cfg == null || cfg.exitAnimation == null ? "slide-left" : cfg.exitAnimation.toLowerCase(Locale.ROOT), false);
+                        if (exit != null) {
+                            exit.addListener(new AnimatorListenerAdapter() {
+                                @Override public void onAnimationEnd(Animator a) {
+                                    if (generation == animationGeneration && ad.id.equals(currentAdId)) hideAdvertisement();
+                                }
+                            });
+                            activeAnimator = new AnimatorSet();
+                            ((AnimatorSet)activeAnimator).playTogether(exit);
+                            activeAnimator.start();
+                        } else {
+                            hideAdvertisement();
+                        }
                     }
                 }
             });
@@ -731,6 +754,43 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             }
         });
     }
+
+    private Animator buildBarTransition(String mode, boolean entering) {
+        String m = mode == null ? "slide-right" : mode.toLowerCase(Locale.ROOT);
+        long d = m.contains("fire") ? 360L : (m.contains("gold") ? 320L : 240L);
+        d = Math.min(420L, Math.max(160L, d));
+        ArrayList<Animator> a = new ArrayList<>();
+        float distance = dp(22);
+        if (m.contains("top")) setTranslationY(entering ? -distance : 0f);
+        else if (m.contains("bottom")) setTranslationY(entering ? distance : 0f);
+        else if (m.contains("right")) setTranslationX(entering ? distance : 0f);
+        else if (m.contains("left")) setTranslationX(entering ? -distance : 0f);
+        else { setTranslationX(0f); setTranslationY(0f); }
+        if (m.contains("zoom") || m.contains("fire") || m.contains("gold")) { setScaleX(entering ? 0.94f : 1f); setScaleY(entering ? 0.94f : 1f); }
+        if (m.contains("fade") || m.contains("fire") || m.contains("gold")) setAlpha(entering ? 0f : 1f);
+        if (entering) {
+            a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_X, getTranslationX(), 0f));
+            a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, getTranslationY(), 0f));
+            a.add(ObjectAnimator.ofFloat(this, View.SCALE_X, getScaleX(), 1f));
+            a.add(ObjectAnimator.ofFloat(this, View.SCALE_Y, getScaleY(), 1f));
+            a.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 1f));
+        } else {
+            float tx=getTranslationX(), ty=getTranslationY();
+            if (m.contains("top")) ty=-distance; else if (m.contains("bottom")) ty=distance; else if (m.contains("right")) tx=distance; else if (m.contains("left")) tx=-distance;
+            a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_X, getTranslationX(), tx));
+            a.add(ObjectAnimator.ofFloat(this, View.TRANSLATION_Y, getTranslationY(), ty));
+            if (m.contains("zoom") || m.contains("fire") || m.contains("gold")) { a.add(ObjectAnimator.ofFloat(this, View.SCALE_X, getScaleX(), 0.94f)); a.add(ObjectAnimator.ofFloat(this, View.SCALE_Y, getScaleY(), 0.94f)); }
+            if (m.contains("fade") || m.contains("fire") || m.contains("gold")) a.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 0f));
+        }
+        AnimatorSet set = new AnimatorSet(); set.playTogether(a); set.setDuration(d); set.setInterpolator(new LinearInterpolator());
+        if (m.contains("fire") || m.contains("gold")) {
+            glowOverlay.setAlpha(entering ? Math.max(0.15f, (cfgGlowIntensity()) / 100f) : glowOverlay.getAlpha());
+            glowOverlay.animate().alpha(entering ? 0.8f : 0f).scaleX(entering ? 1.02f : 1.08f).scaleY(entering ? 1.02f : 1.08f).setDuration(d).start();
+        }
+        return set;
+    }
+
+    private float cfgGlowIntensity() { return config == null ? 55f : Math.max(0, Math.min(100, config.glowIntensity)); }
 
     private long calculateTextMotionDuration(String rawMode, int viewportWidth, int textWidth,
                                              AdvertisementDtos.Ticker cfg, long displayBudget) {
@@ -803,8 +863,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
             // viewport, so users never see a stationary message between passes.
             ValueAnimator ticker = ValueAnimator.ofFloat(0f, 1f);
             ticker.setDuration(Math.max(1L, cycleMs));
-            ticker.setRepeatCount(ValueAnimator.INFINITE);
-            ticker.setRepeatMode(ValueAnimator.RESTART);
+            // One complete pass only. The backend expiry is motionBudget + 300ms,
+            // so the row disappears shortly after the final word clears the viewport.
+            ticker.setRepeatCount(0);
             ticker.setInterpolator(new LinearInterpolator());
             // Drive the ticker from monotonic elapsed time anchored to the server
             // start timestamp. A delayed frame catches up immediately instead of
