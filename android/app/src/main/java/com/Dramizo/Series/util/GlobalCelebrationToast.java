@@ -684,6 +684,21 @@ public final class GlobalCelebrationToast {
         ImageView badge = banner.findViewById(R.id.imgCelebrationBadge);
         TextView tvTitle = banner.findViewById(R.id.tvCelebrationTitle);
         TextView tvBody = banner.findViewById(R.id.tvCelebrationBody);
+        if (centerPlacement && avatar != null) {
+            // The center reward toast is a personal text result, not a profile card.
+            View avatarSlot = (View) avatar.getParent();
+            if (avatarSlot != null) avatarSlot.setVisibility(View.GONE);
+            avatar.setVisibility(View.GONE);
+            if (tvTitle != null && tvTitle.getParent() instanceof View) {
+                View titleColumn = (View) tvTitle.getParent();
+                ViewGroup.LayoutParams raw = titleColumn.getLayoutParams();
+                if (raw instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) raw;
+                    lp.setMarginStart(0);
+                    titleColumn.setLayoutParams(lp);
+                }
+            }
+        }
         View wrapTimes = banner.findViewById(R.id.wrapCelebrationTimes);
         TextView tvTimes = banner.findViewById(R.id.tvCelebrationTimes);
         TextView btnGo = banner.findViewById(R.id.btnCelebrationGo);
