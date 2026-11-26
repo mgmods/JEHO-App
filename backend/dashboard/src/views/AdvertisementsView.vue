@@ -98,6 +98,11 @@
             <div class="col-6"><label class="form-label small">إزاحة الموضع المخصص dp</label><input v-model.number="form.customOffsetDp" type="number" min="-100" max="100" class="form-control" :disabled="form.position!=='custom-safe'"></div>
             <div class="col-6"><label class="form-label small">الموقع الأفقي %</label><input v-model.number="form.positionXPercent" type="number" min="0" max="100" class="form-control" :disabled="form.position!=='free'"></div><div class="col-6"><label class="form-label small">الموقع العمودي %</label><input v-model.number="form.positionYPercent" type="number" min="0" max="100" class="form-control" :disabled="form.position!=='free'"></div><div class="col-6"><label class="form-label small">الاتجاه</label><select v-model="form.direction" class="form-select"><option value="rtl">RTL</option><option value="ltr">LTR</option></select></div>
             <div class="col-6"><label class="form-label small">نوع الانتقال</label><select v-model="form.transitionType" class="form-select"><option value="slide">انزلاق</option><option value="fade">تلاشي</option></select></div>
+            <div class="col-6"><label class="form-label small">دخول احترافي للشريط</label><select v-model="form.entryAnimation" class="form-select"><option value="slide-top">سحب من الأعلى</option><option value="slide-bottom">سحب من الأسفل</option><option value="slide-right">سحب من اليمين</option><option value="slide-left">سحب من اليسار</option><option value="gold">دخول ذهبي</option><option value="fire">دخول ناري</option><option value="fade">تلاشي ناعم</option><option value="zoom">تكبير ناعم</option></select></div>
+            <div class="col-6"><label class="form-label small">خروج احترافي للشريط</label><select v-model="form.exitAnimation" class="form-select"><option value="slide-top">خروج للأعلى</option><option value="slide-bottom">خروج للأسفل</option><option value="slide-right">خروج لليمين</option><option value="slide-left">خروج لليسار</option><option value="gold">خروج ذهبي</option><option value="fire">خروج ناري</option><option value="fade">تلاشي ناعم</option><option value="zoom">تصغير ناعم</option></select></div>
+            <div class="col-4"><label class="form-label small">نوع التوهج</label><select v-model="form.glowType" class="form-select"><option value="none">بدون</option><option value="gold">ذهبي</option><option value="fire">ناري</option></select></div>
+            <div class="col-4"><label class="form-label small">لون التوهج</label><input v-model="form.glowColor" type="color" class="form-control form-control-color w-100"></div>
+            <div class="col-4"><label class="form-label small">قوة التوهج %</label><input v-model.number="form.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
             <div class="col-12"><div class="fw-semibold small mt-2">حركة عناصر الإعلان بشكل مستقل</div><div class="small text-muted mb-2">اختر اتجاه حركة النص والاسم والصورة كلٌّ على حدة، أو ثبّته أو اجعله يتلاشى</div></div>
             <div class="col-4"><label class="form-label small">حركة نص الإعلان</label><select v-model="form.textMotion" class="form-select"><option value="right-to-left">من اليمين لليسار</option><option value="left-to-right">من اليسار لليمين</option><option value="static">ثابت</option><option value="fade">تلاشي</option></select></div>
             <div class="col-4"><label class="form-label small">حركة الاسم</label><select v-model="form.nameMotion" class="form-select"><option value="right-to-left">من اليمين لليسار</option><option value="left-to-right">من اليسار لليمين</option><option value="static">ثابت</option><option value="fade">تلاشي</option></select></div>
@@ -211,6 +216,51 @@
         </div>
       </div>
 
+      <div class="col-12">
+        <div class="glass p-3">
+          <div class="d-flex align-items-center justify-content-between mb-3"><div><h3 class="h6 mb-1">صلاحيات الإعلان المتقدمة</h3><div class="small text-muted">تحكم مستقل لـ VIP أو مستخدم محدد بالـID: عدد الإعلانات، الخلفية، الخط، والحركة والتوهج.</div></div></div>
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="border rounded-3 p-3">
+                <div class="fw-semibold small mb-2">سياسة VIP</div>
+                <div class="row g-2">
+                  <div class="col-6"><label class="form-label small">عدد الإعلانات يومياً</label><input v-model.number="vipPolicy.dailyLimit" type="number" min="0" max="1000" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">نوع الدخول</label><select v-model="vipPolicy.entryAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
+                  <div class="col-6"><label class="form-label small">نوع الخروج</label><select v-model="vipPolicy.exitAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
+                  <div class="col-6"><label class="form-label small">التوهج</label><select v-model="vipPolicy.glowType" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="none">بدون</option></select></div>
+                  <div class="col-6"><label class="form-label small">لون التوهج</label><input v-model="vipPolicy.glowColor" type="color" class="form-control form-control-color w-100"></div>
+                  <div class="col-6"><label class="form-label small">قوة التوهج %</label><input v-model.number="vipPolicy.glowIntensity" type="number" min="0" max="100" class="form-control"></div>
+                  <div class="col-12"><label class="form-label small">خلفية شريط VIP URL</label><input v-model="vipPolicy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://..."></div>
+                  <div class="col-6"><label class="form-label small">لون اسم VIP</label><input v-model="vipPolicy.nameColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">لون نص VIP</label><input v-model="vipPolicy.textColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">الخط</label><select v-model="vipPolicy.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="custom">مخصص</option></select></div>
+                  <div class="col-6"><label class="form-label small">حركة النص</label><select v-model="vipPolicy.textMotion" class="form-select"><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="static">ثابت</option></select></div>
+                  <div class="col-12"><button class="btn btn-aurora btn-sm" :disabled="policySaving" @click="saveVipPolicy">حفظ سياسة VIP</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="border rounded-3 p-3">
+                <div class="fw-semibold small mb-2">صلاحية مستخدم محدد</div>
+                <div class="input-group mb-2"><input v-model="policyRef" class="form-control" dir="ltr" placeholder="Public ID أو UUID المستخدم"><button class="btn btn-outline-light" :disabled="policyLoading" @click="loadUserPolicy">جلب</button></div>
+                <div v-if="policyUser" class="small text-muted mb-2">{{ policyUser.displayName }} · {{ policyUser.publicId || policyUser.id }}</div>
+                <div class="row g-2">
+                  <div class="col-6"><label class="form-label small">عدد الإعلانات يومياً</label><input v-model.number="policy.dailyLimit" type="number" min="0" max="1000" class="form-control"></div>
+                  <div class="col-6"><label class="form-label small">الدخول</label><select v-model="policy.entryAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
+                  <div class="col-6"><label class="form-label small">الخروج</label><select v-model="policy.exitAnimation" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="slide-right">يمين</option><option value="slide-left">يسار</option><option value="slide-top">أعلى</option><option value="slide-bottom">أسفل</option><option value="fade">تلاشي</option></select></div>
+                  <div class="col-6"><label class="form-label small">التوهج</label><select v-model="policy.glowType" class="form-select"><option value="gold">ذهبي</option><option value="fire">ناري</option><option value="none">بدون</option></select></div>
+                  <div class="col-12"><label class="form-label small">خلفية خاصة URL</label><input v-model="policy.backgroundImage" type="text" class="form-control" dir="ltr" placeholder="https://..."></div>
+                  <div class="col-6"><label class="form-label small">لون الاسم</label><input v-model="policy.nameColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">لون النص</label><input v-model="policy.textColor" type="text" class="form-control" dir="ltr"></div>
+                  <div class="col-6"><label class="form-label small">الخط</label><select v-model="policy.fontFamily" class="form-select"><option value="default">افتراضي</option><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option><option value="custom">مخصص</option></select></div>
+                  <div class="col-6"><label class="form-label small">حركة النص</label><select v-model="policy.textMotion" class="form-select"><option value="right-to-left">يمين ← يسار</option><option value="left-to-right">يسار ← يمين</option><option value="static">ثابت</option></select></div>
+                  <div class="col-12"><button class="btn btn-outline-light btn-sm" :disabled="policySaving" @click="saveUserPolicy">حفظ صلاحية المستخدم</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="col-lg-8">
         <div class="glass p-3 h-100">
           <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -261,9 +311,11 @@ import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
-const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false)
+const loading=ref(true), saving=ref(false), savingWords=ref(false), fontUploading=ref(false), error=ref(''), success=ref(''), dragging=ref(false), policyLoading=ref(false), policySaving=ref(false), policyRef=ref(''), policyUser=ref(null)
+const policy=reactive({dailyLimit:0,background:'',backgroundImage:'',nameColor:'',textColor:'',fontFamily:'default',customFontUrl:'',customFontName:'',textMotion:'right-to-left',entryAnimation:'gold',exitAnimation:'gold',glowType:'gold',glowColor:'#FFD66B',glowIntensity:55})
+const vipPolicy=reactive({dailyLimit:5,background:'',backgroundImage:'',nameColor:'',textColor:'',fontFamily:'default',customFontUrl:'',customFontName:'',textMotion:'right-to-left',entryAnimation:'gold',exitAnimation:'gold',glowType:'gold',glowColor:'#FFD66B',glowIntensity:55})
 const bannedWords=ref(''), queue=ref([]), stats=ref({}), statsDays=ref(7), queueSearch=ref(''), showHistory=ref(false)
-const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,maxQueueSize:500,maxTextLength:180,maxWords:30,publishDelayMs:0,position:'free',positionXPercent:50,positionYPercent:52,composerBackgroundImage:'',composerBackgroundOpacity:100,composerBackgroundColor:'#F7F9FC',composerIconUrl:'',composerTitleColor:'#172033',composerSubtitleColor:'#66758B',composerInputTextColor:'#111827',composerInputHintColor:'#9AA7B8',composerInputBackgroundColor:'#FFFFFF',composerInputBorderColor:'#D8E0EA',composerCancelTextColor:'#43536A',composerCancelBackgroundColor:'#F4F7FB',composerCancelBorderColor:'#DCE4EE',composerSendTextColor:'#241C14',composerSendGradientStartColor:'#EEC577',composerSendGradientEndColor:'#BC7E2F',composerSendBorderColor:'#EFC981',composerButtonRadiusDp:24,composerIconSizeDp:42,composerButtonText:'✦  إعلان عام',composerButtonTextColor:'#FFFFFF',composerButtonBackgroundStartColor:'#694117',composerButtonBackgroundEndColor:'#E5B85B',composerButtonBorderColor:'#EFC981',composerButtonBorderWidthDp:1,composerButtonWidthDp:0,composerButtonHorizontalPaddingDp:20,composerButtonHeightDp:46,composerButtonTextSizeSp:13,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapValue:1.8,gapUnit:'seconds',entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#9A681F',textColor:'#111827',background:'linear-gradient(90deg,#F8FAFC,#E8EEF6)',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
+const form=reactive({enabled:true,sendButtonEnabled:true,paused:false,dailyLimit:1,vipDailyLimit:5,entryAnimation:'slide-right',exitAnimation:'slide-left',glowType:'none',glowColor:'#FFD66B',glowIntensity:0,maxQueueSize:500,maxTextLength:180,maxWords:30,publishDelayMs:0,position:'free',positionXPercent:50,positionYPercent:52,composerBackgroundImage:'',composerBackgroundOpacity:100,composerBackgroundColor:'#F7F9FC',composerIconUrl:'',composerTitleColor:'#172033',composerSubtitleColor:'#66758B',composerInputTextColor:'#111827',composerInputHintColor:'#9AA7B8',composerInputBackgroundColor:'#FFFFFF',composerInputBorderColor:'#D8E0EA',composerCancelTextColor:'#43536A',composerCancelBackgroundColor:'#F4F7FB',composerCancelBorderColor:'#DCE4EE',composerSendTextColor:'#241C14',composerSendGradientStartColor:'#EEC577',composerSendGradientEndColor:'#BC7E2F',composerSendBorderColor:'#EFC981',composerButtonRadiusDp:24,composerIconSizeDp:42,composerButtonText:'✦  إعلان عام',composerButtonTextColor:'#FFFFFF',composerButtonBackgroundStartColor:'#694117',composerButtonBackgroundEndColor:'#E5B85B',composerButtonBorderColor:'#EFC981',composerButtonBorderWidthDp:1,composerButtonWidthDp:0,composerButtonHorizontalPaddingDp:20,composerButtonHeightDp:46,composerButtonTextSizeSp:13,direction:'rtl',textMotion:'right-to-left',nameMotion:'static',avatarMotion:'static',displayDurationMs:9000,gapValue:1.8,gapUnit:'seconds',entrySpeedPxPerSec:120,exitSpeedPxPerSec:120,reducedMotionStatic:true,heightDp:48,avatarDp:34,nameSp:12,textSp:13,nameColor:'#9A681F',textColor:'#111827',background:'linear-gradient(90deg,#F8FAFC,#E8EEF6)',backgroundImage:'',backgroundOpacity:92,radiusDp:18,spacingDp:8,avatarShape:'circle',resetTimezone:'UTC',transitionType:'slide',fontFamily:'default',customFontUrl:'',customFontName:'',nameGradientEnabled:false,nameGradientStartColor:'#FFD98A',nameGradientEndColor:'#FF6B9D',textGradientEnabled:false,textGradientStartColor:'#111827',textGradientEndColor:'#111827',template:'premium-v1',customOffsetDp:0,avatarOffsetXDp:0,avatarOffsetYDp:0,nameOffsetXDp:0,nameOffsetYDp:0,nameWidthDp:90,textOffsetXDp:0,textOffsetYDp:0,textWidthDp:0})
 function apply(data){
   Object.assign(form,data||{});
   const gapMs=Math.max(0,Number(data?.gapMs ?? form.gapMs ?? 1800)||0);
@@ -289,6 +341,8 @@ async function load(){
   if(c.error){error.value=c.error.message||String(c.error);loading.value=false;return}
   const configData=c.data?.data??c.data
   apply(configData?.ticker??configData)
+  Object.assign(vipPolicy, configData?.ticker?.vipPolicy || configData?.vipPolicy || {})
+  if(configData?.ticker?.vipDailyLimit!=null) vipPolicy.dailyLimit=Number(configData.ticker.vipDailyLimit)
   applyPreviewFont()
   queue.value=q.data?.items||q.data?.data?.items||[]
   stats.value=s.data?.data??s.data??{}
@@ -309,6 +363,23 @@ async function save(){
   if(r.error){error.value=r.error.message||String(r.error);return}
   success.value='تم حفظ إعدادات الإعلانات';
   apply(r.data?.data??r.data)
+}
+async function loadUserPolicy(){
+  const ref=String(policyRef.value||'').trim(); if(!ref){error.value='أدخل ID المستخدم أولاً';return}
+  policyLoading.value=true; const r=await advertisementsApi.userPolicy(ref); policyLoading.value=false
+  if(r.error){error.value=r.error.message||String(r.error);return}
+  const d=r.data?.data??r.data; policyUser.value=d?.user||null; Object.assign(policy,d?.policy||{}); success.value='تم جلب صلاحية الإعلان للمستخدم'
+}
+async function saveVipPolicy(){
+  policySaving.value=true; const r=await advertisementsApi.saveVipPolicy({...vipPolicy}); policySaving.value=false
+  if(r.error){error.value=r.error.message||String(r.error);return}
+  success.value='تم حفظ صلاحيات إعلانات VIP'
+}
+async function saveUserPolicy(){
+  const ref=String(policyRef.value||'').trim(); if(!ref){error.value='أدخل ID المستخدم';return}
+  policySaving.value=true; const r=await advertisementsApi.saveUserPolicy({userId:ref,...policy}); policySaving.value=false
+  if(r.error){error.value=r.error.message||String(r.error);return}
+  success.value='تم حفظ صلاحية الإعلان للمستخدم'
 }
 async function saveWords(){savingWords.value=true;const r=await advertisementsApi.saveBannedWords(bannedWords.value);savingWords.value=false;if(r.error){error.value=r.error.message||String(r.error);return}success.value='تم حفظ الكلمات المحظورة'}
 async function loadQueue(){const r=await advertisementsApi.queue({limit:100,q:queueSearch.value,history:showHistory.value});if(!r.error)queue.value=r.data?.items||r.data?.data?.items||[]}
