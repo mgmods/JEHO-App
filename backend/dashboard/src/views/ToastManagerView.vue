@@ -198,9 +198,9 @@ const tabs = [
 const activeTab = ref('luckyWinNormal')
 const form = reactive({
   giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 12 },
-  luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 24 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 12 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
+  luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 32 },
+  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 16 },
   luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12, placementX: 50, placementY: 50 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   highWinMinMultiplier: 10,
@@ -279,7 +279,7 @@ async function load() {
       bodySizeSp: Math.max(8, Math.min(30, Number(incoming.bodySizeSp) || 12)),
       countSizeSp: Math.max(8, Math.min(30, Number(incoming.countSizeSp) || 12)),
       placementX: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementX)) ? Number(incoming.placementX) : 50)),
-      placementY: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementY)) ? Number(incoming.placementY) : (key === 'luckyReturn' ? 24 : key === 'luckyWinHighRoom' ? 50 : 12))),
+      placementY: Math.max(0, Math.min(100, Number.isFinite(Number(incoming.placementY)) ? Number(incoming.placementY) : (key === 'luckyReturn' ? 32 : key === 'luckyWinHighRoom' ? 50 : 16))),
     })
   }
   form.highWinMinMultiplier = Math.max(0, Math.floor(Number.isFinite(Number(cfg.highWinMinMultiplier)) ? Number(cfg.highWinMinMultiplier) : 10))
@@ -403,7 +403,7 @@ onMounted(load)
 .toast-tabs{display:flex;flex-wrap:wrap;gap:8px}
 .toast-tab{border:1px solid rgba(255,211,111,.28);border-radius:10px;padding:9px 13px;background:rgba(20,18,31,.55);color:inherit;font-size:.92rem}
 .toast-tab.active{border-color:#f5ca69;background:linear-gradient(110deg,rgba(125,22,54,.8),rgba(90,43,103,.7));box-shadow:0 0 12px rgba(255,191,64,.18)}
- .toast-preview-wrap{position:relative;width:100%;height:280px;min-height:280px;padding:0;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:hidden;touch-action:none}
+ .toast-preview-wrap{position:relative;width:100%;height:360px;min-height:360px;padding:0;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:hidden;touch-action:none}
 .toast-canvas{position:absolute;max-width:calc(100% - 12px);min-width:220px;margin:0;border:0;border-radius:0;background:transparent;overflow:visible;color:#fff;touch-action:none;isolation:isolate}
 .toast-canvas-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
 .drag-item{touch-action:none;cursor:grab;user-select:none}
