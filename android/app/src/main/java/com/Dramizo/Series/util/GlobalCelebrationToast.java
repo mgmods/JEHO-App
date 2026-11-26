@@ -75,9 +75,9 @@ public final class GlobalCelebrationToast {
     private static volatile int remoteLuckyHighDurationSeconds = 5;
     private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
     private static volatile float remoteGiftBodyX = 25f, remoteGiftBodyY = 67f, remoteGiftCountX = 88f, remoteGiftCountY = 50f;
-    private static volatile float remoteLuckyNormalPlacementX = 50f, remoteLuckyNormalPlacementY = 12f;
-    private static volatile float remoteLuckyReturnPlacementX = 50f, remoteLuckyReturnPlacementY = 24f;
-    private static volatile float remoteLuckyHighPlacementX = 50f, remoteLuckyHighPlacementY = 12f;
+    private static volatile float remoteLuckyNormalPlacementX = 50f, remoteLuckyNormalPlacementY = 16f;
+    private static volatile float remoteLuckyReturnPlacementX = 50f, remoteLuckyReturnPlacementY = 32f;
+    private static volatile float remoteLuckyHighPlacementX = 50f, remoteLuckyHighPlacementY = 16f;
     private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 42f;
     private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 42f, remoteLuckyNormalBodyX = 25f, remoteLuckyNormalBodyY = 62f;
     private static volatile float remoteLuckyNormalCountX = 88f, remoteLuckyNormalCountY = 50f;
@@ -362,9 +362,9 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyReturnBackgroundUrl = stringValue(returned.get("backgroundUrl"), "");
                     remoteLuckyNormalPlacementX = floatValue(normal.get("placementX"), 50f);
-                    remoteLuckyNormalPlacementY = floatValue(normal.get("placementY"), 12f);
+                    remoteLuckyNormalPlacementY = floatValue(normal.get("placementY"), 16f);
                     remoteLuckyReturnPlacementX = floatValue(returned.get("placementX"), 50f);
-                    remoteLuckyReturnPlacementY = floatValue(returned.get("placementY"), 24f);
+                    remoteLuckyReturnPlacementY = floatValue(returned.get("placementY"), 32f);
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyRoomHighBackgroundUrl = stringValue(roomHigh.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -414,7 +414,7 @@ public final class GlobalCelebrationToast {
                     remoteLuckyRoomHighPlacementX = floatValue(roomHigh.get("placementX"), 50f);
                     remoteLuckyRoomHighPlacementY = floatValue(roomHigh.get("placementY"), 50f);
                     remoteLuckyHighPlacementX = floatValue(high.get("placementX"), 50f);
-                    remoteLuckyHighPlacementY = floatValue(high.get("placementY"), 12f);
+                    remoteLuckyHighPlacementY = floatValue(high.get("placementY"), 16f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
                     remoteLuckyRoomHighTextX = floatValue(roomHigh.get("textX"), 25f);
                     remoteLuckyHighTextY = floatValue(high.get("textY"), 42f);
