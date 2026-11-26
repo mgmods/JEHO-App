@@ -151,11 +151,6 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     // Migrate the old built-in 10-second delay to immediate publishing, while
     // preserving any non-default delay explicitly chosen by the administrator.
     if (Number(value?.publishDelayMs) === 10000) merged.publishDelayMs = 0;
-    // Upgrade only the original built-in dark/white preset. Preserve any
-    // administrator-customized ticker background and name styling.
-    if (String(value?.background || '') === 'linear-gradient(90deg,rgba(20,12,42,.94),rgba(50,24,76,.86))') {
-      merged.background = DEFAULT_CONFIG.background;
-    }
     if (String(value?.textColor || '').toUpperCase() === '#FFFFFF' && value?.textGradientEnabled !== true) {
       merged.textColor = '#111827';
     }
