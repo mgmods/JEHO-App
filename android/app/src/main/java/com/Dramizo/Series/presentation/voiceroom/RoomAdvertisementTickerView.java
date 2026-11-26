@@ -419,6 +419,9 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         config = cfg;
         bindConfig(cfg);
         bindAd(ad);
+        // Do not flash the completed-position bar for a frame before its
+        // server-synchronized entrance phase is initialized.
+        setVisibility(INVISIBLE);
         scheduleExpiry(ad.id, remainingMs, animationGeneration);
         animateTextIn(ad, cfg, animationGeneration, Math.max(0L, ad.displayDurationMs - remainingMs));
     }
@@ -608,8 +611,8 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
         setAlpha(1f);
         final long budget = Math.max(1000L, currentDisplayBudgetMs > 0 ? currentDisplayBudgetMs : 9000L);
         if (isReduceMotionEnabled()) {
-            // Android's global animator scale of zero completes ObjectAnimators immediately.
-            // Keep the message readable instead of moving it instantly off-screen.
+            // Respect the device's reduced-motion setting while keeping the ad readable.
+            setVisibility(VISIBLE);
             animationInitialized = true;
             return;
         }
@@ -662,8 +665,10 @@ public final class RoomAdvertisementTickerView extends FrameLayout implements Re
                     Math.max(1, getWidth()), textMotionDuration, animations, elapsedSinceServerStartMs);
             if (animations.isEmpty()) {
                 // Static mode remains visible until the authoritative expiry callback fires.
+                setVisibility(VISIBLE);
                 return;
             }
+            setVisibility(VISIBLE);
             AnimatorSet set = new AnimatorSet();
             set.playTogether(animations);
             activeAnimator = set;
