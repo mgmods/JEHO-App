@@ -12356,9 +12356,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             String chat = "مبروك " + who + " حصل على " + Math.max(1L, coins)
                     + (game != null && !game.isEmpty() ? (" · " + game) : "");
-            if (roomBannerEnabled()) {
-                appendGameCelebrationLine(chat, badgeUrl);
-            }
+            // Reward results are mandatory in-room text announcements, independent
+            // of the optional decorative room banner setting.
+            appendGameCelebrationLine(chat, badgeUrl);
             return;
         }
 
@@ -12399,10 +12399,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
                         who, "lucky_hit_high", targetRoomId);
             }
-            // Keep the room's existing chat announcement, but do not add a second visual bubble.
-            if (roomBannerEnabled()) {
-                appendGameCelebrationLine(chat, badgeUrl);
-            }
+            // Keep one readable in-room result line for every lucky win.
+            appendGameCelebrationLine(chat, badgeUrl);
             return;
         } else {
             toastMsg = line;
@@ -17057,9 +17055,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         + (rawMultiplier > 0d
                             ? " · ×" + String.format(java.util.Locale.US, "%.0f", rawMultiplier)
                             : "");
-                if (roomBannerEnabled()) {
-                    appendGameCelebrationLine(roomWinLine, null);
-                }
+                appendGameCelebrationLine(roomWinLine, null);
                 boolean localWinner = senderId != null && myUserId != null
                         && sameUser(senderId, myUserId);
                 if (localWinner && (won >= 1000L || rawMultiplier >= 10d)) {
