@@ -11,15 +11,15 @@ const DEFAULT_CONFIG: any = {
   entrySpeedPxPerSec: 120, exitSpeedPxPerSec: 120, reducedMotionStatic: true,
   textMotion: 'right-to-left', nameMotion: 'static', avatarMotion: 'static',
   template: 'premium-v1', position: 'safe-bottom', direction: 'rtl', transitionType: 'slide', fontFamily: 'default',
-  background: 'linear-gradient(90deg,#F8FAFC,#E8EEF6)',
-  backgroundImage: '', backgroundOpacity: 92, radiusDp: 18, heightDp: 48,
+  background: '',
+  backgroundImage: '', backgroundOpacity: 100, radiusDp: 0, heightDp: 48,
   avatarDp: 34, avatarShape: 'circle', nameSp: 12, textSp: 13, customOffsetDp: 0,
   nameColor: '#9A681F', textColor: '#111827',
   nameGradientEnabled: false, nameGradientStartColor: '#FFD98A', nameGradientEndColor: '#FF6B9D',
   textGradientEnabled: false, textGradientStartColor: '#FFFFFF', textGradientEndColor: '#9EDCFF',
   entryAnimation: 'slide-right', exitAnimation: 'slide-left', glowType: 'none', glowColor: '#FFD66B', glowIntensity: 0,
   vipDailyLimit: 5,
-  vipPolicy: { durationDays:0, displayDurationSeconds:9, background:'', backgroundImage:'', nameColor:'', textColor:'', fontFamily:'default', customFontUrl:'', textMotion:'right-to-left', entryAnimation:'gold', exitAnimation:'gold', glowType:'gold', glowColor:'#FFD66B', glowIntensity:55 },
+  vipPolicy: { durationDays:0, displayDurationSeconds:9, dailyLimit:5, backgroundImage:'' },
   userPolicies: {},
   customFontUrl: '', customFontName: '', spacingDp: 8,
   avatarOffsetXDp: 0, avatarOffsetYDp: 0, nameOffsetXDp: 0, nameOffsetYDp: 0, nameWidthDp: 90,
@@ -159,6 +159,13 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if (String(value?.textColor || '').toUpperCase() === '#FFFFFF' && value?.textGradientEnabled !== true) {
       merged.textColor = '#111827';
     }
+    // Legacy glow and decorative bar fills are disabled: only the uploaded transparent frame is rendered.
+    merged.background = '';
+    merged.backgroundOpacity = 100;
+    merged.radiusDp = 0;
+    merged.glowType = 'none'; merged.glowColor = ''; merged.glowIntensity = 0;
+    if (!['slide-top','slide-bottom','slide-left','slide-right','fade','zoom'].includes(merged.entryAnimation)) merged.entryAnimation = 'slide-right';
+    if (!['slide-top','slide-bottom','slide-left','slide-right','fade','zoom'].includes(merged.exitAnimation)) merged.exitAnimation = 'slide-left';
     return merged;
   }
 
@@ -425,7 +432,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private pickDisplayConfig(c:any){
-    const keys=['displayDurationSeconds','displayDurationMs','background','backgroundImage','backgroundOpacity','radiusDp','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','fontFamily','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','glowIntensity','transitionType','direction','position','positionXPercent','positionYPercent','customOffsetDp','entrySpeedPxPerSec','exitSpeedPxPerSec'];
+    const keys=['displayDurationSeconds','displayDurationMs','backgroundImage','heightDp','avatarDp','avatarShape','nameSp','textSp','nameColor','textColor','nameGradientEnabled','nameGradientStartColor','nameGradientEndColor','textGradientEnabled','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','fontFamily','spacingDp','avatarOffsetXDp','avatarOffsetYDp','nameWidthDp','textOffsetXDp','textOffsetYDp','textWidthDp','textMotion','nameMotion','avatarMotion' ,'entryAnimation','exitAnimation','transitionType','direction','position','positionXPercent','positionYPercent','customOffsetDp','entrySpeedPxPerSec','exitSpeedPxPerSec'];
     const out:any={}; for(const k of keys) if(c[k]!==undefined) out[k]=c[k]; return out;
   }
 
@@ -454,7 +461,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     // a different place or using a second set of motion settings.
     const merged={...base};
     const applyBackgroundOnly=(source:any)=>{
-      for(const k of ['background','backgroundImage','backgroundOpacity']) {
+      for(const k of ['backgroundImage']) {
         const v=source?.[k];
         if(v!==undefined && v!==null && !(typeof v==='string' && v.trim()==='')) merged[k]=v;
       }
@@ -491,7 +498,7 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     if(!user) user=await this.users.findOne({where:{publicId:userRef}});
     if(!user) throw new BadRequestException('المستخدم غير موجود');
     let all:any={users:{}}; try{const rows=await this.db.query('SELECT "value" FROM "jeho_own"."app_settings" WHERE "key"=$1 LIMIT 1',['voice_room_ads_user_policies']); all=rows?.[0]?.value?JSON.parse(rows[0].value):all;}catch{} all.users=all.users||{};
-    const key=String((user as any).publicId||user.id); const previous=all.users[key]||{}; const p:any={...previous}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','background','backgroundImage','backgroundOpacity']) if(body[k]!==undefined)p[k]=body[k];
+    const key=String((user as any).publicId||user.id); const previous=all.users[key]||{}; const p:any={...previous}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','backgroundImage']) if(body[k]!==undefined)p[k]=body[k];
     if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,1);
     if(body.durationDays!==undefined){
       p.durationDays=this.bound(body.durationDays,1,3650,1);
@@ -502,12 +509,12 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
       p.expiresAt=new Date(Date.now()+p.durationDays*86400000).toISOString();
     }
     if(p.displayDurationSeconds!==undefined)p.displayDurationSeconds=this.bound(p.displayDurationSeconds,1,120,9);
-    if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,0);
+   
     all.users[key]=p; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(all),'voice_room_ads_user_policies']); return {ok:true,user:{id:user.id,publicId:(user as any).publicId,displayName:(user as any).displayName},policy:p};
   }
 
   async patchVipPolicy(body:any){
-    const base=await this.config(); const p:any={...(base.vipPolicy||{})}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','background','backgroundImage','backgroundOpacity']) if(body[k]!==undefined)p[k]=body[k]; if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,5); if(p.durationDays!==undefined)p.durationDays=this.bound(p.durationDays,0,3650,0); if(p.displayDurationSeconds!==undefined)p.displayDurationSeconds=this.bound(p.displayDurationSeconds,1,120,9); if(p.glowIntensity!==undefined)p.glowIntensity=this.bound(p.glowIntensity,0,100,55);
+    const base=await this.config(); const p:any={...(base.vipPolicy||{})}; for(const k of ['durationDays','displayDurationSeconds','dailyLimit','backgroundImage']) if(body[k]!==undefined)p[k]=body[k]; if(p.dailyLimit!==undefined)p.dailyLimit=this.bound(p.dailyLimit,0,1000,5); if(p.durationDays!==undefined)p.durationDays=this.bound(p.durationDays,0,3650,0); if(p.displayDurationSeconds!==undefined)p.displayDurationSeconds=this.bound(p.displayDurationSeconds,1,120,9);
     const merged={...base,vipPolicy:p,vipDailyLimit:p.dailyLimit}; await this.db.query('UPDATE "jeho_own"."app_settings" SET "value"=$1,"updatedAt"=NOW() WHERE "key"=$2',[JSON.stringify(merged),'voice_room_ads_config']); this.realtime.server.to('rooms:all').emit('room:advertisement:config',merged); return {ok:true,vipPolicy:p};
   }
 
@@ -515,21 +522,22 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     const c=await this.config();
     const merged:any={...c};
     const num=(k:string,min:number,max:number)=>{if(input[k]!==undefined)merged[k]=this.bound(input[k],min,max,min);};
-    [['dailyLimit',0,1000],['vipDailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,86400000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['glowIntensity',0,100],['backgroundOpacity',0,100],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerButtonWidthDp',0,600],['composerButtonHorizontalPaddingDp',0,80],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
+    [['dailyLimit',0,1000],['vipDailyLimit',0,1000],['maxQueueSize',1,5000],['maxTextLength',1,500],['maxWords',1,200],['publishDelayMs',0,60000],['displayDurationMs',1000,120000],['gapMs',0,86400000],['entrySpeedPxPerSec',20,800],['exitSpeedPxPerSec',20,800],['composerBackgroundOpacity',0,100],['radiusDp',0,40],['composerButtonRadiusDp',0,40],['composerButtonWidthDp',0,600],['composerButtonHorizontalPaddingDp',0,80],['composerIconSizeDp',20,80],['composerButtonBorderWidthDp',0,8],['composerButtonHeightDp',32,80],['composerButtonTextSizeSp',9,24],['heightDp',32,140],['avatarDp',20,80],['nameSp',8,32],['textSp',9,36],['spacingDp',0,40],['customOffsetDp',-150,150],['avatarOffsetXDp',-300,300],['avatarOffsetYDp',-100,100],['nameOffsetXDp',-300,300],['nameOffsetYDp',-100,100],['nameWidthDp',24,260],['textOffsetXDp',-300,300],['textOffsetYDp',-100,100],['textWidthDp',0,1000],['positionXPercent',0,100],['positionYPercent',0,100]].forEach(x=>num(x[0] as string,x[1] as number,x[2] as number));
     ['enabled','sendButtonEnabled','paused','reducedMotionStatic','nameGradientEnabled','textGradientEnabled'].forEach(k=>{if(input[k]!==undefined)merged[k]=input[k]===true;});
-    ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','glowType','glowColor','background','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily','composerBackgroundImage','composerBackgroundColor','composerIconUrl','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor','composerButtonText','composerButtonTextColor','composerButtonBackgroundStartColor','composerButtonBackgroundEndColor','composerButtonBorderColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
+    ['resetTimezone','template','position','direction','textMotion','nameMotion','avatarMotion','entryAnimation','exitAnimation','backgroundImage','avatarShape','nameColor','textColor','nameGradientStartColor','nameGradientEndColor','textGradientStartColor','textGradientEndColor','customFontUrl','customFontName','transitionType','fontFamily','composerBackgroundImage','composerBackgroundColor','composerIconUrl','composerTitleColor','composerSubtitleColor','composerInputTextColor','composerInputHintColor','composerInputBackgroundColor','composerInputBorderColor','composerCancelTextColor','composerCancelBackgroundColor','composerCancelBorderColor','composerSendTextColor','composerSendGradientStartColor','composerSendGradientEndColor','composerSendBorderColor','composerButtonText','composerButtonTextColor','composerButtonBackgroundStartColor','composerButtonBackgroundEndColor','composerButtonBorderColor'].forEach(k=>{if(input[k]!==undefined)merged[k]=String(input[k]??'');});
     if (!['slide','fade'].includes(merged.transitionType)) merged.transitionType='slide';
-    const animationModes=['slide-top','slide-bottom','slide-left','slide-right','fade','zoom','gold','fire'];
+    const animationModes=['slide-top','slide-bottom','slide-left','slide-right','fade','zoom'];
     if (!animationModes.includes(merged.entryAnimation)) merged.entryAnimation='slide-right';
     if (!animationModes.includes(merged.exitAnimation)) merged.exitAnimation='slide-left';
-    if (!['none','gold','fire'].includes(merged.glowType)) merged.glowType='none';
+    merged.glowType='none'; merged.glowColor=''; merged.glowIntensity=0;
+    merged.background=''; merged.backgroundOpacity=100; merged.radiusDp=0;
     if (!['default','sans','serif','mono','custom'].includes(merged.fontFamily)) merged.fontFamily='default';
     merged.customFontUrl=String(merged.customFontUrl||'').slice(0,2048);
     merged.customFontName=String(merged.customFontName||'').slice(0,128);
     if (merged.fontFamily==='custom' && !/^\/uploads\/[a-z0-9-]+\.(ttf|otf)$/i.test(merged.customFontUrl)) {
       merged.fontFamily='default'; merged.customFontUrl=''; merged.customFontName='';
     }
-    if (!['premium-v1','compact','gold'].includes(merged.template)) merged.template='premium-v1';
+    if (!['premium-v1','compact'].includes(merged.template)) merged.template='premium-v1';
     if (!['circle','square'].includes(merged.avatarShape)) merged.avatarShape='circle';
     if (!['safe-top','safe-bottom','custom-safe','free'].includes(merged.position)) merged.position='safe-bottom';
     if (!['rtl','ltr'].includes(merged.direction)) merged.direction='rtl';
