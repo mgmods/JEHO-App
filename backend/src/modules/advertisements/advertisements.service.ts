@@ -434,7 +434,9 @@ export class AdvertisementsService implements OnModuleInit, OnModuleDestroy {
     try{const vipRows=await this.db.query('SELECT 1 FROM "jeho_own"."user_vips" WHERE "userId"=$1 AND "isActive"=true AND "startsAt"<=NOW() AND "expiresAt">NOW() LIMIT 1',[userId]); vip=vipRows?.length>0;}catch{}
     const vipPolicy=(base.vipPolicy&&typeof base.vipPolicy==='object')?base.vipPolicy:{};
     const direct=overrides?.users?.[userId]||(publicId?overrides?.users?.[publicId]:null)||{};
-    const merged={...base,...(vip?vipPolicy:{}),...direct};
+    const vipOverlay:any={};
+    if(vip) for(const [k,v] of Object.entries(vipPolicy)) if(v!==undefined && v!==null && !(typeof v==='string' && v.trim()==='')) vipOverlay[k]=v;
+    const merged={...base,...vipOverlay,...direct};
     if(vip&&direct?.dailyLimit===undefined) merged.dailyLimit=this.bound(vipPolicy.dailyLimit??base.vipDailyLimit??base.dailyLimit,0,1000,base.dailyLimit);
     return merged;
   }
