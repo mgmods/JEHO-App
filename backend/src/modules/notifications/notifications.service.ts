@@ -92,6 +92,16 @@ function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, 
     (winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement));
 }
 
+/** Lucky-win notifications are room-only and must never be persisted or pushed. */
+function isLuckyWinNotification(data?: Record<string, unknown>, title?: string, body?: string): boolean {
+  const serialized = JSON.stringify(data || {}).toLowerCase();
+  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
+  const luckyMetadata = /(lucky[_-]?(multiplier|coinswon|return|payout|win|gift|box)|is[_-]?lucky[_-]?win)/i.test(serialized);
+  const luckyWords = /(حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(serialized + ' ' + copy);
+  const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy);
+  return luckyMetadata || (luckyWords && rewardWords);
+}
+
 export class CreateNotificationDto {
   @ApiProperty()
   @IsUUID()
