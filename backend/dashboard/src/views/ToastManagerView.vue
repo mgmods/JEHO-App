@@ -266,7 +266,7 @@ function startDrag(target, event) {
 function moveDrag(event) {
   if (!dragTarget.value) return
   const rect = (dragTarget.value === 'toast' ? roomPreviewRef.value : toastCanvasRef.value)?.getBoundingClientRect()
-  if (!rect.width || !rect.height) return
+  if (!rect || !rect.width || !rect.height) return
   const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
   const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
   const s = currentStyle.value
