@@ -85,6 +85,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                 row.put("targetId", entry.targetId);
                 row.put("targetName", entry.targetName);
                 row.put("score", entry.score);
+                row.put("meta", entry.meta);
                 java.util.Map<String, Object> user = new java.util.LinkedHashMap<>();
                 if (entry.user != null) {
                     user.put("id", entry.user.id);
