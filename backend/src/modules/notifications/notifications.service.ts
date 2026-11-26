@@ -334,7 +334,7 @@ export class NotificationsService {
       order: { createdAt: 'DESC' },
     });
     const filtered = rows.filter((notification) =>
-      !isRoomRewardWinPayload(notification.data as any, notification.title, notification.body));
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
     const items = filtered.slice(query.skip || 0, (query.skip || 0) + take);
     const total = filtered.length;
     // Chronological for chat bubbles (oldest → newest).
@@ -343,13 +343,14 @@ export class NotificationsService {
   }
 
   async officialPreview(userId: string) {
-    const latest = await this.notifRepo.findOne({
+    const rows = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES) },
       order: { createdAt: 'DESC' },
     });
-    const unread = await this.notifRepo.count({
-      where: { userId, type: In(OFFICIAL_NEWS_TYPES), isRead: false },
-    });
+    const visible = rows.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
+    const latest = visible[0] || null;
+    const unread = visible.filter((notification) => !notification.isRead).length;
     return {
       unread,
       lastTitle: latest?.title || null,
@@ -373,29 +374,39 @@ export class NotificationsService {
 
   async markAllRead(userId: string) {
     const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
-    const ids = unread.filter((notification) => !isDirectMessageNotification(notification)).map((notification) => notification.id);
+    const ids = unread.filter((notification) =>
+      !isDirectMessageNotification(notification) &&
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body))
+      .map((notification) => notification.id);
     if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true };
   }
 
   async markAllOfficialRead(userId: string) {
-    await this.notifRepo.update(
-      { userId, isRead: false, type: In(OFFICIAL_NEWS_TYPES) },
-      { isRead: true },
-    );
+    const unread = await this.notifRepo.find({
+      where: { userId, isRead: false, type: In(OFFICIAL_NEWS_TYPES) },
+    });
+    const ids = unread.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body))
+      .map((notification) => notification.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true };
   }
 
   async unreadCount(userId: string) {
     const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
-    const count = unread.filter((notification) => !isDirectMessageNotification(notification)).length;
+    const count = unread.filter((notification) =>
+      !isDirectMessageNotification(notification) &&
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body)).length;
     return { count };
   }
 
   async officialUnreadCount(userId: string) {
-    const count = await this.notifRepo.count({
+    const unread = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES), isRead: false },
     });
+    const count = unread.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body)).length;
     return { count };
   }
 
