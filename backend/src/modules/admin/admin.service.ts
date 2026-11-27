@@ -3688,7 +3688,9 @@ export class AdminService {
       items.map((r: any) => ({
         ...r,
         userName: r.user?.displayName || r.user?.username || '—',
+        userPublicId: r.user?.publicId || null,
         coins: r.coins ?? r.coinAmount ?? 0,
+        shamCashReceipt: r.provider === 'sham_cash' ? (r.providerPayload || null) : null,
         providerLabel:
           r.provider === 'sham_cash'
             ? 'شام كاش'
@@ -3716,35 +3718,77 @@ export class AdminService {
     );
   }
 
-  async completeRechargeOrder(orderId: string, providerPaymentId?: string, note?: string) {
+  async completeRechargeOrder(orderId: string, providerPaymentId?: string, note?: string, adminId?: string) {
     const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('طلب الشحن غير موجود');
     if (order.status !== RechargeStatus.PENDING) {
       throw new BadRequestException('الطلب ليس معلّقاً');
     }
+    const payload = (order.providerPayload || {}) as Record<string, any>;
+    if (order.provider === 'sham_cash' && !payload.receiptSubmittedAt) {
+      throw new BadRequestException('لا يمكن اعتماد طلب شام كاش قبل استلام الإيصال');
+    }
+
     const completed = await this.walletService.completeRecharge(
       orderId,
       providerPaymentId || `admin_confirm_${Date.now()}`,
     );
-    if (note) {
-      completed.providerPayload = {
-        ...(completed.providerPayload || {}),
-        adminNote: note,
-        confirmedAt: new Date().toISOString(),
-      };
-      await this.rechargeRepo.save(completed);
+    completed.providerPayload = {
+      ...((completed.providerPayload || {}) as Record<string, any>),
+      ...(note ? { adminNote: note } : {}),
+      confirmedAt: new Date().toISOString(),
+      ...(adminId ? { confirmedBy: adminId } : {}),
+      ...(completed.provider === 'sham_cash' ? { receiptStatus: 'approved' } : {}),
+    };
+    await this.rechargeRepo.save(completed);
+
+    if (completed.provider === 'sham_cash') {
+      await this.notificationsService.notifyUser(
+        completed.userId,
+        NotificationType.WALLET,
+        'تم تأكيد الدفع بنجاح',
+        `تمت مراجعة إيصال شام كاش وتفعيل باقتك بنجاح. تمت إضافة ${Number(completed.coins || 0) + Number(completed.bonusCoins || 0)} كوينز إلى حسابك.`,
+        {
+          kind: 'sham_cash_payment_approved',
+          orderId: completed.id,
+          targetUserId: completed.userId,
+          userId: completed.userId,
+          publicUserId: (await this.usersRepo.findOne({ where: { id: completed.userId }, select: ['publicId'] }))?.publicId || null,
+          coins: Number(completed.coins || 0) + Number(completed.bonusCoins || 0),
+          sku: completed.sku,
+        },
+      );
     }
     return completed;
   }
 
-  async cancelRechargeOrder(orderId: string) {
+  async cancelRechargeOrder(orderId: string, note?: string) {
     const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('طلب الشحن غير موجود');
     if (order.status !== RechargeStatus.PENDING) {
       throw new BadRequestException('الطلب ليس معلّقاً');
     }
     order.status = RechargeStatus.CANCELLED;
-    return this.rechargeRepo.save(order);
+    const payload = (order.providerPayload || {}) as Record<string, any>;
+    if (order.provider === 'sham_cash') {
+      order.providerPayload = {
+        ...payload,
+        receiptStatus: 'rejected',
+        rejectionReason: String(note || 'تعذر التحقق من التحويل').trim().slice(0, 300),
+        rejectedAt: new Date().toISOString(),
+      };
+    }
+    const saved = await this.rechargeRepo.save(order);
+    if (order.provider === 'sham_cash' && payload.receiptSubmittedAt) {
+      await this.notificationsService.notifyUser(
+        order.userId,
+        NotificationType.WALLET,
+        'تعذر قبول إيصال التحويل',
+        String(note || 'تعذر التحقق من إيصال شام كاش. يرجى مراجعة الإدارة وإعادة إرسال طلب جديد.').trim().slice(0, 300),
+        { kind: 'sham_cash_payment_rejected', orderId: order.id, targetUserId: order.userId, userId: order.userId },
+      );
+    }
+    return saved;
   }
 
   listRechargePackages() {
