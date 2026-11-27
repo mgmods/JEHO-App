@@ -871,6 +871,11 @@ async function persistSplashImage(url) {
     updatedAt: new Date().toISOString(),
     splash: { ...oldSplash, enabled: true, items },
     brand: { ...(splashThemeConfig.brand || {}), splashUrl: url || '' },
+    backgrounds: {
+      ...(splashThemeConfig.backgrounds || {}),
+      splash: url || '',
+      auth: url || '',
+    },
   }
   const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(splashThemeConfig) })
   if (err) throw new Error(err.message || 'تعذّر حفظ إعداد السبلاش.')
