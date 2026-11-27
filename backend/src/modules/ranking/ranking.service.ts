@@ -76,15 +76,16 @@ export class RankingService {
     const imageUrl = String(value || '').trim().slice(0, 2048);
     if (!imageUrl) return '';
 
-    // Store uploads and bundled assets are intentionally represented as app-relative
-    // paths. They are resolved against the active JEHO origin by dashboard resolveAsset().
-    // Reject protocol-relative URLs, traversal, control characters, and non-HTTPS hosts.
-    if (/^[\\/]{2}/.test(imageUrl) || /[\\\\\\u0000-\\u001f]/.test(imageUrl) || imageUrl.split('/').some((part) => part === '..')) {
+    // JEHO uploads/assets are app-relative and resolve against the active HTTPS origin.
+    // Do not accept protocol-relative URLs, traversal, backslashes, or control characters.
+    if (imageUrl.startsWith('//') || imageUrl.includes('\\')
+        || /[\u0000-\u001f]/.test(imageUrl)
+        || imageUrl.split('/').some((part) => part === '..')) {
       throw new BadRequestException('Reward image must be an HTTPS URL or a JEHO upload path');
     }
-    if (/^(?:\\/?uploads|\\/?assets)\\//i.test(imageUrl)
-        || /^\\/?api\\/v\\d+\\/uploads\\//i.test(imageUrl)) {
-      return imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+    if (/^(?:\/?uploads|\/?assets)\//i.test(imageUrl)
+        || /^\/?api\/v\d+\/uploads\//i.test(imageUrl)) {
+      return imageUrl.startsWith('/') ? imageUrl : \`/\${imageUrl}\`;
     }
 
     let parsed: URL;
