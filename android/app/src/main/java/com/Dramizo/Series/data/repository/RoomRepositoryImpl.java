@@ -1,6 +1,10 @@
 package com.Dramizo.Series.data.repository;
 
 import com.Dramizo.Series.data.remote.api.RoomApi;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.domain.model.Result;
@@ -11,14 +15,22 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
 
 public class RoomRepositoryImpl implements RoomRepository {
+    private static final long ROOM_LIST_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(3);
     private final RoomApi api;
     private final ExecutorService io;
+    private final EncryptedFeatureCache cache;
+    private final Type roomListType = new TypeToken<MiscDtos.ListResult<RoomDtos.RoomDto>>() {}.getType();
+    private final ConcurrentHashMap<String, AtomicBoolean> refreshes = new ConcurrentHashMap<>();
 
-    public RoomRepositoryImpl(RoomApi api, ExecutorService io) {
+    public RoomRepositoryImpl(RoomApi api, ExecutorService io, EncryptedFeatureCache cache) {
         this.api = api;
         this.io = io;
+        this.cache = cache;
     }
 
     @Override
@@ -44,7 +56,43 @@ public class RoomRepositoryImpl implements RoomRepository {
     @Override
     public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit) {
         int safe = Math.max(1, Math.min(100, limit));
-        return ApiCall.execute(api.list(page, safe));
+        String namespace = "rooms_list_p" + Math.max(1, page) + "_l" + safe;
+        MiscDtos.ListResult<RoomDtos.RoomDto> cached =
+                cache.getJson(EncryptedFeatureCache.UID_APP, namespace, roomListType, 0L);
+        if (cached != null) {
+            // Paint the last known room catalogue immediately. Refresh it in the background
+            // only after its short freshness window, never on every Home/room-list revisit.
+            if (!cache.isFresh(EncryptedFeatureCache.UID_APP, namespace, ROOM_LIST_CACHE_TTL_MS)) {
+                refreshRoomListInBackground(page, safe, namespace);
+            }
+            return Result.ok(cached);
+        }
+
+        Result<MiscDtos.ListResult<RoomDtos.RoomDto>> network = ApiCall.execute(api.list(page, safe));
+        if (network.success && network.data != null) {
+            cache.putJson(EncryptedFeatureCache.UID_APP, namespace, network.data);
+        }
+        return network;
+    }
+
+    private void refreshRoomListInBackground(int page, int limit, String namespace) {
+        AtomicBoolean gate = refreshes.computeIfAbsent(namespace, key -> new AtomicBoolean(false));
+        if (!gate.compareAndSet(false, true)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result =
+                            ApiCall.execute(api.list(page, limit));
+                    if (result.success && result.data != null) {
+                        cache.putJson(EncryptedFeatureCache.UID_APP, namespace, result.data);
+                    }
+                } finally {
+                    gate.set(false);
+                }
+            });
+        } catch (RuntimeException rejected) {
+            gate.set(false);
+        }
     }
 
     @Override
