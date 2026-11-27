@@ -140,12 +140,19 @@ public class GiftRepositoryImpl implements GiftRepository {
 
     private Result<GiftDtos.GiftList> fetchNetwork() {
         Result<GiftDtos.GiftList> r = ApiCall.execute(api.list());
-        if (r.success && r.data != null && !r.data.isEmpty()) {
+        if (r.success && r.data != null) {
             GiftDtos.GiftList list = copyList(r.data);
-            // Always replace memory — never merge old Room clones with new rows.
+            // A successful empty catalogue is authoritative too: remove deleted gifts
+            // from memory and disk instead of resurrecting stale rows on the next launch.
             MEMORY.set(list);
             memoryAt = System.currentTimeMillis();
-            persistAsync(list);
+            if (list.isEmpty()) {
+                io.execute(() -> {
+                    try { dao.clear(); } catch (Exception ignored) { }
+                });
+            } else {
+                persistAsync(list);
+            }
             return Result.ok(copyList(list));
         }
         return r;
