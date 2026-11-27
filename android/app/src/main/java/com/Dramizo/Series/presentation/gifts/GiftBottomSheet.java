@@ -1255,7 +1255,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     reconciled.add(id.trim());
                 }
             }
-            if (reconciled.isEmpty() && !latest.isEmpty()) {
+            if (reconciled.isEmpty() && latest != null && !latest.isEmpty()) {
                 String fallback = src.getDefaultGiftReceiverId();
                 if (fallback != null && liveIds.contains(fallback)) reconciled.add(fallback);
                 if (reconciled.isEmpty()) reconciled.add(liveIds.iterator().next());
