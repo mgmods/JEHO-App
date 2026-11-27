@@ -5001,8 +5001,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         luckyCannonPulseEnabled = nextPulseEnabled;
                         luckyCannonRemoteIconUrl = nextIconUrl;
                         if (luckyCannonLayer != null) {
-                            luckyCannonLayer.setVisibility(nextEnabled ? View.VISIBLE : View.GONE);
-                            if (!nextEnabled) stopLuckyCannonHold(false);
+                            // Dashboard enablement only permits the cannon; it must not
+                            // expose the floating launcher on room entry. The launcher is
+                            // shown exclusively by armLuckyGiftCannon after a confirmed send.
+                            if (!nextEnabled) {
+                                stopLuckyCannonHold(false);
+                                luckyCannonLayer.setVisibility(View.GONE);
+                            } else if (luckyCannonLayer.getVisibility() != View.VISIBLE
+                                    || luckyCannonGiftId == null || luckyCannonTargets.isEmpty()) {
+                                luckyCannonLayer.setVisibility(View.GONE);
+                            }
                         }
                         if (luckyCannonIconView == null) return;
                         if (nextIconUrl.isEmpty()) {
