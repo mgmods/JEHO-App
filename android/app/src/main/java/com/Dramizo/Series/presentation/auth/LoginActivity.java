@@ -37,6 +37,12 @@ public class LoginActivity extends ThemedActivity {
     private boolean registerMode = false;
 
     @Override
+    protected boolean wantsRemoteThemeChrome() {
+        // Login wallpaper is dashboard-controlled and must update without an APK rebuild.
+        return true;
+    }
+
+    @Override
     protected boolean wantsContentSystemPadding() {
         // Full-bleed Mikoo login art — do not pad the hero ConstraintLayout.
         return false;
