@@ -37,7 +37,7 @@ public class RoomRepositoryImpl implements RoomRepository {
     private boolean beginRefresh(String key) {
         long now = System.currentTimeMillis();
         Long last = refreshStartedAt.get(key);
-        if (last != null && now - last < 30_000L) return false;
+        if (last != null && now - last < 180_000L) return false;
         AtomicBoolean gate = refreshes.computeIfAbsent(key, ignored -> new AtomicBoolean(false));
         if (!gate.compareAndSet(false, true)) return false;
         refreshStartedAt.put(key, now);

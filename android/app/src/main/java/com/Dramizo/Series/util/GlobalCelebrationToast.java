@@ -688,14 +688,16 @@ public final class GlobalCelebrationToast {
     /** Top and winner-only center toasts run in independent lanes and may be visible together. */
     private static void showNext(boolean centerLane) {
         if (centerLane ? showingCenter : showing) return;
-        ToastRequest request = (centerLane ? PENDING_CENTER : PENDING).pollFirst();
+        ArrayDeque<ToastRequest> lane = centerLane ? PENDING_CENTER : PENDING;
+        ToastRequest request = lane.pollFirst();
         if (request == null) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             activity = request.activity.get();
         }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
-            showNext(centerLane);
+            lane.addFirst(request);
+            MAIN.postDelayed(() -> showNext(centerLane), 160L);
             return;
         }
         if (centerLane) showingCenter = true; else showing = true;
@@ -704,11 +706,14 @@ public final class GlobalCelebrationToast {
                     request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
                     request.displayName, request.kind, request.roomId, request.centerPlacement);
         } catch (Throwable error) {
-            // A single malformed asset/activity must not leave the global toast queue
-            // permanently marked as showing and hide every later celebration.
             android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
-            if (centerLane) showingCenter = false; else showing = false;
-            MAIN.post(() -> showNext(centerLane));
+        } finally {
+            // A lane is occupied only while its view is being attached. Never wait for
+            // the 3–6 second animation timer: all events stay visible in their own slots.
+            MAIN.postDelayed(() -> {
+                if (centerLane) showingCenter = false; else showing = false;
+                showNext(centerLane);
+            }, 140L);
         }
     }
 
@@ -726,17 +731,9 @@ public final class GlobalCelebrationToast {
             @Nullable String roomId,
             boolean centerPlacement
     ) {
-        if (activity.isFinishing() || activity.isDestroyed()) {
-            if (centerPlacement) showingCenter = false; else showing = false;
-            showNext(centerPlacement);
-            return;
-        }
+        if (activity.isFinishing() || activity.isDestroyed()) return;
         ViewGroup root = activity.findViewById(android.R.id.content);
-        if (!(root instanceof FrameLayout)) {
-            if (centerPlacement) showingCenter = false; else showing = false;
-            showNext(centerPlacement);
-            return;
-        }
+        if (!(root instanceof FrameLayout)) return;
 
         // Do not replace an already visible toast. Every event receives its own view.
         View banner = LayoutInflater.from(activity)

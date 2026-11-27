@@ -28,6 +28,7 @@ public class GiftRepositoryImpl implements GiftRepository {
     private static final AtomicBoolean REFRESH_IN_FLIGHT = new AtomicBoolean(false);
     private static final AtomicBoolean CATEGORIES_REFRESH_IN_FLIGHT = new AtomicBoolean(false);
     private static volatile long memoryAt;
+    private static volatile long categoriesMemoryAt;
     private static final long MEMORY_SOFT_TTL_MS = 10 * 60_000L;
 
     private final GiftApi api;
@@ -51,11 +52,15 @@ public class GiftRepositoryImpl implements GiftRepository {
         // Stale-while-revalidate: never put a catalog network round-trip in front of
         // a usable in-memory or Room catalog, even after the soft TTL expires.
         GiftDtos.GiftList mem = MEMORY.get();
-        if (mem != null && !mem.isEmpty()) {
-            if (System.currentTimeMillis() - memoryAt >= MEMORY_SOFT_TTL_MS) {
+        if (mem != null) {
+            long age = System.currentTimeMillis() - memoryAt;
+            if (age < MEMORY_SOFT_TTL_MS) return Result.ok(copyList(mem));
+            if (!mem.isEmpty()) {
                 refreshInBackground();
+                return Result.ok(copyList(mem));
             }
-            return Result.ok(copyList(mem));
+            // A stale empty cache goes directly to one network request; do not
+            // schedule a background request and then duplicate it synchronously.
         }
 
         // Cold process start: Room is the first fallback, not the last one.
@@ -93,7 +98,7 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public GiftDtos.GiftList peekLocalOrNull() {
         GiftDtos.GiftList mem = MEMORY.get();
-        if (mem != null && !mem.isEmpty()) {
+        if (mem != null) {
             return copyList(mem);
         }
         try {
@@ -102,6 +107,7 @@ public class GiftRepositoryImpl implements GiftRepository {
             GiftDtos.GiftList list = fromEntities(local);
             if (!list.isEmpty()) {
                 MEMORY.set(copyList(list));
+                memoryAt = System.currentTimeMillis();
                 return list;
             }
         } catch (Exception ignored) {
@@ -111,8 +117,17 @@ public class GiftRepositoryImpl implements GiftRepository {
 
     @Override
     public Result<GiftDtos.GiftList> refreshGifts() {
+        GiftDtos.GiftList warm = MEMORY.get();
+        if (warm != null && System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
+            return Result.ok(copyList(warm));
+        }
+        GiftDtos.GiftList localWarm = peekLocalOrNull();
+        if (localWarm != null && !localWarm.isEmpty()
+                && System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
+            return Result.ok(localWarm);
+        }
         Result<GiftDtos.GiftList> net = fetchNetwork();
-        if (net.success && net.data != null && !net.data.isEmpty()) {
+        if (net.success && net.data != null) {
             return net;
         }
         GiftDtos.GiftList local = peekLocalOrNull();
@@ -127,13 +142,14 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public List<GiftDtos.GiftCategoryDto> peekCategoriesOrNull() {
         List<GiftDtos.GiftCategoryDto> mem = MEMORY_CATS.get();
-        if (mem != null && !mem.isEmpty()) return new ArrayList<>(mem);
+        if (mem != null) return new ArrayList<>(mem);
         if (featureCache != null) {
             Type type = new TypeToken<List<GiftDtos.GiftCategoryDto>>() {}.getType();
             List<GiftDtos.GiftCategoryDto> disk = featureCache.getJson(
                     EncryptedFeatureCache.UID_APP, "gift_categories", type, 0L);
-            if (disk != null && !disk.isEmpty()) {
+            if (disk != null) {
                 MEMORY_CATS.set(new ArrayList<>(disk));
+                categoriesMemoryAt = System.currentTimeMillis();
                 return new ArrayList<>(disk);
             }
         }
@@ -143,14 +159,17 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public Result<List<GiftDtos.GiftCategoryDto>> refreshCategories() {
         List<GiftDtos.GiftCategoryDto> cached = peekCategoriesOrNull();
-        if (cached != null && !cached.isEmpty()) {
-            refreshCategoriesInBackground();
+        if (cached != null) {
+            if (System.currentTimeMillis() - categoriesMemoryAt >= MEMORY_SOFT_TTL_MS) {
+                refreshCategoriesInBackground();
+            }
             return Result.ok(cached);
         }
         Result<GiftDtos.GiftCategoryList> r = ApiCall.execute(api.categories());
         if (r.success && r.data != null) {
             // Dashboard is authoritative — even an empty list wins over any cached fallback.
             MEMORY_CATS.set(new ArrayList<>(r.data));
+            categoriesMemoryAt = System.currentTimeMillis();
             if (featureCache != null) featureCache.putJson(
                     EncryptedFeatureCache.UID_APP, "gift_categories", r.data);
             return Result.ok(new ArrayList<>(r.data));
@@ -169,6 +188,7 @@ public class GiftRepositoryImpl implements GiftRepository {
                     if (result.success && result.data != null) {
                         List<GiftDtos.GiftCategoryDto> fresh = new ArrayList<>(result.data);
                         MEMORY_CATS.set(fresh);
+                        categoriesMemoryAt = System.currentTimeMillis();
                         if (featureCache != null) featureCache.putJson(
                                 EncryptedFeatureCache.UID_APP, "gift_categories", fresh);
                     }
@@ -179,12 +199,18 @@ public class GiftRepositoryImpl implements GiftRepository {
 
     private Result<GiftDtos.GiftList> fetchNetwork() {
         Result<GiftDtos.GiftList> r = ApiCall.execute(api.list());
-        if (r.success && r.data != null && !r.data.isEmpty()) {
+        if (r.success && r.data != null) {
             GiftDtos.GiftList list = copyList(r.data);
-            // Always replace memory — never merge old Room clones with new rows.
+            // A successful empty catalogue is authoritative; never resurrect deleted rows.
             MEMORY.set(list);
             memoryAt = System.currentTimeMillis();
-            persistAsync(list);
+            if (list.isEmpty()) {
+                io.execute(() -> {
+                    try { dao.clear(); } catch (Exception ignored) { }
+                });
+            } else {
+                persistAsync(list);
+            }
             return Result.ok(copyList(list));
         }
         return r;
@@ -206,10 +232,8 @@ public class GiftRepositoryImpl implements GiftRepository {
             e.category = g.category;
             e.sortOrder = g.sortOrder;
             e.cachedAt = System.currentTimeMillis();
-            String stem = localArtStem(g.iconUrl);
-            if (stem.isEmpty()) stem = localArtStem(g.animationUrl);
-            String key = !stem.isEmpty() ? "s:" + stem
-                    : (g.name != null ? "n:" + g.name.trim().toLowerCase() : "id:" + g.id);
+            // The server gift ID is the unique identity. Multiple gifts may share art.
+            String key = "id:" + g.id;
             if (uniq.containsKey(key)) continue;
             uniq.put(key, e);
         }
