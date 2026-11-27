@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, OnModuleInit, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
