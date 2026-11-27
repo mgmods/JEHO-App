@@ -19,6 +19,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity;
