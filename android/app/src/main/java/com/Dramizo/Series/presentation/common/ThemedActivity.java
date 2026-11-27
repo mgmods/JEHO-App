@@ -351,7 +351,8 @@ public abstract class ThemedActivity extends AppCompatActivity {
         String name = getClass().getSimpleName();
 
         if (name.contains("Splash")) return "splash";
-        if (containsAny(name, "Login", "Guest", "Register", "Otp", "ProfileSetup")) return "auth";
+        if (name.contains("ProfileSetup")) return "register";
+        if (containsAny(name, "Login", "Guest", "Register", "Otp")) return "auth";
         if (containsAny(name, "Profile", "EditProfile", "UserLevel", "Visitors", "Task", "GiftHistory")) {
             return "profile";
         }
