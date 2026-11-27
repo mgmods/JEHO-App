@@ -119,8 +119,8 @@ internal class AdminDashboardRenderer(private val a:Activity) {
             override fun afterTextChanged(s:android.text.Editable?){}
         })
         body.addView(TextView(a).apply{text="JEHO  •  الوصول محمي بالصلاحيات من الخادم";textSize=9f;gravity=Gravity.CENTER;setTextColor(0xFF999EAE.toInt());setPadding(0,dp(13),0,dp(2))})
-        api.overview().enqueue(object:Callback<ApiResponse<Object>>{
-            override fun onResponse(call:Call<ApiResponse<Object>>,response:Response<ApiResponse<Object>>){
+        api.overview().enqueue(object:Callback<ApiResponse<Any>>{
+            override fun onResponse(call:Call<ApiResponse<Any>>,response:Response<ApiResponse<Object>>){
                 if(a.isFinishing||a.isDestroyed)return
                 val data=response.body()?.getData() as? Map<*,*>?:return
                 values.forEach{(key,v)->val raw=data[key];v.text=when(raw){is Number->if(key=="todayRevenue")String.format(java.util.Locale.US,"%.0f",raw.toDouble())else raw.toLong().toString();null->"0";else->raw.toString()}}
