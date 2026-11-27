@@ -20,6 +20,8 @@ import { PaymentWebhookEvent } from '../../database/entities/payment-webhook-eve
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User } from '../../database/entities/user.entity';
 import { WalletService } from '../wallet/wallet.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 import { PaymentSettingsService } from './payment-settings.service';
 import { FourthwallClient } from './fourthwall.client';
 import { STANDARD_RECHARGE_PACKAGES } from '../../common/pricing-catalog';
@@ -191,6 +193,7 @@ export class PaymentsService {
     private readonly usersRepo: Repository<User>,
     private readonly walletService: WalletService,
     private readonly paymentSettingsService: PaymentSettingsService,
+    private readonly notifications: NotificationsService,
   ) {
     const key = this.configService.get<string>('app.stripe.secretKey');
     if (key && key.startsWith('sk_')) {
@@ -725,6 +728,7 @@ export class PaymentsService {
     accountName: string;
     accountId: string;
     instructions: string;
+    qrImageUrl: string;
   }> {
     const row = await this.settingsRepo.findOne({ where: { key: 'sham_cash_config' } });
     let cur: Record<string, any> = {};
@@ -743,6 +747,7 @@ export class PaymentsService {
         .trim()
         .toLowerCase(),
       instructions: String(cur.instructions || '').trim(),
+      qrImageUrl: String(cur.qrImageUrl || '').trim(),
     };
   }
 
@@ -774,7 +779,8 @@ export class PaymentsService {
       accountName: cfg.accountName,
       accountId: cfg.accountId,
       instructions: cfg.instructions,
-      configured: hasAccount && digits.length >= 8,
+      qrImageUrl: cfg.qrImageUrl,
+      configured: hasAccount,
     };
   }
 
@@ -785,6 +791,7 @@ export class PaymentsService {
     accountName?: string;
     accountId?: string;
     instructions?: string;
+    qrImageUrl?: string;
   }) {
     const cur = await this.loadShamCashConfig();
     if (body.enabled !== undefined) cur.enabled = !!body.enabled;
@@ -807,6 +814,13 @@ export class PaymentsService {
     }
     if (body.instructions !== undefined) {
       cur.instructions = String(body.instructions || '').trim();
+    }
+    if (body.qrImageUrl !== undefined) {
+      const url = String(body.qrImageUrl || '').trim();
+      if (url && !(/^https:\/\//i.test(url) || /^\/?uploads\/[A-Za-z0-9._-]+$/i.test(url))) {
+        throw new BadRequestException('رابط صورة QR غير صالح');
+      }
+      cur.qrImageUrl = url;
     }
     const encoded = JSON.stringify({ ...cur, updatedAt: new Date().toISOString() });
     const row = await this.settingsRepo.findOne({ where: { key: 'sham_cash_config' } });
@@ -838,8 +852,9 @@ export class PaymentsService {
       accountId: hasAccount ? cfg.accountId : '',
       instructions: hasAccount
         ? cfg.instructions ||
-          'حوّل عبر شام كاش بالمسح أو الرقم، ثم أرسل صورة الإثبات على واتساب.'
+          'حوّل عبر شام كاش بالمسح أو الرقم، ثم أرسل إيصال التحويل للمراجعة.'
         : '',
+      qrImageUrl: cfg.qrImageUrl,
     };
   }
 
@@ -901,11 +916,105 @@ export class PaymentsService {
         displayName: cfg.displayName,
         whatsapp: digits.length >= 8 ? cfg.whatsapp : '',
         qrPayload: cfg.accountId,
+        qrImageUrl: cfg.qrImageUrl,
         instructions:
           cfg.instructions ||
-          'حوّل عبر شام كاش ثم أرسل صورة الإثبات على واتساب مع رقم الطلب.',
+          'حوّل إلى حساب شام كاش ثم ارفع إيصال التحويل للمراجعة.',
       },
     };
+  }
+
+  async submitShamCashReceipt(userId: string, orderId: string, body: Record<string, unknown>) {
+    const order = await this.walletService.getOrderForUser(orderId, userId);
+    if (order.provider !== PaymentProvider.SHAM_CASH) throw new NotFoundException('Order not found');
+    if (order.status !== RechargeStatus.PENDING) throw new BadRequestException('الطلب لم يعد قيد الانتظار');
+
+    const current = (order.providerPayload || {}) as Record<string, any>;
+    if (current.receiptSubmittedAt) throw new BadRequestException('تم إرسال إيصال هذا الطلب مسبقاً');
+
+    const senderName = String(body.senderName || '').trim().slice(0, 128);
+    const amountSent = Number(body.amountSent);
+    const transferDate = String(body.transferDate || '').trim();
+    const receiptUrl = String(body.receiptUrl || '').trim();
+    const receiptMimeType = String(body.receiptMimeType || '').trim().toLowerCase();
+    const receiptFilename = String(body.receiptFilename || '').trim().slice(0, 255);
+    const transferReference = String(body.transferReference || '').trim().slice(0, 128);
+    const note = String(body.note || '').trim().slice(0, 500);
+
+    if (!senderName) throw new BadRequestException('اسم المرسل مطلوب كما يظهر في الحوالة');
+    if (!Number.isFinite(amountSent) || amountSent <= 0 || amountSent > 100000000) {
+      throw new BadRequestException('أدخل مبلغ التحويل بشكل صحيح');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(transferDate) || Number.isNaN(Date.parse(transferDate))) {
+      throw new BadRequestException('تاريخ التحويل مطلوب');
+    }
+    if (!/^\/?uploads\/[A-Za-z0-9._-]+$/i.test(receiptUrl)) {
+      throw new BadRequestException('ارفع صورة الإيصال أو ملف PDF صالحاً');
+    }
+    if (!['image/jpeg', 'image/png', 'application/pdf'].includes(receiptMimeType)) {
+      throw new BadRequestException('صيغة الإيصال يجب أن تكون JPG أو PNG أو PDF');
+    }
+
+    if (transferReference) {
+      const existing = await this.ordersRepo.find({
+        where: { provider: PaymentProvider.SHAM_CASH },
+      });
+      const duplicate = existing.find((item) => {
+        const payload = (item.providerPayload || {}) as Record<string, any>;
+        return item.id !== order.id &&
+          String(payload.transferReference || '').trim().toLowerCase() === transferReference.toLowerCase();
+      });
+      if (duplicate) throw new BadRequestException('رقم عملية التحويل مستخدم في طلب آخر');
+    }
+
+    order.providerPayload = {
+      ...current,
+      senderName,
+      amountSent,
+      transferDate,
+      transferReference,
+      note,
+      receiptUrl,
+      receiptMimeType,
+      receiptFilename,
+      receiptSubmittedAt: new Date().toISOString(),
+      receiptStatus: 'pending_review',
+    };
+    await this.ordersRepo.save(order);
+
+    const admins = await this.usersRepo.find({
+      where: [{ staffRole: 'super' }, { isAdmin: true }],
+      select: ['id'],
+    });
+    const adminIds = Array.from(new Set(admins.map((admin) => admin.id).filter(Boolean)));
+    await Promise.all(adminIds.map((adminId) => this.notifications.notifyUser(
+      adminId,
+      NotificationType.WALLET,
+      'طلب تحويل شام كاش جديد',
+      `وصل إيصال تحويل جديد من المستخدم ${userId} للمراجعة.`,
+      { kind: 'sham_cash_receipt', orderId: order.id, userId, receiptUrl },
+    )));
+
+    return {
+      submitted: true,
+      orderId: order.id,
+      status: order.status,
+      message: 'تم إرسال إيصالك للمراجعة',
+    };
+  }
+
+  async cancelShamCashOrder(userId: string, orderId: string) {
+    const order = await this.walletService.getOrderForUser(orderId, userId);
+    if (order.provider !== PaymentProvider.SHAM_CASH) throw new NotFoundException('Order not found');
+    if (order.status !== RechargeStatus.PENDING) throw new BadRequestException('الطلب لم يعد قابلاً للإلغاء');
+    order.status = RechargeStatus.CANCELLED;
+    order.providerPayload = {
+      ...(order.providerPayload || {}),
+      receiptStatus: 'cancelled_by_user',
+      cancelledAt: new Date().toISOString(),
+    };
+    await this.ordersRepo.save(order);
+    return { cancelled: true, orderId: order.id };
   }
 
   async getShamCashOrder(userId: string, orderId: string) {
