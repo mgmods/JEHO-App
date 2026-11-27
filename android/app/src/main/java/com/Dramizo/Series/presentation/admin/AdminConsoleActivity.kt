@@ -106,7 +106,6 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
         Module("staffIdentity", "هوية الرتب الإدارية", "تخصيص الشارة والإطار وبطاقة الاسم والدخولية لكل رتبة", "💎"),
-        Module("operators", "إدارة صلاحيات الإدارة", "إدارة حسابات الإدارة المحدودة — للسوبر أدمن فقط", "🛡️")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
