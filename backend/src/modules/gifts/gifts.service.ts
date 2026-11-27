@@ -3581,6 +3581,41 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
       if (prior) return prior;
     }
+    const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    const roomHostId = String(room.activeHostId || room.cohostId || room.hostId || '').trim();
+    if (!roomHostId) throw new BadRequestException('Room has no host');
+
+    // The Android seat roster can briefly contain a user who has just left.
+    // Ignore only those stale IDs and keep every authoritative live target;
+    // one stale recipient must not reject the entire multi-seat gift.
+    const liveReceiverIds: string[] = [];
+    for (const rid of receiverIds) {
+      try {
+        await this.assertGiftTarget({
+          giftId: dto.giftId,
+          receiverId: rid,
+          roomId: dto.roomId,
+          quantity: dto.quantity,
+        }, rid === String(senderId));
+        liveReceiverIds.push(rid);
+      } catch (error) {
+        if (error instanceof BadRequestException
+            && String(error.message || '') === 'Receiver is not in this room') {
+          continue;
+        }
+        throw error;
+      }
+    }
+    receiverIds.splice(0, receiverIds.length, ...liveReceiverIds);
+    if (receiverIds.length === 0) {
+      // No selected seat survived validation: deliver only to the actual live host.
+      receiverIds.push(roomHostId);
+    }
+    if (dto.requestId) {
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
+      if (prior) return prior;
+    }
     if (receiverIds.length === 1) {
       return this.send(senderId, {
         giftId: dto.giftId,
@@ -3591,20 +3626,6 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
         cannonLaunch: dto.cannonLaunch,
         requestId: dto.requestId,
       });
-    }
-
-    const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    const roomHostId = String(room.activeHostId || room.hostId || '');
-    if (!roomHostId) throw new BadRequestException('Room has no host');
-
-    for (const rid of receiverIds) {
-      await this.assertGiftTarget({
-        giftId: dto.giftId,
-        receiverId: rid,
-        roomId: dto.roomId,
-        quantity: dto.quantity,
-      }, rid === String(senderId));
     }
 
     const gift = await this.giftsRepo.findOne({
