@@ -87,6 +87,12 @@ public final class RoomAudioSession {
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
+            // Room/seat callbacks can call acquire repeatedly. If this session already
+            // owns focus and communication routing, keep it untouched to avoid mic
+            // indicator flicker and audio interruptions during room entry.
+            if (focusHeld && am.getMode() == AudioManager.MODE_IN_COMMUNICATION) return;
+
+            int focusResult;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
@@ -97,16 +103,17 @@ public final class RoomAudioSession {
                         .setAcceptsDelayedFocusGain(true)
                         .setWillPauseWhenDucked(false)
                         .build();
-                am.requestAudioFocus(focusRequest);
+                focusResult = am.requestAudioFocus(focusRequest);
             } else {
-                am.requestAudioFocus(
+                focusResult = am.requestAudioFocus(
                         null,
                         AudioManager.STREAM_VOICE_CALL,
                         AudioManager.AUDIOFOCUS_GAIN);
             }
-            focusHeld = true;
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            focusHeld = focusResult == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            if (focusHeld) am.setMode(AudioManager.MODE_IN_COMMUNICATION);
         } catch (Throwable ignored) {
+            focusHeld = false;
         }
     }
 
