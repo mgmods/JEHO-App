@@ -1236,7 +1236,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
-        // Reconcile the selected IDs against the latest room roster immediately before
+        // Final safety pass: reconcile selected IDs against the latest room roster immediately before
         // sending. Seat snapshots can change while the gift sheet is open; posting stale IDs
         // produces the misleading "no users on seats" response even when the room has users.
         if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
