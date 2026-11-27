@@ -630,8 +630,7 @@ public final class GlobalCelebrationToast {
             @Nullable String displayName,
             @Nullable String kind,
             @Nullable String roomId,
-            boolean centerPlacement,
-            @NonNull String laneKey
+            boolean centerPlacement
     ) {
         if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
@@ -726,6 +725,7 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId,
             boolean centerPlacement
+            , @NonNull String laneKey
     ) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         ViewGroup root = activity.findViewById(android.R.id.content);
