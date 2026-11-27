@@ -356,4 +356,4 @@ onMounted(async () => {
   await loadCosmeticCatalog()
   await loadBoard()
 })
-</script>
+</script>\n\n<style scoped>\n.cup-reward-thumb{width:58px;height:58px;object-fit:contain;border-radius:10px;border:1px solid var(--bs-border-color);background:rgba(0,0,0,.18);padding:4px}\n</style>
