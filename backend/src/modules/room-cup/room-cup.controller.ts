@@ -114,94 +114,114 @@ export class RoomCupController implements OnModuleInit {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('admin/end-season')
-  @ApiOperation({ summary: 'Award prizes, set winner badges, reset for next season' })
+  @ApiOperation({ summary: 'Atomically award prizes once, set winner badges, and close the room cup season' })
   async endSeason() {
-    const board = await this.leaderboard();
-    let prizes: any[] = [];
-    try {
-      prizes = JSON.parse(await this.setting('room_cup.prizes', '[]'));
-    } catch {
-      prizes = [];
-    }
-    const seasonKey = board.seasonKey;
-    // Clear previous badges
-    await this.roomsRepo
-      .createQueryBuilder()
-      .update(Room)
-      .set({ cupBadgeSeason: null })
-      .where('"cupBadgeSeason" IS NOT NULL')
-      .execute();
+    // The advisory transaction lock serializes concurrent admin clicks and retries.
+    // The last-closed key is checked while holding the same lock, so no reward can
+    // be paid twice for a season even if two requests arrive simultaneously.
+    return this.roomsRepo.manager.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1))',
+        ['jeho:room-cup:end-season'],
+      );
 
-    for (const prize of prizes) {
-      const rank = Number(prize.rank) || 0;
-      const item = board.items.find((x: any) => x.rank === rank);
-      if (!item?.roomId) continue;
-      const room = await this.roomsRepo.findOne({ where: { id: item.roomId } });
-      if (!room) continue;
-      room.cupBadgeSeason = seasonKey;
-      await this.roomsRepo.save(room);
-      const hostId = room.hostId;
-      if (!hostId) continue;
-      const coins = Math.max(0, Math.floor(Number(prize.coins) || 0));
-      const diamonds = Math.max(0, Math.floor(Number(prize.diamonds) || 0));
-      if (coins > 0 || diamonds > 0) {
-        let wallet = await this.walletsRepo.findOne({ where: { userId: hostId } });
+      const settings = manager.getRepository(AppSetting);
+      const rooms = manager.getRepository(Room);
+      const wallets = manager.getRepository(Wallet);
+      const transactions = manager.getRepository(WalletTransaction);
+      const board = await this.leaderboard();
+      const seasonKey = String(board.seasonKey || '');
+      if (!seasonKey) {
+        throw new Error('Room cup season key is missing; no prizes were issued.');
+      }
+
+      const lastClosed = await settings.findOne({ where: { key: 'room_cup.season_key' } });
+      if (lastClosed?.value === seasonKey) {
+        return { closed: true, alreadyClosed: true, seasonKey, winners: board.items.slice(0, 3) };
+      }
+
+      let prizes: any[] = [];
+      try {
+        const raw = await this.setting('room_cup.prizes', '[]');
+        const parsed = JSON.parse(raw);
+        prizes = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        prizes = [];
+      }
+
+      await rooms.createQueryBuilder()
+        .update(Room)
+        .set({ cupBadgeSeason: null })
+        .where('"cupBadgeSeason" IS NOT NULL')
+        .execute();
+
+      for (const prize of prizes) {
+        const rank = Number(prize.rank) || 0;
+        const item = board.items.find((entry: any) => entry.rank === rank);
+        if (!item?.roomId) continue;
+
+        const room = await rooms.findOne({ where: { id: item.roomId } });
+        if (!room) continue;
+        room.cupBadgeSeason = seasonKey;
+        await rooms.save(room);
+
+        const hostId = room.hostId;
+        if (!hostId) continue;
+        const coins = Math.max(0, Math.floor(Number(prize.coins) || 0));
+        const diamonds = Math.max(0, Math.floor(Number(prize.diamonds) || 0));
+        if (coins <= 0 && diamonds <= 0) continue;
+
+        let wallet = await wallets.findOne({ where: { userId: hostId }, lock: { mode: 'pessimistic_write' } });
         if (!wallet) {
-          wallet = await this.walletsRepo.save(this.walletsRepo.create({ userId: hostId }));
+          wallet = wallets.create({ userId: hostId });
         }
+
         if (coins > 0) {
-          wallet.coins = Number(wallet.coins) + coins;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.COINS,
-              amount: coins,
-              balanceAfter: Number(wallet.coins),
-              referenceType: 'room_cup',
-              referenceId: `${seasonKey}:r${rank}:coins`,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
+          wallet.coins = Number(wallet.coins || 0) + coins;
+          await wallets.save(wallet);
+          await transactions.save(transactions.create({
+            userId: hostId,
+            type: TransactionType.LUCKY_REWARD,
+            currency: CurrencyType.COINS,
+            amount: coins,
+            balanceAfter: Number(wallet.coins),
+            referenceType: 'room_cup',
+            referenceId: `${seasonKey}:r${rank}:coins`,
+            description: `جائزة كأس الروم #${rank}`,
+          }));
         }
         if (diamonds > 0) {
-          wallet.diamonds = Number(wallet.diamonds) + diamonds;
-          await this.walletsRepo.save(wallet);
-          await this.txRepo.save(
-            this.txRepo.create({
-              userId: hostId,
-              type: TransactionType.LUCKY_REWARD,
-              currency: CurrencyType.DIAMONDS,
-              amount: diamonds,
-              balanceAfter: Number(wallet.diamonds),
-              referenceType: 'room_cup',
-              referenceId: `${seasonKey}:r${rank}:diamonds`,
-              description: `جائزة كأس الروم #${rank}`,
-            }),
-          );
+          wallet.diamonds = Number(wallet.diamonds || 0) + diamonds;
+          await wallets.save(wallet);
+          await transactions.save(transactions.create({
+            userId: hostId,
+            type: TransactionType.LUCKY_REWARD,
+            currency: CurrencyType.DIAMONDS,
+            amount: diamonds,
+            balanceAfter: Number(wallet.diamonds),
+            referenceType: 'room_cup',
+            referenceId: `${seasonKey}:r${rank}:diamonds`,
+            description: `جائزة كأس الروم #${rank}`,
+          }));
         }
       }
-      // VIP is purchase-only — ignore vipLevel / vipPlanId prizes from room cup.
-    }
 
-    await this.settingsRepo.save(
-      (await this.settingsRepo.findOne({ where: { key: 'room_cup.season_key' } })) ||
-        this.settingsRepo.create({ key: 'room_cup.season_key' }),
-    ).catch(() => undefined);
-    const seasonRow = await this.settingsRepo.findOne({ where: { key: 'room_cup.season_key' } });
-    if (seasonRow) {
-      seasonRow.value = seasonKey;
-      await this.settingsRepo.save(seasonRow);
-    } else {
-      await this.settingsRepo.save(
-        this.settingsRepo.create({
+      // VIP remains purchase-only. Persist the closed season in the same
+      // transaction as wallet credits and badges, so a failure rolls everything back.
+      if (lastClosed) {
+        lastClosed.value = seasonKey;
+        lastClosed.description = 'Last closed room cup season';
+        await settings.save(lastClosed);
+      } else {
+        await settings.save(settings.create({
           key: 'room_cup.season_key',
           value: seasonKey,
           description: 'Last closed room cup season',
-        }),
-      );
-    }
-    return { closed: true, seasonKey, winners: board.items.slice(0, 3) };
+        }));
+      }
+
+      return { closed: true, alreadyClosed: false, seasonKey, winners: board.items.slice(0, 3) };
+    });
   }
+}
 }
