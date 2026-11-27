@@ -137,7 +137,7 @@ export const walletApi = {
   recharges: (params) => safeRequest(() => api.get('/admin/wallet/recharges', { params })),
   completeRecharge: (id, data = {}) =>
     safeRequest(() => api.post(`/admin/wallet/recharges/${id}/complete`, data)),
-  cancelRecharge: (id) => safeRequest(() => api.post(`/admin/wallet/recharges/${id}/cancel`)),
+  cancelRecharge: (id, data = {}) => safeRequest(() => api.post(`/admin/wallet/recharges/${id}/cancel`, data)),
   packages: () => safeRequest(() => api.get('/admin/wallet/packages')),
   savePackages: (data) => safeRequest(() => api.put('/admin/wallet/packages', data)),
   withdrawPackages: () => safeRequest(() => api.get('/admin/wallet/withdraw-packages')),
