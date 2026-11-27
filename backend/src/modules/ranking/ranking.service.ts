@@ -65,7 +65,8 @@ export class RankingService {
         rank: index + 1,
         name: String(item?.name || '').slice(0, 80),
         imageUrl: String(item?.imageUrl || '').slice(0, 2048),
-        description: String(item?.description || '').slice(0, 180),\n        cosmeticId: String(item?.cosmeticId || '').slice(0, 128),
+        description: String(item?.description || '').slice(0, 180),
+        cosmeticId: String(item?.cosmeticId || '').slice(0, 128),
       })) : [];
       return { enabled: parsed.enabled !== false, weekly: normalize(parsed.weekly), monthly: normalize(parsed.monthly) };
     } catch { return defaults; }
@@ -81,7 +82,8 @@ export class RankingService {
         if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
           throw new BadRequestException('Reward image URLs must use HTTPS');
         }
-        const cosmeticId = String(item?.cosmeticId || '').trim().slice(0, 128);\n        return { rank: index + 1, name, imageUrl, description, cosmeticId };
+        const cosmeticId = String(item?.cosmeticId || '').trim().slice(0, 128);
+        return { rank: index + 1, name, imageUrl, description, cosmeticId };
       });
     };
     const current = await this.getRewardConfig();
