@@ -916,15 +916,17 @@ export class AdminService {
     // Return only metrics that each rank is permitted to administer.
     if (staffRole === 'super') return snapshot;
     if (staffRole === 'admin') {
-      const {
-        pendingWithdraws: _pendingWithdraws,
-        totalRechargeFiat: _totalRechargeFiat,
-        revenue: _revenue,
-        totalRevenue: _totalRevenue,
-        todayRevenue: _todayRevenue,
-        revenueByProvider: _revenueByProvider,
-        ...adminSnapshot
-      } = snapshot;
+      const adminSnapshot: Record<string, unknown> = { ...snapshot };
+      for (const key of [
+        'pendingWithdraws',
+        'totalRechargeFiat',
+        'revenue',
+        'totalRevenue',
+        'todayRevenue',
+        'revenueByProvider',
+      ]) {
+        delete adminSnapshot[key];
+      }
       return adminSnapshot;
     }
     return {
