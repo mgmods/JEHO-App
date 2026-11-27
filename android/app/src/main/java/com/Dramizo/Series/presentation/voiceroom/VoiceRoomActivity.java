@@ -5116,10 +5116,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void startLuckyCannonHold() {
         stopLuckyCannonHold(false);
         if (!luckyCannonEnabled || luckyCannonGiftId == null || roomId == null || roomId.isEmpty()) return;
-        if (collectOccupiedMicUserIds().isEmpty()) {
-            Toast.makeText(this, "لا يوجد مستخدمون على المقاعد لإرسال الهدية", Toast.LENGTH_SHORT).show();
-            return;
-        }
         luckyCannonHoldActive = true;
         luckyCannonComboCount = 0;
         updateLuckyCannonCounter();
@@ -5151,16 +5147,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
         // Resolve only the recipients selected when the lucky gift was armed.
         // Their current seat positions are resolved later for the center-to-seat flight.
-        java.util.LinkedHashSet<String> occupiedNow =
-                new java.util.LinkedHashSet<>(collectOccupiedMicUserIds());
+        // currentSeats is a presentation cache and may be empty/stale during
+        // room entry or a seat refresh. Keep the explicitly selected recipient IDs
+        // and let the backend validate live seat occupancy before charging/sending.
         java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>();
         for (String selectedId : luckyCannonTargets) {
-            if (selectedId != null && occupiedNow.contains(selectedId)) {
-                liveTargets.add(selectedId);
-            }
+            if (selectedId != null && !selectedId.trim().isEmpty()) liveTargets.add(selectedId);
         }
         if (liveTargets.isEmpty()) {
-            Toast.makeText(this, "لم يعد هناك مستخدمون على المقاعد المحددة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "حدد مستخدماً لإرسال الهدية", Toast.LENGTH_SHORT).show();
             return;
         }
         final List<String> targets = new ArrayList<>(liveTargets);
