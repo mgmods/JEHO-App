@@ -150,7 +150,22 @@ export class RoomCupController implements OnModuleInit, OnModuleDestroy {
         hostName: room?.host?.displayName || room?.host?.username || null,
       };
     });
-    return { enabled: true, period, seasonKey: key, periodStart: start.toISOString(), periodEnd: end?.toISOString() || null, items };
+    let prizes: any[] = [];
+    try {
+      const raw = JSON.parse(await this.setting('room_cup.prizes', '[]'));
+      prizes = Array.isArray(raw) ? raw.slice(0, 10) : [];
+    } catch {
+      prizes = [];
+    }
+    return {
+      enabled: true,
+      period,
+      seasonKey: key,
+      periodStart: start.toISOString(),
+      periodEnd: end?.toISOString() || null,
+      prizes,
+      items,
+    };
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
