@@ -72,16 +72,40 @@ export class RankingService {
     } catch { return defaults; }
   }
 
+  private normalizeRewardImageUrl(value: unknown): string {
+    const imageUrl = String(value || '').trim().slice(0, 2048);
+    if (!imageUrl) return '';
+
+    // Store uploads and bundled assets are intentionally represented as app-relative
+    // paths. They are resolved against the active JEHO origin by dashboard resolveAsset().
+    // Reject protocol-relative URLs, traversal, control characters, and non-HTTPS hosts.
+    if (/^[\\/]{2}/.test(imageUrl) || /[\\\\\\u0000-\\u001f]/.test(imageUrl) || imageUrl.split('/').some((part) => part === '..')) {
+      throw new BadRequestException('Reward image must be an HTTPS URL or a JEHO upload path');
+    }
+    if (/^(?:\\/?uploads|\\/?assets)\\//i.test(imageUrl)
+        || /^\\/?api\\/v\\d+\\/uploads\\//i.test(imageUrl)) {
+      return imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      throw new BadRequestException('Reward image must be an HTTPS URL or a JEHO upload path');
+    }
+    if (parsed.protocol !== 'https:' || !parsed.hostname) {
+      throw new BadRequestException('Reward image URLs must use HTTPS');
+    }
+    return parsed.toString();
+  }
+
   async patchRewardConfig(input: Record<string, unknown>) {
     const normalize = (items: unknown) => {
       if (!Array.isArray(items)) return [];
       return items.slice(0, 3).map((item: any, index: number) => {
         const name = String(item?.name || '').trim().slice(0, 80);
-        const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2048);
+        const imageUrl = this.normalizeRewardImageUrl(item?.imageUrl);
         const description = String(item?.description || '').trim().slice(0, 180);
-        if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
-          throw new BadRequestException('Reward image URLs must use HTTPS');
-        }
         const cosmeticId = String(item?.cosmeticId || '').trim().slice(0, 128);
         return { rank: index + 1, name, imageUrl, description, cosmeticId };
       });
