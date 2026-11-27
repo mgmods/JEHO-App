@@ -27,6 +27,7 @@ import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
 import java.util.WeakHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -43,10 +44,8 @@ public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static WeakReference<View> current = new WeakReference<>(null);
     private static WeakReference<View> currentCenter = new WeakReference<>(null);
-    private static String lastDedupeKey;
-    private static long lastShownAt;
-    /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
-    private static int lastDedupePlacementMask;
+    /** Deduplicate each event + toast kind + placement independently for a short window. */
+    private static final LinkedHashMap<String, DedupeState> RECENT_DEDUPE = new LinkedHashMap<>();
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
     private static boolean showing;
@@ -119,6 +118,11 @@ public final class GlobalCelebrationToast {
             copy.put(String.valueOf(entry.getKey()), entry.getValue());
         }
         supportChestToastConfig = copy;
+    }
+
+    private static final class DedupeState {
+        long shownAt;
+        int placementMask;
     }
 
     private static final class ToastRequest {
@@ -642,19 +646,27 @@ public final class GlobalCelebrationToast {
         if (isLuckyToastKind(kind)) refreshToastStyle(activity);
         if (!isToastEnabled(kind, centerPlacement, multiplier, coinsWon, body)) return;
         long now = System.currentTimeMillis();
-        // One high-win event may intentionally have two placements on the sender device:
-        // the shared top banner and the sender-only center celebration. Permit that paired
-        // placement once, while continuing to suppress duplicate events in the same lane.
-        int placementBit = centerPlacement ? 2 : 1;
-        boolean sameRecentEvent = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
-                && now - lastShownAt < 1_200L;
-        boolean pairedPlacement = sameRecentEvent
-                && (lastDedupePlacementMask & placementBit) == 0;
-        if (sameRecentEvent && !pairedPlacement) return;
-        if (!sameRecentEvent) lastDedupePlacementMask = 0;
-        lastDedupeKey = dedupeKey;
-        lastShownAt = now;
-        lastDedupePlacementMask |= placementBit;
+        // Keep a separate dedupe lane per toast kind. A normal room win, a public
+        // high-win toast and the sender-only personal toast may all describe the same
+        // reward event and must still be allowed to appear together.
+        if (dedupeKey != null && !dedupeKey.trim().isEmpty()) {
+            RECENT_DEDUPE.entrySet().removeIf(entry -> now - entry.getValue().shownAt >= 1_200L);
+            String kindKey = kind == null ? "" : kind.trim().toLowerCase(Locale.ROOT);
+            String scopedKey = dedupeKey + "|" + kindKey;
+            int placementBit = centerPlacement ? 2 : 1;
+            DedupeState state = RECENT_DEDUPE.get(scopedKey);
+            if (state != null && (state.placementMask & placementBit) != 0) return;
+            if (state == null) {
+                state = new DedupeState();
+                RECENT_DEDUPE.put(scopedKey, state);
+            }
+            state.shownAt = now;
+            state.placementMask |= placementBit;
+            while (RECENT_DEDUPE.size() > 128) {
+                String oldest = RECENT_DEDUPE.keySet().iterator().next();
+                RECENT_DEDUPE.remove(oldest);
+            }
+        }
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
