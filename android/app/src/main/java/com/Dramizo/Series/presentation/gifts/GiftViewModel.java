@@ -286,11 +286,24 @@ public class GiftViewModel extends ViewModel {
                 error.postValue("تعذر إرسال الهدية، حاول مرة أخرى");
                 return;
             }
+            // Retrofit/network wrappers can report a transport-level failure after the
+            // server has already committed the gift (for example a timeout while the response
+            // body was still in flight). Never show a false failure when the authoritative
+            // response payload confirms success.
+            if (!r.success && r.data != null && r.data.success) {
+                sent.postValue(r.data);
+                return;
+            }
             if (!r.success) {
-                error.postValue(r.error);
+                error.postValue(r.error != null && !r.error.isEmpty()
+                        ? r.error : "تعذر إرسال الهدية، حاول مرة أخرى");
                 return;
             }
             GiftDtos.SendGiftResult data = r.data;
+            if (data != null && !data.success) {
+                error.postValue("تعذر تأكيد نتيجة إرسال الهدية، حاول مرة أخرى");
+                return;
+            }
             // Server may echo combo — never let lucky inflate local streak.
             if (data != null && data.comboCount > 0 && !isLuckyGift(giftId)) {
                 combo = data.comboCount;
