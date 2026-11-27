@@ -327,7 +327,7 @@ public class AppContainer {
         agencyRepository = new AgencyRepositoryImpl(agencyApi, ioExecutor);
         rankingRepository = new RankingRepositoryImpl(rankingApi, ioExecutor);
         notificationRepository = new NotificationRepositoryImpl(notificationApi, ioExecutor, sessionManager, context);
-        cosmeticsRepository = new CosmeticsRepositoryImpl(cosmeticsApi);
+        cosmeticsRepository = new CosmeticsRepositoryImpl(cosmeticsApi, featureCache, sessionManager, ioExecutor);
 
         billingHelper = new BillingHelper(appContext);
 
