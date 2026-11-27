@@ -350,7 +350,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
     private int luckyCannonInFlight;
     /** Preserve the first tap if earlier requests temporarily occupy all sender slots. */
-    private boolean luckyCannonPendingTapShot;
+    private int luckyCannonPendingTapShots;
+    private static final int LUCKY_CANNON_MAX_PENDING_TAPS = 20;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
@@ -5050,6 +5051,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!luckyCannonEnabled || isFinishing() || isDestroyed()
                 || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
         luckyCannonRequestId = null;
+        luckyCannonPendingTapShots = 0;
         luckyCannonGiftId = giftId;
         luckyCannonGiftIcon = giftIcon;
         luckyCannonGiftName = giftName;
@@ -5129,7 +5131,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             // A previous released press may still be completing on the network.
             // Retain this new tap and send it as soon as one bounded slot is free.
-            luckyCannonPendingTapShot = true;
+            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
+                    luckyCannonPendingTapShots + 1);
         }
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
@@ -5154,7 +5157,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
         if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
-            luckyCannonPendingTapShot = true;
+            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
+                    luckyCannonPendingTapShots + 1);
             return;
         }
         // Resolve only the recipients selected when the lucky gift was armed.
@@ -5227,10 +5231,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         // The same idempotency key was retried once. Stop this gesture
                         // quietly rather than issuing a new key that could double-charge
                         // a shot whose first server response was lost.
-                        luckyCannonPendingTapShot = false;
+                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                     } else {
-                        luckyCannonPendingTapShot = false;
+                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                         BalanceRedirect.handle(VoiceRoomActivity.this,
                                 failure != null && !failure.trim().isEmpty()
@@ -5246,18 +5250,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             container.getLuckyCannonExecutor().execute(sendTask);
             // Reflect each accepted one-unit shot immediately, rather than waiting
             // for network latency; ACTION_UP prevents any later increments.
-            if (luckyCannonHoldActive) {
-                luckyCannonComboCount++;
-                updateLuckyCannonCounter();
-                showLuckyCannonSendToast(luckyCannonComboCount, true);
-            }
+            // Count every accepted shot, including a tap deferred until the previous
+            // request finishes. A released finger only changes the live animation state.
+            luckyCannonComboCount++;
+            updateLuckyCannonCounter();
+            showLuckyCannonSendToast(luckyCannonComboCount, luckyCannonHoldActive);
         } catch (RuntimeException rejected) {
             // Saturation is back-pressure, not a user-facing gift failure. Keep the
             // first tap pending and resume as soon as a sender slot becomes available.
             luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
             luckyCannonSending = luckyCannonInFlight > 0;
             if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-            luckyCannonPendingTapShot = true;
+            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
+                    luckyCannonPendingTapShots + 1);
             android.util.Log.w("LuckyCannon", "Gift send deferred while executor is busy", rejected);
             handler.postDelayed(this::drainLuckyCannonPendingTap, 160L);
             if (luckyCannonHoldActive) {
@@ -5279,10 +5284,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void drainLuckyCannonPendingTap() {
-        if (!luckyCannonPendingTapShot || luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT
+        if (luckyCannonPendingTapShots <= 0 || luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT
                 || !luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        luckyCannonPendingTapShot = false;
+        luckyCannonPendingTapShots--;
         handler.post(() -> sendLuckyCannonBatch(1));
     }
 
@@ -13468,7 +13473,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onStop() {
         // A backgrounded room must never keep a hold-to-fire gesture running.
         stopLuckyCannonHold(false);
-        luckyCannonPendingTapShot = false;
+        luckyCannonPendingTapShots = 0;
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
