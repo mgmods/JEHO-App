@@ -52,6 +52,9 @@ public final class GlobalCelebrationToast {
     private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
     private static boolean showing;
     private static boolean showingCenter;
+    // Each celebration owns its own timeout; one active toast must never cancel another.
+    private static final Map<View, Runnable> BANNER_HIDE_RUNNABLES = new WeakHashMap<>();
+    private static final Map<View, Boolean> ACTIVE_BANNERS = new WeakHashMap<>();
     private static volatile String remoteBackgroundUrl = "";
     private static volatile String remoteLuckyNormalBackgroundUrl = "";
     private static volatile String remoteLuckyReturnBackgroundUrl = "";
@@ -668,7 +671,12 @@ public final class GlobalCelebrationToast {
 
     private static void showNext() { showNext(false); }
 
-    /** Top and winner-only center toasts run in independent lanes and may be visible together. */
+    /**
+     * Drain each event lane with a short launch stagger, not by waiting for the
+     * previous banner to disappear. Banners remain independently visible and
+     * own independent hide timers, so simultaneous room/global/personal wins
+     * are rendered at event time instead of being held behind a long queue.
+     */
     private static void showNext(boolean centerLane) {
         if (centerLane ? showingCenter : showing) return;
         ToastRequest request = (centerLane ? PENDING_CENTER : PENDING).pollFirst();
@@ -678,7 +686,7 @@ public final class GlobalCelebrationToast {
             activity = request.activity.get();
         }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
-            showNext(centerLane);
+            MAIN.postDelayed(() -> showNext(centerLane), 120L);
             return;
         }
         if (centerLane) showingCenter = true; else showing = true;
@@ -687,11 +695,13 @@ public final class GlobalCelebrationToast {
                     request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
                     request.displayName, request.kind, request.roomId, request.centerPlacement);
         } catch (Throwable error) {
-            // A single malformed asset/activity must not leave the global toast queue
-            // permanently marked as showing and hide every later celebration.
             android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
-            if (centerLane) showingCenter = false; else showing = false;
-            MAIN.post(() -> showNext(centerLane));
+        } finally {
+            // Release the lane after attaching the banner, not after its display duration.
+            MAIN.postDelayed(() -> {
+                if (centerLane) showingCenter = false; else showing = false;
+                showNext(centerLane);
+            }, 140L);
         }
     }
 
@@ -721,12 +731,7 @@ public final class GlobalCelebrationToast {
             return;
         }
 
-        View existing = centerPlacement ? currentCenter.get() : current.get();
-        if (existing != null && existing.getParent() instanceof ViewGroup) {
-            ((ViewGroup) existing.getParent()).removeView(existing);
-        }
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
-        if (laneHide != null) MAIN.removeCallbacks(laneHide);
+        // Do not replace an already visible celebration in this lane.
 
         View banner = LayoutInflater.from(activity)
                 .inflate(R.layout.layout_celebration_toast, root, false);
@@ -973,12 +978,13 @@ public final class GlobalCelebrationToast {
                     : luckyReturn ? remoteLuckyReturnPlacementY : remoteLuckyNormalPlacementY;
             final float placementX = Math.max(0f, Math.min(100f, rawX)) / 100f;
             final float placementY = Math.max(0f, Math.min(100f, rawY)) / 100f;
+            final int stackOffset = activeBannerCount(root) * (toastHeight + dp(activity, 8));
             banner.post(() -> {
                 if (banner.getParent() == null) return;
                 int maxLeft = Math.max(0, root.getWidth() - banner.getWidth());
                 int maxTop = Math.max(0, root.getHeight() - banner.getHeight());
                 int left = Math.round(root.getWidth() * placementX - banner.getWidth() / 2f);
-                int top = Math.round(root.getHeight() * placementY - banner.getHeight() / 2f);
+                int top = Math.round(root.getHeight() * placementY - banner.getHeight() / 2f) + stackOffset;
                 FrameLayout.LayoutParams positioned = (FrameLayout.LayoutParams) banner.getLayoutParams();
                 positioned.leftMargin = Math.max(0, Math.min(maxLeft, left));
                 positioned.topMargin = Math.max(0, Math.min(maxTop, top));
@@ -1024,6 +1030,7 @@ public final class GlobalCelebrationToast {
             sheen.setAlpha(0.78f);
         } else if (sheen != null) sheen.setVisibility(View.GONE);
         root.addView(banner);
+        ACTIVE_BANNERS.put(banner, Boolean.TRUE);
         if (centerPlacement) currentCenter = new WeakReference<>(banner);
         else current = new WeakReference<>(banner);
 
@@ -1074,17 +1081,10 @@ public final class GlobalCelebrationToast {
             });
         }
         Runnable laneHideRunnable = () -> removeBanner(banner, centerPlacement);
-        if (centerPlacement) {
-            hideRunnableCenter = laneHideRunnable;
-            MAIN.postDelayed(hideRunnableCenter, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        } else {
-            hideRunnable = laneHideRunnable;
-            MAIN.postDelayed(hideRunnable, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        }
+        BANNER_HIDE_RUNNABLES.put(banner, laneHideRunnable);
+        MAIN.postDelayed(laneHideRunnable, customToastStyle
+                ? Math.max(1, Math.min(12, customDuration)) * 1000L
+                : (canOpenRoom ? 6200L : 5200L));
     }
 
     /** Room-wide reward burst for a completed support-chest level. */
@@ -1372,9 +1372,8 @@ public final class GlobalCelebrationToast {
 
     private static void removeBanner(View banner, boolean centerPlacement) {
         if (banner == null) return;
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
-        if (laneHide != null) MAIN.removeCallbacks(laneHide);
-        if (centerPlacement) hideRunnableCenter = null; else hideRunnable = null;
+        Runnable ownHide = BANNER_HIDE_RUNNABLES.remove(banner);
+        if (ownHide != null) MAIN.removeCallbacks(ownHide);
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
                 .alpha(0f)
@@ -1385,17 +1384,22 @@ public final class GlobalCelebrationToast {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
                     }
+                    ACTIVE_BANNERS.remove(banner);
                     if (centerPlacement) {
                         if (currentCenter.get() == banner) currentCenter = new WeakReference<>(null);
-                        showingCenter = false;
-                        showNext(true);
-                    } else {
-                        if (current.get() == banner) current = new WeakReference<>(null);
-                        showing = false;
-                        showNext(false);
+                    } else if (current.get() == banner) {
+                        current = new WeakReference<>(null);
                     }
                 })
                 .start();
+    }
+
+    private static int activeBannerCount(ViewGroup root) {
+        int count = 0;
+        for (View banner : ACTIVE_BANNERS.keySet()) {
+            if (banner != null && banner.getParent() == root) count++;
+        }
+        return count;
     }
 
     private static int dp(View view, int value) {
