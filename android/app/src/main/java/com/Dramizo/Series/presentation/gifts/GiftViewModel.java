@@ -103,13 +103,25 @@ public class GiftViewModel extends ViewModel {
             c.getIoExecutor().execute(() -> {
             boolean catalogRefreshSucceeded = false;
             try {
-                Result<List<GiftDtos.GiftCategoryDto>> cats =
-                        c.getGiftRepository().refreshCategories();
-                if (cats.success && cats.data != null && !cats.data.isEmpty()) {
-                    categories.postValue(new ArrayList<>(cats.data));
+                if (!GiftRepositoryImpl.hasWarmCategories()) {
+                    Result<List<GiftDtos.GiftCategoryDto>> cats =
+                            c.getGiftRepository().refreshCategories();
+                    if (cats.success && cats.data != null) {
+                        categories.postValue(new ArrayList<>(cats.data));
+                    }
+                } else {
+                    List<GiftDtos.GiftCategoryDto> cachedCategories =
+                            c.getGiftRepository().peekCategoriesOrNull();
+                    if (cachedCategories != null) {
+                        categories.postValue(new ArrayList<>(cachedCategories));
+                    }
                 }
 
-                Result<GiftDtos.GiftList> r = c.getGiftRepository().refreshGifts();
+                // Reuse the local catalogue for ten minutes; refresh from the server only
+                // after the cache becomes stale, never on every gift-sheet opening.
+                Result<GiftDtos.GiftList> r = GiftRepositoryImpl.hasWarmMemory()
+                        ? c.getGiftRepository().getGifts()
+                        : c.getGiftRepository().refreshGifts();
                 if (r.success && r.data != null && !r.data.isEmpty()) {
                     catalogRefreshSucceeded = true;
                     gifts.postValue(new ArrayList<>(r.data));
