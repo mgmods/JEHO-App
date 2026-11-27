@@ -352,6 +352,7 @@ public abstract class ThemedActivity extends AppCompatActivity {
 
         if (name.contains("Splash")) return "splash";
         if (name.contains("ProfileSetup")) return "register";
+        if (name.contains("Login")) return "login";
         if (containsAny(name, "Login", "Guest", "Register", "Otp")) return "auth";
         if (containsAny(name, "Profile", "EditProfile", "UserLevel", "Visitors", "Task", "GiftHistory")) {
             return "profile";
