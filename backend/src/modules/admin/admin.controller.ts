@@ -407,15 +407,15 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('dashboard')
-  dashboard() {
-    return this.adminService.dashboard();
+  dashboard(@CurrentUser() user: any) {
+    return this.adminService.dashboard(String(user?.staffRole || 'manager').toLowerCase());
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('dashboard/overview')
-  overview() {
-    return this.adminService.dashboard();
+  overview(@CurrentUser() user: any) {
+    return this.adminService.dashboard(String(user?.staffRole || 'manager').toLowerCase());
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
