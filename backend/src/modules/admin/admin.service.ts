@@ -818,7 +818,7 @@ export class AdminService {
     return persisted;
   }
 
-  async dashboard() {
+  async dashboard(staffRole: string = 'super') {
     const [
       users,
       deletedUsers,
@@ -892,7 +892,7 @@ export class AdminService {
     // After a revenue reset, hide legacy totals; keep today's new sales visible.
     const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
 
-    return {
+    const snapshot = {
       brand: 'JEHO CHAT',
       users,
       totalUsers: users,
@@ -910,6 +910,33 @@ export class AdminService {
       totalRevenue: totalRev,
       todayRevenue,
       revenueByProvider: scaledProviders,
+    };
+
+    // The dashboard endpoint is shared by all three native staff ranks.
+    // Return only metrics that each rank is permitted to administer.
+    if (staffRole === 'super') return snapshot;
+    if (staffRole === 'admin') {
+      const adminSnapshot: Record<string, unknown> = { ...snapshot };
+      for (const key of [
+        'pendingWithdraws',
+        'totalRechargeFiat',
+        'revenue',
+        'totalRevenue',
+        'todayRevenue',
+        'revenueByProvider',
+      ]) {
+        delete adminSnapshot[key];
+      }
+      return adminSnapshot;
+    }
+    return {
+      brand: snapshot.brand,
+      rooms: snapshot.rooms,
+      openRooms: snapshot.openRooms,
+      liveStreams: snapshot.liveStreams,
+      streams: snapshot.streams,
+      activeStreams: snapshot.activeStreams,
+      pendingReports: snapshot.pendingReports,
     };
   }
 

@@ -106,7 +106,6 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
         Module("staffIdentity", "هوية الرتب الإدارية", "تخصيص الشارة والإطار وبطاقة الاسم والدخولية لكل رتبة", "💎"),
-        Module("operators", "إدارة صلاحيات الإدارة", "إدارة حسابات الإدارة المحدودة — للسوبر أدمن فقط", "🛡️")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -218,11 +217,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun buildShell() {
-        window.statusBarColor = Color.WHITE
-        window.navigationBarColor = Color.WHITE
+        window.statusBarColor = 0xFF15182B.toInt()
+        window.navigationBarColor = 0xFF171A2E.toInt()
         @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -235,18 +233,19 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = android.graphics.drawable.ColorDrawable(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF15182B.toInt(), 0xFF302653.toInt()))
             elevation = dp(5).toFloat()
         }
         backButton = TextView(this).apply {
             text = "‹"
             textSize = 29f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(TEXT)
+            setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             visibility = View.GONE
             contentDescription = "الرجوع إلى القسم السابق"
-            background = roundRect(0xFFF2F0F8.toInt(), 14)
+            background = roundRect(0x332FFFFFFF.toInt(), 14)
             setOnClickListener { handleAdminBack() }
         }
         val brand = LinearLayout(this).apply {
@@ -257,7 +256,7 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView = TextView(this).apply {
             text = "لوحة إدارة JEHO"
             textSize = 18f
-            setTextColor(TEXT)
+            setTextColor(Color.WHITE)
             gravity = Gravity.RIGHT
             setTypeface(typeface, Typeface.BOLD)
             includeFontPadding = false
@@ -266,16 +265,16 @@ class AdminConsoleActivity : ThemedActivity() {
         brand.addView(TextView(this).apply {
             text = "مساحة إدارة Android • " + roleLabel()
             textSize = 10.5f
-            setTextColor(MUTED)
+            setTextColor(0xFFC9C2E0.toInt())
             includeFontPadding = false
         })
         val refreshButton = TextView(this).apply {
             text = "⟳"
             textSize = 24f
-            setTextColor(TEXT)
+            setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             contentDescription = "تحديث القسم"
-            background = roundRect(0xFFF2F0F8.toInt(), 14)
+            background = roundRect(0x332FFFFFFF.toInt(), 14)
             setOnClickListener {
                 when (currentSection) {
                     "home" -> showHome(false)
@@ -310,7 +309,10 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = android.graphics.drawable.ColorDrawable(Color.WHITE)
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0xFF171A2E.toInt(), 0xFF27213F.toInt())
+            )
             elevation = dp(12).toFloat()
         }
         val homeButton = navButton("⌂  الرئيسية") {
@@ -352,11 +354,11 @@ class AdminConsoleActivity : ThemedActivity() {
             textSize = 13.5f
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(0xFFFFE7B7.toInt())
             contentDescription = label
             background = GradientDrawable(
                 GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF7659D2.toInt(), 0xFF5B42B0.toInt())
+                intArrayOf(0xFF66502C.toInt(), 0xFF8A6B38.toInt())
             ).apply { cornerRadius = dp(15).toFloat() }
             setOnClickListener { action() }
         }
@@ -533,288 +535,22 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun showHome(remember: Boolean = true) {
         if (remember) rememberCurrentSection("home")
         currentSection = "home"
-        titleView.text = "نظام المدراء"
+        titleView.text = "JEHO Control Center"
         setBackButtonsVisible(false)
-        body.removeAllViews()
-        body.layoutDirection = View.LAYOUT_DIRECTION_RTL
-
-        val roleLabel = when (currentRole) {
-            StaffRoleHelper.SUPER -> "سوبر أدمن"
-            StaffRoleHelper.ADMIN -> "أدمن"
-            StaffRoleHelper.MANAGER -> "مانجر"
-            else -> "غير مخوّل"
-        }
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
-
-        // Profile strip, matching the supplied native-app reference.
-        val profile = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(5), dp(4), dp(14))
-        }
-        val avatar = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            background = roundRect(0xFFECEAF2.toInt(), 50)
-            clipToOutline = true
-            contentDescription = "الصورة الشخصية للحساب الإداري"
-        }
-        profile.addView(avatar, LinearLayout.LayoutParams(dp(72), dp(72)).apply { marginEnd = dp(12) })
-        val avatarUrl = user?.avatarUrl?.takeIf { it.isNotBlank() }
-        if (avatarUrl != null) {
-            val resolved = AssetCatalog.absoluteUrl(avatarUrl) ?: avatarUrl
-            Glide.with(this).load(resolved).circleCrop().into(avatar)
-        } else {
-            avatar.setImageResource(android.R.drawable.sym_def_app_icon)
-        }
-        val identity = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
+        val visible = modules.distinctBy { it.key }.filter { roleCanAccessModule(it.key) }
+        val items = visible.map { AdminDashboardItem(it.key, it.title, it.subtitle, it.icon) }
         val displayName = user?.displayName?.takeIf { it.isNotBlank() }
             ?: user?.username?.takeIf { it.isNotBlank() } ?: "فريق JEHO"
-        addText(identity, displayName, 18f, true, TEXT)
         val publicId = user?.publicId?.takeIf { it.isNotBlank() } ?: "—"
-        addText(identity, "المعرّف: $publicId", 12f, false, MUTED)
-        profile.addView(identity, LinearLayout.LayoutParams(0, -2, 1f))
-        val roleBadge = TextView(this).apply {
-            text = roleLabel
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(9), dp(12), dp(9))
-            background = GradientDrawable().apply {
-                setColor(0xFF28B6E8.toInt())
-                cornerRadius = dp(15).toFloat()
-            }
-        }
-        profile.addView(roleBadge)
-        body.addView(profile)
-
-        // Compact executive welcome panel: clear hierarchy without consuming
-        // the screen with oversized web-dashboard style cards.
-        val welcome = card().apply {
-            setPadding(dp(17), dp(15), dp(17), dp(15))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFFF7F4FF.toInt(), Color.WHITE, 0xFFF0EBFF.toInt())
-            ).apply {
-                cornerRadius = dp(24).toFloat()
-                setStroke(dp(1), 0xFFE2D9FF.toInt())
-            }
-            elevation = dp(2).toFloat()
-        }
-        addText(welcome, "مركز إدارة JEHO", 18f, true, TEXT)
-        addText(welcome, "إدارة التطبيق ومتابعة عملياته من مكان واحد", 12f, false, MUTED)
-        val welcomeMeta = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, 0)
-        }
-        val rolePill = TextView(this).apply {
-            text = "●  $roleLabel"
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.WHITE)
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-            background = roundRect(0xFFFFF4D6.toInt(), 30)
-        }
-        welcomeMeta.addView(rolePill)
-        welcomeMeta.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        welcomeMeta.addView(TextView(this).apply {
-            text = "لوحة داخل التطبيق"
-            textSize = 10f
-            setTextColor(0xFFEAE5FF.toInt())
-            gravity = Gravity.CENTER_VERTICAL
-        })
-        welcome.addView(welcomeMeta)
-        body.addView(welcome, LinearLayout.LayoutParams(-1, -2).apply {
-            bottomMargin = dp(15)
-        })
-
-        val searchRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                setColor(0xFFF3F3F7.toInt())
-                cornerRadius = dp(18).toFloat()
-                setStroke(dp(1), 0xFFE2E2E8.toInt())
-            }
-            setPadding(dp(12), 0, dp(12), 0)
-        }
-        searchRow.addView(TextView(this).apply {
-            text = "⌕"
-            textSize = 28f
-            setTextColor(0xFF9299A5.toInt())
-            gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(dp(34), dp(52)))
-        val search = EditText(this).apply {
-            hint = "ابحث بالقسم أو اسم الأداة"
-            textSize = 14f
-            setSingleLine(true)
-            setTextColor(TEXT)
-            setHintTextColor(0xFF9999A3.toInt())
-            background = null
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            textDirection = View.TEXT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
-            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-            setPadding(dp(6), 0, dp(6), 0)
-        }
-        searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
-        body.addView(searchRow, LinearLayout.LayoutParams(-1, dp(54)).apply {
-            bottomMargin = dp(17)
-        })
-
-        val keys = modules.map { it.key }
-        val visible = keys.distinct().filter { roleCanAccessModule(it) }
-            .mapNotNull { key -> modules.firstOrNull { it.key == key } }
-
-        val sectionHeading = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2), dp(1), dp(2), dp(9))
-        }
-        sectionHeading.addView(TextView(this).apply {
-            text = "الأقسام المتاحة"
-            textSize = 15f
-            setTextColor(TEXT)
-            typeface = Typeface.DEFAULT_BOLD
-        })
-        sectionHeading.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        sectionHeading.addView(TextView(this).apply {
-            text = "${visible.size} قسم"
-            textSize = 11f
-            setTextColor(ACCENT)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(9), dp(5), dp(9), dp(5))
-            background = roundRect(0xFFEFEAFF.toInt(), 20)
-        })
-        body.addView(sectionHeading)
-
-        val empty = TextView(this).apply {
-            text = "لا توجد أقسام تطابق البحث"
-            textSize = 13f
-            setTextColor(MUTED)
-            gravity = Gravity.CENTER
-            visibility = View.GONE
-            setPadding(0, dp(22), 0, dp(22))
-        }
-        body.addView(empty)
-        val records = mutableListOf<Pair<View, Module>>()
-        visible.chunked(3).forEach { group ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutDirection = View.LAYOUT_DIRECTION_RTL
-            }
-            group.forEach { module ->
-                val tile = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    layoutDirection = View.LAYOUT_DIRECTION_RTL
-                    setPadding(dp(8), dp(10), dp(8), dp(9))
-                    val tileShape = GradientDrawable().apply {
-                        setColor(Color.WHITE)
-                        cornerRadius = dp(16).toFloat()
-                        setStroke(dp(1), 0xFFEEEEEE.toInt())
-                    }
-                    background = android.graphics.drawable.RippleDrawable(
-                        android.content.res.ColorStateList.valueOf(0x226B4CC2),
-                        tileShape,
-                        roundRect(0xFFF0ECFF.toInt(), 16)
-                    )
-                    elevation = dp(1).toFloat()
-                    isClickable = true
-                    isFocusable = true
-                    layoutParams = LinearLayout.LayoutParams(0, dp(150), 1f).apply {
-                        marginStart = dp(4)
-                        marginEnd = dp(4)
-                        bottomMargin = dp(10)
-                    }
-                    setOnClickListener { openModule(module.key) }
-                }
-                val iconTint = when (module.key) {
-                    "operators", "staffIdentity" -> 0xFF8156D8.toInt()
-                    "users", "genderVerifications", "agencyApplications" -> 0xFF347FE0.toInt()
-                    "agencies", "rooms", "streams", "rechargeAgents" -> 0xFF1EAD69.toInt()
-                    "notifications", "toastManager", "supportChest" -> 0xFFE04D94.toInt()
-                    "vip", "walletAdjust", "withdrawals" -> 0xFFE0A126.toInt()
-                    else -> ACCENT
-                }
-                val icon = TextView(this).apply {
-                    text = module.icon
-                    textSize = 23f
-                    gravity = Gravity.CENTER
-                    setTextColor(iconTint)
-                    background = roundRect(0xFFF5F4F9.toInt(), 15)
-                    layoutParams = LinearLayout.LayoutParams(dp(50), dp(50))
-                }
-                tile.addView(icon)
-                tile.addView(TextView(this).apply {
-                    text = module.title
-                    textSize = 11f
-                    setTextColor(TEXT)
-                    typeface = Typeface.DEFAULT_BOLD
-                    gravity = Gravity.CENTER
-                    layoutDirection = View.LAYOUT_DIRECTION_RTL
-                    textDirection = View.TEXT_DIRECTION_RTL
-                    maxLines = 2
-                    minLines = 1
-                    includeFontPadding = false
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(dp(2), dp(8), dp(2), 0)
-                }, LinearLayout.LayoutParams(-1, -2))
-                tile.addView(TextView(this).apply {
-                    text = module.subtitle
-                    textSize = 9.5f
-                    setTextColor(MUTED)
-                    gravity = Gravity.CENTER
-                    layoutDirection = View.LAYOUT_DIRECTION_RTL
-                    textDirection = View.TEXT_DIRECTION_RTL
-                    maxLines = 2
-                    minLines = 2
-                    includeFontPadding = false
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(dp(3), dp(3), dp(3), 0)
-                }, LinearLayout.LayoutParams(-1, -2))
-                row.addView(tile)
-                records.add(tile to module)
-            }
-            if (group.size < 3) {
-                repeat(3 - group.size) {
-                    row.addView(View(this), LinearLayout.LayoutParams(0, dp(1), 1f).apply {
-                        marginStart = dp(4)
-                        marginEnd = dp(4)
-                    })
-                }
-            }
-            body.addView(row)
-        }
-        if (visible.isEmpty()) {
-            empty.visibility = View.VISIBLE
-            empty.text = "لا توجد أقسام متاحة لهذه الرتبة"
-        }
-        search.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
-                var found = false
-                records.forEach { (view, module) ->
-                    val match = query.isEmpty() ||
-                        module.title.lowercase(java.util.Locale.ROOT).contains(query) ||
-                        module.subtitle.lowercase(java.util.Locale.ROOT).contains(query) ||
-                        module.key.lowercase(java.util.Locale.ROOT).contains(query)
-                    view.visibility = if (match) View.VISIBLE else View.GONE
-                    if (match) found = true
-                }
-                empty.visibility = if (query.isNotEmpty() && !found) View.VISIBLE else View.GONE
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
+        AdminDashboardRenderer(this).render(
+            body,
+            currentRole,
+            displayName,
+            publicId,
+            items,
+            api
+        ) { key -> openModule(key) }
     }
 
     private fun hasCustomGiftWritePermission(): Boolean {
@@ -824,18 +560,11 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun roleCanAccessModule(key: String): Boolean {
-        // Keep this allow-list in sync with backend AdminGuard's native-app policy.
-        // A new module is hidden by default until the server explicitly allows it.
+        // The native control center exposes exactly three app staff ranks.
+        // Dashboard-only legacy operator accounts are not an Android staff role.
+        if (key == "operators") return false
         return when (currentRole) {
-            // Super Admin native-app allow-list: expose only the requested operational tools.
-            // Keep unrelated dashboard modules hidden without deleting their code or APIs.
-            StaffRoleHelper.SUPER -> key in setOf(
-                "users", "rooms", "streams",
-                "agencies", "agencyApplications",
-                "rechargeApplications", "rechargeAgents",
-                "notifications", "vanityIds", "vip",
-                "operators", "privateEntries", "customGifts"
-            )
+            StaffRoleHelper.SUPER -> modules.any { it.key == key }
             StaffRoleHelper.ADMIN -> key in setOf(
                 "users", "rooms", "streams", "reports", "agencies", "agencyApplications",
                 "cosmetics", "grantCosmetics", "gifts", "vip", "vanityIds"

@@ -2,6 +2,7 @@ package com.Dramizo.Series.data.repository;
 
 import com.Dramizo.Series.data.local.dao.GiftDao;
 import com.Dramizo.Series.data.local.entity.GiftEntity;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.remote.api.GiftApi;
 import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.domain.model.Result;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 
 /**
  * Stale-while-revalidate gift catalog: memory → Room → network.
@@ -23,17 +26,24 @@ public class GiftRepositoryImpl implements GiftRepository {
     private static final AtomicReference<List<GiftDtos.GiftCategoryDto>> MEMORY_CATS =
             new AtomicReference<>();
     private static final AtomicBoolean REFRESH_IN_FLIGHT = new AtomicBoolean(false);
+    private static final AtomicBoolean CATEGORIES_REFRESH_IN_FLIGHT = new AtomicBoolean(false);
     private static volatile long memoryAt;
     private static final long MEMORY_SOFT_TTL_MS = 10 * 60_000L;
 
     private final GiftApi api;
     private final GiftDao dao;
     private final ExecutorService io;
+    private final EncryptedFeatureCache featureCache;
 
     public GiftRepositoryImpl(GiftApi api, GiftDao dao, ExecutorService io) {
+        this(api, dao, io, null);
+    }
+
+    public GiftRepositoryImpl(GiftApi api, GiftDao dao, ExecutorService io, EncryptedFeatureCache featureCache) {
         this.api = api;
         this.dao = dao;
         this.io = io;
+        this.featureCache = featureCache;
     }
 
     @Override
@@ -117,22 +127,54 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public List<GiftDtos.GiftCategoryDto> peekCategoriesOrNull() {
         List<GiftDtos.GiftCategoryDto> mem = MEMORY_CATS.get();
-        return mem != null && !mem.isEmpty()
-                ? new ArrayList<>(mem)
-                : null;
+        if (mem != null && !mem.isEmpty()) return new ArrayList<>(mem);
+        if (featureCache != null) {
+            Type type = new TypeToken<List<GiftDtos.GiftCategoryDto>>() {}.getType();
+            List<GiftDtos.GiftCategoryDto> disk = featureCache.getJson(
+                    EncryptedFeatureCache.UID_APP, "gift_categories", type, 0L);
+            if (disk != null && !disk.isEmpty()) {
+                MEMORY_CATS.set(new ArrayList<>(disk));
+                return new ArrayList<>(disk);
+            }
+        }
+        return null;
     }
 
     @Override
     public Result<List<GiftDtos.GiftCategoryDto>> refreshCategories() {
+        List<GiftDtos.GiftCategoryDto> cached = peekCategoriesOrNull();
+        if (cached != null && !cached.isEmpty()) {
+            refreshCategoriesInBackground();
+            return Result.ok(cached);
+        }
         Result<GiftDtos.GiftCategoryList> r = ApiCall.execute(api.categories());
         if (r.success && r.data != null) {
             // Dashboard is authoritative — even an empty list wins over any cached fallback.
             MEMORY_CATS.set(new ArrayList<>(r.data));
+            if (featureCache != null) featureCache.putJson(
+                    EncryptedFeatureCache.UID_APP, "gift_categories", r.data);
             return Result.ok(new ArrayList<>(r.data));
         }
         List<GiftDtos.GiftCategoryDto> mem = peekCategoriesOrNull();
         if (mem != null) return Result.ok(mem);
         return Result.ok(new ArrayList<>());
+    }
+
+    private void refreshCategoriesInBackground() {
+        if (!CATEGORIES_REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    Result<GiftDtos.GiftCategoryList> result = ApiCall.execute(api.categories());
+                    if (result.success && result.data != null) {
+                        List<GiftDtos.GiftCategoryDto> fresh = new ArrayList<>(result.data);
+                        MEMORY_CATS.set(fresh);
+                        if (featureCache != null) featureCache.putJson(
+                                EncryptedFeatureCache.UID_APP, "gift_categories", fresh);
+                    }
+                } finally { CATEGORIES_REFRESH_IN_FLIGHT.set(false); }
+            });
+        } catch (RuntimeException rejected) { CATEGORIES_REFRESH_IN_FLIGHT.set(false); }
     }
 
     private Result<GiftDtos.GiftList> fetchNetwork() {

@@ -27,6 +27,8 @@ import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
+import java.util.WeakHashMap;
 import java.util.Locale;
 import java.util.Map;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
@@ -42,16 +44,15 @@ public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static WeakReference<View> current = new WeakReference<>(null);
     private static WeakReference<View> currentCenter = new WeakReference<>(null);
-    private static Runnable hideRunnable;
-    private static Runnable hideRunnableCenter;
-    private static String lastDedupeKey;
-    private static long lastShownAt;
-    /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
-    private static int lastDedupePlacementMask;
+    /** Deduplicate each event + toast kind + placement independently for a short window. */
+    private static final LinkedHashMap<String, DedupeState> RECENT_DEDUPE = new LinkedHashMap<>();
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
     private static boolean showing;
     private static boolean showingCenter;
+    /** Each visible banner owns its hide timer; simultaneous wins never cancel one another. */
+    private static final Map<View, Runnable> ACTIVE_HIDE_TASKS = new WeakHashMap<>();
+    private static final Map<View, Integer> STACK_STEPS_DP = new WeakHashMap<>();
     private static volatile String remoteBackgroundUrl = "";
     private static volatile String remoteLuckyNormalBackgroundUrl = "";
     private static volatile String remoteLuckyReturnBackgroundUrl = "";
@@ -117,6 +118,11 @@ public final class GlobalCelebrationToast {
             copy.put(String.valueOf(entry.getKey()), entry.getValue());
         }
         supportChestToastConfig = copy;
+    }
+
+    private static final class DedupeState {
+        long shownAt;
+        int placementMask;
     }
 
     private static final class ToastRequest {
@@ -285,10 +291,13 @@ public final class GlobalCelebrationToast {
                 positionViewPercent(active.findViewById(R.id.wrapCelebrationTimes), active, countX, countY, true);
             });
         }
-        if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
-        hideRunnable = () -> removeBanner(active);
+        Runnable previousHide = ACTIVE_HIDE_TASKS.remove(active);
+        if (previousHide != null) MAIN.removeCallbacks(previousHide);
+        boolean activeCenter = active == currentCenter.get();
+        Runnable styleHide = () -> removeBanner(active, activeCenter);
+        ACTIVE_HIDE_TASKS.put(active, styleHide);
         int duration = giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
-        MAIN.postDelayed(hideRunnable, Math.max(1, Math.min(12, duration)) * 1000L);
+        MAIN.postDelayed(styleHide, Math.max(1, Math.min(12, duration)) * 1000L);
     }
 
     @SuppressWarnings("unchecked")
@@ -637,19 +646,27 @@ public final class GlobalCelebrationToast {
         if (isLuckyToastKind(kind)) refreshToastStyle(activity);
         if (!isToastEnabled(kind, centerPlacement, multiplier, coinsWon, body)) return;
         long now = System.currentTimeMillis();
-        // One high-win event may intentionally have two placements on the sender device:
-        // the shared top banner and the sender-only center celebration. Permit that paired
-        // placement once, while continuing to suppress duplicate events in the same lane.
-        int placementBit = centerPlacement ? 2 : 1;
-        boolean sameRecentEvent = dedupeKey != null && dedupeKey.equals(lastDedupeKey)
-                && now - lastShownAt < 1_200L;
-        boolean pairedPlacement = sameRecentEvent
-                && (lastDedupePlacementMask & placementBit) == 0;
-        if (sameRecentEvent && !pairedPlacement) return;
-        if (!sameRecentEvent) lastDedupePlacementMask = 0;
-        lastDedupeKey = dedupeKey;
-        lastShownAt = now;
-        lastDedupePlacementMask |= placementBit;
+        // Keep a separate dedupe lane per toast kind. A normal room win, a public
+        // high-win toast and the sender-only personal toast may all describe the same
+        // reward event and must still be allowed to appear together.
+        if (dedupeKey != null && !dedupeKey.trim().isEmpty()) {
+            RECENT_DEDUPE.entrySet().removeIf(entry -> now - entry.getValue().shownAt >= 1_200L);
+            String kindKey = kind == null ? "" : kind.trim().toLowerCase(Locale.ROOT);
+            String scopedKey = dedupeKey + "|" + kindKey;
+            int placementBit = centerPlacement ? 2 : 1;
+            DedupeState state = RECENT_DEDUPE.get(scopedKey);
+            if (state != null && (state.placementMask & placementBit) != 0) return;
+            if (state == null) {
+                state = new DedupeState();
+                RECENT_DEDUPE.put(scopedKey, state);
+            }
+            state.shownAt = now;
+            state.placementMask |= placementBit;
+            while (RECENT_DEDUPE.size() > 128) {
+                String oldest = RECENT_DEDUPE.keySet().iterator().next();
+                RECENT_DEDUPE.remove(oldest);
+            }
+        }
         final int margin = Math.max(8, topMarginDp);
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
@@ -721,13 +738,7 @@ public final class GlobalCelebrationToast {
             return;
         }
 
-        View existing = centerPlacement ? currentCenter.get() : current.get();
-        if (existing != null && existing.getParent() instanceof ViewGroup) {
-            ((ViewGroup) existing.getParent()).removeView(existing);
-        }
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
-        if (laneHide != null) MAIN.removeCallbacks(laneHide);
-
+        // Do not replace an already visible toast. Every event receives its own view.
         View banner = LayoutInflater.from(activity)
                 .inflate(R.layout.layout_celebration_toast, root, false);
         ImageView avatar = banner.findViewById(R.id.imgCelebrationAvatar);
@@ -990,7 +1001,19 @@ public final class GlobalCelebrationToast {
                     ? Math.max(0, Math.min(300, (int) numberConfig(chestToast, "yOffset", topMarginDp)))
                     : topMarginDp);
         }
+        String laneTag = centerPlacement ? "jeho-toast-personal" : "jeho-toast-public";
+        int stackIndex = 0;
+        for (int i = 0; i < root.getChildCount(); i++) {
+            Object tag = root.getChildAt(i).getTag();
+            if (tag instanceof String && ((String) tag).startsWith("jeho-toast-")) stackIndex++;
+        }
+        banner.setTag(laneTag);
         banner.setLayoutParams(lp);
+        // Keep dashboard-selected X/Y coordinates intact; stack additional banners
+        // vertically beneath the first one instead of serializing the toast stream.
+        int stackStepDp = Math.max(72, Math.min(196, requestedHeightDp)) + 8;
+        STACK_STEPS_DP.put(banner, stackStepDp);
+        banner.setTranslationY(dp(activity, stackIndex * stackStepDp));
         banner.setAlpha(0f);
         banner.setScaleX(0.985f);
         banner.setScaleY(0.985f);
@@ -1026,6 +1049,10 @@ public final class GlobalCelebrationToast {
         root.addView(banner);
         if (centerPlacement) currentCenter = new WeakReference<>(banner);
         else current = new WeakReference<>(banner);
+        // The view is now on screen; release this lane immediately so the next
+        // event is rendered in the same frame window, not after this toast expires.
+        if (centerPlacement) showingCenter = false; else showing = false;
+        MAIN.post(() -> showNext(centerPlacement));
 
         banner.animate()
                 .alpha(1f)
@@ -1074,17 +1101,10 @@ public final class GlobalCelebrationToast {
             });
         }
         Runnable laneHideRunnable = () -> removeBanner(banner, centerPlacement);
-        if (centerPlacement) {
-            hideRunnableCenter = laneHideRunnable;
-            MAIN.postDelayed(hideRunnableCenter, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        } else {
-            hideRunnable = laneHideRunnable;
-            MAIN.postDelayed(hideRunnable, customToastStyle
-                    ? Math.max(1, Math.min(12, customDuration)) * 1000L
-                    : (canOpenRoom ? 6200L : 5200L));
-        }
+        ACTIVE_HIDE_TASKS.put(banner, laneHideRunnable);
+        MAIN.postDelayed(laneHideRunnable, customToastStyle
+                ? Math.max(1, Math.min(12, customDuration)) * 1000L
+                : (canOpenRoom ? 6200L : 5200L));
     }
 
     /** Room-wide reward burst for a completed support-chest level. */
@@ -1372,9 +1392,8 @@ public final class GlobalCelebrationToast {
 
     private static void removeBanner(View banner, boolean centerPlacement) {
         if (banner == null) return;
-        Runnable laneHide = centerPlacement ? hideRunnableCenter : hideRunnable;
+        Runnable laneHide = ACTIVE_HIDE_TASKS.remove(banner);
         if (laneHide != null) MAIN.removeCallbacks(laneHide);
-        if (centerPlacement) hideRunnableCenter = null; else hideRunnable = null;
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
                 .alpha(0f)
@@ -1384,18 +1403,30 @@ public final class GlobalCelebrationToast {
                 .withEndAction(() -> {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
+                        STACK_STEPS_DP.remove(banner);
+                        reflowToastStack(parent);
                     }
                     if (centerPlacement) {
                         if (currentCenter.get() == banner) currentCenter = new WeakReference<>(null);
-                        showingCenter = false;
-                        showNext(true);
                     } else {
                         if (current.get() == banner) current = new WeakReference<>(null);
-                        showing = false;
-                        showNext(false);
                     }
                 })
                 .start();
+    }
+
+    private static void reflowToastStack(ViewGroup root) {
+        int index = 0;
+        for (int i = 0; i < root.getChildCount(); i++) {
+            View child = root.getChildAt(i);
+            Object tag = child.getTag();
+            if (!(tag instanceof String) || !((String) tag).startsWith("jeho-toast-")) continue;
+            int step = STACK_STEPS_DP.getOrDefault(child, 96);
+            float target = dp(child, index * step);
+            child.animate().translationY(target).setDuration(180L)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            index++;
+        }
     }
 
     private static int dp(View view, int value) {
