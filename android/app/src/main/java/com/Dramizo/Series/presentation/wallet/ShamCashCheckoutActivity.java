@@ -37,7 +37,6 @@ import com.Dramizo.Series.util.QrBitmap;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -331,10 +330,17 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         btnSubmitReceipt.setEnabled(false);
         showLoading(true);
         final double sentAmount = amount;
+        final Uri receiptUri = selectedReceiptUri;
+        final String receiptMime = selectedReceiptMime != null ? selectedReceiptMime : "application/octet-stream";
+        final String receiptName = selectedReceiptName != null ? selectedReceiptName : "receipt";
+        final String transferDate = selectedTransferDate;
+        final String transferReference = etTransferReference.getText() == null ? "" : etTransferReference.getText().toString().trim();
+        final String transferNote = etTransferNote.getText() == null ? "" : etTransferNote.getText().toString().trim();
+        final String orderId = orderResult.order.id;
         c.getIoExecutor().execute(() -> {
             try {
                 byte[] fileBytes;
-                try (InputStream input = getContentResolver().openInputStream(selectedReceiptUri);
+                try (InputStream input = getContentResolver().openInputStream(receiptUri);
                      ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                     if (input == null) throw new IllegalStateException("تعذر قراءة ملف الإيصال");
                     byte[] buffer = new byte[8192];
@@ -347,10 +353,8 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
                     }
                     fileBytes = output.toByteArray();
                 }
-                String mime = selectedReceiptMime != null ? selectedReceiptMime : "application/octet-stream";
-                RequestBody requestBody = RequestBody.create(MediaType.parse(mime), fileBytes);
-                MultipartBody.Part part = MultipartBody.Part.createFormData("file",
-                        selectedReceiptName != null ? selectedReceiptName : "receipt", requestBody);
+                RequestBody requestBody = RequestBody.create(MediaType.parse(receiptMime), fileBytes);
+                MultipartBody.Part part = MultipartBody.Part.createFormData("file", receiptName, requestBody);
                 Result<UploadApi.UploadResult> upload = ApiCall.execute(c.getUploadApi().upload(part));
                 if (!upload.success || upload.data == null || upload.data.url == null || upload.data.url.isEmpty()) {
                     throw new IllegalStateException(upload.error != null && !upload.error.isEmpty()
@@ -360,14 +364,14 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
                 Map<String, Object> body = new HashMap<>();
                 body.put("senderName", sender);
                 body.put("amountSent", sentAmount);
-                body.put("transferDate", selectedTransferDate);
-                body.put("transferReference", etTransferReference.getText() == null ? "" : etTransferReference.getText().toString().trim());
-                body.put("note", etTransferNote.getText() == null ? "" : etTransferNote.getText().toString().trim());
+                body.put("transferDate", transferDate);
+                body.put("transferReference", transferReference);
+                body.put("note", transferNote);
                 body.put("receiptUrl", upload.data.url);
-                body.put("receiptMimeType", mime);
-                body.put("receiptFilename", upload.data.filename != null ? upload.data.filename : selectedReceiptName);
+                body.put("receiptMimeType", receiptMime);
+                body.put("receiptFilename", upload.data.filename != null ? upload.data.filename : receiptName);
                 Result<Map<String, Object>> submit = ApiCall.execute(
-                        c.getWalletApi().submitShamCashReceipt(orderResult.order.id, body));
+                        c.getWalletApi().submitShamCashReceipt(orderId, body));
                 if (!submit.success) {
                     throw new IllegalStateException(submit.error != null && !submit.error.isEmpty()
                             ? submit.error : "تعذر إرسال الإيصال للمراجعة");
