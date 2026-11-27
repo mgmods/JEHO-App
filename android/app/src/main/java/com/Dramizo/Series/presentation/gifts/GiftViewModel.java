@@ -103,17 +103,20 @@ public class GiftViewModel extends ViewModel {
             c.getIoExecutor().execute(() -> {
             boolean catalogRefreshSucceeded = false;
             try {
+                List<GiftDtos.GiftCategoryDto> categorySource = null;
                 if (!GiftRepositoryImpl.hasWarmCategories()) {
                     Result<List<GiftDtos.GiftCategoryDto>> cats =
                             c.getGiftRepository().refreshCategories();
                     if (cats.success && cats.data != null) {
-                        categories.postValue(new ArrayList<>(cats.data));
+                        categorySource = new ArrayList<>(cats.data);
+                        categories.postValue(categorySource);
                     }
                 } else {
                     List<GiftDtos.GiftCategoryDto> cachedCategories =
                             c.getGiftRepository().peekCategoriesOrNull();
                     if (cachedCategories != null) {
-                        categories.postValue(new ArrayList<>(cachedCategories));
+                        categorySource = new ArrayList<>(cachedCategories);
+                        categories.postValue(categorySource);
                     }
                 }
 
@@ -180,10 +183,7 @@ public class GiftViewModel extends ViewModel {
                 gifts.postValue(merged);
 
                 List<GiftDtos.GiftCategoryDto> visibleCats = new ArrayList<>();
-                List<GiftDtos.GiftCategoryDto> categorySource =
-                        cats.success && cats.data != null
-                                ? cats.data
-                                : categories.getValue();
+                if (categorySource == null) categorySource = categories.getValue();
                 if (categorySource != null) {
                     for (GiftDtos.GiftCategoryDto category : categorySource) {
                         if (category != null && !"custom".equalsIgnoreCase(category.key)) {
