@@ -5053,7 +5053,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!luckyCannonEnabled || isFinishing() || isDestroyed()
                 || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
         luckyCannonRequestId = null;
-        luckyCannonPendingTapShots = 0;
         luckyCannonGiftId = giftId;
         luckyCannonGiftIcon = giftIcon;
         luckyCannonGiftName = giftName;
