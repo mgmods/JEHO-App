@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsInt, Min, IsArray, ArrayMinSize, ArrayMaxSize, IsBoolean } from 'class-validator';
+import { IsUUID, IsOptional, IsInt, Min, IsArray, ArrayMaxSize, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SendGiftDto {
@@ -46,7 +46,6 @@ export class SendAllMicGiftDto {
 
   @ApiProperty({ type: [String] })
   @IsArray()
-  @ArrayMinSize(1)
   @ArrayMaxSize(30)
   @IsUUID('all', { each: true })
   receiverIds: string[];
