@@ -335,9 +335,18 @@
                     class="action-btns justify-content-end"
                     v-if="tab === 'recharges' && (r.status || '').toLowerCase() === 'pending'"
                   >
-                    <button class="btn btn-sm btn-outline-success" type="button" @click="approveRecharge(r)">
-                      تأكيد الشحن
-                    </button>
+                    <button
+                      v-if="r.provider === 'sham_cash'"
+                      class="btn btn-sm btn-outline-primary"
+                      type="button"
+                      @click="openRechargeDetails(r)"
+                    >مراجعة الإيصال</button>
+                    <button
+                      v-else
+                      class="btn btn-sm btn-outline-success"
+                      type="button"
+                      @click="approveRecharge(r)"
+                    >تأكيد الشحن</button>
                     <button class="btn btn-sm btn-outline-danger" type="button" @click="cancelRecharge(r)">
                       إلغاء
                     </button>
@@ -347,6 +356,98 @@
             </template>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div v-if="selectedRecharge" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.62); z-index: 1060">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content glass-modal">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-1">مراجعة إيصال شام كاش</h5>
+              <div class="small text-muted">طلب {{ shortId(selectedRecharge.id) }} · المستخدم {{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
+            </div>
+            <button type="button" class="btn-close" @click="selectedRecharge = null"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="small text-muted">اسم المستخدم</div>
+                <div class="fw-semibold">{{ selectedRecharge.userName || '—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">معرّف الحساب (User ID)</div>
+                <div class="fw-semibold font-monospace text-break">{{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
+                <div class="small text-muted font-monospace text-break">{{ selectedRecharge.userId }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">الباقة</div>
+                <div class="fw-semibold">{{ selectedRecharge.sku || '—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">الكوينز المستحقة</div>
+                <div class="fw-semibold">{{ formatNumber(Number(selectedRecharge.coins || 0) + Number(selectedRecharge.bonusCoins || 0)) }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">السعر المحدد للباقة</div>
+                <div class="fw-semibold">{{ formatMoney(selectedRecharge.amountFiat || 0, selectedRecharge.currency || 'USD') }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">اسم المرسل في الحوالة</div>
+                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.senderName || '—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">المبلغ المرسل</div>
+                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.amountSent ?? '—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">تاريخ التحويل</div>
+                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.transferDate || '—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="small text-muted">رقم العملية</div>
+                <div class="fw-semibold font-monospace">{{ selectedRecharge.shamCashReceipt?.transferReference || '—' }}</div>
+              </div>
+              <div class="col-12" v-if="selectedRecharge.shamCashReceipt?.note">
+                <div class="small text-muted">ملاحظة المستخدم</div>
+                <div class="rounded p-2 bg-dark-subtle">{{ selectedRecharge.shamCashReceipt.note }}</div>
+              </div>
+              <div class="col-12">
+                <div class="small text-muted mb-2">ملف إيصال التحويل</div>
+                <img
+                  v-if="String(selectedRecharge.shamCashReceipt?.receiptMimeType || '').startsWith('image/')"
+                  :src="selectedRecharge.shamCashReceipt.receiptUrl"
+                  alt="إيصال شام كاش"
+                  class="img-fluid rounded border"
+                  style="max-height:420px; width:100%; object-fit:contain; background:#fff"
+                />
+                <a
+                  v-if="selectedRecharge.shamCashReceipt?.receiptUrl"
+                  class="btn btn-outline-info btn-sm mt-2"
+                  :href="selectedRecharge.shamCashReceipt.receiptUrl"
+                  target="_blank"
+                  rel="noopener"
+                ><i class="bi bi-file-earmark-arrow-down me-1"></i>فتح / تنزيل الإيصال</a>
+                <div v-if="!selectedRecharge.shamCashReceipt?.receiptUrl" class="text-warning">لم يتم إرفاق إيصال لهذا الطلب.</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" type="button" @click="selectedRecharge = null">إغلاق</button>
+            <button
+              class="btn btn-outline-danger"
+              type="button"
+              :disabled="reviewingRecharge"
+              @click="rejectShamCashReceipt(selectedRecharge)"
+            >رفض الطلب</button>
+            <button
+              class="btn btn-success"
+              type="button"
+              :disabled="reviewingRecharge || !selectedRecharge.shamCashReceipt?.receiptSubmittedAt"
+              @click="approveShamCashReceipt(selectedRecharge)"
+            ><span v-if="reviewingRecharge" class="spinner-border spinner-border-sm me-1"></span>موافقة وتفعيل وشحن الكوينز</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -472,6 +573,8 @@ const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const showAdjust = ref(false)
+const selectedRecharge = ref(null)
+const reviewingRecharge = ref(false)
 const savingEconomy = ref(false)
 const economy = reactive({
   diamondUsdRate: 0.00005,
@@ -806,6 +909,50 @@ async function approve(r) {
     toast().success(success.value)
     await load()
   }
+}
+
+function openRechargeDetails(r) {
+  selectedRecharge.value = r
+}
+
+async function approveShamCashReceipt(r) {
+  if (!r?.id || reviewingRecharge.value) return
+  reviewingRecharge.value = true
+  const { error: err } = await walletApi.completeRecharge(r.id, {
+    note: 'تمت مراجعة إيصال شام كاش والموافقة عليه',
+  })
+  reviewingRecharge.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  selectedRecharge.value = null
+  success.value = 'تمت الموافقة وشحن الكوينز وإرسال إشعار للمستخدم'
+  toast().success(success.value)
+  await load()
+}
+
+async function rejectShamCashReceipt(r) {
+  if (!r?.id || reviewingRecharge.value) return
+  const reason = await askPrompt({
+    title: 'رفض إيصال شام كاش',
+    message: 'اكتب سبب رفض التحويل ليصل للمستخدم ضمن الإشعار.',
+    defaultValue: 'تعذر التحقق من بيانات التحويل أو الإيصال',
+  })
+  if (reason === null) return
+  reviewingRecharge.value = true
+  const { error: err } = await walletApi.cancelRecharge(r.id, { note: reason })
+  reviewingRecharge.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  selectedRecharge.value = null
+  success.value = 'تم رفض الطلب وإشعار المستخدم'
+  toast().success(success.value)
+  await load()
 }
 
 async function approveRecharge(r) {
