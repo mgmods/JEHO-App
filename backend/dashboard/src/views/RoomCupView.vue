@@ -32,6 +32,7 @@
       </div>
       <div class="mt-3">
         <h6 class="mb-2">جوائز المراكز</h6>
+        <div class="alert alert-info py-2 small">تُمنح العملات والألماس فقط. مستوى VIP ومدة VIP لا يُمنحان من كأس الروم لأن VIP شراء فقط.</div>
         <div class="widget-grid mb-3">
           <div v-for="(p, idx) in prizeCards" :key="idx" class="widget-card">
             <div class="widget-card-body">
@@ -49,14 +50,6 @@
                 <div class="col-6">
                   <label class="form-label small">ألماس</label>
                   <input v-model.number="p.diamonds" type="number" min="0" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6">
-                  <label class="form-label small">VIP</label>
-                  <input v-model.number="p.vipLevel" type="number" min="0" class="form-control form-control-sm" />
-                </div>
-                <div class="col-6">
-                  <label class="form-label small">أيام VIP</label>
-                  <input v-model.number="p.vipDays" type="number" min="1" class="form-control form-control-sm" />
                 </div>
               </div>
             </div>
@@ -172,9 +165,9 @@ const cfg = reactive({
   officialRoomId: '',
 })
 const prizeCards = ref([
-  { rank: 1, coins: 100000, diamonds: 0, vipLevel: 3, vipDays: 30 },
-  { rank: 2, coins: 50000, diamonds: 0, vipLevel: 2, vipDays: 30 },
-  { rank: 3, coins: 20000, diamonds: 0, vipLevel: 1, vipDays: 30 },
+  { rank: 1, coins: 100000, diamonds: 0 },
+  { rank: 2, coins: 50000, diamonds: 0 },
+  { rank: 3, coins: 20000, diamonds: 0 },
 ])
 const board = ref({ items: [], seasonKey: '' })
 const cardTop = reactive({ enabled: false, period: 'weekly', metric: 'diamonds', frames: ['', '', ''] })
@@ -193,7 +186,7 @@ function absUrl(u) {
 
 function addPrize() {
   const next = (prizeCards.value.at(-1)?.rank || 0) + 1
-  prizeCards.value.push({ rank: next, coins: 0, diamonds: 0, vipLevel: 0, vipDays: 30 })
+  prizeCards.value.push({ rank: next, coins: 0, diamonds: 0 })
 }
 
 function removePrize(idx) {
@@ -220,7 +213,7 @@ async function loadCfg() {
   if (map['room_cup.prizes']) {
     try {
       const parsed = JSON.parse(map['room_cup.prizes'])
-      if (Array.isArray(parsed) && parsed.length) prizeCards.value = parsed
+      if (Array.isArray(parsed) && parsed.length) prizeCards.value = parsed.map((p) => ({ rank: Number(p.rank) || 0, coins: Math.max(0, Number(p.coins) || 0), diamonds: Math.max(0, Number(p.diamonds) || 0) }))
     } catch {
       /* keep defaults */
     }
