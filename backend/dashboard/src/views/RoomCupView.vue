@@ -13,11 +13,20 @@
           </div>
         </div>
         <div class="col-md-3">
-          <label class="form-label">مدة الموسم</label>
+          <label class="form-label">نظام الموسم</label>
           <select v-model="cfg.period" class="form-select">
-            <option value="weekly">أسبوعي</option>
-            <option value="monthly">شهري</option>
+            <option value="weekly">أسبوعي تلقائي</option>
+            <option value="monthly">شهري تلقائي</option>
+            <option value="custom">بداية ونهاية محددة</option>
           </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">يبدأ الموسم</label>
+          <input v-model="cfg.startAt" class="form-control" type="datetime-local" :disabled="cfg.period !== 'custom'" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">ينتهي الموسم</label>
+          <input v-model="cfg.endAt" class="form-control" type="datetime-local" :disabled="cfg.period !== 'custom'" />
         </div>
         <div class="col-md-3">
           <label class="form-label">آي دي الروم الرسمي (UUID)</label>
@@ -57,6 +66,19 @@
                 <div class="col-6">
                   <label class="form-label small">أيام VIP</label>
                   <input v-model.number="p.vipDays" type="number" min="1" class="form-control form-control-sm" />
+                </div>
+                <div class="col-8">
+                  <label class="form-label small">مكافأة من المتجر</label>
+                  <select v-model="p.cosmeticId" class="form-select form-select-sm">
+                    <option value="">بدون عنصر متجر</option>
+                    <option v-for="item in cosmeticCatalog" :key="item.id" :value="item.id">
+                      {{ item.name }} · {{ item.type }}
+                    </option>
+                  </select>
+                </div>
+                <div class="col-4">
+                  <label class="form-label small">مدة العنصر (أيام)</label>
+                  <input v-model.number="p.cosmeticDays" type="number" min="0" class="form-control form-control-sm" />
                 </div>
               </div>
             </div>
@@ -155,7 +177,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { roomCupApi, settingsApi } from '@/api'
+import { roomCupApi, settingsApi, cosmeticsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 import { formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
@@ -170,14 +192,17 @@ const cfg = reactive({
   enabled: true,
   period: 'weekly',
   officialRoomId: '',
+  startAt: '',
+  endAt: '',
 })
 const prizeCards = ref([
-  { rank: 1, coins: 100000, diamonds: 0, vipLevel: 3, vipDays: 30 },
-  { rank: 2, coins: 50000, diamonds: 0, vipLevel: 2, vipDays: 30 },
-  { rank: 3, coins: 20000, diamonds: 0, vipLevel: 1, vipDays: 30 },
+  { rank: 1, coins: 100000, diamonds: 0, vipLevel: 3, vipDays: 30, cosmeticId: '', cosmeticDays: 0 },
+  { rank: 2, coins: 50000, diamonds: 0, vipLevel: 2, vipDays: 30, cosmeticId: '', cosmeticDays: 0 },
+  { rank: 3, coins: 20000, diamonds: 0, vipLevel: 1, vipDays: 30, cosmeticId: '', cosmeticDays: 0 },
 ])
 const board = ref({ items: [], seasonKey: '' })
 const cardTop = reactive({ enabled: false, period: 'weekly', metric: 'diamonds', frames: ['', '', ''] })
+const cosmeticCatalog = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const ending = ref(false)
@@ -191,9 +216,24 @@ function absUrl(u) {
   return resolveAsset(u)
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (!Number.isFinite(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+    'T' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+}
+
+function toIso(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isFinite(d.getTime()) ? d.toISOString() : ''
+}
+
 function addPrize() {
   const next = (prizeCards.value.at(-1)?.rank || 0) + 1
-  prizeCards.value.push({ rank: next, coins: 0, diamonds: 0, vipLevel: 0, vipDays: 30 })
+  prizeCards.value.push({ rank: next, coins: 0, diamonds: 0, vipLevel: 0, vipDays: 30, cosmeticId: '', cosmeticDays: 0 })
 }
 
 function removePrize(idx) {
@@ -213,6 +253,8 @@ async function loadCfg() {
   cfg.enabled = String(map['room_cup.enabled'] ?? 'true') !== 'false'
   cfg.period = map['room_cup.period'] || 'weekly'
   cfg.officialRoomId = map['official_room_id'] || ''
+  cfg.startAt = toDateTimeLocal(map['room_cup.start_at'] || '')
+  cfg.endAt = toDateTimeLocal(map['room_cup.end_at'] || '')
   cardTop.enabled = String(map['room_card_top.enabled'] ?? 'false') === 'true'
   cardTop.period = map['room_card_top.period'] === 'daily' ? 'daily' : 'weekly'
   cardTop.metric = map['room_card_top.metric'] === 'coins' ? 'coins' : 'diamonds'
@@ -220,11 +262,20 @@ async function loadCfg() {
   if (map['room_cup.prizes']) {
     try {
       const parsed = JSON.parse(map['room_cup.prizes'])
-      if (Array.isArray(parsed) && parsed.length) prizeCards.value = parsed
+      if (Array.isArray(parsed) && parsed.length) prizeCards.value = parsed.map((p) => ({
+        ...p,
+        cosmeticId: p?.cosmeticId || '',
+        cosmeticDays: Number(p?.cosmeticDays || 0),
+      }))
     } catch {
       /* keep defaults */
     }
   }
+}
+
+async function loadCosmeticCatalog() {
+  const { data, error: err } = await cosmeticsApi.catalog({ type: 'room_card' })
+  if (!err) cosmeticCatalog.value = data?.data || data || []
 }
 
 async function saveCfg() {
@@ -235,6 +286,8 @@ async function saveCfg() {
   const { error: err } = await settingsApi.update({
     'room_cup.enabled': String(!!cfg.enabled),
     'room_cup.period': cfg.period,
+    'room_cup.start_at': cfg.period === 'custom' ? toIso(cfg.startAt) : '',
+    'room_cup.end_at': cfg.period === 'custom' ? toIso(cfg.endAt) : '',
     'room_cup.prizes': prizesJson,
     official_room_id: cfg.officialRoomId || '',
   })
@@ -300,6 +353,7 @@ async function endSeason() {
 
 onMounted(async () => {
   await loadCfg()
+  await loadCosmeticCatalog()
   await loadBoard()
 })
 </script>
