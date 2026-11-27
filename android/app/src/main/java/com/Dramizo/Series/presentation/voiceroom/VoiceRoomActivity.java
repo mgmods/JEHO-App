@@ -346,8 +346,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 120L;
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 250L;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
     private int luckyCannonInFlight;
     /** Preserve the first tap if earlier requests temporarily occupy all sender slots. */
     private boolean luckyCannonPendingTapShot;
@@ -5219,8 +5219,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
                 luckyCannonSending = luckyCannonInFlight > 0;
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-                if (finalResult == null || !finalResult.success
-                        || finalResult.data == null || !finalResult.data.success) {
+                // A confirmed success payload wins over a transport wrapper timeout.
+                if (finalResult == null || finalResult.data == null || !finalResult.data.success) {
                     String failure = finalResult != null ? finalResult.error : null;
                     if (isTransientLuckyCannonFailure(failure)) {
                         android.util.Log.w("LuckyCannon", "Gift send remains uncertain after idempotent retry: " + failure);
