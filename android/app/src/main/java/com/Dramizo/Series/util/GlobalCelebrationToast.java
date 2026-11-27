@@ -29,6 +29,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import retrofit2.Call;
 import retrofit2.Callback;
