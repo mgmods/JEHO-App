@@ -1239,20 +1239,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         // Final safety pass: reconcile selected IDs against the latest room roster immediately before
         // sending. Seat snapshots can change while the gift sheet is open; posting stale IDs
         // produces the misleading "no users on seats" response even when the room has users.
-        if (!chatMode && targets.isEmpty() && getActivity() instanceof GiftRecipientSource src) {
-            // A room may be between roster snapshots while opening the gift sheet.
-            // If no mic recipient is currently available, use the room's authoritative
-            // default host target rather than failing with a misleading empty-seat error.
-            String hostFallback = src.getDefaultGiftReceiverId();
-            if (hostFallback != null && !hostFallback.trim().isEmpty()) {
-                targets.add(hostFallback.trim());
-                receiverId = hostFallback.trim();
-                sendToAllMic = false;
-                selectedRecipientIds.clear();
-                selectedRecipientIds.add(receiverId);
-            }
-        }
-
         if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
             List<GiftRecipient> latest = src.getGiftRecipients();
             LinkedHashSet<String> liveIds = new LinkedHashSet<>();
@@ -1280,6 +1266,19 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 receiverId = targets.get(0);
                 selectedRecipientIds.clear();
                 selectedRecipientIds.addAll(targets);
+            }
+        }
+
+        if (!chatMode && targets.isEmpty() && getActivity() instanceof GiftRecipientSource src) {
+            // If the live seat roster is momentarily empty, send to the room's default
+            // host target. Never guess an arbitrary occupant from a stale seat snapshot.
+            String hostFallback = src.getDefaultGiftReceiverId();
+            if (hostFallback != null && !hostFallback.trim().isEmpty()) {
+                targets.add(hostFallback.trim());
+                receiverId = hostFallback.trim();
+                sendToAllMic = false;
+                selectedRecipientIds.clear();
+                selectedRecipientIds.add(receiverId);
             }
         }
 
