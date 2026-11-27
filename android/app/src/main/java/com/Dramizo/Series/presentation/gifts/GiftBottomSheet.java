@@ -1236,6 +1236,39 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
+        // Reconcile the selected IDs against the latest room roster immediately before
+        // sending. Seat snapshots can change while the gift sheet is open; posting stale IDs
+        // produces the misleading "no users on seats" response even when the room has users.
+        if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
+            List<GiftRecipient> latest = src.getGiftRecipients();
+            LinkedHashSet<String> liveIds = new LinkedHashSet<>();
+            if (latest != null) {
+                for (GiftRecipient r : latest) {
+                    if (r != null && r.userId != null && !r.userId.trim().isEmpty()) {
+                        liveIds.add(r.userId.trim());
+                    }
+                }
+            }
+            List<String> reconciled = new ArrayList<>();
+            for (String id : targets) {
+                if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
+                    reconciled.add(id.trim());
+                }
+            }
+            if (reconciled.isEmpty() && !latest.isEmpty()) {
+                String fallback = src.getDefaultGiftReceiverId();
+                if (fallback != null && liveIds.contains(fallback)) reconciled.add(fallback);
+                if (reconciled.isEmpty()) reconciled.add(liveIds.iterator().next());
+            }
+            targets.clear();
+            targets.addAll(reconciled);
+            if (!targets.isEmpty()) {
+                receiverId = targets.get(0);
+                selectedRecipientIds.clear();
+                selectedRecipientIds.addAll(targets);
+            }
+        }
+
         // Self-gifting is controlled by the live dashboard policy and enforced by the server.
         // Keep selected recipients intact; stripping the sender here made the dashboard toggle ineffective.
 
