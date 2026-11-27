@@ -53,12 +53,14 @@ public class GiftRepositoryImpl implements GiftRepository {
         // a usable in-memory or Room catalog, even after the soft TTL expires.
         GiftDtos.GiftList mem = MEMORY.get();
         if (mem != null) {
-            if (System.currentTimeMillis() - memoryAt >= MEMORY_SOFT_TTL_MS) {
+            long age = System.currentTimeMillis() - memoryAt;
+            if (age < MEMORY_SOFT_TTL_MS) return Result.ok(copyList(mem));
+            if (!mem.isEmpty()) {
                 refreshInBackground();
-            }
-            if (!mem.isEmpty() || System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
                 return Result.ok(copyList(mem));
             }
+            // A stale empty cache goes directly to one network request; do not
+            // schedule a background request and then duplicate it synchronously.
         }
 
         // Cold process start: Room is the first fallback, not the last one.
