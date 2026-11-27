@@ -295,6 +295,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean micOn = false;
     /** True only after the user taps mute — survives refresh / WhatsApp return. */
     private boolean userChoseMute = false;
+    /** Prevents transient seat refreshes from re-toggling the microphone on/off. */
+    private boolean micStateInitializedForRoom = false;
     /** Last confirmed self-seat time; short stale-snapshot grace prevents mic publish flapping. */
     private long lastSelfSeatConfirmedAtMs = 0L;
     private boolean locked;
@@ -1521,7 +1523,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             RoomDtos.SeatDto mySeat = findMySeat(seats);
 
             // New seat assignment: open mic unless moderator-muted or user already chose mute.
-            if (nowOnSeat && !wasOnSeat) {
+            if (nowOnSeat && !wasOnSeat && !micStateInitializedForRoom) {
                 boolean modMuted = mySeat != null && mySeat.isModeratorMuted;
                 try {
                     if (modMuted || userChoseMute) {
@@ -1535,9 +1537,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 } catch (Exception zegoErr) {
                     android.util.Log.e("VoiceRoom", "mic activate failed", zegoErr);
                 }
+                micStateInitializedForRoom = true;
                 Toast.makeText(this, isHost ? "أنت المبدع على المايك" : "أنت على المايك الآن", Toast.LENGTH_SHORT).show();
             } else if (!nowOnSeat && wasOnSeat) {
                 micOn = false;
+                micStateInitializedForRoom = false;
                 // Keep the user's explicit mute preference across seat changes and room re-entry.
                 try {
                     RoomRtcEngine.getInstance().setMicEnabled(false);
@@ -1555,6 +1559,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             } else if (nowOnSeat && isHost && !userChoseMute && !micOn
+                    && !micStateInitializedForRoom
                     && (mySeat == null || !mySeat.isModeratorMuted)) {
                 // Host already seated on first open (no wasOnSeat edge) — still open mic.
                 micOn = true;
@@ -17618,6 +17623,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 restoreSeatSnapshotUntilMs = 0L;
                 lastSelfSeatConfirmedAtMs = 0L;
                 micOn = false;
+                micStateInitializedForRoom = false;
                 // Seat removal is not a request to erase the user's saved mute preference.
                 RoomRtcEngine.getInstance().setMicEnabled(false);
                 RoomRtcEngine.getInstance().stopPublishing();
