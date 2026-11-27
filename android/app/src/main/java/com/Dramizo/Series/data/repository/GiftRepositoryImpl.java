@@ -92,6 +92,7 @@ public class GiftRepositoryImpl implements GiftRepository {
             GiftDtos.GiftList list = fromEntities(local);
             if (!list.isEmpty()) {
                 MEMORY.set(copyList(list));
+                memoryAt = System.currentTimeMillis();
                 return list;
             }
         } catch (Exception ignored) {
@@ -164,10 +165,9 @@ public class GiftRepositoryImpl implements GiftRepository {
             e.category = g.category;
             e.sortOrder = g.sortOrder;
             e.cachedAt = System.currentTimeMillis();
-            String stem = localArtStem(g.iconUrl);
-            if (stem.isEmpty()) stem = localArtStem(g.animationUrl);
-            String key = !stem.isEmpty() ? "s:" + stem
-                    : (g.name != null ? "n:" + g.name.trim().toLowerCase() : "id:" + g.id);
+            // Gift identity is its server ID, never its artwork URL or display name.
+            // Different gifts may intentionally share one thumbnail/animation.
+            String key = "id:" + g.id;
             if (uniq.containsKey(key)) continue;
             uniq.put(key, e);
         }
