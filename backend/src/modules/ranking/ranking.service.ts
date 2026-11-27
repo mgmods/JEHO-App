@@ -85,7 +85,7 @@ export class RankingService {
     }
     if (/^(?:\/?uploads|\/?assets)\//i.test(imageUrl)
         || /^\/?api\/v\d+\/uploads\//i.test(imageUrl)) {
-      return imageUrl.startsWith('/') ? imageUrl : \`/\${imageUrl}\`;
+      return imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl;
     }
 
     let parsed: URL;
