@@ -217,11 +217,10 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun buildShell() {
-        window.statusBarColor = Color.WHITE
-        window.navigationBarColor = Color.WHITE
+        window.statusBarColor = 0xFF15182B.toInt()
+        window.navigationBarColor = 0xFF171A2E.toInt()
         @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
