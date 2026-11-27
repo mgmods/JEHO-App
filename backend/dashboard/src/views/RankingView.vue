@@ -33,9 +33,14 @@
               <img v-if="reward.imageUrl" :src="resolveAsset(reward.imageUrl) || reward.imageUrl" alt="معاينة المكافأة">
               <span v-else>صورة المكافأة</span>
             </div>
-            <label class="form-label small">اختيار مكافأة من متجر التطبيق</label>\n            <select v-model="reward.cosmeticId" class="form-select form-select-sm mb-2" @change="applyStoreReward(reward)">\n              <option value="">مكافأة بصورة مخصصة</option>\n              <option v-for="item in cosmeticCatalog" :key="item.id" :value="item.id">{{ item.name }} · {{ item.type }}</option>\n            </select>\n            <label class="form-label small">اسم المكافأة</label>
+            <label class="form-label small">اختيار مكافأة من متجر التطبيق</label>
+            <select v-model="reward.cosmeticId" class="form-select form-select-sm mb-2" @change="applyStoreReward(reward)">
+              <option value="">مكافأة بصورة مخصصة</option>
+              <option v-for="item in cosmeticCatalog" :key="item.id" :value="item.id">{{ item.name }} · {{ item.type }}</option>
+            </select>
+            <label class="form-label small">اسم المكافأة</label>
             <input v-model="reward.name" class="form-control form-control-sm mb-2" maxlength="80" placeholder="مثلاً: إطار ذهبي">
-            <label class="form-label small">رابط صورة المكافأة (HTTPS)</label>
+            <label class="form-label small">رابط HTTPS أو مسار صورة داخل التطبيق</label>
             <input v-model="reward.imageUrl" class="form-control form-control-sm mb-2" type="url" placeholder="https://...">
             <label class="form-label small">وصف اختياري</label>
             <input v-model="reward.description" class="form-control form-control-sm" maxlength="180" placeholder="تفاصيل الجائزة">
@@ -119,7 +124,7 @@ const loading = ref(false)
 const error = ref('')
 const rewardPeriod = ref('weekly')
 const savingRewards = ref(false)
-const emptyRewards = () => Array.from({ length: 3 }, () => ({ name: '', imageUrl: '', description: '' }))
+const emptyRewards = () => Array.from({ length: 3 }, () => ({ name: '', imageUrl: '', description: '', cosmeticId: '' }))
 const rewardConfig = ref({ enabled: true, weekly: emptyRewards(), monthly: emptyRewards() })
 const cosmeticCatalog = ref([])
 function selectedCosmetic(id) { return cosmeticCatalog.value.find(item => String(item.id) === String(id)) }

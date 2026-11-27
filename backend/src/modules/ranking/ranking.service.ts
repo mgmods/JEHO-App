@@ -79,8 +79,32 @@ export class RankingService {
         const name = String(item?.name || '').trim().slice(0, 80);
         const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2048);
         const description = String(item?.description || '').trim().slice(0, 180);
-        if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
-          throw new BadRequestException('Reward image URLs must use HTTPS');
+        const isHttpsUrl = (() => {
+          try {
+            const parsed = new URL(imageUrl);
+            return parsed.protocol === 'https:' && !!parsed.hostname
+              && !parsed.username && !parsed.password;
+          } catch {
+            return false;
+          }
+        })();
+        const isSafeLocalAsset = (() => {
+          try {
+            if (!imageUrl.startsWith('/') || imageUrl.startsWith('//') || imageUrl.includes('\\')) {
+              return false;
+            }
+            const parsed = new URL(imageUrl, 'https://jeho-local.invalid');
+            if (parsed.origin !== 'https://jeho-local.invalid') return false;
+            const decodedPath = decodeURIComponent(parsed.pathname);
+            const allowedRoot = /^\/(?:uploads|assets|visual-system)\//i.test(decodedPath);
+            const unsafeSegment = decodedPath.split('/').some((part) => part === '.' || part === '..');
+            return allowedRoot && !unsafeSegment && !decodedPath.includes('\\');
+          } catch {
+            return false;
+          }
+        })();
+        if (imageUrl && !isHttpsUrl && !isSafeLocalAsset) {
+          throw new BadRequestException('Reward image must be HTTPS or a safe app asset path');
         }
         const cosmeticId = String(item?.cosmeticId || '').trim().slice(0, 128);
         return { rank: index + 1, name, imageUrl, description, cosmeticId };
