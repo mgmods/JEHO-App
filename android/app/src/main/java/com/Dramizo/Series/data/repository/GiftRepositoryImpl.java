@@ -2,6 +2,7 @@ package com.Dramizo.Series.data.repository;
 
 import com.Dramizo.Series.data.local.dao.GiftDao;
 import com.Dramizo.Series.data.local.entity.GiftEntity;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.remote.api.GiftApi;
 import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.domain.model.Result;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 
 /**
  * Stale-while-revalidate gift catalog: memory → Room → network.
@@ -30,11 +33,17 @@ public class GiftRepositoryImpl implements GiftRepository {
     private final GiftApi api;
     private final GiftDao dao;
     private final ExecutorService io;
+    private final EncryptedFeatureCache featureCache;
 
     public GiftRepositoryImpl(GiftApi api, GiftDao dao, ExecutorService io) {
+        this(api, dao, io, null);
+    }
+
+    public GiftRepositoryImpl(GiftApi api, GiftDao dao, ExecutorService io, EncryptedFeatureCache featureCache) {
         this.api = api;
         this.dao = dao;
         this.io = io;
+        this.featureCache = featureCache;
     }
 
     @Override
@@ -118,9 +127,17 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public List<GiftDtos.GiftCategoryDto> peekCategoriesOrNull() {
         List<GiftDtos.GiftCategoryDto> mem = MEMORY_CATS.get();
-        return mem != null && !mem.isEmpty()
-                ? new ArrayList<>(mem)
-                : null;
+        if (mem != null && !mem.isEmpty()) return new ArrayList<>(mem);
+        if (featureCache != null) {
+            Type type = new TypeToken<List<GiftDtos.GiftCategoryDto>>() {}.getType();
+            List<GiftDtos.GiftCategoryDto> disk = featureCache.getJson(
+                    EncryptedFeatureCache.UID_APP, "gift_categories", type, 0L);
+            if (disk != null && !disk.isEmpty()) {
+                MEMORY_CATS.set(new ArrayList<>(disk));
+                return new ArrayList<>(disk);
+            }
+        }
+        return null;
     }
 
     @Override
@@ -134,6 +151,8 @@ public class GiftRepositoryImpl implements GiftRepository {
         if (r.success && r.data != null) {
             // Dashboard is authoritative — even an empty list wins over any cached fallback.
             MEMORY_CATS.set(new ArrayList<>(r.data));
+            if (featureCache != null) featureCache.putJson(
+                    EncryptedFeatureCache.UID_APP, "gift_categories", r.data);
             return Result.ok(new ArrayList<>(r.data));
         }
         List<GiftDtos.GiftCategoryDto> mem = peekCategoriesOrNull();
