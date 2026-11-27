@@ -80,6 +80,17 @@
                   <label class="form-label small">مدة العنصر (أيام)</label>
                   <input v-model.number="p.cosmeticDays" type="number" min="0" class="form-control form-control-sm" />
                 </div>
+                <div v-if="selectedCosmetic(p.cosmeticId)" class="col-12 d-flex align-items-center gap-2 mt-2">
+                  <img
+                    :src="absUrl(selectedCosmetic(p.cosmeticId).previewUrl)"
+                    class="cup-reward-thumb"
+                    :alt="selectedCosmetic(p.cosmeticId).name"
+                  />
+                  <div class="small">
+                    <div class="fw-semibold">{{ selectedCosmetic(p.cosmeticId).name }}</div>
+                    <div class="text-muted">معاينة مكافأة المتجر التي ستُمنح لصاحب هذا المركز</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -214,6 +225,11 @@ const periodLabel = computed(() => (cfg.period === 'monthly' ? 'شهري' : cfg.
 
 function absUrl(u) {
   return resolveAsset(u)
+}
+
+function selectedCosmetic(id) {
+  if (!id) return null
+  return cosmeticCatalog.value.find((item) => String(item.id) === String(id)) || null
 }
 
 function toDateTimeLocal(value) {
