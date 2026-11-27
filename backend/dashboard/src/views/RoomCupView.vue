@@ -210,7 +210,7 @@ const error = ref('')
 const ok = ref('')
 const askEnd = ref(false)
 
-const periodLabel = computed(() => (cfg.period === 'monthly' ? 'شهري' : 'أسبوعي'))
+const periodLabel = computed(() => (cfg.period === 'monthly' ? 'شهري' : cfg.period === 'custom' ? 'محدد' : 'أسبوعي'))
 
 function absUrl(u) {
   return resolveAsset(u)
@@ -274,7 +274,7 @@ async function loadCfg() {
 }
 
 async function loadCosmeticCatalog() {
-  const { data, error: err } = await cosmeticsApi.catalog({ type: 'room_card' })
+  const { data, error: err } = await cosmeticsApi.catalog()
   if (!err) cosmeticCatalog.value = data?.data || data || []
 }
 
