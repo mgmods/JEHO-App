@@ -349,12 +349,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 250L;
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 130L;
+    // A small bounded parallel window keeps press-and-hold responsive without queuing after release.
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private int luckyCannonInFlight;
-    /** Preserve the first tap if earlier requests temporarily occupy all sender slots. */
-    private int luckyCannonPendingTapShots;
-    private static final int LUCKY_CANNON_MAX_PENDING_TAPS = 20;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
@@ -5132,11 +5130,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // again" feeling and makes every new press an independent lucky-gift start.
         if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
             sendLuckyCannonBatch(1);
-        } else {
-            // A previous released press may still be completing on the network.
-            // Retain this new tap and send it as soon as one bounded slot is free.
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
         }
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
@@ -5160,11 +5153,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void sendLuckyCannonBatch(int requestedQuantity) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
-            return;
-        }
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
         // Resolve only the recipients selected when the lucky gift was armed.
         // Their current seat positions are resolved later for the center-to-seat flight.
         // currentSeats is a presentation cache and may be empty/stale during
@@ -5235,10 +5224,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         // The same idempotency key was retried once. Stop this gesture
                         // quietly rather than issuing a new key that could double-charge
                         // a shot whose first server response was lost.
-                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                     } else {
-                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                         BalanceRedirect.handle(VoiceRoomActivity.this,
                                 failure != null && !failure.trim().isEmpty()
@@ -5247,7 +5234,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 showLuckyCannonAndScheduleHide();
-                drainLuckyCannonPendingTap();
             });
         };
         try {
@@ -5265,10 +5251,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
             luckyCannonSending = luckyCannonInFlight > 0;
             if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
-            android.util.Log.w("LuckyCannon", "Gift send deferred while executor is busy", rejected);
-            handler.postDelayed(this::drainLuckyCannonPendingTap, 160L);
+            android.util.Log.w("LuckyCannon", "Gift send rejected by executor", rejected);
             if (luckyCannonHoldActive) {
                 handler.removeCallbacks(luckyCannonRepeatRunnable);
                 handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
@@ -5287,13 +5270,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || value.contains("temporarily unavailable");
     }
 
-    private void drainLuckyCannonPendingTap() {
-        if (luckyCannonPendingTapShots <= 0 || luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT
-                || !luckyCannonEnabled || luckyCannonGiftId == null
-                || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        luckyCannonPendingTapShots--;
-        handler.post(() -> sendLuckyCannonBatch(1));
-    }
 
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
                                       long totalCoins, int quantity, int personCount,
