@@ -24,6 +24,7 @@ public class GiftRepositoryImpl implements GiftRepository {
             new AtomicReference<>();
     private static final AtomicBoolean REFRESH_IN_FLIGHT = new AtomicBoolean(false);
     private static volatile long memoryAt;
+    private static volatile long memoryCategoriesAt;
     private static final long MEMORY_SOFT_TTL_MS = 10 * 60_000L;
 
     private final GiftApi api;
@@ -129,6 +130,7 @@ public class GiftRepositoryImpl implements GiftRepository {
         if (r.success && r.data != null) {
             // Dashboard is authoritative — even an empty list wins over any cached fallback.
             MEMORY_CATS.set(new ArrayList<>(r.data));
+            memoryCategoriesAt = System.currentTimeMillis();
             return Result.ok(new ArrayList<>(r.data));
         }
         List<GiftDtos.GiftCategoryDto> mem = peekCategoriesOrNull();
@@ -245,5 +247,11 @@ public class GiftRepositoryImpl implements GiftRepository {
         GiftDtos.GiftList mem = MEMORY.get();
         return mem != null && !mem.isEmpty()
                 && (System.currentTimeMillis() - memoryAt) < MEMORY_SOFT_TTL_MS;
+    }
+
+    public static boolean hasWarmCategories() {
+        List<GiftDtos.GiftCategoryDto> categories = MEMORY_CATS.get();
+        return categories != null
+                && (System.currentTimeMillis() - memoryCategoriesAt) < MEMORY_SOFT_TTL_MS;
     }
 }
