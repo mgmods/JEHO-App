@@ -43,8 +43,6 @@ public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static WeakReference<View> current = new WeakReference<>(null);
     private static WeakReference<View> currentCenter = new WeakReference<>(null);
-    private static Runnable hideRunnable;
-    private static Runnable hideRunnableCenter;
     private static String lastDedupeKey;
     private static long lastShownAt;
     /** Bit 0 = top placement shown; bit 1 = center placement shown for this event. */
@@ -289,10 +287,13 @@ public final class GlobalCelebrationToast {
                 positionViewPercent(active.findViewById(R.id.wrapCelebrationTimes), active, countX, countY, true);
             });
         }
-        if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
-        hideRunnable = () -> removeBanner(active);
+        Runnable previousHide = ACTIVE_HIDE_TASKS.remove(active);
+        if (previousHide != null) MAIN.removeCallbacks(previousHide);
+        boolean activeCenter = active == currentCenter.get();
+        Runnable styleHide = () -> removeBanner(active, activeCenter);
+        ACTIVE_HIDE_TASKS.put(active, styleHide);
         int duration = giftSend ? remoteDurationSeconds : luckyRoomHigh ? remoteLuckyRoomHighDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : luckyReturn ? remoteLuckyReturnDurationSeconds : remoteLuckyNormalDurationSeconds;
-        MAIN.postDelayed(hideRunnable, Math.max(1, Math.min(12, duration)) * 1000L);
+        MAIN.postDelayed(styleHide, Math.max(1, Math.min(12, duration)) * 1000L);
     }
 
     @SuppressWarnings("unchecked")
