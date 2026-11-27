@@ -46,10 +46,8 @@ public final class GlobalCelebrationToast {
     private static WeakReference<View> currentCenter = new WeakReference<>(null);
     /** Deduplicate each event + toast kind + placement independently for a short window. */
     private static final LinkedHashMap<String, DedupeState> RECENT_DEDUPE = new LinkedHashMap<>();
-    private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
-    private static final ArrayDeque<ToastRequest> PENDING_CENTER = new ArrayDeque<>();
-    private static boolean showing;
-    private static boolean showingCenter;
+    private static final Map<String, ArrayDeque<ToastRequest>> PENDING_BY_LANE = new java.util.HashMap<>();
+    private static final java.util.Set<String> ACTIVE_LANES = new java.util.HashSet<>();
     /** Each visible banner owns its hide timer; simultaneous wins never cancel one another. */
     private static final Map<View, Runnable> ACTIVE_HIDE_TASKS = new WeakHashMap<>();
     private static final Map<View, Integer> STACK_STEPS_DP = new WeakHashMap<>();
@@ -631,7 +629,8 @@ public final class GlobalCelebrationToast {
             @Nullable String displayName,
             @Nullable String kind,
             @Nullable String roomId,
-            boolean centerPlacement
+            boolean centerPlacement,
+            @NonNull String laneKey
     ) {
         if ("gift_send".equalsIgnoreCase(kind)) return;
         if (activity == null || activity.isFinishing()) return;
@@ -671,25 +670,26 @@ public final class GlobalCelebrationToast {
         ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
                 margin, multiplier, coinsWon, displayName, kind, roomId, centerPlacement);
         MAIN.post(() -> {
-            // Preserve every distinct toast in arrival order. Do not replace an active
-            // lucky toast or discard pending normal/return/high results.
-            if (request.centerPlacement) {
-                PENDING_CENTER.addLast(request);
-                showNext(true);
-            } else {
-                PENDING.addLast(request);
-                showNext(false);
-            }
+            // Each toast type owns a fixed screen slot and its own FIFO. Different
+            // types can coexist; repeated events of one type wait for that slot to clear.
+            String laneKey = toastLaneKey(request.kind, request.centerPlacement);
+            ArrayDeque<ToastRequest> lane = PENDING_BY_LANE.computeIfAbsent(
+                    laneKey, ignored -> new ArrayDeque<>());
+            lane.addLast(request);
+            showNext(laneKey);
         });
     }
 
-    private static void showNext() { showNext(false); }
+    private static String toastLaneKey(@Nullable String kind, boolean personal) {
+        String normalized = kind == null ? "default" : kind.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) normalized = "default";
+        return normalized + (personal ? "|personal" : "|room");
+    }
 
-    /** Top and winner-only center toasts run in independent lanes and may be visible together. */
-    private static void showNext(boolean centerLane) {
-        if (centerLane ? showingCenter : showing) return;
-        ArrayDeque<ToastRequest> lane = centerLane ? PENDING_CENTER : PENDING;
-        ToastRequest request = lane.pollFirst();
+    private static void showNext(String laneKey) {
+        if (laneKey == null || ACTIVE_LANES.contains(laneKey)) return;
+        ArrayDeque<ToastRequest> lane = PENDING_BY_LANE.get(laneKey);
+        ToastRequest request = lane != null ? lane.pollFirst() : null;
         if (request == null) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
@@ -697,23 +697,18 @@ public final class GlobalCelebrationToast {
         }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             lane.addFirst(request);
-            MAIN.postDelayed(() -> showNext(centerLane), 160L);
+            MAIN.postDelayed(() -> showNext(laneKey), 160L);
             return;
         }
-        if (centerLane) showingCenter = true; else showing = true;
+        ACTIVE_LANES.add(laneKey);
         try {
             showInternal(activity, request.title, request.body, request.avatarUrl,
                     request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
-                    request.displayName, request.kind, request.roomId, request.centerPlacement);
+                    request.displayName, request.kind, request.roomId, request.centerPlacement, laneKey);
         } catch (Throwable error) {
+            ACTIVE_LANES.remove(laneKey);
             android.util.Log.w("GlobalCelebrationToast", "Toast rendering failed", error);
-        } finally {
-            // A lane is occupied only while its view is being attached. Never wait for
-            // the 3–6 second animation timer: all events stay visible in their own slots.
-            MAIN.postDelayed(() -> {
-                if (centerLane) showingCenter = false; else showing = false;
-                showNext(centerLane);
-            }, 140L);
+            MAIN.post(() -> showNext(laneKey));
         }
     }
 
@@ -998,19 +993,11 @@ public final class GlobalCelebrationToast {
                     ? Math.max(0, Math.min(300, (int) numberConfig(chestToast, "yOffset", topMarginDp)))
                     : topMarginDp);
         }
-        String laneTag = centerPlacement ? "jeho-toast-personal" : "jeho-toast-public";
-        int stackIndex = 0;
-        for (int i = 0; i < root.getChildCount(); i++) {
-            Object tag = root.getChildAt(i).getTag();
-            if (tag instanceof String && ((String) tag).startsWith("jeho-toast-")) stackIndex++;
-        }
-        banner.setTag(laneTag);
+        // A lane has exactly one visible toast. Different toast types use their
+        // own dashboard X/Y coordinates and never push one another up or down.
+        banner.setTag("jeho-toast-lane|" + laneKey);
         banner.setLayoutParams(lp);
-        // Keep dashboard-selected X/Y coordinates intact; stack additional banners
-        // vertically beneath the first one instead of serializing the toast stream.
-        int stackStepDp = Math.max(72, Math.min(196, requestedHeightDp)) + 8;
-        STACK_STEPS_DP.put(banner, stackStepDp);
-        banner.setTranslationY(dp(activity, stackIndex * stackStepDp));
+        banner.setTranslationY(0f);
         banner.setAlpha(0f);
         banner.setScaleX(0.985f);
         banner.setScaleY(0.985f);
@@ -1046,10 +1033,7 @@ public final class GlobalCelebrationToast {
         root.addView(banner);
         if (centerPlacement) currentCenter = new WeakReference<>(banner);
         else current = new WeakReference<>(banner);
-        // The view is now on screen; release this lane immediately so the next
-        // event is rendered in the same frame window, not after this toast expires.
-        if (centerPlacement) showingCenter = false; else showing = false;
-        MAIN.post(() -> showNext(centerPlacement));
+        // Keep this lane occupied until this exact banner is removed.
 
         banner.animate()
                 .alpha(1f)
@@ -1400,13 +1384,19 @@ public final class GlobalCelebrationToast {
                 .withEndAction(() -> {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
+                        // Other toast lanes are independent; removal never repositions them.
                         STACK_STEPS_DP.remove(banner);
-                        reflowToastStack(parent);
                     }
                     if (centerPlacement) {
                         if (currentCenter.get() == banner) currentCenter = new WeakReference<>(null);
                     } else {
                         if (current.get() == banner) current = new WeakReference<>(null);
+                    }
+                    Object laneTag = banner.getTag();
+                    if (laneTag instanceof String && ((String) laneTag).startsWith("jeho-toast-lane|")) {
+                        String laneKey = ((String) laneTag).substring("jeho-toast-lane|".length());
+                        ACTIVE_LANES.remove(laneKey);
+                        MAIN.post(() -> showNext(laneKey));
                     }
                 })
                 .start();
