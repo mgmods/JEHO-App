@@ -540,6 +540,7 @@ public final class MiscDtos {
     public static class ThemeBackgrounds {
         @SerializedName("app") public String app;
         @SerializedName("auth") public String auth;
+        @SerializedName("register") public String register;
         @SerializedName("splash") public String splash;
         @SerializedName("home") public String home;
         @SerializedName("profile") public String profile;
