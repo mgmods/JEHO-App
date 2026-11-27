@@ -2826,37 +2826,10 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       );
       if (!owned?.length) throw new NotFoundException('هذه الهدية غير متاحة أو انتهت صلاحيتها');
     }
-    // Seat lists are realtime and can lag by one refresh while a user changes seats.
-    // Verify the target against the authoritative room state. If the selected seat/user
-    // disappeared in that tiny window, route the already-committed gift to the current
-    // live host instead of charging the sender and then showing a false "no user on seat"
-    // failure. Never guess a random occupant.
-    try {
-      await this.assertGiftTarget(dto, selfGift);
-    } catch (error) {
-      const message = error instanceof BadRequestException ? String(error.message || '') : '';
-      if (dto.roomId && message === 'Receiver is not in this room') {
-        const liveRoom = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
-        const fallbackHostId = String(
-          liveRoom?.activeHostId || liveRoom?.cohostId || liveRoom?.hostId || '',
-        ).trim();
-        if (fallbackHostId && fallbackHostId !== String(dto.receiverId)) {
-          dto.receiverId = fallbackHostId;
-          selfGift = String(senderId) === String(dto.receiverId);
-          selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
-          if (selfGiftBlocked) {
-            throw new BadRequestException(
-              'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة',
-            );
-          }
-          await this.assertGiftTarget(dto, selfGift);
-        } else {
-          throw error;
-        }
-      } else {
-        throw error;
-      }
-    }
+    // Never redirect a single-recipient gift to a different person.
+    // If the selected user left the room, reject before wallet mutation so the client
+    // can refresh the seat roster and let the sender choose again.
+    await this.assertGiftTarget(dto, selfGift);
 
     // CB/CP starter gifts are ordinary catalog gifts. The configured gift-to-type
     // mapping creates an invitation after the gift transaction commits; linked users

@@ -1236,10 +1236,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
-        // Final safety pass: reconcile selected IDs against the latest room roster immediately before
-        // sending. Seat snapshots can change while the gift sheet is open; posting stale IDs
-        // produces the misleading "no users on seats" response even when the room has users.
+        // Reconcile against the latest seat roster without changing the recipient chosen by
+        // the sender. A stale explicit selection must never be redirected to another user.
         if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
+            boolean hasExplicitRecipientSelection = sendToAllMic || !selectedRecipientIds.isEmpty();
             List<GiftRecipient> latest = src.getGiftRecipients();
             LinkedHashSet<String> liveIds = new LinkedHashSet<>();
             if (latest != null) {
@@ -1250,15 +1250,32 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 }
             }
             List<String> reconciled = new ArrayList<>();
-            for (String id : targets) {
-                if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
-                    reconciled.add(id.trim());
+            if (hasExplicitRecipientSelection) {
+                for (String id : targets) {
+                    if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
+                        reconciled.add(id.trim());
+                    }
                 }
-            }
-            if (reconciled.isEmpty() && !liveIds.isEmpty()) {
+                if (reconciled.isEmpty()) {
+                    Toast.makeText(requireContext(),
+                            "المستلم الذي اخترته لم يعد على المايك. حدّث المقاعد واختر مستلماً آخر",
+                            Toast.LENGTH_LONG).show();
+                    refreshSendBtn();
+                    return;
+                }
+            } else {
+                // With no explicit selection, keep the room's authoritative default host target.
+                // The host is giftable even when the seat roster is temporarily empty.
                 String fallback = src.getDefaultGiftReceiverId();
-                if (fallback != null && liveIds.contains(fallback)) reconciled.add(fallback);
-                if (reconciled.isEmpty()) reconciled.add(liveIds.iterator().next());
+                if (fallback != null && !fallback.trim().isEmpty()) {
+                    reconciled.add(fallback.trim());
+                } else {
+                    for (String id : targets) {
+                        if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
+                            reconciled.add(id.trim());
+                        }
+                    }
+                }
             }
             targets.clear();
             targets.addAll(reconciled);
