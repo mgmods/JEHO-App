@@ -334,6 +334,25 @@ export class PaymentsController {
     return this.paymentsService.getShamCashOrder(userId, id);
   }
 
+  @Post('sham-cash/orders/:id/receipt')
+  @ApiOperation({ summary: 'Submit Sham Cash transfer receipt for manual review' })
+  shamCashReceipt(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.paymentsService.submitShamCashReceipt(userId, id, body);
+  }
+
+  @Post('sham-cash/orders/:id/cancel')
+  @ApiOperation({ summary: 'Cancel own pending Sham Cash order' })
+  cancelShamCashOrder(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.paymentsService.cancelShamCashOrder(userId, id);
+  }
+
 }
 
 
