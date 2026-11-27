@@ -224,4 +224,3 @@ export class RoomCupController implements OnModuleInit {
     });
   }
 }
-}
