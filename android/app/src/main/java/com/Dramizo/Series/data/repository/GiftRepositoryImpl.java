@@ -52,11 +52,13 @@ public class GiftRepositoryImpl implements GiftRepository {
         // Stale-while-revalidate: never put a catalog network round-trip in front of
         // a usable in-memory or Room catalog, even after the soft TTL expires.
         GiftDtos.GiftList mem = MEMORY.get();
-        if (mem != null && !mem.isEmpty()) {
+        if (mem != null) {
             if (System.currentTimeMillis() - memoryAt >= MEMORY_SOFT_TTL_MS) {
                 refreshInBackground();
             }
-            return Result.ok(copyList(mem));
+            if (!mem.isEmpty() || System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
+                return Result.ok(copyList(mem));
+            }
         }
 
         // Cold process start: Room is the first fallback, not the last one.
@@ -94,7 +96,7 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public GiftDtos.GiftList peekLocalOrNull() {
         GiftDtos.GiftList mem = MEMORY.get();
-        if (mem != null && !mem.isEmpty()) {
+        if (mem != null) {
             return copyList(mem);
         }
         try {
@@ -114,8 +116,7 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public Result<GiftDtos.GiftList> refreshGifts() {
         GiftDtos.GiftList warm = MEMORY.get();
-        if (warm != null && !warm.isEmpty()
-                && System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
+        if (warm != null && System.currentTimeMillis() - memoryAt < MEMORY_SOFT_TTL_MS) {
             return Result.ok(copyList(warm));
         }
         GiftDtos.GiftList localWarm = peekLocalOrNull();
