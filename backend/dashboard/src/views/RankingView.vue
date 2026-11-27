@@ -33,7 +33,7 @@
               <img v-if="reward.imageUrl" :src="resolveAsset(reward.imageUrl) || reward.imageUrl" alt="معاينة المكافأة">
               <span v-else>صورة المكافأة</span>
             </div>
-            <label class="form-label small">اسم المكافأة</label>
+            <label class="form-label small">اختيار مكافأة من متجر التطبيق</label>\n            <select v-model="reward.cosmeticId" class="form-select form-select-sm mb-2" @change="applyStoreReward(reward)">\n              <option value="">مكافأة بصورة مخصصة</option>\n              <option v-for="item in cosmeticCatalog" :key="item.id" :value="item.id">{{ item.name }} · {{ item.type }}</option>\n            </select>\n            <label class="form-label small">اسم المكافأة</label>
             <input v-model="reward.name" class="form-control form-control-sm mb-2" maxlength="80" placeholder="مثلاً: إطار ذهبي">
             <label class="form-label small">رابط صورة المكافأة (HTTPS)</label>
             <input v-model="reward.imageUrl" class="form-control form-control-sm mb-2" type="url" placeholder="https://...">
@@ -103,7 +103,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { rankingApi } from '@/api'
+import { rankingApi, cosmeticsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { resolveAsset } from '@/utils/assets'
@@ -121,6 +121,19 @@ const rewardPeriod = ref('weekly')
 const savingRewards = ref(false)
 const emptyRewards = () => Array.from({ length: 3 }, () => ({ name: '', imageUrl: '', description: '' }))
 const rewardConfig = ref({ enabled: true, weekly: emptyRewards(), monthly: emptyRewards() })
+const cosmeticCatalog = ref([])
+function selectedCosmetic(id) { return cosmeticCatalog.value.find(item => String(item.id) === String(id)) }
+function applyStoreReward(reward) {
+  const item = selectedCosmetic(reward.cosmeticId)
+  if (!item) return
+  reward.name = item.name || reward.name
+  reward.imageUrl = item.previewUrl || item.imageUrl || reward.imageUrl
+  reward.description = reward.description || item.description || ''
+}
+async function loadCosmetics() {
+  const { data, error: err } = await cosmeticsApi.catalog()
+  if (!err) cosmeticCatalog.value = data?.data || data || []
+}
 
 const scoreUnit = computed(() => {
   if (category.value === 'rich') return t('ranking.coin')
@@ -137,7 +150,7 @@ async function loadRewards() {
   const { data, error: err } = await rankingApi.rewards()
   if (err) { toast().danger(err.message); return }
   const payload = data?.data ?? data ?? {}
-  const normalize = list => Array.from({ length: 3 }, (_, i) => ({ name: list?.[i]?.name || '', imageUrl: list?.[i]?.imageUrl || '', description: list?.[i]?.description || '' }))
+  const normalize = list => Array.from({ length: 3 }, (_, i) => ({ name: list?.[i]?.name || '', imageUrl: list?.[i]?.imageUrl || '', description: list?.[i]?.description || '', cosmeticId: list?.[i]?.cosmeticId || '' }))
   rewardConfig.value = { enabled: payload.enabled !== false, weekly: normalize(payload.weekly), monthly: normalize(payload.monthly) }
 }
 async function saveRewards() {
@@ -160,7 +173,7 @@ async function load() {
   rows.value = extractList(payload) || payload?.items || []
   if (!Array.isArray(rows.value)) rows.value = []
 }
-onMounted(() => { load(); loadRewards() })
+onMounted(() => { load(); loadRewards(); loadCosmetics() })
 </script>
 
 <style scoped>
