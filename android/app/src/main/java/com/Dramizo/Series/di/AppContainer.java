@@ -318,10 +318,10 @@ public class AppContainer {
 
         authRepository = new AuthRepositoryImpl(authApi, sessionManager, database.userDao(), ioExecutor);
         userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager);
-        roomRepository = new RoomRepositoryImpl(roomApi, ioExecutor);
+        roomRepository = new RoomRepositoryImpl(roomApi, ioExecutor, featureCache);
         chatRepository = new ChatRepositoryImpl(chatApi, database.chatMessageDao(), ioExecutor);
         walletRepository = new WalletRepositoryImpl(walletApi, database.walletDao(), ioExecutor);
-        giftRepository = new GiftRepositoryImpl(giftApi, database.giftDao(), ioExecutor);
+        giftRepository = new GiftRepositoryImpl(giftApi, database.giftDao(), ioExecutor, featureCache);
         gameRepository = new GameRepositoryImpl(gameApi, ioExecutor);
         vipRepository = new VipRepositoryImpl(vipApi, ioExecutor);
         agencyRepository = new AgencyRepositoryImpl(agencyApi, ioExecutor);

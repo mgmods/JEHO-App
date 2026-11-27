@@ -349,6 +349,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 120L;
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private int luckyCannonInFlight;
+    /** Preserve the first tap if earlier requests temporarily occupy all sender slots. */
+    private boolean luckyCannonPendingTapShot;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
@@ -5122,7 +5124,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // First send happens on ACTION_DOWN. This removes the old "release then press
         // again" feeling and makes every new press an independent lucky-gift start.
-        sendLuckyCannonBatch(1);
+        if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
+            sendLuckyCannonBatch(1);
+        } else {
+            // A previous released press may still be completing on the network.
+            // Retain this new tap and send it as soon as one bounded slot is free.
+            luckyCannonPendingTapShot = true;
+        }
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
         handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
@@ -5145,6 +5153,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void sendLuckyCannonBatch(int requestedQuantity) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
+            luckyCannonPendingTapShot = true;
+            return;
+        }
         // Resolve only the recipients selected when the lucky gift was armed.
         // Their current seat positions are resolved later for the center-to-seat flight.
         // currentSeats is a presentation cache and may be empty/stale during
@@ -5180,6 +5192,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             request.requestId = requestId;
             Result<GiftDtos.SendGiftResult> result =
                     ApiCall.execute(container.getGiftApi().sendAllMic(request));
+            if (result != null && !result.success && isTransientLuckyCannonFailure(result.error)) {
+                // Retry a timeout once with the SAME idempotency key. If the first
+                // request reached the server, this cannot charge/send the shot twice.
+                try { Thread.sleep(220L); } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
+            }
 
             // Keep compatibility with an older pinned API schema, reusing the same
             // idempotency key so the rejected first attempt cannot be charged twice.
@@ -5201,13 +5221,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 if (finalResult == null || !finalResult.success
                         || finalResult.data == null || !finalResult.data.success) {
-                    if (luckyCannonHoldActive) stopLuckyCannonHold(false);
-                    BalanceRedirect.handle(VoiceRoomActivity.this,
-                            finalResult != null && finalResult.error != null
-                                    ? finalResult.error : "تعذر إرسال دفعة الهدية");
+                    String failure = finalResult != null ? finalResult.error : null;
+                    if (isTransientLuckyCannonFailure(failure)) {
+                        android.util.Log.w("LuckyCannon", "Gift send remains uncertain after idempotent retry: " + failure);
+                        // Avoid a misleading retry toast for a transport timeout. The
+                        // request used a stable idempotency key for both attempts.
+                        if (luckyCannonHoldActive) {
+                            handler.removeCallbacks(luckyCannonRepeatRunnable);
+                            handler.postDelayed(luckyCannonRepeatRunnable, 450L);
+                        }
+                    } else {
+                        luckyCannonPendingTapShot = false;
+                        if (luckyCannonHoldActive) stopLuckyCannonHold(false);
+                        BalanceRedirect.handle(VoiceRoomActivity.this,
+                                failure != null && !failure.trim().isEmpty()
+                                        ? failure : "تعذر إرسال دفعة الهدية");
+                    }
                     return;
                 }
                 showLuckyCannonAndScheduleHide();
+                drainLuckyCannonPendingTap();
             });
         };
         try {
@@ -5220,14 +5253,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showLuckyCannonSendToast(luckyCannonComboCount, true);
             }
         } catch (RuntimeException rejected) {
-            // Executor saturation must not strand the in-flight counter or leave a
-            // press-and-hold loop repeatedly enqueueing work that cannot run.
+            // Saturation is back-pressure, not a user-facing gift failure. Keep the
+            // first tap pending and resume as soon as a sender slot becomes available.
             luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
             luckyCannonSending = luckyCannonInFlight > 0;
             if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-            stopLuckyCannonHold(false);
-            Toast.makeText(this, "تعذر إرسال الهدية الآن، حاول مجددًا", Toast.LENGTH_SHORT).show();
+            luckyCannonPendingTapShot = true;
+            android.util.Log.w("LuckyCannon", "Gift send deferred while executor is busy", rejected);
+            handler.postDelayed(this::drainLuckyCannonPendingTap, 160L);
+            if (luckyCannonHoldActive) {
+                handler.removeCallbacks(luckyCannonRepeatRunnable);
+                handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+            }
         }
+    }
+
+    private boolean isTransientLuckyCannonFailure(@Nullable String message) {
+        if (message == null || message.trim().isEmpty()) return true;
+        String value = message.toLowerCase(java.util.Locale.ROOT);
+        return value.contains("timeout") || value.contains("timed out")
+                || value.contains("socket") || value.contains("connection")
+                || value.contains("network") || value.contains("failed to connect")
+                || value.contains("unexpected end") || value.contains("تعذر الاتصال")
+                || value.contains("انقطع الاتصال") || value.contains("مهلة")
+                || value.contains("temporarily unavailable");
+    }
+
+    private void drainLuckyCannonPendingTap() {
+        if (!luckyCannonPendingTapShot || luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT
+                || !luckyCannonEnabled || luckyCannonGiftId == null
+                || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
+        luckyCannonPendingTapShot = false;
+        handler.post(() -> sendLuckyCannonBatch(1));
     }
 
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
@@ -13412,6 +13469,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onStop() {
         // A backgrounded room must never keep a hold-to-fire gesture running.
         stopLuckyCannonHold(false);
+        luckyCannonPendingTapShot = false;
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
