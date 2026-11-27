@@ -1584,6 +1584,7 @@ async function load() {
 function reloadActive() {
   if (settingsTab.value === 'splash') loadSplashSettings()
   if (settingsTab.value === 'register-background') loadRegisterBgSettings()
+  if (settingsTab.value === 'register-background') loadRegisterBgSettings()
   else if (isCoreTab.value || settingsTab.value === 'app-update') load()
   else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
