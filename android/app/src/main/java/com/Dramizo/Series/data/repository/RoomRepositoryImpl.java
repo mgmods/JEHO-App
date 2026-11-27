@@ -56,7 +56,7 @@ public class RoomRepositoryImpl implements RoomRepository {
     @Override
     public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit) {
         int safe = Math.max(1, Math.min(100, limit));
-        String namespace = "rooms_list_p" + Math.max(1, page) + "_l" + safe;
+        String namespace = "rooms_list_p" + page + "_l" + safe;
         MiscDtos.ListResult<RoomDtos.RoomDto> cached =
                 cache.getJson(EncryptedFeatureCache.UID_APP, namespace, roomListType, 0L);
         if (cached != null) {
