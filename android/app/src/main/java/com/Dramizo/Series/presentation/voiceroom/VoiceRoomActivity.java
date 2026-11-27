@@ -5224,12 +5224,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String failure = finalResult != null ? finalResult.error : null;
                     if (isTransientLuckyCannonFailure(failure)) {
                         android.util.Log.w("LuckyCannon", "Gift send remains uncertain after idempotent retry: " + failure);
-                        // Avoid a misleading retry toast for a transport timeout. The
-                        // request used a stable idempotency key for both attempts.
-                        if (luckyCannonHoldActive) {
-                            handler.removeCallbacks(luckyCannonRepeatRunnable);
-                            handler.postDelayed(luckyCannonRepeatRunnable, 450L);
-                        }
+                        // The same idempotency key was retried once. Stop this gesture
+                        // quietly rather than issuing a new key that could double-charge
+                        // a shot whose first server response was lost.
+                        luckyCannonPendingTapShot = false;
+                        if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                     } else {
                         luckyCannonPendingTapShot = false;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
