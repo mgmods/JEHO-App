@@ -120,12 +120,12 @@ internal class AdminDashboardRenderer(private val a:Activity) {
         })
         body.addView(TextView(a).apply{text="JEHO  •  الوصول محمي بالصلاحيات من الخادم";textSize=9f;gravity=Gravity.CENTER;setTextColor(0xFF999EAE.toInt());setPadding(0,dp(13),0,dp(2))})
         api.overview().enqueue(object:Callback<ApiResponse<Any>>{
-            override fun onResponse(call:Call<ApiResponse<Any>>,response:Response<ApiResponse<Object>>){
+            override fun onResponse(call:Call<ApiResponse<Any>>,response:Response<ApiResponse<Any>>){
                 if(a.isFinishing||a.isDestroyed)return
                 val data=response.body()?.getData() as? Map<*,*>?:return
                 values.forEach{(key,v)->val raw=data[key];v.text=when(raw){is Number->if(key=="todayRevenue")String.format(java.util.Locale.US,"%.0f",raw.toDouble())else raw.toLong().toString();null->"0";else->raw.toString()}}
             }
-            override fun onFailure(call:Call<ApiResponse<Object>>,error:Throwable){if(!a.isFinishing&&!a.isDestroyed)values.values.forEach{it.text="—"}}
+            override fun onFailure(call:Call<ApiResponse<Any>>,error:Throwable){if(!a.isFinishing&&!a.isDestroyed)values.values.forEach{it.text="—"}}
         })
     }
 
