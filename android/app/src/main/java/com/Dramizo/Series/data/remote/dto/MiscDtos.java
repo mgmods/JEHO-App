@@ -399,6 +399,7 @@ public final class MiscDtos {
         @SerializedName("accountName") public String accountName;
         @SerializedName("accountId") public String accountId;
         @SerializedName("instructions") public String instructions;
+        @SerializedName("qrImageUrl") public String qrImageUrl;
     }
 
     /** Bottom tab icons from GET /config/nav-icons (PNG/JPG URLs). */
