@@ -228,7 +228,8 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         if (raw.startsWith("https://") || raw.startsWith("http://")) return raw;
         String base = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
         if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        if (base.endsWith("/api")) base = base.substring(0, base.length() - 4);
+        if (base.endsWith("/api/v1")) base = base.substring(0, base.length() - 7);
+        else if (base.endsWith("/api")) base = base.substring(0, base.length() - 4);
         if (base.isEmpty()) return raw;
         return base + (raw.startsWith("/") ? raw : "/" + raw);
     }
