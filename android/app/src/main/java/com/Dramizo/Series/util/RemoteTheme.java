@@ -254,6 +254,7 @@ public final class RemoteTheme {
         if ("games".equals(screenKey) && notEmpty(bg.games)) return bg.games;
         switch (screenKey) {
             case "app": return bg.app;
+            case "register": return notEmpty(bg.register) ? bg.register : bg.auth;
             case "auth": return bg.auth;
             case "splash": return bg.splash;
             case "home": return bg.home;
