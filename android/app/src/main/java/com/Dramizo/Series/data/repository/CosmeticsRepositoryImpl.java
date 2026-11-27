@@ -115,18 +115,34 @@ public class CosmeticsRepositoryImpl implements CosmeticsRepository {
         }
     }
 
+    private void invalidateInventoryCache() {
+        String userId = sessionManager != null ? sessionManager.getUserId() : null;
+        if (userId != null && !userId.trim().isEmpty()) {
+            cache.remove(EncryptedFeatureCache.UID_APP, "cosmetic_inventory_" + userId);
+        }
+    }
+
     @Override
     public Result<CosmeticDtos.UserCosmeticDto> purchase(String cosmeticId) {
-        return ApiCall.execute(api.purchase(new CosmeticDtos.PurchaseRequest(cosmeticId)));
+        Result<CosmeticDtos.UserCosmeticDto> result =
+                ApiCall.execute(api.purchase(new CosmeticDtos.PurchaseRequest(cosmeticId)));
+        if (result.success) invalidateInventoryCache();
+        return result;
     }
 
     @Override
     public Result<CosmeticDtos.EquipResult> equip(String cosmeticId) {
-        return ApiCall.execute(api.equip(new CosmeticDtos.EquipRequest(cosmeticId)));
+        Result<CosmeticDtos.EquipResult> result =
+                ApiCall.execute(api.equip(new CosmeticDtos.EquipRequest(cosmeticId)));
+        if (result.success) invalidateInventoryCache();
+        return result;
     }
 
     @Override
     public Result<CosmeticDtos.EquipResult> unequip(String cosmeticId) {
-        return ApiCall.execute(api.unequip(new CosmeticDtos.EquipRequest(cosmeticId)));
+        Result<CosmeticDtos.EquipResult> result =
+                ApiCall.execute(api.unequip(new CosmeticDtos.EquipRequest(cosmeticId)));
+        if (result.success) invalidateInventoryCache();
+        return result;
     }
 }
