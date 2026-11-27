@@ -317,7 +317,7 @@ public class AppContainer {
         this.adminApi = retrofit.create(AdminApi.class);
 
         authRepository = new AuthRepositoryImpl(authApi, sessionManager, database.userDao(), ioExecutor);
-        userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager);
+        userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager, featureCache);
         roomRepository = new RoomRepositoryImpl(roomApi, ioExecutor, featureCache);
         chatRepository = new ChatRepositoryImpl(chatApi, database.chatMessageDao(), ioExecutor);
         walletRepository = new WalletRepositoryImpl(walletApi, database.walletDao(), ioExecutor);
