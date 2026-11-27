@@ -77,6 +77,22 @@
             </div>
             <p v-if="splashMessage" class="form-text mt-3" role="status">{{ splashMessage }}</p>
           </section>
+          <section class="settings-card">
+            <h3 class="settings-card-title">خلفية إنشاء الحساب</h3>
+            <p class="form-text mb-3">هذه الصورة تظهر فقط للمستخدم الجديد بعد اختياره المتابعة عبر Google وعند إكمال بيانات حسابه لأول مرة. لا تغيّر خلفية السبلاش ولا شاشة تسجيل الدخول.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="registerBgPreviewUrl" :src="registerBgPreviewUrl" alt="معاينة خلفية إنشاء الحساب" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
+            </div>
+            <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
+                {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+            </div>
+            <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
+          </section>
         </template>
 
         <template v-else-if="settingsTab === 'register-background'">
@@ -1032,7 +1048,6 @@ const settingTabs = computed(() => {
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
     { id: 'splash', label: 'صورة السبلاش', icon: 'bi-card-image', permission: 'settings' },
-    { id: 'register-background', label: 'خلفية إنشاء الحساب', icon: 'bi-person-plus', permission: 'settings' },
     { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
@@ -1456,7 +1471,7 @@ function syncTabFromRoute() {
   if (settingsTab.value === 'admins') loadOperators()
 }
 
-watch(settingsTab, (id) => { if (id === 'splash') loadSplashSettings(); if (id === 'register-background') loadRegisterBgSettings() })
+watch(settingsTab, (id) => { if (id === 'splash') { loadSplashSettings(); loadRegisterBgSettings() } })
 watch(() => route.query.tab, syncTabFromRoute)
 watch(settingTabs, () => {
   const allowed = new Set(settingTabs.value.map((x) => x.id))
@@ -1583,7 +1598,6 @@ async function load() {
 
 function reloadActive() {
   if (settingsTab.value === 'splash') loadSplashSettings()
-  if (settingsTab.value === 'register-background') loadRegisterBgSettings()
   if (settingsTab.value === 'register-background') loadRegisterBgSettings()
   else if (isCoreTab.value || settingsTab.value === 'app-update') load()
   else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
