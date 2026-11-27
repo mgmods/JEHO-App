@@ -79,6 +79,25 @@
           </section>
         </template>
 
+        <template v-else-if="settingsTab === 'register-background'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">خلفية إنشاء الحساب</h3>
+            <p class="form-text mb-3">هذه الصورة تظهر فقط للمستخدم الجديد بعد اختياره المتابعة عبر Google وعند إكمال بيانات حسابه لأول مرة. لا تغيّر خلفية السبلاش ولا شاشة تسجيل الدخول.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="registerBgPreviewUrl" :src="registerBgPreviewUrl" alt="معاينة خلفية إنشاء الحساب" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
+            </div>
+            <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
+                {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+            </div>
+            <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
+          </section>
+        </template>
+
         <template v-else-if="settingsTab === 'staff-identity'">
           <section class="settings-card">
             <h3 class="settings-card-title">هوية السوبر أدمن والأدمن والمانجر</h3>
@@ -818,6 +837,13 @@ const CORE_TABS = new Set(['general', 'economy', 'features', 'moderation', 'othe
 const isCoreTab = computed(() => CORE_TABS.has(settingsTab.value))
 const canWriteSettings = computed(() => auth.can('settings', 'write'))
 
+const registerBgFileInput = ref(null)
+const registerBgFile = ref(null)
+const registerBgPreviewUrl = ref('')
+const registerBgSavedUrl = ref('')
+const registerBgBusy = ref(false)
+const registerBgMessage = ref('')
+
 const splashFileInput = ref(null)
 const splashSelectedFile = ref(null)
 const splashPreviewUrl = ref('')
@@ -827,6 +853,80 @@ const splashUploading = ref(false)
 const splashSaving = ref(false)
 const splashMessage = ref('')
 let splashThemeConfig = {}
+
+async function loadRegisterBgSettings() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) { registerBgMessage.value = err.message || 'تعذّر تحميل خلفية إنشاء الحساب.'; return }
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  registerBgSavedUrl.value = config.backgrounds?.register || ''
+  registerBgPreviewUrl.value = registerBgSavedUrl.value ? resolveAsset(registerBgSavedUrl.value) : ''
+}
+
+function selectRegisterBg(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 12 * 1024 * 1024) {
+    registerBgMessage.value = 'اختر PNG أو JPG أو WebP بحجم لا يتجاوز 12 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  registerBgFile.value = file
+  if (registerBgPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(registerBgPreviewUrl.value)
+  registerBgPreviewUrl.value = URL.createObjectURL(file)
+  registerBgMessage.value = ''
+}
+
+async function persistRegisterBg(url) {
+  const { data, error: err } = await settingsApi.get()
+  if (err) throw new Error(err.message || 'تعذّر تحميل إعدادات الخلفية.')
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  config = { ...config, version: (Number(config.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    backgrounds: { ...(config.backgrounds || {}), register: url || '' } }
+  const { error: saveErr } = await settingsApi.update({ app_theme: JSON.stringify(config) })
+  if (saveErr) throw new Error(saveErr.message || 'تعذّر حفظ خلفية إنشاء الحساب.')
+  registerBgSavedUrl.value = url || ''
+  registerBgPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function saveRegisterBg() {
+  if (!registerBgFile.value) return
+  registerBgBusy.value = true
+  registerBgMessage.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(registerBgFile.value)
+    if (err) throw new Error(err.message || 'تعذّر رفع الصورة.')
+    const uploaded = data?.data || data || {}
+    const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+    if (!url) throw new Error('لم يرجع الخادم رابط الصورة بعد الرفع.')
+    await persistRegisterBg(url)
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تم حفظ خلفية إنشاء الحساب فقط.'
+    toast().success(registerBgMessage.value)
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّر حفظ الخلفية.'
+    toast().danger(registerBgMessage.value)
+  } finally { registerBgBusy.value = false }
+}
+
+async function removeRegisterBg() {
+  registerBgBusy.value = true
+  try {
+    await persistRegisterBg('')
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تمت إزالة خلفية إنشاء الحساب.'
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّرت إزالة الخلفية.'
+  } finally { registerBgBusy.value = false }
+}
 
 async function loadSplashSettings() {
   const { data, error: err } = await settingsApi.get()
@@ -874,7 +974,6 @@ async function persistSplashImage(url) {
     backgrounds: {
       ...(splashThemeConfig.backgrounds || {}),
       splash: url || '',
-      auth: url || '',
     },
   }
   const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(splashThemeConfig) })
@@ -933,6 +1032,7 @@ const settingTabs = computed(() => {
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
     { id: 'splash', label: 'صورة السبلاش', icon: 'bi-card-image', permission: 'settings' },
+    { id: 'register-background', label: 'خلفية إنشاء الحساب', icon: 'bi-person-plus', permission: 'settings' },
     { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
@@ -1356,7 +1456,7 @@ function syncTabFromRoute() {
   if (settingsTab.value === 'admins') loadOperators()
 }
 
-watch(settingsTab, (id) => { if (id === 'splash') loadSplashSettings() })
+watch(settingsTab, (id) => { if (id === 'splash') loadSplashSettings(); if (id === 'register-background') loadRegisterBgSettings() })
 watch(() => route.query.tab, syncTabFromRoute)
 watch(settingTabs, () => {
   const allowed = new Set(settingTabs.value.map((x) => x.id))
@@ -1483,6 +1583,7 @@ async function load() {
 
 function reloadActive() {
   if (settingsTab.value === 'splash') loadSplashSettings()
+  if (settingsTab.value === 'register-background') loadRegisterBgSettings()
   else if (isCoreTab.value || settingsTab.value === 'app-update') load()
   else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
