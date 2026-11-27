@@ -544,14 +544,13 @@ class AdminConsoleActivity : ThemedActivity() {
             ?: user?.username?.takeIf { it.isNotBlank() } ?: "فريق JEHO"
         val publicId = user?.publicId?.takeIf { it.isNotBlank() } ?: "—"
         AdminDashboardRenderer(this).render(
-            body = body,
-            role = currentRole,
-            displayName = displayName,
-            publicId = publicId,
-            modules = items,
-            api = api,
-            onOpen = { key -> openModule(key) }
-        )
+            body,
+            currentRole,
+            displayName,
+            publicId,
+            items,
+            api
+        ) { key -> openModule(key) }
     }
 
     private fun hasCustomGiftWritePermission(): Boolean {
