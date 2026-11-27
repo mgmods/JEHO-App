@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 # Force a fresh candidate build from the current MG-JEHO head.
+# 2026-11-28: rebuild requested Ghaymah image; push trigger publishes only and does not deploy.
 jobs:
   checks:
     runs-on: ubuntu-24.04
