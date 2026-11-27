@@ -17665,6 +17665,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 restoreSeatSnapshot = null;
                 restoreSeatSnapshotUntilMs = 0L;
                 lastSelfSeatConfirmedAtMs = 0L;
+                pendingSelfSeatIndex = -1;
+                pendingSelfSeatUntilMs = 0L;
                 micOn = false;
                 micStateInitializedForRoom = false;
                 // Seat removal is not a request to erase the user's saved mute preference.
