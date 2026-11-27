@@ -109,6 +109,13 @@ public final class EncryptedFeatureCache {
         ed.apply();
     }
 
+    /** Returns whether a cached namespace is still within its freshness window. */
+    public boolean isFresh(String userId, String namespace, long maxAgeMs) {
+        CacheEntry entry = readEntry(userId, namespace);
+        if (entry == null || entry.json == null) return false;
+        return maxAgeMs <= 0L || System.currentTimeMillis() - entry.savedAt <= maxAgeMs;
+    }
+
     @Nullable
     private CacheEntry readEntry(String userId, String namespace) {
         if (userId == null || userId.isEmpty() || namespace == null) return null;
