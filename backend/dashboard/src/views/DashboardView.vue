@@ -175,6 +175,10 @@ const systemHealth = ref(null)
 const healthLoading = ref(false)
 const cleaningLogs = ref(false)
 let timer = null
+let healthTimer = null
+let loadInFlight = false
+let healthInFlight = false
+let transactionsInFlight = false
 
 function seriesDelta(arr) {
   const data = (arr || []).map(Number).filter((n) => !Number.isNaN(n))
@@ -400,14 +404,27 @@ function txAmount(tx) {
 }
 
 async function loadHealth() {
+  if (healthInFlight) return
+  healthInFlight = true
   healthLoading.value = true
-  const { data, error: err } = await dashboardApi.systemHealth()
-  healthLoading.value = false
-  if (err) {
-    // soft-fail — keep rest of dashboard usable
-    return
+  try {
+    const { data, error: err } = await dashboardApi.systemHealth()
+    if (!err && data) systemHealth.value = data
+  } finally {
+    healthLoading.value = false
+    healthInFlight = false
   }
-  systemHealth.value = data || null
+}
+
+async function loadTransactions() {
+  if (transactionsInFlight || !auth.can('wallet', 'read')) return
+  transactionsInFlight = true
+  try {
+    const { data, error: err } = await walletApi.transactions({ limit: 8 })
+    if (!err && data) transactions.value = extractList(data).slice(0, 6)
+  } finally {
+    transactionsInFlight = false
+  }
 }
 
 async function onCleanLogs(payload) {
@@ -440,35 +457,52 @@ async function onCleanLogs(payload) {
 }
 
 async function load() {
+  // A slow response must never overlap the next refresh and multiply DB load.
+  if (loadInFlight) return
+  loadInFlight = true
   loading.value = true
   error.value = ''
-  const [ov, ch, lv, tx] = await Promise.all([
-    dashboardApi.overview(),
-    dashboardApi.charts({ range: '7d' }),
-    dashboardApi.liveStats(),
-    walletApi.transactions({ limit: 8 }),
-  ])
-  loading.value = false
-  if (ov.error && ch.error && lv.error) {
-    error.value = ov.error.message || t('dashboard.apiError')
-    toast().danger(error.value)
-  } else if (ov.error || ch.error || lv.error) {
-    error.value = [ov.error, ch.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
-    toast().warning(error.value)
+  try {
+    const [ov, ch, lv] = await Promise.all([
+      dashboardApi.overview(),
+      dashboardApi.charts({ range: '7d' }),
+      dashboardApi.liveStats(),
+    ])
+    if (ov.error && ch.error && lv.error) {
+      error.value = ov.error.message || t('dashboard.apiError')
+      toast().danger(error.value)
+    } else if (ov.error || ch.error || lv.error) {
+      error.value = [ov.error, ch.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
+      toast().warning(error.value)
+    }
+    // Preserve the last good snapshot when one endpoint temporarily fails.
+    if (ov.data) overview.value = ov.data
+    if (ch.data) charts.value = ch.data
+    if (lv.data) live.value = extractList(lv.data).slice(0, 6)
+  } finally {
+    loading.value = false
+    loadInFlight = false
   }
-  overview.value = ov.data || {}
-  charts.value = ch.data || {}
-  live.value = extractList(lv.data).slice(0, 6)
-  transactions.value = extractList(tx.data).slice(0, 6)
-  loadHealth()
 }
 
 onMounted(() => {
-  load()
-  timer = setInterval(load, 60000)
+  void load()
+  void loadTransactions()
+  void loadHealth()
+  timer = setInterval(() => {
+    if (!document.hidden) {
+      void load()
+      void loadTransactions()
+    }
+  }, 60000)
+  // Process health is comparatively expensive and does not need minute-by-minute polling.
+  healthTimer = setInterval(() => {
+    if (!document.hidden) void loadHealth()
+  }, 300000)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (healthTimer) clearInterval(healthTimer)
 })
 </script>
 
