@@ -3237,6 +3237,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         order: { seatIndex: 'ASC' },
         lock: { mode: 'pessimistic_write' },
       });
+      // Preserve the user's prior mute intent on a seat switch. A first-time
+      // invitation has no previous seat and therefore starts with an open mic.
+      const previousSeats = seats.filter((seat) => seat.userId === targetUserId);
+      const preserveMuted = previousSeats.some((seat) => seat.isMuted);
+      const preserveModeratorMuted = previousSeats.some((seat) => seat.isModeratorMuted);
       let selected =
         preferred != null ? seats.find((seat) => seat.seatIndex === preferred) : null;
       if (
@@ -3268,8 +3273,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       selected.userId = targetUserId;
       selected.status = SeatStatus.OCCUPIED;
-      selected.isMuted = false;
-      selected.isModeratorMuted = false;
+      selected.isMuted = preserveMuted;
+      selected.isModeratorMuted = preserveModeratorMuted;
+      selected.status = preserveMuted || preserveModeratorMuted
+        ? SeatStatus.MUTED
+        : SeatStatus.OCCUPIED;
       return manager.save(RoomSeat, selected);
     });
     await this.seatSignalsRepo.delete({ roomId, userId: targetUserId });
