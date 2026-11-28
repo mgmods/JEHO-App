@@ -232,6 +232,45 @@ export class ReviewWithdrawDto {
 export class AdminService {
   private staffRoleColumnReady = false;
   private dashboardPermissionsColumnReady = false;
+  private readonly dashboardReadCache = new Map<string, {
+    expiresAt: number;
+    value?: unknown;
+    pending?: Promise<unknown>;
+  }>();
+
+  /**
+   * Coalesce concurrent admin dashboard reads and briefly cache aggregate snapshots.
+   * The dashboard issues several COUNT/SUM queries over large tables; navigating
+   * back to it should not immediately repeat those scans.
+   */
+  private async cachedDashboardRead<T>(
+    key: string,
+    ttlMs: number,
+    load: () => Promise<T>,
+  ): Promise<T> {
+    const now = Date.now();
+    const current = this.dashboardReadCache.get(key);
+    if (current && (current.pending || current.expiresAt > now)) {
+      if (current.pending) return current.pending as Promise<T>;
+      return current.value as T;
+    }
+
+    const pending = load().then((value) => {
+      this.dashboardReadCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+      if (this.dashboardReadCache.size > 64) {
+        for (const [cacheKey, entry] of this.dashboardReadCache) {
+          if (!entry.pending && entry.expiresAt <= Date.now()) this.dashboardReadCache.delete(cacheKey);
+        }
+      }
+      return value;
+    }).catch((error) => {
+      this.dashboardReadCache.delete(key);
+      throw error;
+    });
+
+    this.dashboardReadCache.set(key, { expiresAt: now + Math.max(ttlMs, 30_000), pending });
+    return pending;
+  }
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -819,6 +858,13 @@ export class AdminService {
   }
 
   async dashboard(staffRole: string = 'super') {
+    const role = String(staffRole || 'super').toLowerCase();
+    return this.cachedDashboardRead(`dashboard:overview:${role}`, 15_000, () =>
+      this.buildDashboardSnapshot(role),
+    );
+  }
+
+  private async buildDashboardSnapshot(staffRole: string) {
     const [
       users,
       deletedUsers,
@@ -967,6 +1013,12 @@ export class AdminService {
 
   /** Currently live voice rooms for the admin overview panel. */
   async dashboardLive() {
+    return this.cachedDashboardRead('dashboard:live-rooms', 5_000, () =>
+      this.buildDashboardLiveRooms(),
+    );
+  }
+
+  private async buildDashboardLiveRooms() {
     const rooms = await this.roomsRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.host', 'host')
@@ -3335,6 +3387,12 @@ export class AdminService {
   }
 
   async charts() {
+    return this.cachedDashboardRead('dashboard:charts:7d', 30_000, () =>
+      this.buildDashboardCharts(),
+    );
+  }
+
+  private async buildDashboardCharts() {
     // Use one grouped query per series instead of 14 sequential COUNT queries.
     // The old loop waited for each day's users and rooms count before starting
     // the next day, making dashboard navigation increasingly slow on larger DBs.
