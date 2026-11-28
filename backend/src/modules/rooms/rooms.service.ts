@@ -3273,29 +3273,37 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       await this.assertCanTargetUser(roomId, actorId, effectiveUserId);
     }
-    const seat = await this.seatsRepo.findOne({ where: { roomId, userId: effectiveUserId } });
+    // Serialize mute writes with takeSeat/leaveSeat for this exact user. Without
+    // the shared advisory lock, saving a stale RoomSeat entity can resurrect the
+    // user's previous seat after a concurrent seat hop.
+    const seat = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${effectiveUserId}`],
+      );
+      const currentSeat = await manager.findOne(RoomSeat, {
+        where: { roomId, userId: effectiveUserId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!currentSeat) return null;
+      if (!moderatingOther && !muted && currentSeat.isModeratorMuted) {
+        throw new ForbiddenException('يحتاج المضيف أو المشرف لفك كتم المايك أولاً');
+      }
+      if (moderatingOther) {
+        // A moderator can close another user's mic, but cannot open it on their behalf.
+        currentSeat.isMuted = true;
+        currentSeat.isModeratorMuted = false;
+      } else {
+        currentSeat.isMuted = !!muted;
+      }
+      return manager.save(RoomSeat, currentSeat);
+    });
     if (!seat) {
       if (moderatingOther) {
         throw new BadRequestException('المستخدم ليس على المايك حالياً');
       }
       return { roomId, userId: effectiveUserId, muted: !!muted };
     }
-    if (
-      !moderatingOther &&
-      !muted &&
-      seat.isModeratorMuted
-    ) {
-      throw new ForbiddenException('يحتاج المضيف أو المشرف لفك كتم المايك أولاً');
-    }
-    if (moderatingOther) {
-      // A moderator can close another user's mic, but cannot open it on their behalf.
-      // Keep self-unmute under the user's control.
-      seat.isMuted = true;
-      seat.isModeratorMuted = false;
-    } else {
-      seat.isMuted = !!muted;
-    }
-    await this.seatsRepo.save(seat);
     if (moderatingOther && muted) {
       await this.recordAgencyModerationAction(roomId, actorId, effectiveUserId, 'mute', 'moderator_mute');
     }
@@ -3841,15 +3849,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async clearUserSeat(roomId: string, userId: string) {
-    await this.seatsRepo.update(
-      { roomId, userId },
-      {
-        userId: null,
-        status: SeatStatus.EMPTY,
-        isMuted: false,
-        isModeratorMuted: false,
-      },
-    );
+    // Use the same per-user lock as takeSeat and setMic so leave cannot race
+    // with a seat hop or a mute write and restore an obsolete seat row.
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      await manager.update(
+        RoomSeat,
+        { roomId, userId },
+        {
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isMuted: false,
+          isModeratorMuted: false,
+        },
+      );
+    });
     await this.seatSignalsRepo.delete({ roomId, userId });
   }
 
