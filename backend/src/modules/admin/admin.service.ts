@@ -232,6 +232,45 @@ export class ReviewWithdrawDto {
 export class AdminService {
   private staffRoleColumnReady = false;
   private dashboardPermissionsColumnReady = false;
+  private readonly dashboardReadCache = new Map<string, {
+    expiresAt: number;
+    value?: unknown;
+    pending?: Promise<unknown>;
+  }>();
+
+  /**
+   * Coalesce concurrent admin dashboard reads and briefly cache aggregate snapshots.
+   * The dashboard issues several COUNT/SUM queries over large tables; navigating
+   * back to it should not immediately repeat those scans.
+   */
+  private async cachedDashboardRead<T>(
+    key: string,
+    ttlMs: number,
+    load: () => Promise<T>,
+  ): Promise<T> {
+    const now = Date.now();
+    const current = this.dashboardReadCache.get(key);
+    if (current && (current.pending || current.expiresAt > now)) {
+      if (current.pending) return current.pending as Promise<T>;
+      return current.value as T;
+    }
+
+    const pending = load().then((value) => {
+      this.dashboardReadCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+      if (this.dashboardReadCache.size > 64) {
+        for (const [cacheKey, entry] of this.dashboardReadCache) {
+          if (!entry.pending && entry.expiresAt <= Date.now()) this.dashboardReadCache.delete(cacheKey);
+        }
+      }
+      return value;
+    }).catch((error) => {
+      this.dashboardReadCache.delete(key);
+      throw error;
+    });
+
+    this.dashboardReadCache.set(key, { expiresAt: now + Math.max(ttlMs, 30_000), pending });
+    return pending;
+  }
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -819,6 +858,13 @@ export class AdminService {
   }
 
   async dashboard(staffRole: string = 'super') {
+    const role = String(staffRole || 'super').toLowerCase();
+    return this.cachedDashboardRead(`dashboard:overview:${role}`, 15_000, () =>
+      this.buildDashboardSnapshot(role),
+    );
+  }
+
+  private async buildDashboardSnapshot(staffRole: string) {
     const [
       users,
       deletedUsers,
@@ -827,9 +873,7 @@ export class AdminService {
       gifts,
       pendingWithdraws,
       pendingReports,
-      rechargeSum,
-      revenueByProviderRaw,
-      todayRechargeSum,
+      revenueTotals,
     ] = await Promise.all([
       this.usersRepo.count({ where: { status: Not(UserStatus.DELETED) } }),
       this.usersRepo.count({ where: { status: UserStatus.DELETED } }),
@@ -840,55 +884,32 @@ export class AdminService {
       this.giftsRepo.count({ where: { isActive: true } }),
       this.withdrawRepo.count({ where: { status: WithdrawStatus.PENDING } }),
       this.reportsRepo.count({ where: { status: ReportStatus.PENDING } }),
+      // One filtered aggregate replaces three full scans of recharge_orders
+      // (lifetime total, provider grouping and today's total). Provider detail
+      // is loaded lazily by the charts endpoint after the first dashboard paint.
       this.rechargeRepo
         .createQueryBuilder('r')
         .select('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .getRawOne(),
-      this.rechargeRepo
-        .createQueryBuilder('r')
-        .select('r.provider', 'provider')
-        .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .addSelect('COUNT(*)', 'count')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .groupBy('r.provider')
-        .getRawMany(),
-      this.rechargeRepo
-        .createQueryBuilder('r')
-        .select('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .andWhere('r.completedAt >= :day', {
-          day: (() => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })(),
-        })
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN r.completedAt >= :dayStart THEN r.amountFiat ELSE 0 END),0)',
+          'today',
+        )
+        .where('r.status = :status', { status: RechargeStatus.COMPLETED })
+        .setParameter('dayStart', (() => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          return d;
+        })())
         .getRawOne(),
     ]);
 
-    const revenueByProvider = (revenueByProviderRaw || []).map((row: any) => {
-      const provider = String(row.provider || 'other');
-      return {
-        provider,
-        label: this.providerRevenueLabel(provider),
-        total: Number(row.total || 0),
-        count: Number(row.count || 0),
-      };
-    }).sort((a, b) => b.total - a.total);
-
-    const rawTotal = Number(rechargeSum?.total || 0);
+    const rawTotal = Number(revenueTotals?.total || 0);
     const baselineRow = await this.settingsRepo.findOne({
       where: { key: 'dashboard_revenue_baseline_fiat' },
     });
     const baseline = Math.max(0, Number(baselineRow?.value || 0) || 0);
     const totalRev = Math.max(0, rawTotal - baseline);
-    const scale = rawTotal > 0 ? totalRev / rawTotal : 0;
-    const scaledProviders = revenueByProvider.map((row) => ({
-      ...row,
-      total: Math.round(Number(row.total || 0) * scale * 100) / 100,
-    }));
-    const todayRaw = Number(todayRechargeSum?.total || 0);
+    const todayRaw = Number(revenueTotals?.today || 0);
     // After a revenue reset, hide legacy totals; keep today's new sales visible.
     const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
 
@@ -909,7 +930,7 @@ export class AdminService {
       revenue: totalRev,
       totalRevenue: totalRev,
       todayRevenue,
-      revenueByProvider: scaledProviders,
+      // Provider breakdown is supplied by the deferred charts request. Avoid a second full-table aggregate here.\n      revenueByProvider: [],
     };
 
     // The dashboard endpoint is shared by all three native staff ranks.
@@ -967,6 +988,12 @@ export class AdminService {
 
   /** Currently live voice rooms for the admin overview panel. */
   async dashboardLive() {
+    return this.cachedDashboardRead('dashboard:live-rooms', 5_000, () =>
+      this.buildDashboardLiveRooms(),
+    );
+  }
+
+  private async buildDashboardLiveRooms() {
     const rooms = await this.roomsRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.host', 'host')
@@ -2116,6 +2143,31 @@ export class AdminService {
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
+    // Gift media is served from the app's CDN or existing upload paths. Reject
+    // insecure schemes, embedded credentials and oversized values at the API too;
+    // dashboard-side validation alone is not a security boundary.
+    const validateGiftMediaUrl = (value: string | null | undefined, field: string) => {
+      const raw = String(value || '').trim();
+      if (!raw) return raw;
+      if (raw.length > 512) throw new BadRequestException(`رابط ${field} أطول من المسموح`);
+      const localMediaPath = /^(uploads|assets)\//i.test(raw)
+        && !raw.includes('..')
+        && !raw.includes('\\');
+      if (localMediaPath) {
+        return raw;
+      }
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+          throw new Error('unsafe');
+        }
+        return raw;
+      } catch {
+        throw new BadRequestException(`رابط ${field} يجب أن يكون HTTPS صالحاً أو مسار وسائط محلياً`);
+      }
+    };
+    dto.iconUrl = validateGiftMediaUrl(dto.iconUrl, 'أيقونة الهدية');
+    dto.animationUrl = validateGiftMediaUrl(dto.animationUrl, 'حركة الهدية');
     const nextCategory = String(dto.category ?? '').trim().toLowerCase();
     const cpType = String(dto.cpRelationshipType ?? 'love').trim().toLowerCase();
     if (nextCategory === 'cp' && !['friendship', 'brotherhood', 'love', 'engagement', 'marriage'].includes(cpType)) {
@@ -3335,59 +3387,91 @@ export class AdminService {
   }
 
   async charts() {
-    const days = 7;
-    const labels: string[] = [];
-    const usersSeries: number[] = [];
-    const roomsSeries: number[] = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const day = new Date();
-      day.setHours(0, 0, 0, 0);
-      day.setDate(day.getDate() - i);
-      const next = new Date(day);
-      next.setDate(next.getDate() + 1);
-      labels.push(day.toISOString().slice(5, 10));
-      usersSeries.push(
-        await this.usersRepo
-          .createQueryBuilder('u')
-          .where('u.createdAt >= :day AND u.createdAt < :next', { day, next })
-          .getCount(),
-      );
-      roomsSeries.push(
-        await this.roomsRepo
-          .createQueryBuilder('r')
-          .where('r.createdAt >= :day AND r.createdAt < :next', { day, next })
-          .getCount(),
-      );
-    }
-    const rechargeCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.type = :type', { type: TransactionType.RECHARGE })
-      .andWhere('t.currency = :cur', { cur: CurrencyType.COINS })
-      .getRawOne();
-    const giftCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.type = :type', { type: TransactionType.GIFT_SEND })
-      .andWhere('t.currency = :cur', { cur: CurrencyType.COINS })
-      .getRawOne();
-    const vipCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.referenceType = :ref', { ref: 'vip_purchase' })
-      .getRawOne();
-    const rechargeVal = Math.max(0, Number(rechargeCoins?.total || 0));
-    const giftsVal = Math.max(0, Number(giftCoins?.total || 0));
-    const vipVal = Math.max(0, Number(vipCoins?.total || 0));
+    return this.cachedDashboardRead('dashboard:charts:7d', 30_000, () =>
+      this.buildDashboardCharts(),
+    );
+  }
 
-    const providerRows = await this.rechargeRepo
-      .createQueryBuilder('r')
-      .select('r.provider', 'provider')
-      .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
-      .addSelect('COUNT(*)', 'count')
-      .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-      .groupBy('r.provider')
-      .getRawMany();
+  private async buildDashboardCharts() {
+    // Use one grouped query per series instead of 14 sequential COUNT queries.
+    // The old loop waited for each day's users and rooms count before starting
+    // the next day, making dashboard navigation increasingly slow on larger DBs.
+    const now = new Date();
+    const end = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+    ));
+    const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const labels: string[] = [];
+    const dayKeys: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+      dayKeys.push(day.toISOString().slice(0, 10));
+      labels.push(day.toISOString().slice(5, 10));
+    }
+
+    const userDayExpr = `to_char(u."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+    const roomDayExpr = `to_char(r."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+    const [
+      userRows,
+      roomRows,
+      coinTotals,
+      providerRows,
+      chartBaselineRow,
+    ] = await Promise.all([
+      this.usersRepo.createQueryBuilder('u')
+        .select(userDayExpr, 'day')
+        .addSelect('COUNT(*)', 'count')
+        .where('u."createdAt" >= :start AND u."createdAt" < :end', { start, end })
+        .groupBy(userDayExpr)
+        .getRawMany(),
+      this.roomsRepo.createQueryBuilder('r')
+        .select(roomDayExpr, 'day')
+        .addSelect('COUNT(*)', 'count')
+        .where('r."createdAt" >= :start AND r."createdAt" < :end', { start, end })
+        .groupBy(roomDayExpr)
+        .getRawMany(),
+      this.txRepo.createQueryBuilder('t')
+        .select(
+          'COALESCE(SUM(CASE WHEN t.type = :rechargeType AND t.currency = :coinCurrency THEN ABS(t.amount) ELSE 0 END), 0)',
+          'recharge',
+        )
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN t.type = :giftType AND t.currency = :coinCurrency THEN ABS(t.amount) ELSE 0 END), 0)',
+          'gifts',
+        )
+        .addSelect(
+          "COALESCE(SUM(CASE WHEN t.\"referenceType\" = :vipReference THEN ABS(t.amount) ELSE 0 END), 0)",
+          'vip',
+        )
+        .setParameters({
+          rechargeType: TransactionType.RECHARGE,
+          giftType: TransactionType.GIFT_SEND,
+          coinCurrency: CurrencyType.COINS,
+          vipReference: 'vip_purchase',
+        })
+        .getRawOne(),
+      this.rechargeRepo.createQueryBuilder('r')
+        .select('r.provider', 'provider')
+        .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
+        .addSelect('COUNT(*)', 'count')
+        .where('r.status = :status', { status: RechargeStatus.COMPLETED })
+        .groupBy('r.provider')
+        .getRawMany(),
+      this.settingsRepo.findOne({ where: { key: 'dashboard_revenue_baseline_fiat' } }),
+    ]);
+
+    const countByDay = (rows: Array<{ day: string; count: string | number }>) =>
+      new Map((rows || []).map((row) => [String(row.day), Number(row.count || 0)]));
+    const usersByDay = countByDay(userRows);
+    const roomsByDay = countByDay(roomRows);
+    const usersSeries = dayKeys.map((day) => usersByDay.get(day) ?? 0);
+    const roomsSeries = dayKeys.map((day) => roomsByDay.get(day) ?? 0);
+
+    const rechargeVal = Math.max(0, Number(coinTotals?.recharge || 0));
+    const giftsVal = Math.max(0, Number(coinTotals?.gifts || 0));
+    const vipVal = Math.max(0, Number(coinTotals?.vip || 0));
     const byProviderRaw = (providerRows || [])
       .map((row: any) => ({
         provider: String(row.provider || 'other'),
@@ -3395,51 +3479,33 @@ export class AdminService {
         total: Number(row.total || 0),
         count: Number(row.count || 0),
       }))
-      .filter((r) => r.total > 0 || r.count > 0)
+      .filter((row) => row.total > 0 || row.count > 0)
       .sort((a, b) => b.total - a.total);
-    const chartRawTotal = byProviderRaw.reduce((s, r) => s + Number(r.total || 0), 0);
-    const chartBaselineRow = await this.settingsRepo.findOne({
-      where: { key: 'dashboard_revenue_baseline_fiat' },
-    });
+    const chartRawTotal = byProviderRaw.reduce((sum, row) => sum + Number(row.total || 0), 0);
     const chartBaseline = Math.max(0, Number(chartBaselineRow?.value || 0) || 0);
     const chartNet = Math.max(0, chartRawTotal - chartBaseline);
     const chartScale = chartRawTotal > 0 ? chartNet / chartRawTotal : 0;
-    const byProvider = byProviderRaw.map((r) => ({
-      ...r,
-      total: Math.round(Number(r.total || 0) * chartScale * 100) / 100,
-    })).filter((r) => r.total > 0 || (chartNet <= 0 && r.count > 0));
-    // Doughnut = real fiat revenue by payment channel (Play / card / USDT / …).
-    const revLabels = byProvider.length ? byProvider.map((r) => r.label) : ['—'];
-    const revValues = byProvider.length ? byProvider.map((r) => r.total) : [0];
-    if (chartNet <= 0) {
-      revLabels.length = 0;
-      revValues.length = 0;
-      revLabels.push('—');
-      revValues.push(0);
-    }
+    const byProvider = byProviderRaw.map((row) => ({
+      ...row,
+      total: Math.round(Number(row.total || 0) * chartScale * 100) / 100,
+    })).filter((row) => row.total > 0 || (chartNet <= 0 && row.count > 0));
+    const revLabels = chartNet > 0 ? byProvider.map((row) => row.label) : ['—'];
+    const revValues = chartNet > 0 ? byProvider.map((row) => row.total) : [0];
 
     return {
       labels,
-      users: {
-        labels,
-        users: usersSeries,
-        data: usersSeries,
-      },
+      users: { labels, users: usersSeries, data: usersSeries },
       revenue: {
         labels: revLabels,
         values: revValues,
         data: revValues,
         byProvider: chartNet <= 0 ? [] : byProvider,
-        // Keep coin totals for mini-stats (not revenue).
         coinVolume: {
           labels: ['Recharge', 'Gifts', 'VIP'],
           values: [rechargeVal, giftsVal, vipVal],
         },
       },
-      rooms: {
-        labels,
-        data: roomsSeries,
-      },
+      rooms: { labels, data: roomsSeries },
     };
   }
 

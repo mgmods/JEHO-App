@@ -175,6 +175,16 @@ const systemHealth = ref(null)
 const healthLoading = ref(false)
 const cleaningLogs = ref(false)
 let timer = null
+let chartsTimer = null
+let chartsRefreshTimer = null
+let healthTimer = null
+let transactionsTimer = null
+let initialHealthTimer = null
+let initialTransactionsTimer = null
+let loadInFlight = false
+let chartsInFlight = false
+let healthInFlight = false
+let transactionsInFlight = false
 
 function seriesDelta(arr) {
   const data = (arr || []).map(Number).filter((n) => !Number.isNaN(n))
@@ -400,14 +410,27 @@ function txAmount(tx) {
 }
 
 async function loadHealth() {
+  if (healthInFlight) return
+  healthInFlight = true
   healthLoading.value = true
-  const { data, error: err } = await dashboardApi.systemHealth()
-  healthLoading.value = false
-  if (err) {
-    // soft-fail — keep rest of dashboard usable
-    return
+  try {
+    const { data, error: err } = await dashboardApi.systemHealth()
+    if (!err && data) systemHealth.value = data
+  } finally {
+    healthLoading.value = false
+    healthInFlight = false
   }
-  systemHealth.value = data || null
+}
+
+async function loadTransactions() {
+  if (transactionsInFlight || !auth.can('wallet', 'read')) return
+  transactionsInFlight = true
+  try {
+    const { data, error: err } = await walletApi.transactions({ limit: 8 })
+    if (!err && data) transactions.value = extractList(data).slice(0, 6)
+  } finally {
+    transactionsInFlight = false
+  }
 }
 
 async function onCleanLogs(payload) {
@@ -440,35 +463,73 @@ async function onCleanLogs(payload) {
 }
 
 async function load() {
+  // Load the two small, immediately visible datasets first. Charts, transactions
+  // and process-health data are staggered so one heavy query cannot delay the
+  // first useful dashboard paint on a small database instance.
+  if (loadInFlight) return
+  loadInFlight = true
   loading.value = true
   error.value = ''
-  const [ov, ch, lv, tx] = await Promise.all([
-    dashboardApi.overview(),
-    dashboardApi.charts({ range: '7d' }),
-    dashboardApi.liveStats(),
-    walletApi.transactions({ limit: 8 }),
-  ])
-  loading.value = false
-  if (ov.error && ch.error && lv.error) {
-    error.value = ov.error.message || t('dashboard.apiError')
-    toast().danger(error.value)
-  } else if (ov.error || ch.error || lv.error) {
-    error.value = [ov.error, ch.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
-    toast().warning(error.value)
+  try {
+    const [ov, lv] = await Promise.all([
+      dashboardApi.overview(),
+      dashboardApi.liveStats(),
+    ])
+    if (ov.error && lv.error) {
+      error.value = ov.error.message || t('dashboard.apiError')
+      toast().danger(error.value)
+    } else if (ov.error || lv.error) {
+      error.value = [ov.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
+      toast().warning(error.value)
+    }
+    if (ov.data) overview.value = ov.data
+    if (lv.data) live.value = extractList(lv.data).slice(0, 6)
+  } finally {
+    loading.value = false
+    loadInFlight = false
   }
-  overview.value = ov.data || {}
-  charts.value = ch.data || {}
-  live.value = extractList(lv.data).slice(0, 6)
-  transactions.value = extractList(tx.data).slice(0, 6)
-  loadHealth()
+}
+
+async function loadCharts() {
+  if (chartsInFlight) return
+  chartsInFlight = true
+  try {
+    const { data, error: err } = await dashboardApi.charts({ range: '7d' })
+    if (!err && data) charts.value = data
+    else if (err && !charts.value?.labels) error.value = err.message
+  } finally {
+    chartsInFlight = false
+  }
 }
 
 onMounted(() => {
-  load()
-  timer = setInterval(load, 60000)
+  void load()
+  // Defer secondary panels until the summary/live cards have had a chance to paint.
+  chartsTimer = setTimeout(() => { if (!document.hidden) void loadCharts() }, 250)
+  initialTransactionsTimer = setTimeout(() => { if (!document.hidden) void loadTransactions() }, 500)
+  initialHealthTimer = setTimeout(() => { if (!document.hidden) void loadHealth() }, 900)
+
+  timer = setInterval(() => {
+    if (!document.hidden) {
+      void load()
+      void loadTransactions()
+    }
+  }, 60000)
+  chartsRefreshTimer = setInterval(() => {
+    if (!document.hidden) void loadCharts()
+  }, 300000)
+  healthTimer = setInterval(() => {
+    if (!document.hidden) void loadHealth()
+  }, 300000)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (chartsTimer) clearTimeout(chartsTimer)
+  if (chartsRefreshTimer) clearInterval(chartsRefreshTimer)
+  if (healthTimer) clearInterval(healthTimer)
+  if (transactionsTimer) clearInterval(transactionsTimer)
+  if (initialHealthTimer) clearTimeout(initialHealthTimer)
+  if (initialTransactionsTimer) clearTimeout(initialTransactionsTimer)
 })
 </script>
 

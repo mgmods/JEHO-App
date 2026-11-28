@@ -3558,7 +3558,16 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     if (receiverIds.length > 31) throw new BadRequestException('Too many gift recipients');
 
     const selfGiftBlocked = await this.isSelfGiftBlocked();
-    if (selfGiftBlocked && receiverIds.some((id) => id === String(senderId))) {
+    if (selfGiftBlocked && dto.includeHost === true) {
+      // The server expands "all mics" from authoritative occupied seats, so the
+      // sender may also be present in that list. Match the Android recipient strip:
+      // when self-gifting is disabled, omit only the sender and still deliver to
+      // every other selected/occupied recipient (including a seated room owner).
+      receiverIds = receiverIds.filter((id) => id !== String(senderId));
+      if (receiverIds.length === 0) {
+        throw new BadRequestException('لا يوجد مستلم آخر على المايك لإرسال الهدية إليه');
+      }
+    } else if (selfGiftBlocked && receiverIds.some((id) => id === String(senderId))) {
       throw new BadRequestException('إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة');
     }
     if (dto.requestId) {

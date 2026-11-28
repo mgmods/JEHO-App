@@ -1143,31 +1143,75 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async occupyHostSeat(roomId: string, hostId: string, seatCount: number) {
-    let hostSeat = await this.seatsRepo.findOne({ where: { roomId, seatIndex: 0 } });
-    if (!hostSeat) {
-      const seats: RoomSeat[] = [];
-      for (let i = 0; i < seatCount; i++) {
-        seats.push(
-          this.seatsRepo.create({
+    // Reopening a persistent room must repair the complete seat map, not only
+    // seat zero. The old implementation returned as soon as seat zero existed,
+    // leaving any missing indexes missing forever.
+    const target = Math.min(31, Math.max(2, Math.floor(Number(seatCount) || DEFAULT_ROOM_SEAT_COUNT)));
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      const seatsRepo = manager.getRepository(RoomSeat);
+      const roomsRepo = manager.getRepository(Room);
+      const room = await roomsRepo.findOne({
+        where: { id: roomId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!room) throw new NotFoundException('Room not found');
+
+      const existing = await seatsRepo.find({
+        where: { roomId },
+        order: { seatIndex: 'ASC' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const byIndex = new Map(existing.map((seat) => [Number(seat.seatIndex), seat]));
+      const missing: RoomSeat[] = [];
+      for (let index = 0; index < target; index++) {
+        if (!byIndex.has(index)) {
+          missing.push(seatsRepo.create({
             roomId,
-            seatIndex: i,
-            isHostSeat: i === 0,
-            status: i === 0 ? SeatStatus.OCCUPIED : SeatStatus.EMPTY,
-            userId: i === 0 ? hostId : null,
-          }),
-        );
+            seatIndex: index,
+            isHostSeat: index === 0,
+            status: index === 0 ? SeatStatus.OCCUPIED : SeatStatus.EMPTY,
+            userId: index === 0 ? hostId : null,
+            isMuted: false,
+            isModeratorMuted: false,
+          }));
+        }
       }
-      await this.seatsRepo.save(seats);
-      return;
-    }
-    await this.seatsRepo.update(
-      { roomId, userId: hostId },
-      { userId: null, status: SeatStatus.EMPTY },
-    );
-    hostSeat.userId = hostId;
-    hostSeat.status = SeatStatus.OCCUPIED;
-    hostSeat.isHostSeat = true;
-    await this.seatsRepo.save(hostSeat);
+      if (missing.length) await seatsRepo.save(missing);
+
+      const hostSeat = byIndex.get(0) || missing.find((seat) => seat.seatIndex === 0);
+      if (!hostSeat) throw new ConflictException('تعذر تجهيز مقعد صاحب الغرفة');
+      if (hostSeat.userId && hostSeat.userId !== hostId) {
+        throw new ConflictException('مقعد صاحب الغرفة مشغول بحساب آخر؛ لم يتم نقل أو حذف أي مستخدم');
+      }
+      // Keep the host in the reserved index zero and remove any stale duplicate
+      // host assignment elsewhere without touching other users' fixed indexes.
+      await manager.update(
+        RoomSeat,
+        { roomId, userId: hostId },
+        {
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isMuted: false,
+          isModeratorMuted: false,
+        },
+      );
+      hostSeat.userId = hostId;
+      hostSeat.status = SeatStatus.OCCUPIED;
+      hostSeat.isHostSeat = true;
+      hostSeat.isMuted = false;
+      hostSeat.isModeratorMuted = false;
+      await seatsRepo.save(hostSeat);
+
+      room.seatCount = Math.max(
+        target,
+        Math.min(31, Math.max(2, Number(room.seatCount) || target)),
+      );
+      await roomsRepo.save(room);
+    });
   }
 
   private async notifyRoomOpened(
@@ -2806,21 +2850,32 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       'canManageSeats',
       'Seat management permission is required',
     );
-    const seat = await this.seatsRepo.findOne({ where: { roomId, seatIndex } });
-    if (!seat) throw new NotFoundException('Seat not found');
-    if (seat.isHostSeat || seat.seatIndex === 0) {
-      throw new ForbiddenException('Host seat cannot be locked or cleared');
-    }
-    if (locked) {
-      if (seat.userId && seat.userId !== actorId) {
-        throw new ConflictException('Cannot lock occupied seat');
+    const seat = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      const current = await manager.findOne(RoomSeat, {
+        where: { roomId, seatIndex },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current) throw new NotFoundException('Seat not found');
+      if (current.isHostSeat || current.seatIndex === 0) {
+        throw new ForbiddenException('Host seat cannot be locked or cleared');
       }
-      seat.userId = null;
-      seat.status = SeatStatus.LOCKED;
-    } else {
-      seat.status = SeatStatus.EMPTY;
-    }
-    await this.seatsRepo.save(seat);
+      if (locked) {
+        if (current.userId && current.userId !== actorId) {
+          throw new ConflictException('Cannot lock occupied seat');
+        }
+        current.userId = null;
+        current.isMuted = false;
+        current.isModeratorMuted = false;
+        current.status = SeatStatus.LOCKED;
+      } else {
+        current.status = SeatStatus.EMPTY;
+      }
+      return manager.save(RoomSeat, current);
+    });
     this.emitRoomEvent(roomId, 'room:seat_locked', {
       seatIndex,
       locked,
@@ -2838,93 +2893,70 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       'canManageRoom',
       'Room management permission is required',
     );
-    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-    // Client sends total seats including host (seat 0). Clamp 2..31.
-    const target = Math.min(31, Math.max(2, Math.floor(Number(seatCount) || DEFAULT_ROOM_SEAT_COUNT)));
+    // The seat index is a permanent position, not a display rank. Never compact or
+    // renumber occupants when a room is resized: that made users appear to jump
+    // seats and made a 30-seat room look like 29/19/9 after a hop.
+    const target = Math.min(
+      31,
+      Math.max(2, Math.floor(Number(seatCount) || DEFAULT_ROOM_SEAT_COUNT)),
+    );
 
     await this.dataSource.transaction(async (manager) => {
+      // Serialize resize against take/leave/approve/mute and reopen repair.
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
       const seatsRepo = manager.getRepository(RoomSeat);
       const roomsRepo = manager.getRepository(Room);
+      const managedRoom = await roomsRepo.findOne({
+        where: { id: roomId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!managedRoom) throw new NotFoundException('Room not found');
+
       const existing = await seatsRepo.find({
         where: { roomId },
         order: { seatIndex: 'ASC' },
+        lock: { mode: 'pessimistic_write' },
       });
-      const occupied = existing
-        .filter((seat) => !!seat.userId)
-        .sort((a, b) => {
-          if (a.userId === room.hostId) return -1;
-          if (b.userId === room.hostId) return 1;
-          return a.seatIndex - b.seatIndex;
-        });
-
-      if (occupied.length > target) {
+      const byIndex = new Map(existing.map((seat) => [Number(seat.seatIndex), seat]));
+      const occupiedOutsideTarget = existing.filter(
+        (seat) => seat.seatIndex >= target && !!seat.userId,
+      );
+      if (occupiedOutsideTarget.length) {
         throw new ConflictException(
-          'The new room size is smaller than the number of users currently seated',
+          'لا يمكن تقليل عدد المقاعد قبل إخلاء المقاعد المشغولة خارج النطاق الجديد',
         );
       }
 
-      // Keep every seated user. Compact occupied seats from left to right so
-      // reducing 30 to 10 does not strand or evict users sitting in seats 11–30.
-      const occupantState = occupied.map((seat) => ({
-        userId: seat.userId!,
-        isMuted: seat.isMuted,
-        isModeratorMuted: seat.isModeratorMuted,
-        status: seat.status,
-      }));
-
-      const requiredCount = Math.max(existing.length, target);
-      for (let i = existing.length; i < requiredCount; i++) {
-        existing.push(seatsRepo.create({
+      // Add only missing indexes. Existing rows, occupants, mute state and locked
+      // state are left untouched, so seat 17 remains seat 17 after any resize.
+      const missing: RoomSeat[] = [];
+      for (let index = 0; index < target; index++) {
+        if (byIndex.has(index)) continue;
+        missing.push(seatsRepo.create({
           roomId,
-          seatIndex: i,
-          isHostSeat: false,
+          seatIndex: index,
+          isHostSeat: index === 0,
           status: SeatStatus.EMPTY,
           userId: null,
+          isMuted: false,
+          isModeratorMuted: false,
         }));
       }
-      existing.sort((a, b) => a.seatIndex - b.seatIndex);
+      if (missing.length) await seatsRepo.save(missing);
 
-      // Clear user IDs first to respect the room/user unique index while moving.
-      for (const seat of existing) {
-        seat.userId = null;
-        seat.isMuted = false;
-        seat.isModeratorMuted = false;
-        seat.isHostSeat = seat.seatIndex === 0;
-        if (seat.status !== SeatStatus.LOCKED) seat.status = SeatStatus.EMPTY;
-      }
-      await seatsRepo.save(existing);
+      const removable = existing.filter(
+        (seat) => seat.seatIndex >= target && !seat.userId,
+      );
+      if (removable.length) await seatsRepo.remove(removable);
 
-      for (let i = 0; i < target; i++) {
-        const seat = existing[i];
-        const occupant = occupantState[i];
-        seat.isHostSeat = i === 0;
-        if (occupant) {
-          seat.userId = occupant.userId;
-          seat.isMuted = occupant.isMuted;
-          seat.isModeratorMuted = occupant.isModeratorMuted;
-          seat.isHostSeat = i === 0;
-          seat.status = occupant.status === SeatStatus.MUTED
-            ? SeatStatus.MUTED
-            : SeatStatus.OCCUPIED;
-        } else if (seat.status !== SeatStatus.LOCKED) {
-          seat.status = SeatStatus.EMPTY;
-        }
-      }
-      await seatsRepo.save(existing.slice(0, target));
-      if (existing.length > target) {
-        await seatsRepo.remove(existing.slice(target));
-      }
-
-      const managedRoom = await roomsRepo.findOne({ where: { id: roomId } });
-      if (!managedRoom) throw new NotFoundException('Room not found');
       managedRoom.seatCount = target;
       await roomsRepo.save(managedRoom);
     });
 
-    this.emitRoomEvent(roomId, 'room:seats_resized', {
-      seatCount: target,
-    });
+    this.emitRoomEvent(roomId, 'room:seats_resized', { seatCount: target });
     this.notifyRoomUpdated(roomId);
     return this.getRoom(roomId);
   }
@@ -3194,6 +3226,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // Approval/assignment must serialize with the target user's own seat and mic writes.
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${targetUserId}`],
       );
       const seats = await manager.find(RoomSeat, {
@@ -3201,6 +3237,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         order: { seatIndex: 'ASC' },
         lock: { mode: 'pessimistic_write' },
       });
+      // Preserve the user's prior mute intent on a seat switch. A first-time
+      // invitation has no previous seat and therefore starts with an open mic.
+      const previousSeats = seats.filter((seat) => seat.userId === targetUserId);
+      const preserveMuted = previousSeats.some((seat) => seat.isMuted);
+      const preserveModeratorMuted = previousSeats.some((seat) => seat.isModeratorMuted);
       let selected =
         preferred != null ? seats.find((seat) => seat.seatIndex === preferred) : null;
       if (
@@ -3232,8 +3273,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       selected.userId = targetUserId;
       selected.status = SeatStatus.OCCUPIED;
-      selected.isMuted = false;
-      selected.isModeratorMuted = false;
+      selected.isMuted = preserveMuted;
+      selected.isModeratorMuted = preserveModeratorMuted;
+      selected.status = preserveMuted || preserveModeratorMuted
+        ? SeatStatus.MUTED
+        : SeatStatus.OCCUPIED;
       return manager.save(RoomSeat, selected);
     });
     await this.seatSignalsRepo.delete({ roomId, userId: targetUserId });
@@ -3300,6 +3344,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const seat = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${effectiveUserId}`],
       );
       const currentSeats = await manager.find(RoomSeat, {
@@ -3317,8 +3365,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // clears the old rows and assigns exactly one target seat.
       for (const currentSeat of currentSeats) {
         if (moderatingOther) {
+          // A moderator mute is distinct from a user's own mute. Mark it explicitly
+          // so the client cannot reopen the mic until the moderator restriction ends.
           currentSeat.isMuted = true;
-          currentSeat.isModeratorMuted = false;
+          currentSeat.isModeratorMuted = true;
         } else {
           currentSeat.isMuted = !!muted;
         }
@@ -3359,6 +3409,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   async leave(roomId: string, userId: string) {
     const roomBefore = await this.roomsRepo.findOne({ where: { id: roomId } });
     const wasSeated = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
@@ -3542,6 +3596,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // A user can only occupy one seat; serialize concurrent hops across target rows.
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       // Read every stale/duplicate row under the same per-user lock. findOne() could
@@ -3581,10 +3639,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         },
       );
       seat.userId = userId;
-      seat.status = SeatStatus.OCCUPIED;
       // A seat hop is not an implicit unmute or a moderator-unmute action.
       seat.isMuted = preserveMuted;
       seat.isModeratorMuted = preserveModeratorMuted;
+      seat.status = preserveMuted || preserveModeratorMuted
+        ? SeatStatus.MUTED
+        : SeatStatus.OCCUPIED;
       await manager.save(RoomSeat, seat);
     });
     // Owner remains the live host for permissions; seat change only moves stage presence.
@@ -3747,6 +3807,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const removal = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       const seat = await manager.findOne(RoomSeat, {
@@ -3906,6 +3970,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       await manager.update(
@@ -3985,12 +4053,25 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Auto-moderation: mute mic without requiring a human moderator. */
   async systemMuteMic(roomId: string, userId: string, reason?: string) {
-    const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
-    if (seat) {
-      seat.isMuted = true;
-      seat.isModeratorMuted = true;
-      await this.seatsRepo.save(seat);
-    }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      const seats = await manager.find(RoomSeat, {
+        where: { roomId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      for (const seat of seats) {
+        seat.isMuted = true;
+        seat.isModeratorMuted = true;
+      }
+      if (seats.length) await manager.save(RoomSeat, seats);
+    });
     this.notifyRoomUpdated(roomId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,

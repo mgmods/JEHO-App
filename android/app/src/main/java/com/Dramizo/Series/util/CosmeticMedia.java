@@ -59,7 +59,9 @@ public final class CosmeticMedia {
     }
 
     private static String stripQuery(String url) {
-        int q = url.indexOf('?');
-        return q >= 0 ? url.substring(0, q) : url;
+        int query = url.indexOf('?');
+        int fragment = url.indexOf('#');
+        int end = query < 0 ? fragment : (fragment < 0 ? query : Math.min(query, fragment));
+        return end >= 0 ? url.substring(0, end) : url;
     }
 }

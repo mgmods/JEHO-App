@@ -269,7 +269,15 @@
                 <div class="col-md-6">
                   <label class="form-label">{{ t('gifts.icon') }}</label>
                   <input type="file" accept="image/*,.gif,.webp" class="form-control" @change="onFile" />
-                  <div class="form-text">أيقونة الهدية في القائمة (صورة ثابتة أو GIF)</div>
+                  <input
+                    v-model.trim="form.iconUrl"
+                    type="text"
+                    inputmode="url"
+                    maxlength="512"
+                    class="form-control mt-2"
+                    placeholder="أو ضع رابط HTTPS مباشر للصورة /uploads/gift.png"
+                  />
+                  <div class="form-text">أيقونة الهدية: صورة ثابتة أو GIF/WebP متحرك. يمكنك رفعها أو وضع رابط CDN خارجي مباشر.</div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">{{ t('gifts.animation') }} · فيديو التأثير</label>
@@ -279,8 +287,16 @@
                     class="form-control"
                     @change="onAnimFile"
                   />
+                  <input
+                    v-model.trim="form.animationUrl"
+                    type="text"
+                    inputmode="url"
+                    maxlength="512"
+                    class="form-control mt-2"
+                    placeholder="أو ضع رابط HTTPS مباشر للحركة /gift-effect.mp4 أو .gif"
+                  />
                   <div class="form-text">
-                    مهم: ارفع فيديو الهدية هنا (MP4) ليشتغل ملء الشاشة مثل الدخوليات — ليس في حقل الأيقونة فقط
+                    ارفع الملف أو الصق رابط CDN مباشر. يدعم MP4/WebM/MOV وGIF/WebP. يفضّل رابط ملف مباشر ينتهي بامتداد الوسيط، مع HTTPS ودعم CDN لطلبات Range للفيديو.
                   </div>
                 </div>
                 <div class="col-6" v-if="form.iconUrl && !isVideo(form.iconUrl)">
@@ -517,6 +533,18 @@ function absUrl(u) {
   return resolveAsset(u)
 }
 
+function isSafeMediaUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return true
+  if (/^\/(uploads|assets)\//i.test(raw) || /^(uploads|assets)\//i.test(raw)) return true
+  try {
+    const parsed = new URL(raw)
+    return parsed.protocol === 'https:' && !!parsed.hostname && !parsed.username && !parsed.password
+  } catch {
+    return false
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -672,6 +700,11 @@ async function onAnimFile(e) {
 async function save() {
   if (!form.iconUrl && !form.animationUrl) {
     error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أو ملف الحركة أولاً'
+    toast().danger(error.value)
+    return
+  }
+  if (!isSafeMediaUrl(form.iconUrl) || !isSafeMediaUrl(form.animationUrl)) {
+    error.value = 'روابط الوسائط يجب أن تكون HTTPS صحيحة أو مسارات محلية داخل /uploads أو /assets'
     toast().danger(error.value)
     return
   }

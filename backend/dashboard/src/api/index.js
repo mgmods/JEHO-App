@@ -47,10 +47,10 @@ export const paidMessagesApi = {
 }
 
 export const dashboardApi = {
-  overview: () => safeRequest(() => api.get('/admin/dashboard/overview')),
-  charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params })),
-  liveStats: () => safeRequest(() => api.get('/admin/dashboard/live')),
-  systemHealth: () => safeRequest(() => api.get('/admin/system/health')),
+  overview: () => safeRequest(() => api.get('/admin/dashboard/overview', { timeout: 15000 })),
+  charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params, timeout: 15000 })),
+  liveStats: () => safeRequest(() => api.get('/admin/dashboard/live', { timeout: 12000 })),
+  systemHealth: () => safeRequest(() => api.get('/admin/system/health', { timeout: 8000 })),
 }
 
 export const logsApi = {
@@ -130,7 +130,7 @@ export const giftsApi = {
 }
 
 export const walletApi = {
-  transactions: (params) => safeRequest(() => api.get('/admin/wallet/transactions', { params })),
+  transactions: (params) => safeRequest(() => api.get('/admin/wallet/transactions', { params, timeout: 10000 })),
   withdraws: (params) => safeRequest(() => api.get('/admin/wallet/withdraws', { params })),
   approveWithdraw: (id) => safeRequest(() => api.post(`/admin/wallet/withdraws/${id}/approve`)),
   rejectWithdraw: (id, data = {}) => safeRequest(() => api.post(`/admin/wallet/withdraws/${id}/reject`, data)),
