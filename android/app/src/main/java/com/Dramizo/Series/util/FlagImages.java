@@ -17,6 +17,12 @@ public final class FlagImages {
         CountryCatalog.Entry entry = CountryCatalog.resolve(country);
         String url = CountryCatalog.flagImageUrl(country);
         if (imageView != null) {
+            if (entry != null && "SY".equalsIgnoreCase(entry.code)) {
+                imageView.setVisibility(View.VISIBLE);
+                imageView.setImageResource(com.Dramizo.Series.R.drawable.ic_flag_syria);
+                if (emojiFallback != null) emojiFallback.setVisibility(View.GONE);
+                return;
+            }
             if (url != null) {
                 imageView.setVisibility(View.VISIBLE);
                 Glide.with(imageView.getContext())

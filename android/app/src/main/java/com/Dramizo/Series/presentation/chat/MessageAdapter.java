@@ -2,7 +2,9 @@ package com.Dramizo.Series.presentation.chat;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
@@ -19,6 +21,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
+import android.widget.MediaController;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,6 +37,8 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.AgencyInviteCodec;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
@@ -40,7 +46,11 @@ import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,10 +61,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private static final int TYPE_PEER = 0;
     private static final int TYPE_MINE = 1;
+    private static final String STORY_PREVIEW_TAG = "jeho_story_preview";
 
     public interface Listener {
         void onLongClick(ChatDtos.MessageDto msg);
@@ -70,9 +82,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private final List<ChatDtos.MessageDto> items = new ArrayList<>();
     private final Map<String, String> translations = new HashMap<>();
     private final String myUserId;
-    private final AuthDtos.UserDto me;
+    private AuthDtos.UserDto me;
     private final Listener listener;
     private String peerAvatarUrl;
+    private String peerChatBubbleUrl;
     private String peerHostBadgeUrl;
     private java.util.Map<String, Object> peerHostBadgeMeta;
     private String peerDisplayName;
@@ -80,6 +93,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private int peerLevel = 1;
     private long peerLastReadAtMs;
     private final Set<String> playedAudioIds = new HashSet<>();
+    /** Tracks pending custom bubble loads so recycled rows cannot restore removed artwork. */
+    private final Map<View, CustomTarget<Drawable>> customBubbleTargets = new WeakHashMap<>();
     private MediaPlayer playing;
     private String playingUrl;
     private String playingMessageId;
@@ -119,11 +134,18 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             int vipLevel,
             int level) {
         this.peerDisplayName = displayName;
+        this.peerChatBubbleUrl = null;
         this.peerAvatarUrl = avatarUrl;
         this.peerHostBadgeUrl = hostBadgeUrl;
         this.peerHostBadgeMeta = hostBadgeMeta;
         this.peerVipLevel = Math.max(0, vipLevel);
         this.peerLevel = Math.max(1, level);
+        notifyDataSetChanged();
+    }
+
+    /** Refresh the signed-in sender profile after changing worn cosmetics. */
+    public void setMyProfile(@Nullable AuthDtos.UserDto user) {
+        this.me = user;
         notifyDataSetChanged();
     }
 
@@ -139,6 +161,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 null,
                 peer.vipLevel,
                 peer.level > 0 ? peer.level : 1);
+        this.peerChatBubbleUrl = peer.chatBubbleUrl;
     }
 
     public void setPeerLastReadAt(String iso) {
@@ -173,8 +196,30 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     }
 
     public void submit(List<ChatDtos.MessageDto> data) {
+        // Chat updates are frequent. Avoid clearing/rebinding the whole RecyclerView on
+        // every realtime message; that causes visible flicker and dropped frames while typing.
+        List<ChatDtos.MessageDto> next = data != null ? data : Collections.emptyList();
+        int oldSize = items.size();
+        boolean samePrefix = next.size() >= oldSize;
+        if (samePrefix) {
+            for (int i = 0; i < oldSize; i++) {
+                ChatDtos.MessageDto a = items.get(i);
+                ChatDtos.MessageDto b = next.get(i);
+                String aid = a != null ? a.id : null;
+                String bid = b != null ? b.id : null;
+                if (aid == null ? bid != null : !aid.equals(bid)) {
+                    samePrefix = false;
+                    break;
+                }
+            }
+        }
+        if (samePrefix && next.size() > oldSize) {
+            items.addAll(next.subList(oldSize, next.size()));
+            notifyItemRangeInserted(oldSize, next.size() - oldSize);
+            return;
+        }
         items.clear();
-        if (data != null) items.addAll(data);
+        items.addAll(next);
         notifyDataSetChanged();
     }
 
@@ -269,10 +314,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         } else if (useVipSkin) {
             // Paid VIP bubble skins apply to BOTH mine and peer (sender's VIP tier).
             VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
-            int padH = dp(holder, 16);
-            int padT = dp(holder, 12);
-            int padB = dp(holder, 10);
+            // Keep text, emoji, reply tools and inline icons comfortably inside the VIP frame.
+            int padH = dp(holder, 22);
+            int padT = dp(holder, 17);
+            int padB = dp(holder, 15);
             holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
+            holder.b.bubbleRoot.setClipChildren(true);
+            holder.b.bubbleRoot.setClipToPadding(true);
         } else {
             int padH = dp(holder, 12);
             int padT = dp(holder, 8);
@@ -285,11 +333,40 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             }
         }
 
+        // Staff message cards are role-owned assets, not store cosmetics. Prefer the
+        // configured role card and refresh it asynchronously if the public config is stale.
+        AuthDtos.UserDto bubbleSender = mine ? me : msg.sender;
+        String staffRole = StaffRoleHelper.normalize(bubbleSender);
+        String customBubble = bubbleSender != null && bubbleSender.chatBubbleUrl != null
+                && !bubbleSender.chatBubbleUrl.trim().isEmpty()
+                ? bubbleSender.chatBubbleUrl
+                : (mine ? (me != null ? me.chatBubbleUrl : null) : peerChatBubbleUrl);
+        if (StaffRoleHelper.isStaff(bubbleSender)) {
+            StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
+            if (identity.messageCardUrl != null && !identity.messageCardUrl.isEmpty()) {
+                customBubble = identity.messageCardUrl;
+            }
+            final int bindPosition = holder.getBindingAdapterPosition();
+            final ChatDtos.MessageDto boundMessage = msg;
+            StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
+                if (bindPosition == RecyclerView.NO_POSITION
+                        || holder.getBindingAdapterPosition() != bindPosition
+                        || bindPosition >= items.size()
+                        || items.get(bindPosition) != boundMessage) return;
+                StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
+                if (latest.messageCardUrl != null && !latest.messageCardUrl.isEmpty()) {
+                    applyCustomBubbleArtwork(holder.b.bubbleRoot, latest.messageCardUrl);
+                }
+            });
+        }
+        applyCustomBubbleArtwork(holder.b.bubbleRoot, customBubble);
+
         // VIP-aware body colors (white on rose/VIP; dark on peer light gray).
         applyBubbleInk(holder, mine, useVipSkin ? vipLevel : 0);
 
         bindReplyQuote(holder, msg);
         bindBody(holder, msg);
+        bindPaidMessageInfo(holder, msg);
 
         String time = DeviceTimeFormat.messageTime(holder.itemView.getContext(), msg.createdAt);
         if (msg.isEdited) time = time + " · معدّلة";
@@ -304,6 +381,43 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         };
         holder.itemView.setOnLongClickListener(longClick);
         holder.b.bubbleRoot.setOnLongClickListener(longClick);
+    }
+
+    private void bindPaidMessageInfo(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg) {
+        TextView label = holder.b.tvPaidMessageInfo;
+        if (label == null) return;
+        if (msg.paidCoins <= 0 || msg.paidStatus == null || msg.paidStatus.isEmpty()) {
+            label.setVisibility(View.GONE);
+            label.setText("");
+            return;
+        }
+        String status;
+        switch (msg.paidStatus) {
+            case "replied":
+                status = "تم الرد";
+                break;
+            case "refunded":
+                status = "تم استرداد العملات";
+                break;
+            case "expired":
+                status = "انتهت المهلة بلا رد";
+                break;
+            default:
+                status = "بانتظار الرد";
+                if (msg.replyDeadlineAt != null) {
+                    long deadline = parseIsoMs(msg.replyDeadlineAt);
+                    if (deadline > 0) {
+                        long remaining = Math.max(0, deadline - System.currentTimeMillis());
+                        long minutes = (remaining + 59_999L) / 60_000L;
+                        status += " · " + (minutes / 60 > 0 ? (minutes / 60) + "س " : "") + (minutes % 60) + "د";
+                    }
+                }
+                break;
+        }
+        label.setText("💰 " + msg.paidCoins + " عملة · " + status);
+        label.setVisibility(View.VISIBLE);
+        label.setTextColor(msg.paidStatus.equals("refunded") || msg.paidStatus.equals("expired")
+                ? 0xFFB45309 : 0xFF667085);
     }
 
     private void bindDaySeparator(
@@ -477,7 +591,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             } catch (Exception ignored) {
             }
             avatarUrl = liveMe != null ? liveMe.avatarUrl : null;
-            frameUrl = liveMe != null ? liveMe.vipBadgeUrl : null;
+            frameUrl = liveMe != null ? AvatarCosmetics.avatarFrameUrl(liveMe) : null;
             hostBadgeUrl = null;
             name = firstNonEmpty(
                     liveMe != null ? liveMe.displayName : null,
@@ -487,8 +601,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             AuthDtos.UserDto sender = msg.sender;
             avatarUrl = sender != null && sender.avatarUrl != null
                     ? sender.avatarUrl : peerAvatarUrl;
+            // Prefer the sender's equipped frame; peer profile is the fallback when
+            // an individual message payload omits cosmetic fields.
             frameUrl = firstNonEmpty(
-                    sender != null ? sender.vipBadgeUrl : null,
+                    sender != null ? AvatarCosmetics.avatarFrameUrl(sender) : null,
                     peerHostBadgeUrl);
             hostBadgeUrl = null;
             name = firstNonEmpty(
@@ -498,23 +614,52 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                     "صديق");
         }
 
-        if (showAvatar) {
-            AvatarCosmetics.bindAvatar(holder.b.imgAvatar, avatarUrl);
-            AvatarCosmetics.applyHostWear(
-                    holder.b.imgFrame,
-                    holder.b.imgHostBadge,
-                    holder.b.imgAvatar,
-                    frameUrl,
-                    hostBadgeUrl,
-                    frameMeta,
-                    hostBadgeMeta);
-            if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
-                holder.b.imgFrame.bringToFront();
+        String customRankName = mine
+                ? (me != null ? me.customDisplayRankName : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankName : null);
+        String customRankImageUrl = mine
+                ? (me != null ? me.customDisplayRankImageUrl : null)
+                : (msg.sender != null ? msg.sender.customDisplayRankImageUrl : null);
+        if (customRankName != null && !customRankName.trim().isEmpty()) {
+            name = name + "  ·  " + customRankName.trim();
+        }
+        if (holder.b.imgCustomRankBadge != null) {
+            if (customRankImageUrl != null && !customRankImageUrl.trim().isEmpty() && showAvatar) {
+                holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView)
+                        .load(customRankImageUrl.trim())
+                        .into(holder.b.imgCustomRankBadge);
+            } else {
+                Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+                holder.b.imgCustomRankBadge.setVisibility(View.GONE);
             }
         }
 
-        holder.b.tvSender.setVisibility(View.GONE);
+        if (showAvatar) {
+            // Central wear binder keeps GIF/WebP animation and uses the native player for
+            // SVGA/video frames instead of silently flattening them in an ImageView.
+            AvatarCosmetics.bindWear(
+                    holder.b.imgAvatar, holder.b.imgFrame, avatarUrl, frameUrl,
+                    hostBadgeUrl, frameMeta, hostBadgeMeta);
+            if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
+                holder.b.imgFrame.bringToFront();
+            }
+        } else if (holder.b.imgAvatar != null && holder.b.imgFrame != null) {
+            // Clear any playback view retained by a recycled message row.
+            AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, null, null);
+            holder.b.imgAvatar.setVisibility(View.INVISIBLE);
+            holder.b.imgFrame.setVisibility(View.GONE);
+        }
+
+        AuthDtos.UserDto styledNameUser = mine ? me : msg.sender;
+        boolean hasActiveNameStyle = styledNameUser != null
+                && styledNameUser.nameStyle != null
+                && (Boolean.TRUE.equals(styledNameUser.nameStyle.get("enabled"))
+                    || "true".equalsIgnoreCase(String.valueOf(styledNameUser.nameStyle.get("enabled"))));
         holder.b.tvSender.setText(name);
+        holder.b.tvSender.setVisibility(hasActiveNameStyle ? View.VISIBLE : View.GONE);
+        VipNameStyle.bind(holder.b.tvSender, styledNameUser);
+        bindAgencyClubBadge(holder, msg, mine);
 
         if (showAvatar && listener != null) {
             String clickUserId;
@@ -539,6 +684,52 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.avatarWrap.setOnClickListener(null);
             holder.b.avatarWrap.setClickable(false);
         }
+    }
+
+    /** Small agency-club identity chip shown with messages from active club members. */
+    private void bindAgencyClubBadge(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg, boolean mine) {
+        if (!(holder.b.rowBadges instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) holder.b.rowBadges;
+        row.removeAllViews();
+        AuthDtos.UserDto user = mine ? me : msg.sender;
+        AuthDtos.UserDto.AgencySnip agency = user != null ? user.agency : null;
+        AuthDtos.AgencyClubDto club = user != null ? user.agencyClub : null;
+        String role = agency != null && agency.role != null
+                ? agency.role.trim().toLowerCase(java.util.Locale.ROOT)
+                : (club != null && club.role != null
+                    ? club.role.trim().toLowerCase(java.util.Locale.ROOT) : "");
+        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+        String roleLabel;
+        if ("owner".equals(role) || "leader".equals(role)) {
+            roleLabel = female ? "قائدة الوكالة" : "قائد الوكالة";
+        } else if ("host".equals(role) || "member".equals(role)) {
+            roleLabel = female ? "مضيفة" : "مضيف";
+        } else {
+            row.setVisibility(View.GONE);
+            return;
+        }
+        // Messages show a plain role label only: no dashboard image and no agency name.
+        TextView chip = new TextView(holder.itemView.getContext());
+        chip.setText("♛ " + roleLabel);
+        chip.setTextColor(0xFF805A19);
+        // Slightly reduce the badge footprint without changing its row, order,
+        // alignment, or surrounding message layout.
+        chip.setTextSize(9);
+        chip.setTypeface(null, android.graphics.Typeface.BOLD);
+        int horizontal = dp(holder, 8);
+        chip.setPadding(horizontal, dp(holder, 2), horizontal, dp(holder, 2));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFFFFF4D7);
+        bg.setCornerRadius(dp(holder, 10));
+        bg.setStroke(dp(holder, 1), 0xFFE6C477);
+        chip.setBackground(bg);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        row.setVisibility(View.VISIBLE);
+        row.addView(chip, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(holder, 19)));
     }
 
     /** Text / meta ink for light peer, rose me, and VIP skins. */
@@ -643,6 +834,137 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvReplyBody.setText(previewOf(reply != null ? reply : msg));
     }
 
+    private boolean isStoryPreviewMessage(@Nullable ChatDtos.MessageDto msg) {
+        return msg != null && msg.media != null
+                && "application/x-jeho-story".equalsIgnoreCase(msg.media.mimeType)
+                && msg.media.storyId != null && !msg.media.storyId.trim().isEmpty();
+    }
+
+    private void clearStoryPreview(@NonNull VH holder) {
+        LinearLayout bubble = holder.b.bubbleRoot;
+        for (int i = bubble.getChildCount() - 1; i >= 0; i--) {
+            View child = bubble.getChildAt(i);
+            if (STORY_PREVIEW_TAG.equals(child.getTag())) bubble.removeViewAt(i);
+        }
+    }
+
+    private void bindStoryPreview(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg) {
+        ChatDtos.MediaDto media = msg.media;
+        Context context = holder.itemView.getContext();
+        LinearLayout card = new LinearLayout(context);
+        card.setTag(STORY_PREVIEW_TAG);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(holder, 8), dp(holder, 8), dp(holder, 8), dp(holder, 8));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xFFF7EAF1);
+        background.setCornerRadius(dp(holder, 14));
+        background.setStroke(dp(holder, 1), 0x33B82768);
+        card.setBackground(background);
+
+        ImageView thumbnail = new ImageView(context);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbnail.setBackgroundColor(0xFFE8DCE4);
+        LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(dp(holder, 76), dp(holder, 82));
+        imageLp.setMarginEnd(dp(holder, 10));
+        card.addView(thumbnail, imageLp);
+        String thumbUrl = media.storyMediaUrl != null && !media.storyMediaUrl.trim().isEmpty()
+                ? media.storyMediaUrl : media.thumbnailUrl;
+        boolean storyVideo = "video".equalsIgnoreCase(media.storyMediaType);
+        if (thumbUrl != null && !thumbUrl.trim().isEmpty()) {
+            if (storyVideo) {
+                // Decode an actual frame from the story video instead of trying to
+                // display an MP4 URL as a still image (which leaves a blank card).
+                Glide.with(holder.itemView).asBitmap()
+                        .load(AssetCatalog.absoluteUrl(thumbUrl))
+                        .apply(RequestOptions.frameOf(1_000_000L).centerCrop())
+                        .placeholder(ImagePlaceholder.cover())
+                        .into(thumbnail);
+            } else {
+                Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbUrl))
+                        .centerCrop().placeholder(ImagePlaceholder.cover()).into(thumbnail);
+            }
+        }
+        if (storyVideo) {
+            FrameLayout previewFrame = new FrameLayout(context);
+            // The video frame remains visible underneath a clear play affordance.
+            TextView play = new TextView(context);
+            play.setText("▶");
+            play.setTextColor(Color.WHITE);
+            play.setTextSize(18);
+            play.setGravity(android.view.Gravity.CENTER);
+            GradientDrawable playBg = new GradientDrawable();
+            playBg.setColor(0x99000000);
+            playBg.setShape(GradientDrawable.OVAL);
+            play.setBackground(playBg);
+            FrameLayout.LayoutParams playLp = new FrameLayout.LayoutParams(dp(holder, 34), dp(holder, 34),
+                    android.view.Gravity.CENTER);
+            // Keep the thumbnail and play icon as one tappable preview surface.
+            card.removeView(thumbnail);
+            previewFrame.addView(thumbnail, new FrameLayout.LayoutParams(-1, -1));
+            previewFrame.addView(play, playLp);
+            card.addView(previewFrame, 0, imageLp);
+        }
+
+        LinearLayout details = new LinearLayout(context);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(context);
+        label.setText("رد على الستوري");
+        label.setTextColor(0xFFB82768);
+        label.setTextSize(11);
+        label.setTypeface(null, android.graphics.Typeface.BOLD);
+        details.addView(label, new LinearLayout.LayoutParams(-1, dp(holder, 22)));
+
+        String owner = media.storyOwnerName == null || media.storyOwnerName.trim().isEmpty()
+                ? "قصة من JEHO" : media.storyOwnerName;
+        TextView title = new TextView(context);
+        title.setText(owner);
+        title.setTextColor(0xFF29232B);
+        title.setTextSize(13);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        details.addView(title, new LinearLayout.LayoutParams(-1, dp(holder, 22)));
+
+        String caption = media.storyCaption == null || media.storyCaption.trim().isEmpty()
+                ? ("video".equalsIgnoreCase(media.storyMediaType) ? "فيديو الستوري" : "صورة الستوري")
+                : media.storyCaption.trim();
+        TextView subtitle = new TextView(context);
+        subtitle.setText(caption);
+        subtitle.setTextColor(0xFF756A75);
+        subtitle.setTextSize(11);
+        subtitle.setMaxLines(2);
+        subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        details.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
+        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView arrow = new TextView(context);
+        arrow.setText("‹");
+        arrow.setTextSize(25);
+        arrow.setTextColor(0xFFB82768);
+        arrow.setGravity(android.view.Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(holder, 22), dp(holder, 44)));
+
+        card.setOnClickListener(v -> {
+            Intent open = new Intent(context, com.Dramizo.Series.presentation.stories.StoryPreviewActivity.class);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_STORY_ID, media.storyId);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_MEDIA_TYPE, media.storyMediaType);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_MEDIA_URL,
+                    media.storyMediaUrl != null ? media.storyMediaUrl : media.url);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_CAPTION, media.storyCaption);
+            open.putExtra(com.Dramizo.Series.presentation.stories.StoryPreviewActivity.EXTRA_OWNER, media.storyOwnerName);
+            context.startActivity(open);
+        });
+
+        LinearLayout bubble = holder.b.bubbleRoot;
+        int insertAt = Math.min(2, bubble.getChildCount());
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
+                dp(holder, 236), -2);
+        cardLp.setMargins(0, dp(holder, 4), 0, dp(holder, 6));
+        bubble.addView(card, insertAt, cardLp);
+    }
+
     private void bindBody(@NonNull VH holder, ChatDtos.MessageDto msg) {
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         String mediaUrl = msg.media != null ? msg.media.url : null;
@@ -650,6 +972,25 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.GONE);
         holder.b.imgMedia.setVisibility(View.GONE);
         holder.b.imgMedia.setOnClickListener(null);
+        if (holder.b.videoMedia != null) {
+            holder.b.videoMedia.stopPlayback();
+            holder.b.videoMedia.setMediaController(null);
+            holder.b.videoMedia.setOnClickListener(null);
+            holder.b.videoMedia.setOnPreparedListener(null);
+            holder.b.videoMedia.setOnCompletionListener(null);
+            holder.b.videoMedia.setOnErrorListener(null);
+            holder.b.videoMedia.setVisibility(View.GONE);
+        }
+        if (holder.b.imgVideoThumbnail != null) {
+            Glide.with(holder.itemView).clear(holder.b.imgVideoThumbnail);
+            holder.b.imgVideoThumbnail.setVisibility(View.GONE);
+            holder.b.imgVideoThumbnail.setOnClickListener(null);
+            holder.b.imgVideoThumbnail.setImageDrawable(null);
+        }
+        if (holder.b.btnVideoPlay != null) {
+            holder.b.btnVideoPlay.setVisibility(View.GONE);
+            holder.b.btnVideoPlay.setOnClickListener(null);
+        }
         if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
         if (holder.b.agencyInviteRow != null) holder.b.agencyInviteRow.setVisibility(View.GONE);
@@ -658,12 +999,23 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.roomShareRow.setVisibility(View.GONE);
             holder.b.roomShareRow.setOnClickListener(null);
         }
+        clearStoryPreview(holder);
         holder.b.tvContent.setVisibility(View.GONE);
         hideTranslateViews(holder);
 
         RoomShareCodec.Parsed share = RoomShareCodec.parse(msg.content);
         if (share != null && holder.b.roomShareRow != null) {
             bindLiveRoomShare(holder, msg, share);
+            return;
+        }
+
+        if (isStoryPreviewMessage(msg)) {
+            bindStoryPreview(holder, msg);
+            if (msg.content != null && !msg.content.trim().isEmpty()) {
+                holder.b.tvContent.setVisibility(View.VISIBLE);
+                holder.b.tvContent.setText(msg.content);
+                bindTranslate(holder, msg);
+            }
             return;
         }
 
@@ -688,6 +1040,69 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 holder.b.tvContent.setVisibility(View.VISIBLE);
                 holder.b.tvContent.setText(msg.content);
                 bindTranslate(holder, msg);
+            }
+            return;
+        }
+
+        if ("video".equals(type) && mediaUrl != null && !mediaUrl.isEmpty()
+                && holder.b.videoMedia != null) {
+            String fullUrl = AssetCatalog.absoluteUrl(mediaUrl);
+            if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.VISIBLE);
+            holder.b.imgMedia.setVisibility(View.GONE);
+            if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
+            if (holder.b.tvImageTime != null) holder.b.tvImageTime.setVisibility(View.GONE);
+
+            // A durable poster is part of the message media JSON, so history/rebinds can
+            // paint the preview without downloading/starting the full video.
+            ImageView poster = holder.b.imgVideoThumbnail;
+            View playButton = holder.b.btnVideoPlay;
+            VideoView video = holder.b.videoMedia;
+            video.setVisibility(View.GONE);
+            video.setBackgroundColor(Color.BLACK);
+            if (poster != null) {
+                poster.setVisibility(View.VISIBLE);
+                poster.setBackgroundColor(Color.rgb(21, 25, 35));
+                String thumbnailUrl = msg.media != null ? msg.media.thumbnailUrl : null;
+                if (thumbnailUrl != null && !thumbnailUrl.trim().isEmpty()) {
+                    Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(thumbnailUrl))
+                            .centerCrop().dontAnimate().into(poster);
+                } else {
+                    poster.setImageDrawable(null);
+                }
+            }
+            if (playButton != null) playButton.setVisibility(View.VISIBLE);
+
+            View.OnClickListener startVideo = v -> {
+                if (poster != null) poster.setVisibility(View.GONE);
+                if (playButton != null) playButton.setVisibility(View.GONE);
+                video.setVisibility(View.VISIBLE);
+                MediaController controls = new MediaController(holder.itemView.getContext());
+                controls.setAnchorView(video);
+                video.setMediaController(controls);
+                video.setOnPreparedListener(player -> {
+                    player.setLooping(false);
+                    video.start();
+                });
+                video.setOnCompletionListener(player -> {
+                    video.stopPlayback();
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                });
+                video.setOnErrorListener((player, what, extra) -> {
+                    video.setVisibility(View.GONE);
+                    if (poster != null) poster.setVisibility(View.VISIBLE);
+                    if (playButton != null) playButton.setVisibility(View.VISIBLE);
+                    Toast.makeText(holder.itemView.getContext(), "تعذر تشغيل الفيديو", Toast.LENGTH_SHORT).show();
+                    return true;
+                });
+                video.setVideoURI(Uri.parse(fullUrl));
+            };
+            if (poster != null) poster.setOnClickListener(startVideo);
+            if (playButton != null) playButton.setOnClickListener(startVideo);
+            if (msg.content != null && !msg.content.trim().isEmpty()) {
+                holder.b.tvContent.setVisibility(View.VISIBLE);
+                holder.b.tvContent.setText(msg.content);
             }
             return;
         }
@@ -1012,6 +1427,35 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
     }
 
+    private void applyCustomBubbleArtwork(@NonNull View bubble, @Nullable String url) {
+        // A RecyclerView row may be rebound from a user who wears a CP bubble to
+        // one who has removed it. Cancel the previous request before handling the
+        // new value; otherwise a late Glide callback can put the deleted bubble
+        // back on screen after the default background was already restored.
+        CustomTarget<Drawable> previous = customBubbleTargets.remove(bubble);
+        if (previous != null) {
+            try { Glide.with(bubble).clear(previous); } catch (Exception ignored) { }
+        }
+
+        String requested = url != null ? url.trim() : "";
+        if (requested.isEmpty()) return; // caller has already applied the normal mine/peer background
+
+        try {
+            CustomTarget<Drawable> target = new CustomTarget<Drawable>() {
+                @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                    if (bubble.getContext() != null && customBubbleTargets.get(bubble) == this) {
+                        bubble.setBackground(resource);
+                    }
+                }
+                @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+            };
+            customBubbleTargets.put(bubble, target);
+            Glide.with(bubble).load(AssetCatalog.absoluteUrl(requested)).into(target);
+        } catch (Exception ignored) {
+            customBubbleTargets.remove(bubble);
+        }
+    }
+
     private void applyBrandMineBubble(@NonNull View bubble) {
         int primary = RemoteTheme.primaryColor(bubble.getContext());
         int light = lightenColor(primary, 0.22f);
@@ -1329,6 +1773,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (msg == null) return "";
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         if ("image".equals(type)) return "📷 صورة";
+        if ("video".equals(type)) return "🎬 فيديو";
         if ("audio".equals(type)) return "🎤 رسالة صوتية";
         if ("gift".equals(type)) return "🎁 " + (msg.content != null ? msg.content : "هدية");
         if (RoomShareCodec.isRoomShare(msg.content)) return RoomShareCodec.previewLabel(msg.content);
@@ -1443,6 +1888,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final ImageView imgAvatar;
         final ImageView imgFrame;
         final ImageView imgHostBadge;
+        final ImageView imgCustomRankBadge;
         final View bubbleColumn;
         final LinearLayout bubbleRoot;
         final TextView tvDaySeparator;
@@ -1455,6 +1901,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final TextView tvReplyBody;
         final View imageWrap;
         final ImageView imgMedia;
+        final VideoView videoMedia;
+        final ImageView imgVideoThumbnail;
+        final View btnVideoPlay;
         final View rowImageReaction;
         final TextView tvImageReaction;
         final TextView tvImageTime;
@@ -1480,6 +1929,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final ImageView imgRoomShareCover;
         final TextView tvRoomShareTitle;
         final TextView tvContent;
+        final TextView tvPaidMessageInfo;
         final TextView tvTranslateAction;
         final TextView tvTranslated;
         final View rowMetaFooter;
@@ -1492,6 +1942,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imgAvatar = root.findViewById(R.id.imgAvatar);
             imgFrame = root.findViewById(R.id.imgFrame);
             imgHostBadge = root.findViewById(R.id.imgHostBadge);
+            imgCustomRankBadge = root.findViewById(R.id.imgCustomRankBadge);
             bubbleColumn = root.findViewById(R.id.bubbleColumn);
             bubbleRoot = root.findViewById(R.id.bubbleRoot);
             tvDaySeparator = root.findViewById(R.id.tvDaySeparator);
@@ -1504,6 +1955,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             tvReplyBody = root.findViewById(R.id.tvReplyBody);
             imageWrap = root.findViewById(R.id.imageWrap);
             imgMedia = root.findViewById(R.id.imgMedia);
+            videoMedia = root.findViewById(R.id.videoMedia);
+            imgVideoThumbnail = root.findViewById(R.id.imgVideoThumbnail);
+            btnVideoPlay = root.findViewById(R.id.btnVideoPlay);
             rowImageReaction = root.findViewById(R.id.rowImageReaction);
             tvImageReaction = root.findViewById(R.id.tvImageReaction);
             tvImageTime = root.findViewById(R.id.tvImageTime);
@@ -1529,6 +1983,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imgRoomShareCover = root.findViewById(R.id.imgRoomShareCover);
             tvRoomShareTitle = root.findViewById(R.id.tvRoomShareTitle);
             tvContent = root.findViewById(R.id.tvContent);
+            tvPaidMessageInfo = root.findViewById(R.id.tvPaidMessageInfo);
             tvTranslateAction = root.findViewById(R.id.tvTranslateAction);
             tvTranslated = root.findViewById(R.id.tvTranslated);
             rowMetaFooter = root.findViewById(R.id.rowMetaFooter);

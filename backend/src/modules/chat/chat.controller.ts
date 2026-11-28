@@ -26,9 +26,39 @@ export class ChatController {
     return this.chatService.startOrGet(userId, dto);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search conversation names and message history for the current user' })
+  search(
+    @CurrentUser('sub') userId: string,
+    @Query('q') q: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.chatService.searchConversations(
+      userId, q, this.pagination(page, limit),
+    );
+  }
+
   @Get('conversations')
-  list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
-    return this.chatService.listConversations(userId, query);
+  list(
+    @CurrentUser('sub') userId: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.chatService.listConversations(
+      userId, this.pagination(page, limit),
+    );
+  }
+
+  private pagination(rawPage?: string, rawLimit?: string): PaginationDto {
+    const query = new PaginationDto();
+    const page = Number(rawPage);
+    const limit = Number(rawLimit);
+    query.page = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+    query.limit = Number.isFinite(limit) && limit >= 1
+      ? Math.min(100, Math.floor(limit))
+      : 20;
+    return query;
   }
 
   @Get('conversations/:id')
@@ -90,9 +120,8 @@ export class ChatController {
   archive(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('sub') userId: string,
-    @Body('archived') archived: boolean,
   ) {
-    return this.chatService.archive(id, userId, archived !== false);
+    return this.chatService.archive(id, userId);
   }
 
   @Post('conversations/:id/delete')

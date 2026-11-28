@@ -11,6 +11,7 @@ import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
 import com.Dramizo.Series.data.remote.api.AgencyApi;
 import com.Dramizo.Series.data.remote.api.AuthApi;
+import com.Dramizo.Series.data.remote.api.AdminApi;
 import com.Dramizo.Series.data.remote.api.ChatApi;
 import com.Dramizo.Series.data.remote.api.ConfigApi;
 import com.Dramizo.Series.data.remote.api.ContestsApi;
@@ -30,6 +31,7 @@ import com.Dramizo.Series.data.remote.api.RoomApi;
 import com.Dramizo.Series.data.remote.api.RoomCupApi;
 import com.Dramizo.Series.data.remote.api.LuckyBoxesApi;
 import com.Dramizo.Series.data.remote.api.DramaApi;
+import com.Dramizo.Series.data.remote.api.StoriesApi;
 import com.Dramizo.Series.data.remote.api.GameAdsApi;
 import com.Dramizo.Series.data.remote.api.UploadApi;
 import com.Dramizo.Series.data.remote.api.UserApi;
@@ -90,8 +92,10 @@ import com.Dramizo.Series.domain.usecase.wallet.GetWalletUseCase;
 import com.Dramizo.Series.domain.usecase.wallet.GetRechargePackagesUseCase;
 import com.Dramizo.Series.domain.usecase.wallet.VerifyPurchaseUseCase;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -105,7 +109,9 @@ public class AppContainer {
     private final EncryptedFeatureCache featureCache;
     private final AuraDatabase database;
     private final ExecutorService ioExecutor;
+    private final ExecutorService luckyCannonExecutor;
     private final Retrofit retrofit;
+    private final AuthApi authApi;
     private final BillingHelper billingHelper;
 
     private final AuthRepository authRepository;
@@ -140,8 +146,10 @@ public class AppContainer {
     private final GiftApi giftApiRef;
     private final LuckyBoxesApi luckyBoxesApi;
     private final DramaApi dramaApi;
+    private final StoriesApi storiesApi;
     private final GameAdsApi gameAdsApi;
     private final NotificationApi notificationApi;
+    private final AdminApi adminApi;
 
     public final LoginUseCase loginUseCase;
     public final RegisterUseCase registerUseCase;
@@ -175,7 +183,22 @@ public class AppContainer {
         appContext = context.getApplicationContext();
         sessionManager = new SessionManager(appContext);
         featureCache = new EncryptedFeatureCache(appContext);
-        ioExecutor = Executors.newFixedThreadPool(4);
+        // Room joins, chat sends, gifts and background data work share this pool.
+        // Four workers let long uploads/background calls queue latency-sensitive actions;
+        // keep a little more headroom without creating an unbounded thread-per-request pool.
+        ioExecutor = Executors.newFixedThreadPool(16);
+        // Dedicated, bounded lane for hold-to-send gifts. Two requests may execute and
+        // exactly one may wait; accidental repeat-loop regressions cannot grow an
+        // unbounded queue and retain stale wallet transactions after the finger is up.
+        luckyCannonExecutor = new ThreadPoolExecutor(
+                2, 2, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(1),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "jeho-lucky-cannon");
+                    thread.setPriority(Thread.NORM_PRIORITY + 1);
+                    return thread;
+                },
+                new ThreadPoolExecutor.AbortPolicy());
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
                 .build();
@@ -186,14 +209,26 @@ public class AppContainer {
                 ? HttpLoggingInterceptor.Level.BASIC
                 : HttpLoggingInterceptor.Level.NONE);
 
+        // Keep Retrofit rooted at /api/v1 even when a local/debug URL is
+        // configured as only the host. Otherwise relative endpoints can hit
+        // the wrong server path and return errors such as "Cannot POST /".
         String apiBase = ensureTrailingSlash(com.Dramizo.Series.util.ApiOrigin.apiV1());
-        if (BuildConfig.DEBUG && BuildConfig.API_BASE_URL != null && !BuildConfig.API_BASE_URL.isEmpty()) {
-            apiBase = ensureTrailingSlash(BuildConfig.API_BASE_URL);
+        if (BuildConfig.DEBUG && BuildConfig.API_BASE_URL != null && !BuildConfig.API_BASE_URL.trim().isEmpty()) {
+            apiBase = normalizeApiBase(BuildConfig.API_BASE_URL);
         }
         okhttp3.Cache httpCache = new okhttp3.Cache(
                 new java.io.File(appContext.getCacheDir(), "http_cache"),
                 64L * 1024L * 1024L);
+        // The API host is shared by room joins, chat, gifts, wallet and config calls.
+        // OkHttp's default per-host limit (5) makes fast room/gift bursts queue behind
+        // unrelated requests. Raise the connection concurrency without changing request semantics.
+        okhttp3.Dispatcher httpDispatcher = new okhttp3.Dispatcher(
+                java.util.concurrent.Executors.newFixedThreadPool(16));
+        httpDispatcher.setMaxRequests(48);
+        httpDispatcher.setMaxRequestsPerHost(16);
         OkHttpClient client = new OkHttpClient.Builder()
+                .dispatcher(httpDispatcher)
+                .connectionPool(new okhttp3.ConnectionPool(10, 2, TimeUnit.MINUTES))
                 .cache(httpCache)
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(25, TimeUnit.SECONDS)
@@ -204,6 +239,34 @@ public class AppContainer {
                                     + " (Android; okhttp)")
                             .build();
                     return chain.proceed(req);
+                })
+                // Render's free service can briefly sleep/restart and mobile networks
+                // can drop an idle TCP connection. Retry only safe reads so a transient
+                // disconnect does not blank the app or force the user to retry manually.
+                .addInterceptor(chain -> {
+                    okhttp3.Request request = chain.request();
+                    if (!request.method().equalsIgnoreCase("GET")
+                            && !request.method().equalsIgnoreCase("HEAD")) {
+                        return chain.proceed(request);
+                    }
+                    java.io.IOException last = null;
+                    for (int attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            return chain.proceed(request);
+                        } catch (java.io.IOException error) {
+                            last = error;
+                            if (attempt < 2) {
+                                try {
+                                    // Keep safe-read retries responsive; write requests are never retried here.
+                Thread.sleep(attempt == 0 ? 150L : 350L);
+                                } catch (InterruptedException interrupted) {
+                                    Thread.currentThread().interrupt();
+                                    throw error;
+                                }
+                            }
+                        }
+                    }
+                    throw last;
                 })
                 .addInterceptor(new AuthInterceptor(sessionManager))
                 .authenticator(new TokenAuthenticator(sessionManager, apiBase))
@@ -216,7 +279,8 @@ public class AppContainer {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
-        AuthApi authApi = retrofit.create(AuthApi.class);
+        this.authApi = retrofit.create(AuthApi.class);
+        AuthApi authApi = this.authApi;
         UserApi userApi = retrofit.create(UserApi.class);
         RoomApi roomApi = retrofit.create(RoomApi.class);
         chatApi = retrofit.create(ChatApi.class);
@@ -247,21 +311,23 @@ public class AppContainer {
         this.giftApiRef = giftApi;
         this.luckyBoxesApi = retrofit.create(LuckyBoxesApi.class);
         this.dramaApi = retrofit.create(DramaApi.class);
+        this.storiesApi = retrofit.create(StoriesApi.class);
         this.gameAdsApi = retrofit.create(GameAdsApi.class);
         this.notificationApi = notificationApi;
+        this.adminApi = retrofit.create(AdminApi.class);
 
         authRepository = new AuthRepositoryImpl(authApi, sessionManager, database.userDao(), ioExecutor);
-        userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager);
-        roomRepository = new RoomRepositoryImpl(roomApi, ioExecutor);
+        userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager, featureCache);
+        roomRepository = new RoomRepositoryImpl(roomApi, ioExecutor, featureCache);
         chatRepository = new ChatRepositoryImpl(chatApi, database.chatMessageDao(), ioExecutor);
         walletRepository = new WalletRepositoryImpl(walletApi, database.walletDao(), ioExecutor);
-        giftRepository = new GiftRepositoryImpl(giftApi, database.giftDao(), ioExecutor);
+        giftRepository = new GiftRepositoryImpl(giftApi, database.giftDao(), ioExecutor, featureCache);
         gameRepository = new GameRepositoryImpl(gameApi, ioExecutor);
         vipRepository = new VipRepositoryImpl(vipApi, ioExecutor);
         agencyRepository = new AgencyRepositoryImpl(agencyApi, ioExecutor);
         rankingRepository = new RankingRepositoryImpl(rankingApi, ioExecutor);
         notificationRepository = new NotificationRepositoryImpl(notificationApi, ioExecutor, sessionManager, context);
-        cosmeticsRepository = new CosmeticsRepositoryImpl(cosmeticsApi);
+        cosmeticsRepository = new CosmeticsRepositoryImpl(cosmeticsApi, featureCache, sessionManager, ioExecutor);
 
         billingHelper = new BillingHelper(appContext);
 
@@ -294,15 +360,27 @@ public class AppContainer {
         getNotificationsUseCase = new GetNotificationsUseCase(notificationRepository);
     }
 
+    private static String normalizeApiBase(String configured) {
+        String value = configured == null ? "" : configured.trim();
+        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
+        if (value.isEmpty() || !value.matches("(?i)^https?://.+")) {
+            return com.Dramizo.Series.util.ApiOrigin.apiV1();
+        }
+        if (!value.matches("(?i).*/api/v1$")) value += "/api/v1";
+        return value + "/";
+    }
+
     private static String ensureTrailingSlash(String url) {
         if (url == null || url.isEmpty()) return com.Dramizo.Series.util.ApiOrigin.apiV1();
         return url.endsWith("/") ? url : url + "/";
     }
 
+    public AuthApi getAuthApi() { return authApi; }
     public SessionManager getSessionManager() { return sessionManager; }
     public EncryptedFeatureCache getFeatureCache() { return featureCache; }
     public AuraDatabase getDatabase() { return database; }
     public ExecutorService getIoExecutor() { return ioExecutor; }
+    public ExecutorService getLuckyCannonExecutor() { return luckyCannonExecutor; }
     public BillingHelper getBillingHelper() { return billingHelper; }
     public AuthRepository getAuthRepository() { return authRepository; }
     public UserRepository getUserRepository() { return userRepository; }
@@ -337,7 +415,9 @@ public class AppContainer {
     public GiftApi getGiftApi() { return giftApiRef; }
     public LuckyBoxesApi getLuckyBoxesApi() { return luckyBoxesApi; }
     public DramaApi getDramaApi() { return dramaApi; }
+    public StoriesApi getStoriesApi() { return storiesApi; }
     public GameAdsApi getGameAdsApi() { return gameAdsApi; }
     public NotificationApi getNotificationApi() { return notificationApi; }
+    public AdminApi getAdminApi() { return adminApi; }
 }
 

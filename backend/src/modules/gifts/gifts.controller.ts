@@ -25,6 +25,13 @@ export class GiftsController {
     return this.giftsService.listCategories();
   }
 
+  @Public()
+  @Get('policy')
+  @ApiOperation({ summary: 'Public gift policy flags for the app UI' })
+  policy() {
+    return this.giftsService.giftPolicy();
+  }
+
   @Post('send')
   @ApiOperation({ summary: 'Send gift with combo/lucky support' })
   send(@CurrentUser('sub') userId: string, @Body() dto: SendGiftDto) {
@@ -41,6 +48,26 @@ export class GiftsController {
     @Body() dto: SendAllMicGiftDto,
   ) {
     return this.giftsService.sendAllMic(userId, dto);
+  }
+
+  @Get('support-chest')
+  @ApiOperation({ summary: 'Read support chest config and room progress' })
+  supportChest(@Query('roomId') roomId: string) {
+    return this.giftsService.getSupportChestState(roomId);
+  }
+
+  @Public()
+  @Get('history/received')
+  @ApiOperation({ summary: 'Public profile received-gift totals without sender identities' })
+  receivedHistory(@Query('userId') userId: string) {
+    return this.giftsService.receivedHistorySummary(userId);
+  }
+
+  @Public()
+  @Get('supporters')
+  @ApiOperation({ summary: 'Public profile top gift supporters with support totals' })
+  supporters(@Query('userId') userId: string) {
+    return this.giftsService.receivedSupporters(userId);
   }
 
   @Get('history')

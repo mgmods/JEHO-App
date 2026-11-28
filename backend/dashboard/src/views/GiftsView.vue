@@ -23,6 +23,46 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
+    <section class="glass p-3 mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+          <h5 class="mb-1">مدفع هدايا المحظوظ</h5>
+          <p class="small text-secondary mb-0">إعدادات الميزة التي تظهر بعد إرسال هدية محظوظ ناجحة داخل الروم.</p>
+        </div>
+        <button type="button" class="btn btn-aurora btn-sm" :disabled="cannonSaving || cannonLoading" @click="saveCannonConfig">
+          {{ cannonSaving ? 'جارٍ الحفظ…' : 'حفظ إعدادات المدفع' }}
+        </button>
+      </div>
+      <div v-if="cannonLoading" class="small text-secondary mt-3">جارٍ تحميل الإعدادات…</div>
+      <div v-else class="row g-3 mt-1">
+        <div class="col-md-4">
+          <div class="form-check form-switch border rounded-3 p-3 ps-5 h-100">
+            <input id="lucky-cannon-enabled" v-model="cannonConfig.enabled" class="form-check-input" type="checkbox" role="switch" />
+            <label class="form-check-label fw-semibold" for="lucky-cannon-enabled">تفعيل المدفع</label>
+            <div class="small text-secondary mt-1">عند التعطيل لن يظهر زر المدفع بعد إرسال هدية المحظوظ.</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="lucky-cannon-duration">مدة ظهور الزر</label>
+          <select id="lucky-cannon-duration" v-model.number="cannonConfig.durationSeconds" class="form-select">
+            <option :value="1">ثانية واحدة</option>
+            <option :value="2">ثانيتان</option>
+            <option :value="3">3 ثوانٍ</option>
+            <option :value="5">5 ثوانٍ</option>
+            <option :value="10">10 ثوانٍ</option>
+          </select>
+          <div class="small text-secondary mt-1">المدة تعود للبداية بعد كل إرسال ناجح.</div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-check form-switch border rounded-3 p-3 ps-5 h-100">
+            <input id="lucky-cannon-sound" v-model="cannonConfig.soundEnabled" class="form-check-input" type="checkbox" role="switch" />
+            <label class="form-check-label fw-semibold" for="lucky-cannon-sound">صوت الإطلاق</label>
+            <div class="small text-secondary mt-1">تحكم بصوت المؤثر فقط، دون تغيير إعدادات ZEGO.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="glass p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
@@ -55,10 +95,22 @@
       </div>
     </div>
 
+    <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="تصنيف الهدايا">
+      <button type="button" class="btn btn-sm" :class="giftSection === 'all' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'all'">
+        كل الهدايا ({{ gifts.length }})
+      </button>
+      <button type="button" class="btn btn-sm" :class="giftSection === 'normal' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'normal'">
+        الهدايا العادية ({{ normalGiftsCount }})
+      </button>
+      <button type="button" class="btn btn-sm" :class="giftSection === 'cp' ? 'btn-aurora' : 'btn-ghost'" @click="giftSection = 'cp'">
+        <i class="bi bi-heart-fill me-1"></i> هدايا CP ({{ cpGiftsCount }})
+      </button>
+    </div>
+
     <LoadingSpinner v-if="loading" />
     <template v-else>
       <BulkActionBar
-        :count="gifts.length"
+        :count="visibleGifts.length"
         :selected-count="selectedCount"
         :all-selected="allSelected"
         :some-selected="someSelected"
@@ -69,8 +121,8 @@
         @action="onBulkAction"
       />
       <div class="widget-grid">
-        <div v-if="!gifts.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
-        <article v-for="g in gifts" :key="g.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(g.id) }">
+        <div v-if="!visibleGifts.length" class="glass p-4 empty-state">{{ giftSection === 'cp' ? 'لا توجد هدايا CP بعد. أضف هدية جديدة واختر فئة CP.' : t('app.none') }}</div>
+        <article v-for="g in visibleGifts" :key="g.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(g.id) }">
           <BulkCheck :checked="isSelected(g.id)" @toggle="toggle(g.id)" />
         <div class="widget-card-media">
           <video
@@ -112,6 +164,8 @@
           <div class="widget-card-meta mb-2">
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
             <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
+            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="badge text-bg-danger ms-1">CP</span>
+            <span v-if="String(g.category || '').toLowerCase() === 'cp'" class="small text-danger ms-1">· {{ g.cpPoints == null ? 'نقاط النوع الافتراضية' : formatNumber(g.cpPoints) + ' نقطة/هدية' }}</span>
             <span v-if="giftMediaKindLabel(g)"> · {{ giftMediaKindLabel(g) }}</span>
           </div>
           <div class="action-btns">
@@ -164,8 +218,26 @@
                     <option v-for="c in activeCategories" :key="c.key" :value="c.key">
                       {{ c.labelAr || c.labelEn || c.key }}
                     </option>
+                    <option v-if="!activeCategories.some(c => c.key === 'cp')" value="cp">هدايا CP</option>
                   </select>
                 </div>
+                <template v-if="String(form.category || '').toLowerCase() === 'cp'">
+                  <div class="col-md-4">
+                    <label class="form-label">نوع علاقة CP التي تطلبها الهدية</label>
+                    <select v-model="form.cpRelationshipType" class="form-select" required>
+                      <option value="friendship">صداقة</option>
+                      <option value="brotherhood">أخوّة</option>
+                      <option value="love">حب</option>
+                      <option value="engagement">خطوبة</option>
+                      <option value="marriage">زواج</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">نقاط مستوى CP لكل هدية</label>
+                    <input v-model.number="form.cpPoints" type="number" min="0" max="1000000000" step="1" class="form-control" required />
+                    <div class="form-text">تُحدد هذه القيمة لكل نسخة من الهدية. تُضاف عند إرسالها بين شريكين مرتبطين، وتُسجل هدية البدء عند قبول طلب الارتباط.</div>
+                  </div>
+                </template>
                 <template v-if="form.type === 'lucky'">
                   <div class="col-12">
                     <div class="small text-muted mb-2">{{ t('gifts.luckyHint') }}</div>
@@ -211,9 +283,13 @@
                     مهم: ارفع فيديو الهدية هنا (MP4) ليشتغل ملء الشاشة مثل الدخوليات — ليس في حقل الأيقونة فقط
                   </div>
                 </div>
-                <div class="col-6" v-if="form.iconUrl">
+                <div class="col-6" v-if="form.iconUrl && !isVideo(form.iconUrl)">
                   <div class="small text-muted mb-1">أيقونة</div>
                   <img :src="absUrl(form.iconUrl)" alt="" width="88" height="88" style="object-fit: contain" />
+                </div>
+                <div class="col-6" v-else-if="form.iconUrl">
+                  <div class="small text-muted mb-1">وسيط فيديو</div>
+                  <span class="badge text-bg-info">سيظهر الفيديو في المتجر</span>
                 </div>
                 <div class="col-6" v-if="form.animationUrl">
                   <div class="small text-muted mb-1">عرض الأنيميشن</div>
@@ -221,7 +297,6 @@
                     v-if="isVideo(form.animationUrl)"
                     :src="absUrl(form.animationUrl)"
                     controls
-                    muted
                     loop
                     playsinline
                     style="max-width: 160px; max-height: 160px; border-radius: 12px"
@@ -307,6 +382,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { giftsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
@@ -320,7 +396,6 @@ import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
 
 const gifts = ref([])
 const categories = ref([])
@@ -330,20 +405,37 @@ const error = ref('')
 const success = ref('')
 const showModal = ref(false)
 const showCategoryModal = ref(false)
+const giftSection = ref('all')
 const editingId = ref(null)
 const catEditingId = ref(null)
 const bulkBusy = ref(false)
 const pendingCategory = ref(null)
 const importingEntries = ref(false)
+const cannonConfig = reactive({ enabled: true, durationSeconds: 2, soundEnabled: true })
+const cannonLoading = ref(false)
+const cannonSaving = ref(false)
+
 
 const CORE_KEYS = new Set(['normal', 'lucky', 'combo', 'premium', 'country'])
 function isCoreCategory(key) {
   return CORE_KEYS.has(String(key || '').toLowerCase())
 }
 
-const activeCategories = computed(() =>
-  (categories.value || []).filter((c) => c && c.isActive !== false),
-)
+const activeCategories = computed(() => {
+  const rows = (categories.value || []).filter((c) => c && c.isActive !== false)
+  if (!rows.some((c) => String(c.key || '').toLowerCase() === 'cp')) {
+    rows.push({ key: 'cp', labelAr: 'هدايا CP', labelEn: 'CP Gifts', isActive: true })
+  }
+  return rows
+})
+
+const cpGiftsCount = computed(() => gifts.value.filter((g) => String(g.category || '').toLowerCase() === 'cp').length)
+const normalGiftsCount = computed(() => gifts.value.filter((g) => String(g.category || '').toLowerCase() !== 'cp').length)
+const visibleGifts = computed(() => {
+  if (giftSection.value === 'cp') return gifts.value.filter((g) => String(g.category || '').toLowerCase() === 'cp')
+  if (giftSection.value === 'normal') return gifts.value.filter((g) => String(g.category || '').toLowerCase() !== 'cp')
+  return gifts.value
+})
 
 const {
   selectedIds,
@@ -390,6 +482,8 @@ const form = reactive({
   diamondValue: 8,
   type: 'normal',
   category: 'normal',
+  cpRelationshipType: 'love',
+  cpPoints: 0,
   iconUrl: '',
   animationUrl: '',
   sortOrder: 0,
@@ -420,9 +514,7 @@ watch(
 )
 
 function absUrl(u) {
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 
 async function load() {
@@ -477,7 +569,9 @@ function openCreate() {
     coinPrice: 10,
     diamondValue: 8,
     type: 'normal',
-    category: activeCategories.value[0]?.key || 'normal',
+    category: giftSection.value === 'cp' ? 'cp' : (activeCategories.value[0]?.key || 'normal'),
+    cpRelationshipType: 'love',
+    cpPoints: 0,
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
@@ -499,6 +593,8 @@ function openEdit(g) {
     diamondValue: g.diamondValue ?? Math.max(1, Math.floor((g.coinPrice || 1) * 0.8)),
     type: g.type || 'normal',
     category: g.category || g.type || 'normal',
+    cpRelationshipType: g.cpRelationshipType || 'love',
+    cpPoints: g.cpPoints == null ? 0 : Number(g.cpPoints),
     iconUrl: g.iconUrl || '',
     animationUrl: g.animationUrl || '',
     sortOrder: g.sortOrder || 0,
@@ -574,8 +670,8 @@ async function onAnimFile(e) {
 }
 
 async function save() {
-  if (!form.iconUrl) {
-    error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أولاً'
+  if (!form.iconUrl && !form.animationUrl) {
+    error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أو ملف الحركة أولاً'
     toast().danger(error.value)
     return
   }
@@ -584,7 +680,7 @@ async function save() {
   success.value = ''
   const payload = {
     name: form.name,
-    iconUrl: form.iconUrl,
+    iconUrl: form.iconUrl || form.animationUrl,
     // If admin uploaded MP4 as icon only, still treat it as the play media.
     animationUrl: form.animationUrl
       || (isVideo(form.iconUrl) ? form.iconUrl : null),
@@ -592,6 +688,10 @@ async function save() {
     diamondValue: Number(form.diamondValue) || 1,
     type: form.type || 'normal',
     category: form.category || form.type || 'normal',
+    cpRelationshipType: String(form.cpRelationshipType || 'love'),
+    cpPoints: String(form.category || '').toLowerCase() === 'cp'
+      ? Math.max(0, Math.floor(Number(form.cpPoints) || 0))
+      : undefined,
     sortOrder: Number(form.sortOrder) || 0,
     isActive: form.status === 'active',
     luckyConfig:
@@ -755,7 +855,40 @@ async function doRemoveCategory() {
   }
 }
 
-onMounted(load)
+async function loadCannonConfig() {
+  cannonLoading.value = true
+  const { data, error: err } = await giftsApi.luckyCannonConfig()
+  if (err) {
+    error.value = err.message
+  } else if (data) {
+    Object.assign(cannonConfig, {
+      enabled: data.enabled !== false,
+      durationSeconds: Math.max(1, Math.min(10, Number(data.durationSeconds) || 2)),
+      soundEnabled: data.soundEnabled !== false,
+    })
+  }
+  cannonLoading.value = false
+}
+
+async function saveCannonConfig() {
+  cannonSaving.value = true
+  const { data, error: err } = await giftsApi.saveLuckyCannonConfig({
+    enabled: cannonConfig.enabled === true,
+    durationSeconds: Math.max(1, Math.min(10, Number(cannonConfig.durationSeconds) || 2)),
+    soundEnabled: cannonConfig.soundEnabled !== false,
+  })
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else if (data) {
+    Object.assign(cannonConfig, data)
+    success.value = 'تم حفظ إعدادات مدفع هدايا المحظوظ'
+    toast().success(success.value)
+  }
+  cannonSaving.value = false
+}
+
+onMounted(() => { load(); loadCannonConfig() })
 
 function giftTypeLabel(type) {
   const key = String(type || 'normal').toLowerCase()

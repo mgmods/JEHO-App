@@ -102,9 +102,24 @@ public final class AppUpdateChecker {
                 + (arabic ? "عندك: " : "Yours: ")
                 + BuildConfig.VERSION_NAME;
 
-        String positive = arabic ? "تحديث الآن" : "Update now";
-        String negative = force ? null : (arabic ? "لاحقاً" : "Later");
+        if (force) {
+            // A mandatory release is a full-screen gate, never a dismissible dialog.
+            Intent gate = new Intent(activity, com.Dramizo.Series.presentation.splash.UpdateActivity.class);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_FORCE, true);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_CODE, latest);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_VERSION_NAME, versionLabel);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_URL, dto.storeUrl);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_LINK_TYPE, dto.linkType);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_TITLE, title);
+            gate.putExtra(com.Dramizo.Series.presentation.splash.UpdateActivity.EXTRA_MESSAGE, body);
+            gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            activity.startActivity(gate);
+            activity.finish();
+            return;
+        }
 
+        String positive = arabic ? "تحديث الآن" : "Update now";
+        String negative = arabic ? "لاحقاً" : "Later";
         AuraDialogHelper.confirm(
                 activity,
                 title,
@@ -113,21 +128,12 @@ public final class AppUpdateChecker {
                 () -> openStore(activity, dto.storeUrl),
                 negative,
                 () -> {
-                    if (!force) {
-                        prefs.edit().putInt(KEY_SKIPPED_CODE, latest).apply();
-                    }
+                    prefs.edit().putInt(KEY_SKIPPED_CODE, latest).apply();
                     if (onContinue != null) onContinue.onContinue();
                 },
-                !force);
+                true);
 
-        // Soft update: also continue in background so splash isn't blocked forever
-        // if user leaves sheet open — only when not forced.
-        if (!force && onContinue != null) {
-            // Wait for user action; do not auto-continue.
-        }
-        if (force && onContinue == null) {
-            // blocking splash path — user must tap update
-        }
+        // Optional updates remain dismissible; mandatory updates never reach this dialog.
     }
 
     /** Soft reminder after main screen is up (non-blocking). */
@@ -136,19 +142,15 @@ public final class AppUpdateChecker {
     }
 
     private static void openStore(@NonNull Activity activity, @Nullable String storeUrl) {
-        String url = storeUrl != null && !storeUrl.trim().isEmpty()
-                ? storeUrl.trim()
-                : "https://play.google.com/store/apps/details?id=" + BuildConfig.APPLICATION_ID;
+        String url = storeUrl == null ? "" : storeUrl.trim();
+        if (url.isEmpty()) return;
         try {
-            Intent market = new Intent(Intent.ACTION_VIEW,
-                    Uri.parse("market://details?id=" + BuildConfig.APPLICATION_ID));
-            market.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity.startActivity(market);
-        } catch (Exception e) {
-            try {
-                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception ignored) {
-            }
+            Uri uri = Uri.parse(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme))) return;
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
+            // Never substitute Google Play: the dashboard URL is the source of truth.
         }
     }
 

@@ -20,6 +20,7 @@ public class MessagesViewModel extends ViewModel {
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private long lastLoadAtMs = 0L;
+    private volatile long inboxRequestGeneration = 0L;
     private static final long MIN_RELOAD_MS = 8_000L;
     private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
         @Override
@@ -141,8 +142,10 @@ public class MessagesViewModel extends ViewModel {
             return;
         }
         lastLoadAtMs = now;
+        final long requestGeneration = ++inboxRequestGeneration;
         c.getIoExecutor().execute(() -> {
             Result<ChatDtos.ConversationList> r = c.getConversationsUseCase.execute();
+            if (requestGeneration != inboxRequestGeneration) return;
             if (r.success && r.data != null && r.data.items != null) {
                 conversations.postValue(r.data.items);
             } else {

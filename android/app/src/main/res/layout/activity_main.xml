@@ -12,7 +12,7 @@
         android:layout_height="0dp"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white"
+        android:src="@drawable/bg_home_full_gradient"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -77,7 +77,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp">
+            android:paddingVertical="1dp">
 
             <ImageView
                 android:id="@+id/tabParty"
@@ -105,7 +105,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp"
+            android:paddingVertical="1dp"
             android:visibility="gone">
 
             <ImageView
@@ -133,7 +133,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp">
+            android:paddingVertical="1dp">
 
             <ImageView
                 android:id="@+id/tabGames"
@@ -170,7 +170,7 @@
                 android:clipToPadding="false"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="2dp">
+                android:paddingVertical="1dp">
 
                 <ImageView
                     android:id="@+id/tabCreateRoom"
@@ -201,14 +201,29 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp">
+            android:paddingVertical="1dp">
 
-            <ImageView
-                android:id="@+id/tabChat"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:contentDescription="@string/nav_messages"
-                android:scaleType="fitCenter" />
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp">
+                <ImageView
+                    android:id="@+id/tabChat"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/nav_messages"
+                    android:scaleType="fitCenter" />
+                <View
+                    android:id="@+id/tabChatUnreadDot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="1dp"
+                    android:layout_marginEnd="1dp"
+                    android:background="@drawable/bg_unread_badge"
+                    android:elevation="8dp"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/labelChat"
@@ -228,7 +243,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp">
+            android:paddingVertical="1dp">
 
             <ImageView
                 android:id="@+id/tabMe"

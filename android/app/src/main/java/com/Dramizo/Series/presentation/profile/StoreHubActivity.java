@@ -20,6 +20,7 @@ import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VanityIdStyle;
 
 /**
  * Profile store hub: mall, badges, VIP, level, special ID.
@@ -40,14 +41,16 @@ public class StoreHubActivity extends ThemedActivity {
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.rowMall.setOnClickListener(v ->
                 startActivity(new Intent(this, CosmeticsActivity.class)));
-        binding.rowBadges.setOnClickListener(v ->
-                startActivity(new Intent(this, MedalActivity.class)));
-        binding.rowVip.setOnClickListener(v ->
-                startActivity(new Intent(this, VipActivity.class)));
-        binding.rowLevel.setOnClickListener(v ->
-                startActivity(new Intent(this, UserLevelActivity.class)));
-        binding.rowVanity.setOnClickListener(v ->
-                startActivity(new Intent(this, VanityIdsActivity.class)));
+        binding.rowBadges.setOnClickListener(v -> openHtmlStoreSection("badges"));
+        binding.rowVip.setOnClickListener(v -> openHtmlStoreSection("vip"));
+        binding.rowLevel.setOnClickListener(v -> openHtmlStoreSection("level"));
+        binding.rowVanity.setOnClickListener(v -> openHtmlStoreSection("id"));
+    }
+
+    private void openHtmlStoreSection(String section) {
+        Intent intent = new Intent(this, CosmeticsActivity.class);
+        intent.putExtra("store_section", section);
+        startActivity(intent);
     }
 
     @Override
@@ -79,10 +82,9 @@ public class StoreHubActivity extends ThemedActivity {
         binding.tvDisplayName.setText(name);
         GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
         String pid = user.displayPublicId();
-        binding.tvUserId.setText(pid.isEmpty() ? "ID: —" : ("ID: " + pid));
-        String nobilityFrame = VipStyle.profileNobilityFrameUrl(
-                Math.max(0, user.vipLevel), user.vipTouUrl);
-        String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+        binding.tvUserId.setText(pid.isEmpty() ? "—" : pid);
+        VanityIdStyle.bind(binding.tvUserId, c.getVanityApi(), pid, user.vipLevel);
+        String profileFrame = AvatarCosmetics.avatarFrameUrl(user);
         HostSignalView.prefetchWear(this, profileFrame);
         AvatarCosmetics.bindProfileWear(
                 binding.webHostSignal,

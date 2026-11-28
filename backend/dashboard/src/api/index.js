@@ -18,6 +18,34 @@ export const operatorsApi = {
   remove: (id) => safeRequest(() => api.delete(`/admin/operators/${id}`)),
 }
 
+export const cpAdminApi = {
+  // CP editor requests use bounded timeouts so a stalled backend cannot leave
+  // the dashboard's save controls spinning indefinitely.
+  config: () => safeRequest(() => api.get('/admin/cp/config', {
+    timeout: 20000,
+    // CP settings are edited immediately before read-back verification. A cached
+    // GET can return the previous levels and falsely report that a saved write failed.
+    params: { _cpReadAt: Date.now() },
+    headers: { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' },
+  })),
+  updateType: (type, payload) => safeRequest(() => api.patch(`/admin/cp/config/${encodeURIComponent(type)}`, payload, { timeout: 30000 })),
+  updatePolicy: (payload) => safeRequest(() => api.patch('/admin/cp/policy', payload)),
+  updateFeatures: (payload) => safeRequest(() => api.patch('/admin/cp/features', payload)),
+  adjustPoints: (payload) => safeRequest(() => api.post('/admin/cp/relationships/points', payload)),
+  requests: (params) => safeRequest(() => api.get('/admin/cp/requests', { params })),
+  audit: (params) => safeRequest(() => api.get('/admin/cp/audit', { params })),
+  storeItems: () => safeRequest(() => api.get('/admin/cp/store', { timeout: 20000, headers: { 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } })),
+  createStoreItem: (data) => safeRequest(() => api.post('/admin/cp/store', data, { timeout: 30000 })),
+  updateStoreItem: (id, data) => safeRequest(() => api.patch(`/admin/cp/store/${id}`, data, { timeout: 30000 })),
+  removeStoreItem: (id) => safeRequest(() => api.delete(`/admin/cp/store/${id}`, { timeout: 30000 })),
+}
+
+export const paidMessagesApi = {
+  settings: () => safeRequest(() => api.get('/admin/paid-messages/settings')),
+  updateSettings: (payload) => safeRequest(() => api.patch('/admin/paid-messages/settings', payload)),
+  stats: () => safeRequest(() => api.get('/admin/paid-messages/stats')),
+}
+
 export const dashboardApi = {
   overview: () => safeRequest(() => api.get('/admin/dashboard/overview')),
   charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params })),
@@ -56,6 +84,13 @@ export const roomsApi = {
         ? api.post(`/admin/rooms/${id}/customer-service`, { enabled: true })
         : api.delete(`/admin/rooms/${id}/customer-service`),
     ),
+  createPlatform: (data) => safeRequest(() => api.post('/admin/rooms/platform', data)),
+  addPlatformModerator: (id, publicId) =>
+    safeRequest(() => api.post(`/admin/rooms/${id}/platform-moderators`, { publicId })),
+  removePlatformModerator: (id, publicId) =>
+    safeRequest(() => api.delete(`/admin/rooms/${id}/platform-moderators/${encodeURIComponent(publicId)}`)),
+  setPlatformModerators: (id, moderatorIds) =>
+    safeRequest(() => api.patch(`/admin/rooms/${id}/platform-moderators`, { moderatorIds })),
   close: (id) => safeRequest(() => api.post(`/admin/rooms/${id}/close`)),
   forceEnd: (id, data = {}) =>
     safeRequest(() => api.post(`/admin/streams/${id}/force-end`, data)),
@@ -87,6 +122,11 @@ export const giftsApi = {
   /** Clone mall entry effects (الدخولية) into gift panel. */
   importEntryEffects: () =>
     safeRequest(() => api.post('/admin/gifts/import-entry-effects')),
+  luckyCannonConfig: () => safeRequest(() => api.get('/admin/lucky-gift-cannon/config')),
+  saveLuckyCannonConfig: (data) => safeRequest(() => api.patch('/admin/lucky-gift-cannon/config', data)),
+  luckyOddsConfig: () => safeRequest(() => api.get('/admin/lucky-gift-odds/config')),
+  saveLuckyOddsConfig: (data) => safeRequest(() => api.patch('/admin/lucky-gift-odds/config', data)),
+  simulateLuckyOdds: (data) => safeRequest(() => api.post('/admin/lucky-gift-odds/simulate', data)),
 }
 
 export const walletApi = {
@@ -97,7 +137,7 @@ export const walletApi = {
   recharges: (params) => safeRequest(() => api.get('/admin/wallet/recharges', { params })),
   completeRecharge: (id, data = {}) =>
     safeRequest(() => api.post(`/admin/wallet/recharges/${id}/complete`, data)),
-  cancelRecharge: (id) => safeRequest(() => api.post(`/admin/wallet/recharges/${id}/cancel`)),
+  cancelRecharge: (id, data = {}) => safeRequest(() => api.post(`/admin/wallet/recharges/${id}/cancel`, data)),
   packages: () => safeRequest(() => api.get('/admin/wallet/packages')),
   savePackages: (data) => safeRequest(() => api.put('/admin/wallet/packages', data)),
   withdrawPackages: () => safeRequest(() => api.get('/admin/wallet/withdraw-packages')),
@@ -151,6 +191,12 @@ export const rechargeAgentsApi = {
   updatePricing: (data) => safeRequest(() => api.patch('/admin/recharge-agent-pricing', data)),
 }
 
+export const momentsAdminApi = {
+  list: (params = {}) => safeRequest(() => api.get('/admin/moments', { params })),
+  remove: (id) => safeRequest(() => api.delete(`/admin/moments/${id}`)),
+  removeAll: () => safeRequest(() => api.delete('/admin/moments')),
+}
+
 export const reportsApi = {
   list: (params) => safeRequest(() => api.get('/admin/reports', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/reports/${id}`)),
@@ -167,8 +213,25 @@ export const genderVerificationsApi = {
 }
 
 export const notificationsApi = {
+  fcmStatus: () => safeRequest(() => api.get('/admin/notifications/fcm-status')),
+  fcmTest: () => safeRequest(() => api.post('/admin/notifications/fcm-test')),
   list: (params) => safeRequest(() => api.get('/admin/notifications', { params })),
   send: (data) => safeRequest(() => api.post('/admin/notifications/send', data)),
+}
+
+export const staffIdentityApi = {
+  get: () => safeRequest(() => api.get('/admin/staff-identity')),
+  update: (payload) => safeRequest(() => api.patch('/admin/staff-identity', payload)),
+}
+
+export const mysteriousManApi = {
+  get: () => safeRequest(() => api.get('/admin/mysterious-man/config')),
+  update: (data) => safeRequest(() => api.patch('/admin/mysterious-man/config', data)),
+}
+
+export const toastManagerApi = {
+  get: () => safeRequest(() => api.get('/admin/toast-manager')),
+  save: (data) => safeRequest(() => api.patch('/admin/toast-manager', data)),
 }
 
 export const settingsApi = {
@@ -176,11 +239,11 @@ export const settingsApi = {
   update: (data) => safeRequest(() => api.patch('/admin/settings', data)),
 }
 
-export const dramaApi = {
-  settings: () => safeRequest(() => api.get('/admin/drama/settings')),
-  patchSettings: (data) => safeRequest(() => api.patch('/admin/drama/settings', data)),
-  series: () => safeRequest(() => api.get('/admin/drama/series')),
-  seriesGet: (id) => safeRequest(() => api.get(`/admin/drama/series/${id}`)),
+export const storiesAdminApi = {
+  config: () => safeRequest(() => api.get('/admin/stories/config', { headers: { 'Cache-Control': 'no-cache, no-store' } })),
+  update: (data) => safeRequest(() => api.patch('/admin/stories/config', data, { timeout: 30000 })),
+  list: () => safeRequest(() => api.get('/admin/stories', { params: { limit: 150 } })),
+  remove: (id) => safeRequest(() => api.delete(`/admin/stories/${id}`)),
 }
 
 export const gameAdsApi = {
@@ -206,6 +269,11 @@ export const economyApi = {
 }
 
 /** House odds / RTP for all coin games (Mikoo + BaiShun + casual). */
+export const gamesCatalogApi = {
+  get: () => safeRequest(() => api.get('/admin/games/catalog')),
+  save: (value) => safeRequest(() => api.patch('/admin/games/catalog', { value })),
+}
+
 export const gameOddsApi = {
   get: () => safeRequest(() => api.get('/admin/games/odds')),
   update: (patch) => safeRequest(() => api.patch('/admin/games/odds', patch)),
@@ -255,9 +323,7 @@ export const uploadsApi = {
     safeRequest(() => {
       const fd = new FormData()
       fd.append('file', file)
-      return api.post('/uploads', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      return api.post('/uploads', fd)
     }),
   remove: (filename) =>
     safeRequest(() => api.delete(`/uploads/${encodeURIComponent(filename)}`)),
@@ -306,8 +372,44 @@ export const tasksApi = {
     safeRequest(() => api.put('/admin/tasks/enabled', { enabled: !!enabled })),
 }
 
+export const dailyLoginRewardsApi = {
+  get: () => safeRequest(() => api.get('/admin/daily-login-rewards')),
+  save: (payload) => safeRequest(() => api.put('/admin/daily-login-rewards', payload)),
+}
+
 export const rankingApi = {
   board: (period, category, params) =>
     safeRequest(() => api.get(`/admin/ranking/${period}/${category}`, { params })),
+  rewards: () => safeRequest(() => api.get('/admin/ranking/rewards')),
+  saveRewards: (payload) => safeRequest(() => api.patch('/admin/ranking/rewards', payload)),
 }
 
+
+
+export const supportChestApi = {
+  getConfig: () => safeRequest(() => api.get('/admin/support-chest/config', { timeout: 12000 })),
+  saveConfig: (payload) => safeRequest(() => api.patch('/admin/support-chest/config', payload, { timeout: 90000 })),
+}
+
+export const medalsApi = {
+  list: () => safeRequest(() => api.get('/admin/badges')),
+  create: (payload) => safeRequest(() => api.post('/admin/badges', payload)),
+  update: (id, payload) => safeRequest(() => api.put(`/admin/badges/${id}`, payload)),
+  remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
+  grant: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, payload)),
+  grantAll: (id, payload) => safeRequest(() => api.post(`/admin/badges/${id}/grant-all`, payload)),
+}
+
+
+export const advertisementsApi = {
+  config: () => safeRequest(() => api.get('/advertisements/config')),
+  queue: (params) => safeRequest(() => api.get('/advertisements/admin/queue', { params })),
+  stats: (params) => safeRequest(() => api.get('/advertisements/admin/stats', { params })),
+  saveConfig: (data) => safeRequest(() => api.patch('/advertisements/admin/config', data)),
+  userPolicy: (userRef) => safeRequest(() => api.get(`/advertisements/admin/user-policy/${encodeURIComponent(userRef)}`)),
+  saveUserPolicy: (data) => safeRequest(() => api.patch('/advertisements/admin/user-policy', data)),
+  saveVipPolicy: (data) => safeRequest(() => api.patch('/advertisements/admin/vip-policy', data)),
+  bannedWords: () => safeRequest(() => api.get('/advertisements/admin/banned-words')),
+  saveBannedWords: (words) => safeRequest(() => api.patch('/advertisements/admin/banned-words', { words })),
+  queueAction: (id, data) => safeRequest(() => api.patch(`/advertisements/admin/queue/${id}`, data)),
+}

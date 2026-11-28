@@ -32,31 +32,83 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     }
 
     private final List<ChatDtos.ConversationDto> items = new ArrayList<>();
+    private final List<ChatDtos.ConversationDto> sourceItems = new ArrayList<>();
+    private String searchQuery = "";
+    private boolean serverSearchResults;
     private final Listener listener;
+    public interface MoreListener {
+        void onMore(ChatDtos.ConversationDto item, View anchor);
+    }
+    private MoreListener moreListener;
 
     public ChatPreviewAdapter(Listener listener) {
         this.listener = listener;
     }
 
+    public void setMoreListener(MoreListener listener) {
+        this.moreListener = listener;
+    }
+
     public void submit(List<ChatDtos.ConversationDto> data) {
-        if (sameList(items, data)) {
-            List<ChatDtos.ConversationDto> next = data != null ? data : Collections.emptyList();
-            for (int i = 0; i < items.size() && i < next.size(); i++) {
-                ChatDtos.ConversationDto a = items.get(i);
-                ChatDtos.ConversationDto b = next.get(i);
-                if (samePreview(a, b) && sameAvatar(a, b)) continue;
-                items.set(i, b);
-                if (!sameAvatar(a, b)) {
-                    notifyItemChanged(i);
-                } else {
-                    notifyItemChanged(i, PAYLOAD_META);
-                }
-            }
-            return;
-        }
+        serverSearchResults = false;
+        sourceItems.clear();
+        if (data != null) sourceItems.addAll(data);
+        applySearchFilter();
+    }
+
+    /** Results returned by the server include matches in any historical message. */
+    public void submitSearchResults(List<ChatDtos.ConversationDto> data, String query) {
+        serverSearchResults = true;
+        searchQuery = query != null ? query.trim() : "";
+        sourceItems.clear();
+        if (data != null) sourceItems.addAll(data);
         items.clear();
-        if (data != null) items.addAll(data);
+        items.addAll(sourceItems);
         notifyDataSetChanged();
+    }
+
+    public void removeConversation(String conversationId) {
+        if (conversationId == null) return;
+        sourceItems.removeIf(item -> item != null && conversationId.equals(item.id));
+        items.removeIf(item -> item != null && conversationId.equals(item.id));
+        notifyDataSetChanged();
+    }
+
+    public void setSearchQuery(String query) {
+        String next = query != null ? query.trim() : "";
+        if (next.equalsIgnoreCase(searchQuery)) return;
+        searchQuery = next;
+        if (searchQuery.isEmpty()) serverSearchResults = false;
+        if (!serverSearchResults) applySearchFilter();
+    }
+
+    private void applySearchFilter() {
+        items.clear();
+        if (searchQuery.isEmpty()) {
+            items.addAll(sourceItems);
+        } else {
+            String needle = searchQuery.toLowerCase(java.util.Locale.ROOT);
+            for (ChatDtos.ConversationDto item : sourceItems) {
+                if (matchesSearch(item, needle)) items.add(item);
+            }
+        }
+        notifyDataSetChanged();
+    }
+
+    private static boolean matchesSearch(ChatDtos.ConversationDto item, String needle) {
+        if (item == null) return false;
+        if (contains(item.title, needle)) return true;
+        if (item.peer != null) {
+            if (contains(item.peer.displayName, needle)
+                    || contains(item.peer.username, needle)
+                    || contains(item.peer.id, needle)) return true;
+        }
+        if (item.lastMessage != null && contains(item.lastMessage.content, needle)) return true;
+        return false;
+    }
+
+    private static boolean contains(String value, String needle) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).contains(needle);
     }
 
     private static boolean sameList(
@@ -87,15 +139,21 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         if (oa == null ? ob != null : !oa.equals(ob)) return false;
         boolean va = a.peer != null && a.peer.genderVerified;
         boolean vb = b.peer != null && b.peer.genderVerified;
-        return va == vb;
+        if (va != vb) return false;
+        String ra = a.peer != null ? a.peer.customDisplayRankName : null;
+        String rb = b.peer != null ? b.peer.customDisplayRankName : null;
+        return eq(ra, rb);
     }
 
     private static boolean sameAvatar(
             ChatDtos.ConversationDto a, ChatDtos.ConversationDto b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
+        String rankImageA = a.peer != null ? a.peer.customDisplayRankImageUrl : null;
+        String rankImageB = b.peer != null ? b.peer.customDisplayRankImageUrl : null;
         return eq(resolveAvatarUrl(a), resolveAvatarUrl(b))
-                && eq(resolveFrameUrl(a), resolveFrameUrl(b));
+                && eq(resolveFrameUrl(a), resolveFrameUrl(b))
+                && eq(rankImageA, rankImageB);
     }
 
     private static String resolveAvatarUrl(ChatDtos.ConversationDto item) {
@@ -140,7 +198,12 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
                     ? item.title
                     : holder.itemView.getContext().getString(R.string.user_default);
         }
+        String rankName = item.peer != null ? item.peer.customDisplayRankName : null;
+        if (rankName != null && !rankName.trim().isEmpty()) {
+            displayName = displayName + "  ·  " + rankName.trim();
+        }
         holder.b.tvTitle.setText(displayName);
+        com.Dramizo.Series.util.VipNameStyle.bind(holder.b.tvTitle, item.peer);
 
         boolean verified = item.peer != null && item.peer.genderVerified;
         if (holder.b.imgOfficial != null) {
@@ -154,10 +217,25 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
                 holder.b.imgFrame,
                 resolveAvatarUrl(item),
                 resolveFrameUrl(item));
+        String rankImageUrl = item.peer != null ? item.peer.customDisplayRankImageUrl : null;
+        if (rankImageUrl != null && !rankImageUrl.trim().isEmpty()) {
+            holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+            com.bumptech.glide.Glide.with(holder.itemView)
+                    .load(rankImageUrl.trim())
+                    .into(holder.b.imgCustomRankBadge);
+        } else {
+            com.bumptech.glide.Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+        }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(item);
         });
+        if (holder.b.btnConversationMore != null) {
+            holder.b.btnConversationMore.setOnClickListener(v -> {
+                if (moreListener != null) moreListener.onMore(item, v);
+            });
+        }
     }
 
     private void bindMeta(@NonNull VH holder, ChatDtos.ConversationDto item) {

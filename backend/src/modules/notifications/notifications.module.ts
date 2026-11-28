@@ -8,12 +8,13 @@ import { Device } from '../../database/entities/device.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Room } from '../../database/entities/room.entity';
+import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Notification, Device, User, UserVip, Room]),
+    TypeOrmModule.forFeature([Notification, Device, User, UserVip, Room, AgencyMember]),
     AuthModule,
     RealtimeModule,
   ],

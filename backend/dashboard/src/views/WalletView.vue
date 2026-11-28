@@ -232,6 +232,63 @@
         />
       </div>
       <LoadingSpinner v-if="loading" />
+      <section v-else-if="tab === 'recharges'" class="recharge-review-workspace">
+        <div class="recharge-review-summary">
+          <div>
+            <span class="recharge-eyebrow">JEHO · PAYMENTS</span>
+            <h3>مركز مراجعة الشحن</h3>
+            <p>راجع بيانات التحويل والإيصال قبل اعتماد الشحن. لا تُضاف الكوينز إلا بعد الموافقة.</p>
+          </div>
+          <div class="recharge-summary-count">
+            <strong>{{ pendingRechargeCount }}</strong>
+            <span>طلبات بانتظار المراجعة</span>
+          </div>
+        </div>
+        <div v-if="!rows.length" class="recharge-empty-state">
+          <i class="bi bi-receipt-cutoff"></i>
+          <strong>لا توجد طلبات شحن حالياً</strong>
+          <span>ستظهر هنا طلبات المستخدمين فور إرسال إيصالاتهم.</span>
+        </div>
+        <div v-else class="recharge-card-grid">
+          <article v-for="r in rows" :key="r.id" class="recharge-review-card">
+            <header class="recharge-card-header">
+              <label class="recharge-select">
+                <input type="checkbox" class="form-check-input" :checked="rechargeIsSelected(r.id)" @change="rechargeToggle(r.id)" />
+                <span>طلب {{ shortId(r.id) }}</span>
+              </label>
+              <StatusBadge :status="r.status || 'pending'" />
+            </header>
+            <div class="recharge-card-main">
+              <div>
+                <span class="recharge-label">قيمة الباقة</span>
+                <strong class="recharge-amount">{{ formatMoney(r.amountFiat ?? r.amount ?? 0, r.currency || 'USD') }}</strong>
+                <span class="recharge-provider"><i class="bi bi-bank"></i> {{ r.providerLabel || r.provider || r.gateway || '—' }}</span>
+              </div>
+              <div class="recharge-coins">
+                <strong>{{ formatNumber(Number(r.coins || r.credits || 0) + Number(r.bonusCoins || 0)) }}</strong>
+                <span>كوينز مستحقة</span>
+              </div>
+            </div>
+            <div class="recharge-card-details">
+              <div><span>المستخدم</span><strong>{{ r.userName || displayUser(r) }}</strong><small>{{ r.userPublicId || r.userId || '—' }}</small></div>
+              <div><span>الباقة</span><strong>{{ r.sku || r.label || '—' }}</strong></div>
+              <div v-if="r.shamCashReceipt?.senderName"><span>اسم المرسل</span><strong>{{ r.shamCashReceipt.senderName }}</strong></div>
+              <div v-if="r.shamCashReceipt?.amountSent != null"><span>المبلغ المحوّل</span><strong>{{ r.shamCashReceipt.amountSent }}</strong></div>
+              <div v-if="r.shamCashReceipt?.transferReference"><span>رقم العملية</span><strong class="font-monospace">{{ r.shamCashReceipt.transferReference }}</strong></div>
+            </div>
+            <footer class="recharge-card-actions">
+              <button v-if="r.provider === 'sham_cash'" class="btn btn-aurora" type="button" @click="openRechargeDetails(r)">
+                <i class="bi bi-eye me-1"></i> مراجعة الإيصال
+              </button>
+              <button v-else-if="(r.status || '').toLowerCase() === 'pending'" class="btn btn-success" type="button" @click="approveRecharge(r)">
+                <i class="bi bi-check2-circle me-1"></i> تأكيد الشحن
+              </button>
+              <button v-if="(r.status || '').toLowerCase() === 'pending'" class="btn btn-outline-danger" type="button" @click="cancelRecharge(r)">إلغاء الطلب</button>
+              <span v-else class="small text-secondary">تمت معالجة هذا الطلب</span>
+            </footer>
+          </article>
+        </div>
+      </section>
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle">
           <thead>
@@ -329,15 +386,24 @@
                 </td>
                 <td>{{ r.providerLabel || r.provider || r.gateway || '—' }}</td>
                 <td><StatusBadge :status="r.status || 'completed'" /></td>
-                <td>{{ formatDate(r.createdAt) }}</td>
+                <td v-if="tab !== 'recharges'">{{ formatDate(r.createdAt) }}</td>
                 <td class="text-end">
                   <div
                     class="action-btns justify-content-end"
                     v-if="tab === 'recharges' && (r.status || '').toLowerCase() === 'pending'"
                   >
-                    <button class="btn btn-sm btn-outline-success" type="button" @click="approveRecharge(r)">
-                      تأكيد الشحن
-                    </button>
+                    <button
+                      v-if="r.provider === 'sham_cash'"
+                      class="btn btn-sm btn-outline-primary"
+                      type="button"
+                      @click="openRechargeDetails(r)"
+                    >مراجعة الإيصال</button>
+                    <button
+                      v-else
+                      class="btn btn-sm btn-outline-success"
+                      type="button"
+                      @click="approveRecharge(r)"
+                    >تأكيد الشحن</button>
                     <button class="btn btn-sm btn-outline-danger" type="button" @click="cancelRecharge(r)">
                       إلغاء
                     </button>
@@ -347,6 +413,94 @@
             </template>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div v-if="selectedRecharge" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.62); z-index: 1060">
+      <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content glass-modal recharge-review-modal">
+          <div class="modal-header recharge-modal-header">
+            <div>
+              <h5 class="modal-title mb-1">مراجعة إيصال شام كاش</h5>
+              <div class="small text-muted">طلب {{ shortId(selectedRecharge.id) }} · المستخدم {{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
+            </div>
+            <button type="button" class="btn-close" @click="selectedRecharge = null"></button>
+          </div>
+          <div class="modal-body recharge-modal-body">
+            <div class="recharge-detail-grid">
+              <div class="recharge-detail-item">
+                <div class="small text-muted">اسم المستخدم</div>
+                <div class="fw-semibold">{{ selectedRecharge.userName || '—' }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">معرّف الحساب (User ID)</div>
+                <div class="fw-semibold font-monospace text-break">{{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
+                <div class="small text-muted font-monospace text-break">{{ selectedRecharge.userId }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">الباقة</div>
+                <div class="fw-semibold">{{ selectedRecharge.sku || '—' }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">الكوينز المستحقة</div>
+                <div class="fw-semibold">{{ formatNumber(Number(selectedRecharge.coins || 0) + Number(selectedRecharge.bonusCoins || 0)) }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">السعر المحدد للباقة</div>
+                <div class="fw-semibold">{{ formatMoney(selectedRecharge.amountFiat || 0, selectedRecharge.currency || 'USD') }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">اسم المرسل في الحوالة</div>
+                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.senderName || '—' }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">المبلغ المرسل</div>
+                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.amountSent ?? '—' }}</div>
+              </div>
+              <div class="recharge-detail-item">
+                <div class="small text-muted">رقم العملية</div>
+                <div class="fw-semibold font-monospace">{{ selectedRecharge.shamCashReceipt?.transferReference || '—' }}</div>
+              </div>
+              <div class="col-12" v-if="selectedRecharge.shamCashReceipt?.note">
+                <div class="small text-muted">ملاحظة المستخدم</div>
+                <div class="rounded p-2 bg-dark-subtle">{{ selectedRecharge.shamCashReceipt.note }}</div>
+              </div>
+              <div class="col-12">
+                <div class="small text-muted mb-2">ملف إيصال التحويل</div>
+                <img
+                  v-if="String(selectedRecharge.shamCashReceipt?.receiptMimeType || '').startsWith('image/')"
+                  :src="selectedRecharge.shamCashReceipt.receiptUrl"
+                  alt="إيصال شام كاش"
+                  class="img-fluid rounded border"
+                  style="max-height:420px; width:100%; object-fit:contain; background:#fff"
+                />
+                <a
+                  v-if="selectedRecharge.shamCashReceipt?.receiptUrl"
+                  class="btn btn-outline-info btn-sm mt-2"
+                  :href="selectedRecharge.shamCashReceipt.receiptUrl"
+                  target="_blank"
+                  rel="noopener"
+                ><i class="bi bi-file-earmark-arrow-down me-1"></i>فتح / تنزيل الإيصال</a>
+                <div v-if="!selectedRecharge.shamCashReceipt?.receiptUrl" class="text-warning">لم يتم إرفاق إيصال لهذا الطلب.</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer recharge-modal-footer">
+            <button class="btn btn-ghost" type="button" @click="selectedRecharge = null">إغلاق</button>
+            <button
+              class="btn btn-outline-danger"
+              type="button"
+              :disabled="reviewingRecharge"
+              @click="rejectShamCashReceipt(selectedRecharge)"
+            >رفض الطلب</button>
+            <button
+              class="btn btn-success"
+              type="button"
+              :disabled="reviewingRecharge || !selectedRecharge.shamCashReceipt?.receiptSubmittedAt"
+              @click="approveShamCashReceipt(selectedRecharge)"
+            ><span v-if="reviewingRecharge" class="spinner-border spinner-border-sm me-1"></span>موافقة وتفعيل وشحن الكوينز</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -472,6 +626,9 @@ const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const showAdjust = ref(false)
+const selectedRecharge = ref(null)
+const reviewingRecharge = ref(false)
+const pendingRechargeCount = computed(() => rows.value.filter((row) => (row.status || 'pending').toLowerCase() === 'pending').length)
 const savingEconomy = ref(false)
 const economy = reactive({
   diamondUsdRate: 0.00005,
@@ -586,7 +743,7 @@ const economyPreviewLine = computed(() => {
 const headers = computed(() => {
   if (tab.value === 'transactions') return [t('common.id'), t('common.user'), t('common.type'), t('common.amount'), t('common.status'), t('common.date')]
   if (tab.value === 'withdraws') return [t('common.id'), t('common.user'), t('common.amount'), t('wallet.payout'), t('common.status'), t('common.date'), t('common.actions')]
-  return [t('common.id'), t('common.user'), t('common.amount'), t('common.coins'), t('wallet.provider'), t('common.status'), t('common.date')]
+  return [t('common.id'), t('common.user'), t('common.amount'), t('common.coins'), t('wallet.provider'), t('common.status')]
 })
 
 function shortId(id) {
@@ -808,6 +965,50 @@ async function approve(r) {
   }
 }
 
+function openRechargeDetails(r) {
+  selectedRecharge.value = r
+}
+
+async function approveShamCashReceipt(r) {
+  if (!r?.id || reviewingRecharge.value) return
+  reviewingRecharge.value = true
+  const { error: err } = await walletApi.completeRecharge(r.id, {
+    note: 'تمت مراجعة إيصال شام كاش والموافقة عليه',
+  })
+  reviewingRecharge.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  selectedRecharge.value = null
+  success.value = 'تمت الموافقة وشحن الكوينز وإرسال إشعار للمستخدم'
+  toast().success(success.value)
+  await load()
+}
+
+async function rejectShamCashReceipt(r) {
+  if (!r?.id || reviewingRecharge.value) return
+  const reason = await askPrompt({
+    title: 'رفض إيصال شام كاش',
+    message: 'اكتب سبب رفض التحويل ليصل للمستخدم ضمن الإشعار.',
+    defaultValue: 'تعذر التحقق من بيانات التحويل أو الإيصال',
+  })
+  if (reason === null) return
+  reviewingRecharge.value = true
+  const { error: err } = await walletApi.cancelRecharge(r.id, { note: reason })
+  reviewingRecharge.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  selectedRecharge.value = null
+  success.value = 'تم رفض الطلب وإشعار المستخدم'
+  toast().success(success.value)
+  await load()
+}
+
 async function approveRecharge(r) {
   const { error: err } = await walletApi.completeRecharge(r.id, {
     note: 'تأكيد يدوي بعد إثبات شام كاش / تحويل',
@@ -924,4 +1125,57 @@ onMounted(() => {
   color: #fde68a;
   border: 1px solid rgba(251, 191, 36, 0.4);
 }
+
+.recharge-review-workspace { padding: 1.15rem; }
+.recharge-review-summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1.35rem 1.5rem; border-radius:1.25rem;
+  background:linear-gradient(125deg,rgba(24,38,65,.96),rgba(22,31,50,.96) 58%,rgba(27,48,61,.96));
+  border:1px solid rgba(126,164,215,.22); margin-bottom:1rem;
+}
+.recharge-eyebrow { display:block; color:#79d7e8; font-size:.66rem; font-weight:850; letter-spacing:.16em; margin-bottom:.4rem; }
+.recharge-review-summary h3 { margin:0; color:#f7f9ff; font-size:1.12rem; font-weight:850; }
+.recharge-review-summary p { margin:.4rem 0 0; color:#b5c2d6; font-size:.82rem; }
+.recharge-summary-count { min-width:145px; padding:.75rem 1rem; text-align:center; border-radius:1rem; background:rgba(7,15,28,.48); border:1px solid rgba(130,185,211,.2); }
+.recharge-summary-count strong { display:block; color:#fff; font-size:1.65rem; line-height:1.2; }
+.recharge-summary-count span { color:#b7c8dc; font-size:.72rem; }
+.recharge-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr)); gap:.9rem; }
+.recharge-review-card { min-width:0; padding:1rem; border-radius:1.15rem; border:1px solid rgba(143,164,196,.2); background:linear-gradient(155deg,rgba(25,34,52,.96),rgba(15,23,38,.96)); box-shadow:0 12px 30px rgba(0,0,0,.14); }
+.recharge-card-header,.recharge-card-main,.recharge-card-actions { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+.recharge-card-header { padding-bottom:.8rem; border-bottom:1px solid rgba(154,174,205,.14); }
+.recharge-select { display:flex; align-items:center; gap:.55rem; color:#c8d4e5; font-size:.78rem; font-weight:750; }
+.recharge-card-main { align-items:flex-start; padding:1rem 0; }
+.recharge-label,.recharge-card-details span { display:block; color:#8fa3bf; font-size:.7rem; margin-bottom:.25rem; }
+.recharge-amount { display:block; color:#fff; font-size:1.55rem; font-weight:900; letter-spacing:-.03em; }
+.recharge-provider { display:inline-flex; gap:.35rem; align-items:center; margin-top:.4rem; color:#b7c9df; font-size:.74rem; }
+.recharge-coins { min-width:112px; padding:.65rem .8rem; border-radius:.85rem; text-align:center; background:rgba(20,157,120,.12); border:1px solid rgba(52,211,153,.22); }
+.recharge-coins strong { display:block; color:#7ee6c0; font-size:1.1rem; }
+.recharge-coins span { color:#9ab9b1; font-size:.68rem; }
+.recharge-card-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; padding:.85rem 0; border-top:1px solid rgba(154,174,205,.12); }
+.recharge-card-details > div { min-width:0; }
+.recharge-card-details strong,.recharge-card-details small { display:block; color:#e7edf7; font-size:.8rem; overflow-wrap:anywhere; }
+.recharge-card-details small { margin-top:.15rem; color:#8fa3bf; font-size:.68rem; }
+.recharge-card-actions { justify-content:flex-start; flex-wrap:wrap; padding-top:.8rem; border-top:1px solid rgba(154,174,205,.12); }
+.recharge-card-actions .btn { border-radius:.75rem; font-size:.76rem; font-weight:750; }
+.recharge-empty-state { display:grid; justify-items:center; gap:.5rem; padding:3rem 1rem; color:#aebdd2; text-align:center; }
+.recharge-empty-state i { font-size:2rem; color:#76cfe1; }
+.recharge-empty-state strong { color:#f2f6ff; }
+.recharge-empty-state span { font-size:.8rem; }
+.recharge-review-modal { border:1px solid rgba(135,167,210,.25); border-radius:1.25rem; overflow:hidden; background:linear-gradient(160deg,#172238,#101827); color:#f5f7fb; }
+.recharge-modal-header { background:rgba(35,52,77,.55); border-bottom:1px solid rgba(150,175,208,.16); }
+.recharge-modal-body { padding:1.2rem; }
+.recharge-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+.recharge-detail-item { min-width:0; padding:.8rem; border-radius:.85rem; background:rgba(7,14,25,.35); border:1px solid rgba(145,169,202,.13); }
+.recharge-detail-item .small { color:#91a6c1 !important; }
+.recharge-detail-item .fw-semibold { color:#f3f6fc; overflow-wrap:anywhere; }
+.recharge-modal-footer { border-top:1px solid rgba(145,169,202,.16); background:rgba(12,20,33,.55); }
+@media (max-width:640px) {
+  .recharge-review-workspace { padding:.65rem; }
+  .recharge-review-summary { align-items:flex-start; flex-direction:column; padding:1rem; }
+  .recharge-summary-count { width:100%; display:flex; align-items:center; justify-content:center; gap:.6rem; }
+  .recharge-summary-count strong { font-size:1.3rem; }
+  .recharge-detail-grid { grid-template-columns:1fr; }
+  .recharge-card-details { grid-template-columns:1fr 1fr; }
+}
+
 </style>

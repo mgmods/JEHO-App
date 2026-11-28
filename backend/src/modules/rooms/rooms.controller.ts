@@ -81,6 +81,12 @@ export class RoomsController {
     return this.roomsService.removeMusicTrack(trackId, userId);
   }
 
+  @Get('following')
+  @ApiOperation({ summary: 'List rooms and agency rooms followed by the current user' })
+  followingRooms(@CurrentUser('sub') userId: string) {
+    return this.roomsService.followingRooms(userId);
+  }
+
   @Get(':id')
   get(
     @Param('id', ParseUUIDPipe) id: string,
@@ -223,6 +229,16 @@ export class RoomsController {
   @Post(':id/seats/leave')
   leaveSeat(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
     return this.roomsService.leaveSeat(id, userId);
+  }
+
+  @Post(':id/seats/remove-member')
+  @ApiOperation({ summary: 'Dedicated host/moderator action: remove a member from the microphone only' })
+  removeMemberFromMic(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: KickBanDto,
+  ) {
+    return this.roomsService.removeMemberFromMic(id, userId, dto.userId, dto.reason);
   }
 
   @Post(':id/seats/force-leave')
@@ -373,6 +389,16 @@ export class RoomsController {
     return this.roomsService.listSeatRequests(id, userId);
   }
 
+  @Post(':id/seats/assign')
+  @ApiOperation({ summary: 'Room owner/moderator directly assigns a room member to a mic seat' })
+  assignSeat(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() body: { userId: string; seatIndex?: number },
+  ) {
+    return this.roomsService.assignSeat(id, userId, body.userId, body?.seatIndex ?? null);
+  }
+
   @Post(':id/seat-requests/approve')
   @ApiOperation({ summary: 'Approve guest mic/seat request' })
   approveSeat(
@@ -414,6 +440,7 @@ export class RoomsController {
       charmEnabled?: boolean;
       bannerEnabled?: boolean;
       micInteractEnabled?: boolean;
+      micRequestEnabled?: boolean;
       entryEffectsEnabled?: boolean;
       lowGiftEffectsEnabled?: boolean;
     },

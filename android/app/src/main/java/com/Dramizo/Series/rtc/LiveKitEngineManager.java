@@ -11,11 +11,16 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.livekit.android.ConnectOptions;
@@ -39,7 +44,7 @@ public final class LiveKitEngineManager {
     private static LiveKitEngineManager instance;
 
     private Application application;
-    @Nullable private Room room;
+    @Nullable private volatile Room room;
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "livekit-rtc");
         t.setDaemon(true);
@@ -48,24 +53,28 @@ public final class LiveKitEngineManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final CopyOnWriteArrayList<ZegoEngineManager.RoomListener> listeners =
             new CopyOnWriteArrayList<>();
-    private final Set<String> syntheticPlaying = new HashSet<>();
+    // Participant inspection and audio-level reflection must not run on Android's UI thread.
+    private final ScheduledExecutorService monitor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "livekit-room-monitor");
+        t.setDaemon(true);
+        return t;
+    });
+    private final Set<String> syntheticPlaying = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final AtomicBoolean connectInFlight = new AtomicBoolean(false);
-    /** Poll remotes — avoid SharedFlow.collect from Java (crashes process). */
-    private final Runnable pollRemotesRunnable = this::pollRemoteParticipants;
-    /** Combined local+remote speak levels (no SharedFlow collect). */
-    private final Runnable speakLevelPollRunnable = this::pollSpeakLevels;
+    @Nullable private ScheduledFuture<?> remotePollTask;
+    @Nullable private ScheduledFuture<?> speakPollTask;
 
     private String currentRoomId;
-    private String currentUserId;
-    private boolean micEnabled = false;
-    private boolean speakerMuted = false;
-    private boolean publishing;
+    private volatile String currentUserId;
+    private volatile boolean micEnabled = false;
+    private volatile boolean speakerMuted = false;
+    private volatile boolean publishing;
     /** JWT canPublish grant of the currently connected LiveKit session. */
     private boolean sessionCanPublish = false;
-    @Nullable private String publishingStreamId;
+    @Nullable private volatile String publishingStreamId;
     /** Publish requested before room was CONNECTED — applied on connect. */
-    @Nullable private String pendingPublishStreamId;
+    @Nullable private volatile String pendingPublishStreamId;
 
     private String lastUrl;
     private String lastToken;
@@ -177,9 +186,11 @@ public final class LiveKitEngineManager {
                     if (micEnabled && (publishing || pendingPublishStreamId != null)) {
                         applyMicOnEngine(true);
                     }
-                } else {
-                    trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 }
+                // The room-wide local speaker mute applies to every remote audio
+                // participant, regardless of whether this user is publishing a mic.
+                // Reapply after each connection so LiveKit reconnects cannot leak audio.
+                trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 seedRemoteAudioTracks(newRoom);
                 startPolling();
                 notifyRoomState(roomF, 1, 0);
@@ -242,13 +253,21 @@ public final class LiveKitEngineManager {
 
     private void startPolling() {
         stopPolling();
-        mainHandler.post(pollRemotesRunnable);
-        mainHandler.post(speakLevelPollRunnable);
+        // SDK participant inspection and reflective audio-level reads can be expensive with
+        // many seats. Keep that work off the UI thread; only listener delivery is posted.
+        remotePollTask = monitor.scheduleWithFixedDelay(
+                this::pollRemoteParticipants, 0L, 900L, TimeUnit.MILLISECONDS);
+        speakPollTask = monitor.scheduleWithFixedDelay(
+                this::pollSpeakLevels, 0L, 250L, TimeUnit.MILLISECONDS);
     }
 
     private void stopPolling() {
-        mainHandler.removeCallbacks(pollRemotesRunnable);
-        mainHandler.removeCallbacks(speakLevelPollRunnable);
+        ScheduledFuture<?> remote = remotePollTask;
+        remotePollTask = null;
+        if (remote != null) remote.cancel(false);
+        ScheduledFuture<?> speak = speakPollTask;
+        speakPollTask = null;
+        if (speak != null) speak.cancel(false);
     }
 
     private void pollRemoteParticipants() {
@@ -281,9 +300,6 @@ public final class LiveKitEngineManager {
             } catch (Throwable t) {
                 Log.w(TAG, "pollRemote: " + t.getMessage());
             }
-        }
-        if (connected.get()) {
-            mainHandler.postDelayed(pollRemotesRunnable, 900L);
         }
     }
 
@@ -343,6 +359,10 @@ public final class LiveKitEngineManager {
         Room r = room;
         if (r != null) {
             try {
+                // Collect a complete sample off-main, then enqueue one UI delivery for the
+                // whole room. Posting one Handler task per participant creates avoidable
+                // main-queue pressure in 20–30 seat rooms (4 polls × every participant).
+                Map<String, Float> levels = new HashMap<>();
                 LocalParticipant local = r.getLocalParticipant();
                 if (local != null && currentUserId != null) {
                     boolean localActiveMic = micEnabled && (publishing || pendingPublishStreamId != null);
@@ -351,21 +371,18 @@ public final class LiveKitEngineManager {
                     if (localActiveMic && level < 12f && isParticipantSpeaking(local)) {
                         level = 36f;
                     }
-                    notifySoundLevel(currentUserId, level);
+                    levels.put(currentUserId, level);
                 }
                 for (Participant p : r.getRemoteParticipants().values()) {
                     if (p == null) continue;
                     String identity = participantIdentity(p);
                     if (identity == null || identity.isEmpty()) continue;
-                    notifySoundLevel(identity, participantLevel0to100(p, false));
+                    levels.put(identity, participantLevel0to100(p, false));
                 }
+                if (!levels.isEmpty()) notifySoundLevels(levels);
             } catch (Throwable t) {
                 Log.w(TAG, "pollSpeak: " + t.getMessage());
             }
-        }
-        if (connected.get()) {
-            // Faster than 220ms so waves feel responsive on LiveKit free engine.
-            mainHandler.postDelayed(speakLevelPollRunnable, 140L);
         }
     }
 
@@ -462,6 +479,22 @@ public final class LiveKitEngineManager {
         } else {
             mainHandler.post(deliver);
         }
+    }
+
+    /** Deliver one sampled batch to the UI instead of one Handler task per participant. */
+    private void notifySoundLevels(Map<String, Float> levels) {
+        if (levels == null || levels.isEmpty()) return;
+        Map<String, Float> snapshot = new HashMap<>(levels);
+        mainHandler.post(() -> {
+            for (ZegoEngineManager.RoomListener l : listeners) {
+                for (Map.Entry<String, Float> entry : snapshot.entrySet()) {
+                    try {
+                        l.onSoundLevel(entry.getKey(), entry.getValue());
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        });
     }
 
     /** Identity / Sid are Kotlin value classes + flowDelegate — resolve from Java. */
@@ -602,13 +635,22 @@ public final class LiveKitEngineManager {
                                 throw new RuntimeException(e);
                             }
                         });
+                // LiveKit returns false when the track could not be enabled/published.
+                // Do not report a successful mic activation in that case: retry below.
+                if (result instanceof Boolean && !((Boolean) result)) {
+                    last = new IllegalStateException(
+                            "LiveKit setMicrophoneEnabled returned false (enabled=" + enabled + ")");
+                    Log.w(TAG, "setMicrophoneEnabled rejected attempt=" + attempt
+                            + " enabled=" + enabled);
+                    Thread.sleep(150L * attempt);
+                    continue;
+                }
                 applyAudioRoute();
                 // Keep remote levels audible when SPEAKER is the route (common room mode).
                 trySetRemotePlaybackGain(r, speakerMuted ? 0f : 1f);
                 Log.i(TAG, "setMicrophoneEnabled=" + enabled
                         + " attempt=" + attempt
-                        + " result="
-                        + (result != null ? result.getClass().getSimpleName() : "null"));
+                        + " result=" + result);
                 return;
             } catch (Throwable t) {
                 last = t;
@@ -654,6 +696,13 @@ public final class LiveKitEngineManager {
     public void setSpeakerMuted(boolean muted) {
         speakerMuted = muted;
         applyAudioRoute();
+        // LiveKit auto-subscribes remote tracks. Changing the Android speaker route
+        // alone does not mute those tracks, so apply a listener-local gain to every
+        // remote participant. This never changes their published audio or our mic.
+        Room activeRoom = room;
+        if (activeRoom != null && connected.get()) {
+            io.execute(() -> trySetRemotePlaybackGain(activeRoom, muted ? 0f : 1f));
+        }
     }
 
     public boolean isSpeakerMuted() {

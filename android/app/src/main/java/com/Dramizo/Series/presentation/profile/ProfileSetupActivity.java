@@ -31,6 +31,7 @@ import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.GenderVerificationGate;
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.RemoteTheme;
 
 import java.util.Calendar;
 import java.util.Locale;
@@ -59,6 +60,8 @@ public class ProfileSetupActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityProfileSetupBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Apply the cached dashboard register wallpaper immediately after inflation.
+        RemoteTheme.applyActivityBackground(this, "register");
 
         container = ContainerProvider.from(this);
         viewModel = new ViewModelProvider(this, new ViewModelFactory(container))
@@ -121,23 +124,33 @@ public class ProfileSetupActivity extends ThemedActivity {
             saving = false;
             binding.progress.setVisibility(View.GONE);
             binding.btnContinue.setEnabled(true);
+            // Do not leave onboarding fully transparent when /me fails; the user
+            // must always see a recoverable screen instead of an apparently blank page.
+            binding.getRoot().setAlpha(1f);
             if (error != null) Toast.makeText(this, error, Toast.LENGTH_LONG).show();
         });
 
         binding.progress.setVisibility(View.VISIBLE);
         // Hide form until we know setup is actually required (avoids flash after splash).
         binding.getRoot().setAlpha(0f);
-        viewModel.loadMe();
+        viewModel.loadMeForSetup();
     }
 
     public static boolean isProfileComplete(AuthDtos.UserDto user) {
         if (user == null || user.isGuest) return true;
-        // Returning users with a photo already onboarded — do not force setup after re-login.
-        if (nonEmpty(user.avatarUrl)) return true;
-        // Brand-new accounts without photo still need gender + country once.
-        return nonEmpty(user.country)
+        // Profile photos are optional. Do not force a personal photo just to
+        // finish onboarding or to open a voice room; the backend supplies a
+        // neutral/default avatar when avatarUrl is empty.
+        boolean requiredIdentityFieldsPresent = nonEmpty(user.country)
                 && nonEmpty(user.gender)
                 && !"unspecified".equalsIgnoreCase(user.gender);
+        // Some older login responses omit country/gender even though /me or the
+        // saved account snapshot proves that the profile was already created.
+        // Persisted profile fields are evidence of an existing profile, not a new signup.
+        boolean hasPreviouslySavedProfile = nonEmpty(user.bio)
+                || nonEmpty(user.birthday)
+                || nonEmpty(user.country);
+        return requiredIdentityFieldsPresent || hasPreviouslySavedProfile;
     }
 
     private void bindExisting(AuthDtos.UserDto user) {
@@ -146,7 +159,7 @@ public class ProfileSetupActivity extends ThemedActivity {
         if (nonEmpty(user.avatarUrl)) {
             AvatarImageLoader.load(binding.imgAvatar, user.avatarUrl);
         }
-        binding.etBio.setText(user.bio != null ? user.bio : "");
+        binding.etDisplayName.setText(user.displayName != null ? user.displayName : "");
         String birthday = normalizeBirthday(user.birthday);
         binding.etBirthday.setText(birthday.isEmpty() ? "2000-01-01" : birthday);
         if ("male".equalsIgnoreCase(user.gender)) binding.spinnerGender.setSelection(1);
@@ -218,17 +231,13 @@ public class ProfileSetupActivity extends ThemedActivity {
     }
 
     private void saveProfile() {
+        String displayName = text(binding.etDisplayName);
         String birthday = normalizeBirthday(text(binding.etBirthday));
         int genderIndex = binding.spinnerGender.getSelectedItemPosition();
-        String bio = text(binding.etBio);
-        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(bio)) {
-            Toast.makeText(this,
-                    com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (!nonEmpty(avatarUrl)) {
-            Toast.makeText(this, "اختر صورة البروفايل", Toast.LENGTH_SHORT).show();
+        // Profile photos are optional. A failed upload must never block account setup.
+        if (displayName.isEmpty()) {
+            binding.etDisplayName.setError("اكتب اسمك");
+            binding.etDisplayName.requestFocus();
             return;
         }
         if (birthday.isEmpty()) {
@@ -255,14 +264,10 @@ public class ProfileSetupActivity extends ThemedActivity {
             Toast.makeText(this, "اختر الجنس", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (bio.isEmpty()) {
-            Toast.makeText(this, "اكتب نبذة قصيرة عنك", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
-        request.avatarUrl = avatarUrl;
-        request.bio = bio;
+        // Leave avatarUrl unset when no photo was uploaded; backend keeps the default avatar.
+        if (nonEmpty(avatarUrl)) request.avatarUrl = avatarUrl;
+        request.displayName = displayName;
         request.gender = GENDER_VALUES[genderIndex];
         request.birthday = birthday;
         request.country = selectedCountryCode();
@@ -292,7 +297,8 @@ public class ProfileSetupActivity extends ThemedActivity {
                         binding.btnPickAvatar.setEnabled(true);
                     });
                 } else {
-                    throw new IllegalStateException("فشل رفع الصورة");
+                    throw new IllegalStateException(
+                            UploadApi.errorMessage(response, "فشل رفع الصورة"));
                 }
             } catch (Exception e) {
                 runOnUiThread(() -> {

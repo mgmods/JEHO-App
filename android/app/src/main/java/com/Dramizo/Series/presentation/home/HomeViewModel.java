@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** Home rooms: pageSize=10, append load-more with footer anim (Mikoo-style). */
 public class HomeViewModel extends ViewModel {
@@ -43,6 +44,26 @@ public class HomeViewModel extends ViewModel {
     private int roomsPage = 1;
     private boolean roomsHasMore = true;
     private boolean roomsLoadingMore;
+    private final java.util.concurrent.atomic.AtomicBoolean roomsResetLoadInFlight =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicInteger roomsListGeneration =
+            new java.util.concurrent.atomic.AtomicInteger(0);
+    private final java.util.concurrent.atomic.AtomicBoolean roomsQuietRefreshInFlight =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private volatile boolean bannersLoading;
+    private volatile long lastBannersLoadAt;
+    private volatile boolean offersLoading;
+    private volatile long lastOffersLoadAt;
+    private static final long HOME_CONFIG_CACHE_MS = 60_000L;
+    // Avoid duplicate following-room scans when the user switches tabs or resumes the app.
+    private volatile boolean followingLoading;
+    private volatile boolean followingLoaded;
+    private volatile long lastFollowingLoadAt;
+    private static final long FOLLOWING_CACHE_MS = 30_000L;
+    // Avoid queuing the same two ranking requests on every quick tab/app return.
+    private volatile long lastHomeRankingsLoadAt;
+    private volatile boolean homeRankingsLoading;
+    private static final long HOME_RANKINGS_CACHE_MS = 60_000L;
 
     public HomeViewModel(AppContainer c) {
         this.c = c;
@@ -105,57 +126,70 @@ public class HomeViewModel extends ViewModel {
      * while keeping pages beyond 1 in place.
      */
     public void refreshRoomsQuietly() {
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(1, PAGE_SIZE);
-            if (!r.success || r.data == null || r.data.items == null) return;
-            List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-            List<RoomDtos.RoomDto> cur = rooms.getValue();
-            if (cur == null || cur.isEmpty()) {
-                rooms.postValue(pageItems);
-                roomsPage = 1;
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                return;
-            }
-            Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
-            for (RoomDtos.RoomDto x : cur) {
-                if (x != null && x.id != null) oldById.put(x.id, x);
-            }
-            HashSet<String> onHot = new HashSet<>();
-            List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
-            boolean changed = false;
-            // Page-1 slots follow server explore/heat order.
-            for (int i = 0; i < pageItems.size(); i++) {
-                RoomDtos.RoomDto neu = pageItems.get(i);
-                if (neu == null || neu.id == null) continue;
-                onHot.add(neu.id);
-                RoomDtos.RoomDto old = oldById.get(neu.id);
-                RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
-                next.add(row);
-                if (old == null
-                        || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
-                        || (old != null && (old.viewerCount != neu.viewerCount
-                        || old.roomLevel != neu.roomLevel
-                        || old.exploreRank != neu.exploreRank
-                        || !eq(old.coverUrl, neu.coverUrl)
-                        || !eq(old.title, neu.title)))) {
-                    changed = true;
+        // A slow room-list response must not stack another poll behind it.
+        if (!roomsQuietRefreshInFlight.compareAndSet(false, true)) return;
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
+                            c.listRoomsUseCase.execute(1, PAGE_SIZE);
+                    if (!r.success || r.data == null || r.data.items == null) return;
+                    List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                    List<RoomDtos.RoomDto> cur = rooms.getValue();
+                    if (cur == null || cur.isEmpty()) {
+                        rooms.postValue(pageItems);
+                        roomsPage = 1;
+                        roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                        return;
+                    }
+                    Map<String, RoomDtos.RoomDto> oldById = new HashMap<>();
+                    for (RoomDtos.RoomDto x : cur) {
+                        if (x != null && x.id != null) oldById.put(x.id, x);
+                    }
+                    HashSet<String> onHot = new HashSet<>();
+                    List<RoomDtos.RoomDto> next = new ArrayList<>(cur.size() + 4);
+                    boolean changed = false;
+                    // Page-1 slots follow server explore/heat order.
+                    for (int i = 0; i < pageItems.size(); i++) {
+                        RoomDtos.RoomDto neu = pageItems.get(i);
+                        if (neu == null || neu.id == null) continue;
+                        onHot.add(neu.id);
+                        RoomDtos.RoomDto old = oldById.get(neu.id);
+                        RoomDtos.RoomDto row = old != null ? copyRoomVolatile(old, neu) : neu;
+                        next.add(row);
+                        if (old == null
+                                || (i < cur.size() && cur.get(i) != null && !neu.id.equals(cur.get(i).id))
+                                || (old != null && (old.viewerCount != neu.viewerCount
+                                || old.roomLevel != neu.roomLevel
+                                || old.exploreRank != neu.exploreRank
+                                || !Objects.equals(old.roomTopRank, neu.roomTopRank)
+                                || !eq(old.roomTopFrameUrl, neu.roomTopFrameUrl)
+                                || !eq(old.roomTopPeriod, neu.roomTopPeriod)
+                                || !eq(old.coverUrl, neu.coverUrl)
+                                || !eq(old.title, neu.title)))) {
+                            changed = true;
+                        }
+                    }
+                    // Append remaining loaded pages that are not on Hot page 1.
+                    for (RoomDtos.RoomDto old : cur) {
+                        if (old == null || old.id == null || onHot.contains(old.id)) continue;
+                        next.add(old);
+                    }
+                    if (changed || next.size() != cur.size()) {
+                        rooms.postValue(next);
+                    }
+                } finally {
+                    roomsQuietRefreshInFlight.set(false);
                 }
-            }
-            // Append remaining loaded pages that are not on Hot page 1.
-            for (RoomDtos.RoomDto old : cur) {
-                if (old == null || old.id == null || onHot.contains(old.id)) continue;
-                next.add(old);
-            }
-            if (changed || next.size() != cur.size()) {
-                rooms.postValue(next);
-            }
-        });
+            });
+        } catch (RuntimeException rejected) {
+            roomsQuietRefreshInFlight.set(false);
+        }
     }
 
     /** Append next page (Mikoo load more). */
     public void loadMoreRooms() {
-        if (roomsLoadingMore || !roomsHasMore) return;
+        if (roomsLoadingMore || !roomsHasMore || roomsResetLoadInFlight.get()) return;
         loadRooms(true, false);
     }
 
@@ -181,6 +215,7 @@ public class HomeViewModel extends ViewModel {
         // Identity must track server (personal vs agency), not stick to first poll.
         c.agencyId = neu.agencyId != null ? neu.agencyId : old.agencyId;
         c.roomKind = neu.roomKind != null ? neu.roomKind : old.roomKind;
+        c.topic = neu.topic != null ? neu.topic : old.topic;
         c.isSupport = neu.isSupport || "support".equalsIgnoreCase(
                 neu.roomKind != null ? neu.roomKind : "");
         c.isPersistent = neu.isPersistent;
@@ -205,6 +240,11 @@ public class HomeViewModel extends ViewModel {
         c.roomLevel = neu.roomLevel;
         // Keep live Hot rank from server (1/2/3 badges); fall back only if missing.
         c.exploreRank = neu.exploreRank > 0 ? neu.exploreRank : old.exploreRank;
+        // TOP rank/frame are authoritative server fields; copy null too when a room
+        // leaves TOP 1/2/3 so the original room card is restored immediately.
+        c.roomTopRank = neu.roomTopRank;
+        c.roomTopFrameUrl = neu.roomTopFrameUrl;
+        c.roomTopPeriod = neu.roomTopPeriod;
         c.giftSoundsEnabled = old.giftSoundsEnabled;
         c.chatZoneEnabled = old.chatZoneEnabled;
         c.charmEnabled = old.charmEnabled;
@@ -245,6 +285,12 @@ public class HomeViewModel extends ViewModel {
     }
 
     private void loadRooms(boolean quiet, boolean reset) {
+        // Prevent duplicate page-1 requests when resume, tab selection and swipe refresh
+        // happen together. Duplicate resets used to race and replace newer room results.
+        if (reset && !roomsResetLoadInFlight.compareAndSet(false, true)) return;
+        final int requestGeneration = reset
+                ? roomsListGeneration.incrementAndGet() : roomsListGeneration.get();
+        if (!reset && roomsResetLoadInFlight.get()) return;
         if (reset) {
             roomsPage = 1;
             roomsHasMore = true;
@@ -257,72 +303,158 @@ public class HomeViewModel extends ViewModel {
             loadingMore.postValue(true);
         }
         final int page = reset ? 1 : roomsPage + 1;
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(page, PAGE_SIZE);
-            roomsLoadingMore = false;
-            loadingMore.postValue(false);
-            if (!quiet && reset) loading.postValue(false);
-            if (r.success && r.data != null && r.data.items != null) {
-                List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
-                roomsHasMore = pageItems.size() >= PAGE_SIZE;
-                roomsPage = page;
-                if (reset) {
-                    rooms.postValue(pageItems);
-                } else {
-                    List<RoomDtos.RoomDto> merged = new ArrayList<>();
-                    List<RoomDtos.RoomDto> cur = rooms.getValue();
-                    if (cur != null) merged.addAll(cur);
-                    HashSet<String> seen = new HashSet<>();
-                    for (RoomDtos.RoomDto x : merged) {
-                        if (x != null && x.id != null) seen.add(x.id);
+        try {
+            c.getIoExecutor().execute(() -> {
+                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r = null;
+                try {
+                    r = c.listRoomsUseCase.execute(page, PAGE_SIZE);
+                } catch (RuntimeException ignored) {
+                    // A transient transport failure must not strand the loading state.
+                } finally {
+                    if (requestGeneration == roomsListGeneration.get()) {
+                        roomsLoadingMore = false;
+                        if (reset) roomsResetLoadInFlight.set(false);
+                        loadingMore.postValue(false);
+                        if (!quiet && reset) loading.postValue(false);
                     }
-                    for (RoomDtos.RoomDto x : pageItems) {
-                        if (x == null || x.id == null || seen.contains(x.id)) continue;
-                        seen.add(x.id);
-                        merged.add(x);
+                }
+                // A newer refresh supersedes any older pagination response.
+                if (requestGeneration != roomsListGeneration.get()) return;
+                if (r != null && r.success && r.data != null && r.data.items != null) {
+                    List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
+                    roomsHasMore = pageItems.size() >= PAGE_SIZE;
+                    roomsPage = page;
+                    if (reset) {
+                        rooms.postValue(pageItems);
+                    } else {
+                        List<RoomDtos.RoomDto> merged = new ArrayList<>();
+                        List<RoomDtos.RoomDto> cur = rooms.getValue();
+                        if (cur != null) merged.addAll(cur);
+                        HashSet<String> seen = new HashSet<>();
+                        for (RoomDtos.RoomDto x : merged) {
+                            if (x != null && x.id != null) seen.add(x.id);
+                        }
+                        for (RoomDtos.RoomDto x : pageItems) {
+                            if (x == null || x.id == null || seen.contains(x.id)) continue;
+                            seen.add(x.id);
+                            merged.add(x);
+                        }
+                        rooms.postValue(merged);
                     }
-                    rooms.postValue(merged);
+                } else if (!quiet && reset) {
+                    if (r == null || !ApiCall.isRateLimited(r.error)) {
+                        error.postValue(r != null && r.error != null ? r.error
+                                : c.getAppContext().getString(R.string.load_rooms_failed));
+                    }
                 }
-            } else if (!quiet && reset) {
-                if (!ApiCall.isRateLimited(r.error)) {
-                    error.postValue(r.error != null ? r.error
-                            : c.getAppContext().getString(R.string.load_rooms_failed));
-                }
-            } else if (!reset) {
-                roomsHasMore = false;
+                // On a failed "load more", keep roomsHasMore and roomsPage unchanged so
+                // the next user retry requests the same page instead of disabling pagination.
+            });
+        } catch (RuntimeException rejected) {
+            if (requestGeneration == roomsListGeneration.get()) {
+                roomsLoadingMore = false;
+                if (reset) roomsResetLoadInFlight.set(false);
+                loadingMore.postValue(false);
             }
-        });
+            if (!quiet && reset) {
+                loading.postValue(false);
+                error.postValue(c.getAppContext().getString(R.string.load_rooms_failed));
+            }
+        }
     }
 
     public void loadBanners() {
-        c.getIoExecutor().execute(() -> {
-            Result<List<MiscDtos.BannerDto>> r = ApiCall.execute(c.getConfigApi().banners());
-            if (r.success && r.data != null) banners.postValue(r.data);
-        });
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            if (bannersLoading || (lastBannersLoadAt > 0L
+                    && now - lastBannersLoadAt < HOME_CONFIG_CACHE_MS)) return;
+            bannersLoading = true;
+        }
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean success = false;
+                try {
+                    Result<List<MiscDtos.BannerDto>> r = ApiCall.execute(
+                            c.getConfigApi().banners(System.currentTimeMillis()));
+                    if (r.success && r.data != null) {
+                        banners.postValue(r.data);
+                        success = true;
+                    }
+                } finally {
+                    synchronized (HomeViewModel.this) {
+                        bannersLoading = false;
+                        lastBannersLoadAt = success ? System.currentTimeMillis() : 0L;
+                    }
+                }
+            });
+        } catch (RuntimeException rejected) {
+            synchronized (this) { bannersLoading = false; lastBannersLoadAt = 0L; }
+        }
     }
 
     public void loadOffers() {
-        c.getIoExecutor().execute(() -> {
-            Result<List<MiscDtos.OfferDto>> r = ApiCall.execute(c.getConfigApi().offers());
-            if (r.success && r.data != null) offersCount.postValue(r.data.size());
-            else offersCount.postValue(0);
-        });
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            if (offersLoading || (lastOffersLoadAt > 0L
+                    && now - lastOffersLoadAt < HOME_CONFIG_CACHE_MS)) return;
+            offersLoading = true;
+        }
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean success = false;
+                try {
+                    Result<List<MiscDtos.OfferDto>> r = ApiCall.execute(c.getConfigApi().offers());
+                    if (r.success && r.data != null) {
+                        offersCount.postValue(r.data.size());
+                        success = true;
+                    }
+                } finally {
+                    synchronized (HomeViewModel.this) {
+                        offersLoading = false;
+                        lastOffersLoadAt = success ? System.currentTimeMillis() : 0L;
+                    }
+                }
+            });
+        } catch (RuntimeException rejected) {
+            synchronized (this) { offersLoading = false; lastOffersLoadAt = 0L; }
+        }
     }
 
-    public void loadHomeRankings() {
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
-                    c.getRankingsUseCase.execute("weekly", "rich");
-            if (rich.success && rich.data != null && rich.data.items != null) {
-                richRanking.postValue(rich.data.items);
-            }
-            Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
-                    c.getRankingsUseCase.execute("weekly", "gifts");
-            if (gifts.success && gifts.data != null && gifts.data.items != null) {
-                billionRanking.postValue(gifts.data.items);
-            }
-        });
+    public synchronized void loadHomeRankings() {
+        long now = System.currentTimeMillis();
+        if (homeRankingsLoading || (lastHomeRankingsLoadAt > 0L
+                && now - lastHomeRankingsLoadAt < HOME_RANKINGS_CACHE_MS)) {
+            return;
+        }
+        homeRankingsLoading = true;
+        lastHomeRankingsLoadAt = now;
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean success = false;
+                try {
+                    Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
+                            c.getRankingsUseCase.execute("weekly", "rich");
+                    if (rich.success && rich.data != null && rich.data.items != null) {
+                        richRanking.postValue(rich.data.items);
+                        success = true;
+                    }
+                    Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
+                            c.getRankingsUseCase.execute("weekly", "gifts");
+                    if (gifts.success && gifts.data != null && gifts.data.items != null) {
+                        billionRanking.postValue(gifts.data.items);
+                        success = true;
+                    }
+                } catch (Exception ignored) {
+                    // Cached ranking data remains visible; room joins must not be affected by retry storms.
+                } finally {
+                    homeRankingsLoading = false;
+                    if (!success) lastHomeRankingsLoadAt = 0L;
+                }
+            });
+        } catch (RuntimeException rejected) {
+            homeRankingsLoading = false;
+            lastHomeRankingsLoadAt = 0L;
+        }
     }
 
     public void loadFollowingRooms() {
@@ -335,43 +467,43 @@ public class HomeViewModel extends ViewModel {
     }
 
     private void loadFollowingRooms(boolean quiet) {
+        final long now = System.currentTimeMillis();
+        synchronized (this) {
+            if (followingLoading) return;
+            if (followingLoaded && now - lastFollowingLoadAt < FOLLOWING_CACHE_MS) return;
+            followingLoading = true;
+            lastFollowingLoadAt = now;
+        }
         if (!quiet) loading.postValue(true);
-        c.getIoExecutor().execute(() -> {
-            String myId = c.getSessionManager().getUserId();
-            java.util.Set<String> followingIds = new java.util.HashSet<>();
-            if (myId != null && !myId.isEmpty()) {
-                Result<MiscDtos.ListResult<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto>> following =
-                        ApiCall.execute(c.getUserApi().following(myId, 1));
-                if (following.success && following.data != null && following.data.items != null) {
-                    for (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user : following.data.items) {
-                        if (user != null && user.id != null) followingIds.add(user.id);
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean loaded = false;
+                try {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result =
+                            ApiCall.execute(c.getRoomApi().followingRooms());
+                    if (result.success && result.data != null && result.data.items != null) {
+                        followingRooms.postValue(dedupeRooms(result.data.items));
+                        loaded = true;
                     }
+                } catch (Throwable ignored) {
+                    // Keep the last visible list if a refresh fails.
+                } finally {
+                    synchronized (HomeViewModel.this) {
+                        followingLoading = false;
+                        followingLoaded = loaded;
+                        lastFollowingLoadAt = System.currentTimeMillis()
+                                - (loaded ? 0L : FOLLOWING_CACHE_MS - 5_000L);
+                    }
+                    if (!quiet) loading.postValue(false);
                 }
-            }
-            // Paginate like Hot so «أنا» scales (not only first 20).
-            List<RoomDtos.RoomDto> matched = new ArrayList<>();
-            int page = 1;
-            while (page <= 10) {
-                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> roomResult =
-                        c.listRoomsUseCase.execute(page, PAGE_SIZE);
-                if (!roomResult.success || roomResult.data == null || roomResult.data.items == null) {
-                    break;
-                }
-                List<RoomDtos.RoomDto> batch = dedupeRooms(roomResult.data.items);
-                if (batch.isEmpty()) break;
-                for (RoomDtos.RoomDto room : batch) {
-                    if (room == null) continue;
-                    if (!com.Dramizo.Series.util.RoomBrowseFilter.isBrowsablePersonal(room)) continue;
-                    String hostId = room.hostId;
-                    if (hostId == null && room.host != null) hostId = room.host.id;
-                    if (hostId != null && followingIds.contains(hostId)) matched.add(room);
-                }
-                if (batch.size() < PAGE_SIZE) break;
-                page++;
+            });
+        } catch (RuntimeException rejected) {
+            synchronized (this) {
+                followingLoading = false;
+                lastFollowingLoadAt = System.currentTimeMillis() - FOLLOWING_CACHE_MS + 5_000L;
             }
             if (!quiet) loading.postValue(false);
-            followingRooms.postValue(matched);
-        });
+        }
     }
 
     public void createRoom() {

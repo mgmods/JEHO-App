@@ -5,6 +5,7 @@ import com.Dramizo.Series.domain.repository.RankingRepository;
 public class GetRankingsUseCase {
     private final RankingRepository repo;
     public GetRankingsUseCase(RankingRepository repo) { this.repo = repo; }
+    public Result<java.util.Map<String, Object>> rewards() { return repo.rewards(); }
     public Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> execute(String period, String type) {
         return repo.list(period, type);
     }

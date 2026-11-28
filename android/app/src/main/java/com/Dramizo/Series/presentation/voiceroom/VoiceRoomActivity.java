@@ -1,8 +1,12 @@
 package com.Dramizo.Series.presentation.voiceroom;
+
+import com.Dramizo.Series.util.VipNameStyle;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
+import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -61,6 +65,7 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.data.remote.dto.GameDtos;
+import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.databinding.ActivityVoiceRoomBinding;
 import com.Dramizo.Series.databinding.DialogRoomGamesBinding;
@@ -119,9 +124,11 @@ import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.Dramizo.Series.util.RoomKenarHelper;
 import com.Dramizo.Series.util.RoomSoundFx;
 import com.Dramizo.Series.util.RoomUiHelper;
+import com.Dramizo.Series.util.RoomSeatCountPicker;
 import com.Dramizo.Series.util.RoomVisualEffects;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.RemoteSeatStickers;
+import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.VipStyle;
 import com.Dramizo.Series.util.YoutubeAudioResolver;
 
@@ -131,9 +138,10 @@ import java.io.InputStream;
 import com.Dramizo.Series.rtc.LiveKitEngineManager;
 import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
-import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -148,6 +156,8 @@ import java.util.Set;
 @OptIn(markerClass = UnstableApi.class)
 public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSource {
     public static final String EXTRA_ROOM_ID = "room_id";
+    public static final String EXTRA_ROOM_DISPLAY_ID = "room_display_id";
+    public static final String EXTRA_ROOM_IS_AGENCY = "room_is_agency";
     /** True while any VoiceRoomActivity is started (for global invite routing). */
     private static volatile boolean sRoomUiVisible;
     /** Alive room activity (may be paused/minimized) — for world celebration delivery. */
@@ -159,13 +169,140 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean pendingSeatInviteDialog;
 
     private ActivityVoiceRoomBinding binding;
+    private boolean unreadBadgeReceiverRegistered;
+    private final android.content.BroadcastReceiver unreadBadgeReceiver = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context context, Intent intent) {
+            int count = intent != null ? intent.getIntExtra(
+                    com.Dramizo.Series.util.UnreadMessageBadge.EXTRA_COUNT, 0) : 0;
+            updateRoomUnreadDot(count);
+        }
+    };
+
+    private void updateRoomUnreadDot(int count) {
+        if (binding == null || binding.roomPrivateMsgUnreadDot == null) return;
+        binding.roomPrivateMsgUnreadDot.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
+    }
+    private boolean seatStickerRefreshInFlight;
+    @Nullable private TextView roomPkScoreBanner;
+    @Nullable private android.widget.LinearLayout roomPkSplitContainer;
+    @Nullable private TextView roomPkTeamAName;
+    @Nullable private TextView roomPkTeamAScore;
+    @Nullable private TextView roomPkTeamBName;
+    @Nullable private TextView roomPkTeamBScore;
+    @Nullable private TextView roomPkTeamAMembers;
+    private boolean roomPkInRoomChallenge;
+    private boolean roomPkAutoEndRequested;
+    @Nullable private TextView roomPkTeamBMembers;
+    @Nullable private android.view.View roomPkProgressA;
+    @Nullable private android.view.View roomPkProgressB;
+    @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
+    private boolean roomPkSeatSplitApplied;
+    @Nullable private java.util.List<RoomDtos.SeatDto> roomPkLatestGridSeats;
+    private final Runnable roomPkRosterPoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || exiting || roomPkCurrentContestId == null
+                    || roomPkCurrentContestId.isEmpty() || "pending".equals(roomPkCurrentContestId)) return;
+            loadRoomPkRosters();
+            handler.postDelayed(this, 3000L);
+        }
+    };
+    @Nullable private TextView roomPkActionButton;
+    @Nullable private TextView roomPkEndButton;
+    @Nullable private TextView roomPkMinimizeButton;
+    private boolean roomPkOverlayMinimized;
+    private boolean roomPkCanEndChallenge;
+    @Nullable private String roomPkCurrentContestId;
+    private boolean roomPkFeatureEnabled = true;
+    @Nullable private Dialog challengeWheelDialog;
+    @Nullable private ChallengeWheelView challengeWheelView;
+    @Nullable private TextView challengeWheelResult;
+    @Nullable private TextView challengeWheelSpinButton;
+    @Nullable private TextView challengeWheelCloseButton;
+    @Nullable private TextView challengeWheelBanner;
+    private boolean challengeWheelMinimized;
+    @Nullable private String lastChallengeWheelSpinId;
+    private boolean challengeWheelSpinPending;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Fallback poll so a host still sees an invitation if a room event arrives during reconnect. */
+    private final Runnable roomPkInvitationPoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || exiting || !isOwner || roomId == null || roomId.isEmpty()) return;
+            loadRoomPkInvitations();
+            handler.postDelayed(this, 15000L);
+        }
+    };
+    private final Set<String> shownRoomPkInvites = new HashSet<>();
+    private final Set<String> shownCpRoomRequests = new HashSet<>();
+    private final Runnable roomPkPendingTimeout = () -> {
+        if ("pending".equals(roomPkCurrentContestId)) {
+            roomPkCurrentContestId = null;
+            ensureRoomPkActionButton();
+        }
+    };
+    private String roomPkBannerBaseText = "";
+    private long roomPkEndsAtMs;
+    private boolean roomPkBannerEnded;
+    private final Runnable updateRoomPkBannerClock = new Runnable() {
+        @Override public void run() {
+            if (roomPkScoreBanner == null || roomPkSplitContainer == null
+                    || roomPkSplitContainer.getVisibility() != View.VISIBLE
+                    || roomPkBannerEnded || isFinishing() || exiting) return;
+            long remaining = roomPkEndsAtMs > 0L ? roomPkEndsAtMs - System.currentTimeMillis() : -1L;
+            String clock = remaining > 0L
+                    ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
+                    : (roomPkEndsAtMs > 0L ? "00:00" : "مباشر");
+            if (roomPkOverlayMinimized && roomPkTeamAScore != null && roomPkTeamBScore != null) roomPkScoreBanner.setText("🔴 " + roomPkTeamAScore.getText() + " • ⏱ " + clock + " • " + roomPkTeamBScore.getText() + " 🔵");
+            else roomPkScoreBanner.setText(roomPkBannerBaseText + " • ⏱ " + clock);
+            if (remaining > 0L) {
+                handler.postDelayed(this, 1000L);
+            } else if (roomPkEndsAtMs > 0L && isOwner
+                    && !roomPkAutoEndRequested && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.isEmpty()) {
+                roomPkAutoEndRequested = true;
+                ContainerProvider.from(VoiceRoomActivity.this).getContestsApi()
+                        .endInRoomPk(roomPkCurrentContestId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                            retrofit2.Response<ApiResponse<Object>> response) {
+                        if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                            roomPkAutoEndRequested = false;
+                        }
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        roomPkAutoEndRequested = false;
+                    }
+                });
+            }
+        }
+    };
+    private final Runnable hideRoomPkScoreBanner = () -> {
+        handler.removeCallbacks(updateRoomPkBannerClock);
+        if (roomPkSplitContainer != null) roomPkSplitContainer.setVisibility(View.GONE);
+        if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+        handler.removeCallbacks(roomPkRosterPoll);
+        hideRoomPkSeatSplit();
+    };
     private VoiceRoomViewModel viewModel;
     private SeatAdapter seatAdapter;
+    @Nullable private RelationshipSeatEffectsOverlay relationshipSeatEffectsOverlay;
+    private volatile boolean relationshipEffectsFetchInFlight;
+    @Nullable private List<RoomDtos.SeatDto> pendingRelationshipEffectsSeats;
+    @Nullable private List<RoomDtos.SeatDto> lastRelationshipEffectsSeats;
+    @Nullable private String pendingRelationshipEffectsSeatSignature;
+    private long lastRelationshipEffectsFetchMs;
+    @Nullable private String lastRelationshipEffectsSeatSignature;
     private RecentJoinersAdapter audienceAdapter;
     private String roomId;
     private boolean micOn = false;
     /** True only after the user taps mute — survives refresh / WhatsApp return. */
     private boolean userChoseMute = false;
+    private long lastLocalMicChangeAtMs = 0L;
+    /** Prevents transient seat refreshes from re-toggling the microphone on/off. */
+    private boolean micStateInitializedForRoom = false;
+    /** Last confirmed self-seat time; short stale-snapshot grace prevents mic publish flapping. */
+    private long lastSelfSeatConfirmedAtMs = 0L;
+    // Prevent stale room polls from restoring the previous seat after an optimistic hop.
+    private int pendingSelfSeatIndex = -1;
+    private long pendingSelfSeatUntilMs = 0L;
     private boolean locked;
     private boolean isHost;
     private boolean isOwner;
@@ -178,7 +315,63 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
     private String myUserId;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    @Nullable private volatile String mysteriousAvatarUrl;
+    @Nullable private volatile String mysteriousEntryMode;
+    @Nullable private volatile String mysteriousEntryText;
+    @Nullable private volatile String mysteriousEntryEffectUrl;
+    @Nullable private volatile String mysteriousMessageEffectUrl;
+    private volatile boolean selfGiftAllowed = false;
+    private volatile boolean luckyCannonEnabled = true;
+    private volatile boolean luckyCannonSoundEnabled = true;
+    private volatile int luckyCannonDurationSeconds = 2;
+    private volatile boolean luckyCannonPulseEnabled = true;
+    @Nullable private FrameLayout luckyCannonLayer;
+    @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
+    @Nullable private ImageView luckyCannonIconView;
+    @Nullable private TextView luckyCannonCountView;
+    private int luckyCannonComboCount;
+    @Nullable private String luckyCannonRemoteIconUrl;
+    @Nullable private Runnable hideLuckyCannonRunnable;
+    /** Refresh dashboard button styling while the room is visible; animations remain device-local. */
+    private final Runnable luckyButtonStylePoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed() || !sRoomUiVisible) return;
+            refreshLuckyToastButtonStyle();
+            // Config is low-frequency; avoid repeated network wakeups while users chat.
+            handler.postDelayed(this, 60_000L);
+        }
+    };
+    @Nullable private String luckyCannonGiftId;
+    @Nullable private String luckyCannonGiftIcon;
+    @Nullable private String luckyCannonGiftName;
+    private int luckyCannonGiftPrice;
+    private final List<String> luckyCannonTargets = new ArrayList<>();
+    private final Map<String, Integer> luckyCannonRemoteComboCounts = new HashMap<>();
+    private boolean luckyCannonSending;
+    /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
+    private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 70L;
+    // Two units per request reduce round-trip overhead; concurrency remains bounded.
+    private static final int LUCKY_CANNON_UNITS_PER_SHOT = 2;
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
+    private int luckyCannonInFlight;
+    private volatile boolean luckyCannonHoldActive;
+    private volatile long luckyCannonHoldGeneration;
+    private final Runnable luckyCannonRepeatRunnable = new Runnable() {
+        @Override public void run() {
+            if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
+            // Do not wait for ACTION_UP. Each repeat is a real lucky-gift send, so
+            // releasing the finger stops scheduling new sends immediately.
+            if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
+                sendLuckyCannonBatch(LUCKY_CANNON_UNITS_PER_SHOT);
+            }
+            if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+            if (luckyCannonHoldActive) {
+                handler.postDelayed(this, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+            }
+        }
+    };
+    @Nullable private String luckyCannonRequestId;
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
     private MikooHashBridge hashBridge;
@@ -199,10 +392,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final long JOIN_EFFECT_DEDUPE_MS = 8_000L;
     private final Map<String, Long> recentJoinEffects = new HashMap<>();
     private final Map<String, Long> recentGiftEffects = new HashMap<>();
+    @Nullable private android.animation.ValueAnimator giftCountUpAnimator;
     private boolean zegoLoggedIn;
     private boolean exiting;
     /** True when user minimized to Main — keep Zego/realtime, don't tear room down. */
     private boolean minimizing;
+    private boolean minimizeHandoffPending;
     /** Mikoo-style: leave/logout runs once; onDestroy must not repeat it. */
     private boolean roomTeardownDone;
     /** Speaker was muted by us because the app went to background (WhatsApp / Home). */
@@ -252,6 +447,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int realtimeJoinAttempts;
     /** True when this Activity instance restored UI from {@link ActiveRoomSession}. */
     private boolean resumedFromActiveSession;
+    /** Seat roster captured before restore; protects the live mic from a transient empty refresh. */
+    @Nullable private List<RoomDtos.SeatDto> restoreSeatSnapshot;
+    /** Ignore transient empty seat refreshes only during the short post-restore window. */
+    private long restoreSeatSnapshotUntilMs;
     private final Runnable retryRealtimeJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
         connectRealtimeRoom();
@@ -279,7 +478,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (roomId != null && !exiting) {
                 lastRoomRefreshAt = System.currentTimeMillis();
                 viewModel.refresh(roomId);
-                if (canInviteMic) viewModel.loadSeatRequests(roomId);
+                if (canReviewMicRequests()) viewModel.loadSeatRequests(roomId);
             }
             handler.postDelayed(this, 60_000L);
         }
@@ -304,6 +503,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Full room presence (host + seated + listeners) for the viewers sheet. */
     private final List<JsonObject> roomMembersAll = new ArrayList<>();
     private final List<JsonObject> roomAudience = new ArrayList<>();
+    /** Drops stale member-list parses when newer realtime snapshots arrive first. */
+    private int roomMembersBindSeq;
     private RoomDtos.SupportersResult latestSupporters;
     private RoomEffectQueue effectQueue;
     private android.app.Dialog roomJoinLoading;
@@ -314,19 +515,43 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyOverlayActive;
     private Runnable luckyOverlayRelease;
     private ExoPlayer roomMusicPlayer;
+    private volatile boolean externalCaptureMusicPaused;
+    // Process-wide latch: playback callbacks must not restart any music decoder
+    // while another app owns microphone capture, even if the room Activity is recreated.
+    private static volatile boolean externalCaptureMusicSuspended;
+    @Nullable private Player.Listener roomMusicPlayerListener;
     /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
     @Nullable private WebView roomGameWebView;
     /** Lazy: YouTube embed disc WebView. */
     @Nullable private WebView musicYoutubeWebView;
+    @Nullable private WebView activeSupportChestWeb;
+    @Nullable private String activeSupportChestRoomId;
+    @Nullable private String activeSupportChestAsset;
+    @Nullable private Map<String, Object> supportChestRuntimeConfig;
+    /** Dedupe opened UI and the dedicated room-wide explosion audio event independently. */
+    @Nullable private String lastSupportChestOpenedKey;
+    private long lastSupportChestOpenedAtMs;
+    @Nullable private String lastSupportChestBlastKey;
+    private long lastSupportChestBlastAtMs;
+    private final Runnable supportChestEventRefresh = () -> {
+        WebView chestWeb = activeSupportChestWeb;
+        String chestRoom = activeSupportChestRoomId;
+        if (chestWeb != null && chestRoom != null && chestRoom.equals(roomId) && !isFinishing()) {
+            loadSupportChestState(chestWeb, chestRoom);
+        }
+    };
     /** Lazy media3 PlayerViews (PlayerView in XML freezes inflate). */
     @Nullable private androidx.media3.ui.PlayerView musicVideoPlayerView;
     @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
     /** HTTP join kicked off at start of onCreate (parallel with UI setup). */
     private boolean earlyJoinStarted;
     private boolean musicUiReady;
+    /** Prevents room music playback on this device while an external app records voice. */
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
+    /** Exact URL handed to the foreground player; YouTube may be a resolved CDN stream. */
+    @Nullable private String currentMusicHandoffUrl;
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
     private String currentMusicStatus = "stopped";
@@ -335,6 +560,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String currentMusicPublisherId;
     private boolean musicEndReported;
     private boolean musicPanelExpanded;
+    /** Shared music gain (0..1), synchronized for everyone in the live room. */
+    private float sharedMusicVolume = 1.0f;
+    private int sharedMusicVolumeRequestId;
     private ObjectAnimator musicDiscAnimator;
     private android.animation.AnimatorSet taskFloatPulseAnimator;
     private long roomMusicServerOffsetMs;
@@ -360,6 +588,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private RealtimeClient.UserListener moderationUserListener;
     /** Local mirror of server chat mute (text), until epoch ms. */
     private long chatMutedUntilMs;
+    private String lastRoomChatLineKey;
+    private long lastRoomChatLineAtMs;
     private ZegoEngineManager.RoomListener zegoRoomListener;
     private final ActivityResultLauncher<String[]> musicPicker = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
@@ -399,6 +629,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             uri -> {
                 if (uri != null) uploadRoomCover(uri);
             });
+    private final ActivityResultLauncher<String> roomBackgroundPicker = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) uploadRoomBackground(uri);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -406,13 +641,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        setupLuckyCannonUi();
+        applyRoomBottomSafeArea();
+        initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
+        // Restore the last downloaded seat-sticker catalog immediately; refresh silently when opened.
+        RemoteSeatStickers.hydrateFromCache(ContainerProvider.from(this));
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
+        // The tapped room card already knows this ID, so show it on first paint instead of
+        // waiting for the network join response to carry the same value back.
+        String earlyDisplayId = getIntent().getStringExtra(EXTRA_ROOM_DISPLAY_ID);
+        if (earlyDisplayId != null && !earlyDisplayId.trim().isEmpty()) {
+            String earlyLabel = getIntent().getBooleanExtra(EXTRA_ROOM_IS_AGENCY, false)
+                    ? "GID:" : "ID:";
+            binding.tvRoomId.setText(earlyLabel + earlyDisplayId.trim());
+        }
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        userChoseMute = myUserId != null && getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                .getBoolean("muted:" + myUserId, false);
+        refreshMysteriousManMedia();
         // Critical path: HTTP join overlaps layout inflate.
         // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
         boolean canResume = roomId != null && !roomId.isEmpty()
@@ -474,7 +725,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.giftChatEffects != null) {
             giftVisualEffects = new RoomVisualEffects(binding.giftChatEffects);
         }
-        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 1_200L);
+        // Defer nonessential gift-media warming until room join/audio controls settle.
+        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 3_000L);
         effectQueue = new RoomEffectQueue(effect -> {
             if (effect.isEntry()) {
                 if (!roomEntryEffectsEnabled()) {
@@ -572,6 +824,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         applyRoomToolbarIcons();
         startRoomGmtClock();
         setupRealtime();
+        handler.postDelayed(this::loadRoomPkChallenge, 1200L);
+        refreshSelfGiftPolicy();
         setupZegoListener();
         setupLuckyBoxUi();
 
@@ -580,8 +834,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onSeatClick(View anchor, RoomDtos.SeatDto seat) {
                 if (roomId == null || seat == null) return;
                 if (seat.locked()) {
-                    if (canManageSeats) viewModel.lockSeat(roomId, seat.seatIndex, false);
-                    else Toast.makeText(VoiceRoomActivity.this, R.string.seat_locked_toast, Toast.LENGTH_SHORT).show();
+                    String lockedOccupant = seatUserId(seat);
+                    boolean lockedEmpty = lockedOccupant == null || lockedOccupant.isEmpty();
+                    if (lockedEmpty && seat.seatIndex != 0
+                            && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
+                        showEmptySeatActionMenu(anchor, seat);
+                    } else if (canManageSeats) {
+                        viewModel.lockSeat(roomId, seat.seatIndex, false);
+                    } else {
+                        Toast.makeText(VoiceRoomActivity.this, R.string.seat_locked_toast, Toast.LENGTH_SHORT).show();
+                    }
                     return;
                 }
                 String occupantId = seatUserId(seat);
@@ -592,6 +854,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 if (!empty) {
+                    boolean canModerateHiddenIdentity = canManageSeats || canKickUsers
+                            || isHost || isOwner || isPlatformManager() || isPlatformSuper();
+                    if (seat.user != null && seat.user.mysteriousMan && !canModerateHiddenIdentity) {
+                        Toast.makeText(VoiceRoomActivity.this, "هوية هذا العضو مخفية داخل الروم", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String name = seat.user != null
                             ? (seat.user.displayName != null ? seat.user.displayName : seat.user.username)
                             : "مستخدم";
@@ -600,6 +868,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String avatar = seat.user != null ? seat.user.avatarUrl : null;
                     String vipBadge = seat.user != null ? seat.user.vipBadgeUrl : null;
                     String hostBadge = seat.user != null ? seat.user.hostBadgeUrl : null;
+                    // A normal tap always opens the full profile card, including for
+                    // platform staff; moderation actions remain available from long-press.
                     showUserCard(occupantId, name, avatar,
                             vipBadge,
                             isAgencyRoom ? hostBadge : null,
@@ -607,10 +877,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
 
+                // Owners and room staff who are not seated get explicit seat actions.
+                if (seat.seatIndex != 0
+                        && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
+                    showEmptySeatActionMenu(anchor, seat);
+                    return;
+                }
+                takeEmptySeat(seat.seatIndex);
+            }
+
+            private void takeEmptySeat(int seatIndex) {
                 // Host / owner can sit freely and hop seats. Guests already on mic can hop;
                 // first seat requires host approval unless dashboard enables free mic.
                 boolean freeMic = isFreeMicEnabled();
-                boolean canHop = isHost || isOwner || isOnSeat(currentSeats) || freeMic;
+                boolean canHop = isHost || isOwner || canInviteMic || canManageSeats || isOnSeat(currentSeats)
+                        || (freeMic && !isMicRequestEnabled());
                 if (!PermissionHelper.hasAudioPermission(VoiceRoomActivity.this)) {
                     PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
                     Toast.makeText(VoiceRoomActivity.this, "فعّل إذن الميكروفون أولاً", Toast.LENGTH_LONG).show();
@@ -618,10 +899,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 try {
                     if (canHop) {
-                        optimisticTakeSeat(seat.seatIndex);
-                        viewModel.takeSeat(roomId, seat.seatIndex);
+                        optimisticTakeSeat(seatIndex);
+                        viewModel.takeSeat(roomId, seatIndex);
                     } else {
-                        viewModel.requestSeat(roomId, seat.seatIndex);
+                        viewModel.requestSeat(roomId, seatIndex);
                     }
                 } catch (Exception e) {
                     android.util.Log.e("VoiceRoom", "takeSeat click failed", e);
@@ -639,14 +920,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String name = seat.user != null
                             ? firstNonEmpty(seat.user.displayName, seat.user.username, "مستخدم")
                             : "مستخدم";
-                    showUserCard(
-                            seat.userId,
-                            name,
-                            seat.user != null ? seat.user.avatarUrl : null,
-                            seat.user != null ? seat.user.vipBadgeUrl : null,
-                            isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
-                            seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
-                            seat.user != null ? Math.max(1, seat.user.level) : 1);
+                    if (canManageSeats || canKickUsers || isHost || isOwner
+                            || isPlatformManager() || isPlatformSuper() || isRoomStaff()) {
+                        showChatUserActions(binding.recyclerSeats, seat.userId, name,
+                                seat.user != null ? seat.user.avatarUrl : null,
+                                seat.user != null ? seat.user.vipBadgeUrl : null,
+                                seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
+                                seat.user != null ? Math.max(1, seat.user.level) : 1,
+                                null, null);
+                    } else {
+                        showUserCard(
+                                seat.userId,
+                                name,
+                                seat.user != null ? seat.user.avatarUrl : null,
+                                seat.user != null ? seat.user.vipBadgeUrl : null,
+                                isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
+                                seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
+                                seat.user != null ? Math.max(1, seat.user.level) : 1);
+                    }
                     return;
                 }
                 if (!canManageSeats) return;
@@ -675,6 +966,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.recyclerSeats.getParent() instanceof ViewGroup) {
             ((ViewGroup) binding.recyclerSeats.getParent()).setClipChildren(false);
         }
+        // Seat positions are a fixed room stage, not a scrollable list.
+        // All configured seats (including the 30-seat / six-column layout) remain
+        // anchored in place while seat occupancy refreshes.
         binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
             @Override
             public boolean canScrollVertically() {
@@ -682,6 +976,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         });
         binding.recyclerSeats.setAdapter(seatAdapter);
+        try {
+            if (binding.getRoot() instanceof ViewGroup) {
+                relationshipSeatEffectsOverlay = new RelationshipSeatEffectsOverlay(
+                        this, (ViewGroup) binding.getRoot(), binding.recyclerSeats);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("VoiceRoom", "Relationship effect overlay unavailable", e);
+        }
         audienceAdapter = new RecentJoinersAdapter(member ->
                 showUserCard(member.userId, member.displayName, member.avatarUrl,
                         member.vipBadgeUrl,
@@ -742,7 +1044,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.hostStage.setOnClickListener(null);
         }
         binding.btnPlus.setOnClickListener(v -> {
-            if (canInviteMic) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner)
+                    && (!isFreeMicEnabled() || isMicRequestEnabled())) {
                 // Primary host action: approve/reject pending mic join requests.
                 showSeatRequestsDialog();
             } else if (Boolean.TRUE.equals(viewModel.getHandRaised().getValue())) {
@@ -756,7 +1059,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showHostTools();
                 return true;
             }
-            if (canInviteMic) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner)
+                    && (!isFreeMicEnabled() || isMicRequestEnabled())) {
                 showSeatRequestsDialog();
                 return true;
             }
@@ -771,13 +1075,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         Toast.LENGTH_SHORT).show();
                 return;
             }
-            micOn = !micOn;
-            userChoseMute = !micOn;
-            if (roomId != null) viewModel.setMic(roomId, !micOn);
-            RoomRtcEngine.getInstance().setMicEnabled(micOn);
+            boolean requestedMicOn = !RoomRtcEngine.getInstance().isMicEnabled();
+            RoomRtcEngine.getInstance().setMicEnabled(requestedMicOn);
+            boolean actualMicOn = RoomRtcEngine.getInstance().isMicEnabled();
+            if (requestedMicOn && !actualMicOn) {
+                micOn = false;
+                syncMicUi();
+                Toast.makeText(this, "الميكروفون مشغول من تطبيق آخر؛ سيُفتح عند تحريره", Toast.LENGTH_LONG).show();
+                return;
+            }
+            micOn = actualMicOn;
+            userChoseMute = !actualMicOn;
+            lastLocalMicChangeAtMs = System.currentTimeMillis();
+            if (myUserId != null) getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                    .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
+            if (roomId != null) viewModel.setMic(roomId, !actualMicOn);
             syncVoiceAudio(currentSeats);
             syncMicUi();
-            Toast.makeText(this, micOn ? R.string.mic_on : R.string.mic_off, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, actualMicOn ? R.string.mic_on : R.string.mic_off, Toast.LENGTH_SHORT).show();
         });
         binding.btnLock.setOnClickListener(v -> {
             if (!canManageRoom) {
@@ -799,6 +1114,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         });
         binding.btnGift.setOnClickListener(v -> {
+            refreshSelfGiftPolicy();
             RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
             // Default to live host — including self when I am hosting (Mikoo support).
             String hostTarget = resolveLiveHostId(room);
@@ -807,6 +1123,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.btnPrivateMsg != null) {
             binding.btnPrivateMsg.setOnClickListener(v ->
                     RoomPrivateMsgSheet.showSheet(getSupportFragmentManager()));
+        }
+        if (binding.btnWriteMessage != null) {
+            binding.btnWriteMessage.setOnClickListener(v -> openRoomChatComposer(true));
+            binding.btnWriteMessage.setVisibility(View.GONE);
         }
         binding.btnTools.setOnClickListener(v -> showOtherTools());
         binding.btnHeaderMore.setOnClickListener(v -> openRoomSharePicker());
@@ -825,10 +1145,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnEmoji.setOnClickListener(v -> showEmojiPicker());
         if (binding.btnSeatSticker != null) {
             binding.btnSeatSticker.setVisibility(View.VISIBLE);
-            binding.btnSeatSticker.setOnClickListener(v -> showEmojiPicker());
+            binding.btnSeatSticker.setOnClickListener(v -> showSeatStickerPicker());
         }
         binding.btnGames.setOnClickListener(v -> showRoomGames());
+
+        // Keep the room's bottom action row present after room/UI rebinding.
+        // The microphone remains governed exclusively by seated state in syncMicUi().
+        if (binding.bottomBar != null && !roomComposerOpen) {
+            binding.bottomBar.setVisibility(View.VISIBLE);
+        }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.GONE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        if (binding.tvChatInputTips != null && !roomComposerOpen) {
+            binding.tvChatInputTips.setVisibility(View.VISIBLE);
+        }
+        if (binding.bottomBar != null && !roomComposerOpen) binding.bottomBar.bringToFront();
+
+        // Room side shortcuts. Keep the music shortcut on the existing music flow;
+        // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
+        View sideChest = findViewById(R.id.btnRoomSupportChest);
+        View sideMusic = findViewById(R.id.btnRoomSideMusic);
+        View sideGames = findViewById(R.id.btnRoomSideGames);
+        if (sideChest != null) {
+            sideChest.setOnClickListener(v -> showSupportChestSheet());
+            android.animation.ObjectAnimator chestWobble =
+                    android.animation.ObjectAnimator.ofFloat(sideChest, View.ROTATION, -5f, 5f, -5f);
+            chestWobble.setDuration(1900L);
+            chestWobble.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            chestWobble.setRepeatMode(android.animation.ValueAnimator.RESTART);
+            chestWobble.start();
+            sideChest.animate().scaleX(1.045f).scaleY(1.045f).setDuration(900L)
+                    .withEndAction(() -> sideChest.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(900L).start()).start();
+        }
+        View sideSettings = findViewById(R.id.btnRoomSideSettings);
+        View sidePkChallenges = findViewById(R.id.btnRoomSidePkChallenge);
+        if (sideMusic != null) {
+            sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
+        }
+        if (sideGames != null) {
+            sideGames.setOnClickListener(v -> showRoomGames());
+        }
+        if (sideSettings != null) {
+            sideSettings.setOnClickListener(v -> showOtherTools());
+        }
+        // PK must live inside Room Settings (Room section), not as a separate room shortcut.
+        if (sidePkChallenges != null) {
+            sidePkChallenges.setVisibility(View.GONE);
+            sidePkChallenges.setOnClickListener(null);
+        }
+
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
+        if (binding.btnSendChatInline != null) {
+            binding.btnSendChatInline.setOnClickListener(v -> openRoomChatComposer(true));
+        }
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setOnClickListener(v -> openRoomChatComposer(true));
         }
@@ -922,6 +1294,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
+            applyRoomFeedTabsSeatOffset();
+            refreshSupportChestIcon();
             final int bindSeq = ++roomUiBindSeq;
             // Disk chat wipe + history restore: off main thread (ANR on mid-range MIUI).
             final String chatClearedAtIso = room.chatClearedAt;
@@ -935,17 +1309,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             isPersistentRoom = room.isPersistent;
             isAgencyRoom = RoomUiHelper.isAgencyRoom(room);
             if (seatAdapter != null) {
-                seatAdapter.setAgencyRoom(isAgencyRoom);
+                seatAdapter.setAgencyContext(isAgencyRoom, room.agencyId, room.moderatorIds);
             }
             if (audienceAdapter != null) {
                 audienceAdapter.setAgencyRoom(isAgencyRoom);
             }
             roomModeratorIds.clear();
             if (room.moderatorIds != null) roomModeratorIds.addAll(room.moderatorIds);
+            boolean appointed = myUserId != null && roomModeratorIds.contains(myUserId);
             isHost = myUserId != null
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
+            View sidePk = findViewById(R.id.btnRoomSidePkChallenge);
+            // PK is available only from Room Settings > Room; never show the floating shortcut.
+            if (sidePk != null) {
+                sidePk.setVisibility(View.GONE);
+                sidePk.setOnClickListener(null);
+            }
+            handler.post(() -> { ensureRoomPkActionButton(); loadRoomPkInvitations(); });
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
             canChangeFrames = fullStaff;
@@ -981,6 +1363,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canManageSeats = true;
                 canInviteMic = true;
             }
+            if (isPlatformAdmin() || isPlatformManager()) {
+                // Platform admins/managers can manage music in every room, but this is
+                // only the dedicated music stream; microphone capture gain is untouched.
+                canManageMusic = true;
+            }
             if (isPlatformSuper()) {
                 canManageMusic = true;
                 canChangeFrames = true;
@@ -992,19 +1379,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canInviteMic = true;
                 canManageRoom = true;
             }
-            // Appointed room mods (and hosts) should open room tools reliably.
-            boolean appointed =
-                    (myUserId != null && roomModeratorIds.contains(myUserId))
-                    || isHost
-                    || isOwner
-                    || (myUserId != null && sameUser(myUserId, roomCohostId));
-            if (appointed || isPlatformSuper()) {
-                canManageRoom = true;
-                canManageSeats = true;
-                canChangeFrames = true;
-                canBanUsers = true;
-                canManageMusic = true;
-            }
+            // Do not infer permissions from moderator status alone.
+            // UI actions must mirror the server's explicit permission flags so
+            // moderators cannot see controls the API will correctly reject.
             // Manager (platform) stays person-focused: mute/kick/ban, not full host settings.
             if (isPlatformManager() && !isPlatformSuper() && !appointed) {
                 canMuteUsers = true;
@@ -1016,6 +1393,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canManageMusic = false;
                 canChangeFrames = false;
                 canControlGames = false;
+            }
+            // Server-authoritative effective permissions also cover agency owners and
+            // platform roles that are not listed as room moderators.
+            RoomDtos.ViewerPermissionsDto viewerPermissions = room.viewerPermissions;
+            if (viewerPermissions != null) {
+                canManageMusic |= viewerPermissions.canManageMusic;
+                canChangeFrames |= viewerPermissions.canChangeFrames;
+                canControlGames |= viewerPermissions.canControlGames;
+                canMuteUsers |= viewerPermissions.canMute;
+                canKickUsers |= viewerPermissions.canKick;
+                canBanUsers |= viewerPermissions.canBan;
+                canManageSeats |= viewerPermissions.canManageSeats;
+                canInviteMic |= viewerPermissions.canInvite;
+                canManageRoom |= viewerPermissions.canManageRoom;
             }
             updateAdminControls();
             seatAdapter.setHostUserId(roomHostId);
@@ -1055,12 +1446,82 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Agency rooms show agency GID; personal rooms show host publicId.
             String idLabel = RoomUiHelper.isAgencyRoom(room) ? "GID:" : "ID:";
             binding.tvRoomId.setText(idLabel + com.Dramizo.Series.util.RoomUiHelper.displayRoomId(room));
+            // Agency profile is public and shared: open it from the agency name, GID, or room badge.
+            if (agencyRoom && room.agencyId != null && !room.agencyId.trim().isEmpty()) {
+                final String profileAgencyId = room.agencyId.trim();
+                View.OnClickListener openAgencyProfile = v ->
+                        AgencyFamilyInfoSheet.show(VoiceRoomActivity.this, profileAgencyId);
+                binding.tvRoomTitle.setOnClickListener(openAgencyProfile);
+                binding.tvRoomId.setOnClickListener(openAgencyProfile);
+                binding.tvRoomTitle.setClickable(true);
+                binding.tvRoomId.setClickable(true);
+                if (binding.headerHostAvatarWrap != null) {
+                    binding.headerHostAvatarWrap.setOnClickListener(openAgencyProfile);
+                    binding.headerHostAvatarWrap.setClickable(true);
+                }
+            } else {
+                binding.tvRoomTitle.setOnClickListener(null);
+                binding.tvRoomId.setOnClickListener(null);
+                if (binding.headerHostAvatarWrap != null) binding.headerHostAvatarWrap.setOnClickListener(null);
+            }
             applyRoomGiftSounds(room.giftSoundsEnabled);
             applyRoomDisplaySettings(room);
 
             // First paint: seats only. Heavy cover/kenar/host wear/bg staged after.
-            List<RoomDtos.SeatDto> seats = room.seats != null ? room.seats : new ArrayList<>();
+            // Some refresh payloads omit "seats" entirely (null) while the room session
+            // remains live. Do not interpret an omitted field as an authoritative empty roster:
+            // that made restore treat everyone as off-mic and hide the original seat positions.
+            List<RoomDtos.SeatDto> seats = room.seats;
+            if (resumedFromActiveSession && seats != null && seats.isEmpty()
+                    && restoreSeatSnapshot != null && !restoreSeatSnapshot.isEmpty()
+                    && System.currentTimeMillis() <= restoreSeatSnapshotUntilMs) {
+                // A refresh immediately after restoring can return an empty array while the
+                // server/session is catching up. Do not turn that transient snapshot into a
+                // local leave: doing so stops publishing and drops the user from the saved seats.
+                seats = new ArrayList<>(restoreSeatSnapshot);
+                room.seats = seats;
+            } else if (resumedFromActiveSession && seats != null && !seats.isEmpty()) {
+                // Preserve the whole room roster, including other occupied mics when the host
+                // or listener is not seated. But if this user was seated in the saved snapshot
+                // and a refresh omits them, keep the prior snapshot until a real seat-left event
+                // clears it; otherwise a stale response can erase the local mic on next minimize.
+                boolean savedLocalSeat = restoreSeatSnapshot != null && isOnSeat(restoreSeatSnapshot);
+                if (!savedLocalSeat || isOnSeat(seats)) {
+                    restoreSeatSnapshot = new ArrayList<>(seats);
+                }
+            }
+            if (seats == null && resumedFromActiveSession) {
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null && cachedRoom.seats != null) {
+                    seats = cachedRoom.seats;
+                } else if (currentSeats != null && !currentSeats.isEmpty()) {
+                    seats = currentSeats;
+                }
+            }
+            if (seats == null) seats = new ArrayList<>();
+            seats = reconcilePendingSelfSeat(seats);
             boolean wasOnSeat = isOnSeat(currentSeats);
+            // Room snapshots can briefly omit a self seat while the room API and realtime
+            // roster converge. Keep the last confirmed local seat for a short grace window;
+            // explicit room:seat_left events clear this latch immediately.
+            if (wasOnSeat && !isOnSeat(seats) && lastSelfSeatConfirmedAtMs > 0L
+                    && System.currentTimeMillis() - lastSelfSeatConfirmedAtMs < 5000L) {
+                RoomDtos.SeatDto selfSeat = findMySeat(currentSeats);
+                if (selfSeat != null) {
+                    seats = new ArrayList<>(seats);
+                    seats.add(shallowCopySeat(selfSeat));
+                }
+            }
+            // On minimize/restore the new Activity starts with an empty in-memory seat list.
+            // Compare against the cached room roster before deciding this is a brand-new seat;
+            // otherwise the restore path can wrongly re-run new-seat mic activation and overwrite
+            // the user's saved mic intent while everyone is simply returning to the same room.
+            if (!wasOnSeat && resumedFromActiveSession) {
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null && cachedRoom.seats != null) {
+                    wasOnSeat = isOnSeat(cachedRoom.seats);
+                }
+            }
             currentSeats = seats;
             try {
                 List<RoomDtos.SeatDto> gridSeats = prepareGuestSeatsForGrid(seats);
@@ -1075,10 +1536,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 scheduleSupporterRefresh(0L);
             }
             boolean nowOnSeat = isOnSeat(seats);
+            if (nowOnSeat) lastSelfSeatConfirmedAtMs = System.currentTimeMillis();
             RoomDtos.SeatDto mySeat = findMySeat(seats);
 
             // New seat assignment: open mic unless moderator-muted or user already chose mute.
-            if (nowOnSeat && !wasOnSeat) {
+            if (nowOnSeat && !wasOnSeat && !micStateInitializedForRoom) {
                 boolean modMuted = mySeat != null && mySeat.isModeratorMuted;
                 try {
                     if (modMuted || userChoseMute) {
@@ -1092,10 +1554,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 } catch (Exception zegoErr) {
                     android.util.Log.e("VoiceRoom", "mic activate failed", zegoErr);
                 }
+                micStateInitializedForRoom = true;
                 Toast.makeText(this, isHost ? "أنت المبدع على المايك" : "أنت على المايك الآن", Toast.LENGTH_SHORT).show();
             } else if (!nowOnSeat && wasOnSeat) {
                 micOn = false;
-                userChoseMute = false;
+                micStateInitializedForRoom = false;
+                // Keep the user's explicit mute preference across seat changes and room re-entry.
                 try {
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     RoomRtcEngine.getInstance().stopPublishing();
@@ -1112,6 +1576,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             } else if (nowOnSeat && isHost && !userChoseMute && !micOn
+                    && !micStateInitializedForRoom
                     && (mySeat == null || !mySeat.isModeratorMuted)) {
                 // Host already seated on first open (no wasOnSeat edge) — still open mic.
                 micOn = true;
@@ -1196,7 +1661,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.getRoot().post(() -> {
             if (isFinishing() || isDestroyed() || exiting) return;
             if (joinRoomId == null || !joinRoomId.equals(roomId)) return;
-            showRoomJoinLoading();
+            // Keep the room shell interactive and visible while the join request completes.
+            // A full-screen modal here hid the seats and room ID for the entire network round-trip.
             // Prefetch finished before observers were attached — apply now.
             if (pendingPrefetchSession != null) {
                 RoomDtos.JoinRoomResult pre = pendingPrefetchSession;
@@ -1215,6 +1681,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** RTC side of session observer — deferred so first room paint stays under ANR budget. */
     private void attachRtcForSession(@Nullable RoomDtos.JoinRoomResult session) {
         if (session == null || exiting || isFinishing() || zegoLoggedIn) return;
+        if (myUserId != null) {
+            userChoseMute = getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                    .getBoolean("muted:" + myUserId, userChoseMute);
+        }
         zegoLoggedIn = true;
         RoomRtcEngine.getInstance().applyJoinSession(
                 this, session, roomId, myUserId);
@@ -1259,15 +1729,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void bindDeferredRoomChrome(
             @NonNull RoomDtos.RoomDto room, @Nullable List<RoomDtos.SeatDto> seats) {
         if (binding == null) return;
-        if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
+        boolean coverChanged = !Objects.equals(lastBoundCoverUrl, room.coverUrl);
+        boolean coverNeedsRetry = room.coverUrl != null && !room.coverUrl.isEmpty()
+                && binding.imgRoomBannerCover != null
+                && !(binding.imgRoomBannerCover.getTag(R.id.tag_image_url) instanceof String);
+        if (coverChanged || coverNeedsRetry) {
             lastBoundCoverUrl = room.coverUrl;
             if (binding.imgRoomBannerCover != null) {
-                Glide.with(this)
-                        .load(AssetCatalog.absoluteUrl(room.coverUrl))
-                        .centerCrop()
-                        .placeholder(R.drawable.placeholder_cover)
-                        .error(R.drawable.placeholder_cover)
-                        .into(binding.imgRoomBannerCover);
+                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                        binding.imgRoomBannerCover, room.coverUrl, R.drawable.placeholder_cover);
             }
             lastBoundHostStageKey = null;
         }
@@ -1389,6 +1859,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!ars.canResumeUi(roomId)) return false;
         RoomDtos.JoinRoomResult join = ars.session();
         if (join == null) return false;
+        // Keep the restored join result attached to this Activity. Subsequent minimize /
+        // onStop cycles use pendingSession to preserve the live RTC session and seat roster.
+        // Without this assignment, the second minimize could take the normal background-mute
+        // path even though Zego and the room session were still active.
+        pendingSession = join;
         resumedFromActiveSession = true;
         roomJoinLoadingDismissed = true;
         dismissRoomJoinLoading();
@@ -1401,6 +1876,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             micOn = ars.isMicOn();
         }
         roomSpeakerMuted = ars.isSpeakerMuted();
+        // Preserve the pre-restore roster separately: the next HTTP refresh must not erase
+        // the only good copy before we can decide whether an empty response is transient.
+        RoomDtos.RoomDto cachedRoom = ars.latestRoom();
+        restoreSeatSnapshot = cachedRoom != null && cachedRoom.seats != null
+                && !cachedRoom.seats.isEmpty()
+                ? new ArrayList<>(cachedRoom.seats) : null;
+        restoreSeatSnapshotUntilMs = restoreSeatSnapshot != null
+                ? System.currentTimeMillis() + 20_000L : 0L;
         // Zego already logged in — do not call loginRoom again.
         zegoLoggedIn = true;
         realtimeJoined = RealtimeClient.getInstance().isJoinedRoom(roomId);
@@ -1439,6 +1922,464 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
         // Longer on weak networks — user should see loading, not a sudden eject.
         handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
+    }
+
+    /**
+     * The dashboard controls chest icon visibility. If the API is temporarily unavailable,
+     * keep the icon visible so the feature remains discoverable and can be retried.
+     */
+    private void refreshSupportChestIcon() {
+        final View chestIcon = findViewById(R.id.btnRoomSupportChest);
+        if (chestIcon == null || isFinishing() || isDestroyed()) return;
+        chestIcon.setVisibility(View.VISIBLE);
+        final String targetRoomId = roomId;
+        if (targetRoomId == null || targetRoomId.trim().isEmpty()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (isFinishing() || isDestroyed()
+                                    || !targetRoomId.equals(roomId)
+                                    || !response.isSuccessful()
+                                    || response.body() == null
+                                    || response.body().data == null) return;
+                            Object rawConfig = response.body().data.get("config");
+                            if (!(rawConfig instanceof Map)) return;
+                            Map<?, ?> config = (Map<?, ?>) rawConfig;
+                            if (!config.containsKey("iconVisible")) return;
+                            Object visibleValue = config.get("iconVisible");
+                            boolean visible = visibleValue instanceof Boolean
+                                    ? (Boolean) visibleValue
+                                    : Boolean.parseBoolean(String.valueOf(visibleValue));
+                            chestIcon.setVisibility(visible ? View.VISIBLE : View.GONE);
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            // Keep the fallback visible; transient API errors must not hide the icon.
+                        }
+                    });
+        } catch (Exception ignored) {
+            // Keep the fallback visible if the API client is not ready.
+        }
+    }
+
+    private boolean chestRoomIdMatches(@NonNull String targetRoomId) {
+        return targetRoomId.equals(activeSupportChestRoomId) && targetRoomId.equals(roomId);
+    }
+
+    private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
+        if (isFinishing() || isDestroyed()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (!response.isSuccessful() || response.body() == null
+                                    || response.body().data == null
+                                    || isFinishing() || isDestroyed()) return;
+                            Map<String, Object> data = response.body().data;
+                            Object rawConfig = data.get("config");
+                            if (rawConfig instanceof Map) {
+                                supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) rawConfig);
+                            }
+                            Object rawState = data.get("state");
+                            Object rawLevel = data.get("currentLevel");
+                            int chestLevel = rawState instanceof Map
+                                    ? (int) numberForChest(((Map<?, ?>) rawState).get("level"), 1L) : 1;
+                            // One lightweight HTML document renders all three levels.
+                            // The level selector and lock previews are driven by server config.
+                            String desiredAsset = "support-chest.html";
+                            if (!desiredAsset.equals(activeSupportChestAsset)) {
+                                activeSupportChestAsset = desiredAsset;
+                                runOnUiThread(() -> {
+                                    if (!isFinishing() && !isDestroyed() && web != null
+                                            && chestRoomIdMatches(targetRoomId)) {
+                                        web.loadUrl("file:///android_asset/" + desiredAsset);
+                                    }
+                                });
+                                return;
+                            }
+                            Map<String, Object> mergedConfig = new HashMap<>();
+                            if (rawConfig instanceof Map) {
+                                for (Map.Entry<?, ?> entry : ((Map<?, ?>) rawConfig).entrySet()) {
+                                    mergedConfig.put(String.valueOf(entry.getKey()), entry.getValue());
+                                }
+                            }
+                            // The HTML is loaded from file:///android_asset; supply the active
+                            // JEHO API origin so /uploads and /assets reward thumbnails resolve
+                            // exactly like the dashboard's media resolver.
+                            try {
+                                Uri apiUri = Uri.parse(com.Dramizo.Series.BuildConfig.API_BASE_URL);
+                                if (apiUri.getScheme() != null && apiUri.getAuthority() != null) {
+                                    mergedConfig.put("assetBaseUrl",
+                                            apiUri.getScheme() + "://" + apiUri.getAuthority());
+                                }
+                            } catch (Exception ignored) { }
+                            if (rawLevel instanceof Map) mergedConfig.put("currentLevel", rawLevel);
+                            String configJson = new org.json.JSONObject(mergedConfig).toString();
+                            String stateJson = rawState instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawState).toString() : "{}";
+                            String script = "window.applySupportChestData && window.applySupportChestData("
+                                    + configJson + "," + stateJson + ");";
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed() && web != null) {
+                                    web.evaluateJavascript(script, null);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            android.util.Log.w("SupportChest", "Could not load support chest data", error);
+                        }
+                    });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Support chest request could not be started", error);
+        }
+    }
+
+    /** Resolve uploaded chest reward media against the active JEHO API host. */
+    @Nullable
+    private String resolveSupportChestMediaUrl(@Nullable String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String value = raw.trim();
+        try {
+            Uri api = Uri.parse(com.Dramizo.Series.BuildConfig.API_BASE_URL);
+            if (api.getScheme() == null || api.getAuthority() == null) return value;
+            String origin = api.getScheme() + "://" + api.getAuthority();
+            if (value.startsWith("data:") || value.startsWith("file:")
+                    || value.startsWith("content:") || value.startsWith("blob:")) return value;
+            if (value.startsWith("http://") || value.startsWith("https://")) {
+                Uri media = Uri.parse(value);
+                String mediaPath = media.getEncodedPath() == null ? "" : media.getEncodedPath();
+                mediaPath = mediaPath.replaceFirst("^/api/v\\d+(?=/uploads/)", "");
+                if (mediaPath.startsWith("/uploads/") || mediaPath.startsWith("/assets/")) {
+                    return origin + mediaPath
+                            + (media.getEncodedQuery() == null ? "" : "?" + media.getEncodedQuery())
+                            + (media.getEncodedFragment() == null ? "" : "#" + media.getEncodedFragment());
+                }
+                return value;
+            }
+            String normalized = value.replaceFirst("^/?api/v\\d+(?=/uploads/)", "");
+            if (normalized.startsWith("/")) return origin + normalized;
+            if (normalized.startsWith("uploads/") || normalized.startsWith("assets/")) {
+                return origin + "/" + normalized;
+            }
+        } catch (Exception ignored) { }
+        return value;
+    }
+
+    /**
+     * Plays the dashboard-selected support chest media for every room member,
+     * even when the support-chest bottom sheet is closed.
+     */
+    private void showSupportChestBlastOverlay(
+            @Nullable Map<String, Object> config,
+            @NonNull JsonObject winPayload
+    ) {
+        if (config == null || isFinishing() || isDestroyed()) return;
+        Object rawEffect = config.get("explosionEffect");
+        if (!(rawEffect instanceof Map)) return;
+        Map<?, ?> effect = (Map<?, ?>) rawEffect;
+        Object enabled = effect.get("enabled");
+        Object media = effect.get("mediaUrl");
+        Object sound = effect.get("soundUrl");
+        if (!Boolean.TRUE.equals(enabled)
+                || ((media == null || String.valueOf(media).trim().isEmpty())
+                && (sound == null || String.valueOf(sound).trim().isEmpty()))) return;
+        View content = findViewById(android.R.id.content);
+        if (!(content instanceof FrameLayout)) return;
+        FrameLayout root = (FrameLayout) content;
+        // The explosion is a visual-only layer. WebView can still participate in
+        // touch dispatch even when setClickable(false), so explicitly pass every
+        // touch through and place it at the bottom of the room's child stack.
+        WebView blastWeb = new WebView(this) {
+            @Override public boolean dispatchTouchEvent(MotionEvent event) { return false; }
+            @Override public boolean onTouchEvent(MotionEvent event) { return false; }
+        };
+        blastWeb.setBackgroundColor(Color.TRANSPARENT);
+        blastWeb.setClickable(false);
+        blastWeb.setFocusable(false);
+        blastWeb.setFocusableInTouchMode(false);
+        blastWeb.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        blastWeb.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        WebSettings settings = blastWeb.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setDefaultTextEncodingName("UTF-8");
+        blastWeb.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        blastWeb.setVerticalScrollBarEnabled(false);
+        blastWeb.setHorizontalScrollBarEnabled(false);
+        ViewGroup roomRoot = binding != null ? binding.getRoot() : root;
+        ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // Add the transparent blast WebView above room content so the uploaded video is visible.
+        // dispatchTouchEvent() returns false, so room controls underneath remain interactive.
+        roomRoot.addView(blastWeb, params);
+        final boolean[] started = { false };
+        blastWeb.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage message) {
+                android.util.Log.w("SupportChestVideo", message.message() + " @"
+                        + message.sourceId() + ":" + message.lineNumber());
+                return true;
+            }
+        });
+        blastWeb.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                    WebResourceResponse response) {
+                super.onReceivedHttpError(view, request, response);
+                if (request != null && request.isForMainFrame() == false) {
+                    android.util.Log.w("SupportChestVideo", "Media HTTP "
+                            + response.getStatusCode() + " for " + request.getUrl());
+                }
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                if (started[0] || isFinishing() || isDestroyed()) return;
+                started[0] = true;
+                try {
+                    // The blast WebView is loaded from file:///android_asset, so a relative
+                    // /uploads/... URL would resolve to a local file and render as a blank white tile.
+                    // Normalize dashboard media against the same production API origin used by the APK.
+                    Map<String, Object> browserConfig = new java.util.HashMap<>(config);
+                    Map<String, Object> browserEffect = new java.util.HashMap<>();
+                    for (Map.Entry<?, ?> entry : effect.entrySet()) {
+                        browserEffect.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                    Object blastMediaUrl = browserEffect.get("mediaUrl");
+                    if (blastMediaUrl != null) {
+                        String rawUrl = String.valueOf(blastMediaUrl).trim();
+                        if (!rawUrl.isEmpty() && !rawUrl.startsWith("http://")
+                                && !rawUrl.startsWith("https://") && !rawUrl.startsWith("file:")
+                                && !rawUrl.startsWith("content:") && !rawUrl.startsWith("data:")) {
+                            browserEffect.put("mediaUrl",
+                                    com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl));
+                        }
+                    }
+                    Object blastSoundUrl = browserEffect.get("soundUrl");
+                    if (blastSoundUrl != null) {
+                        String rawUrl = String.valueOf(blastSoundUrl).trim();
+                        if (!rawUrl.isEmpty() && !rawUrl.startsWith("http://")
+                                && !rawUrl.startsWith("https://") && !rawUrl.startsWith("file:")
+                                && !rawUrl.startsWith("content:") && !rawUrl.startsWith("data:")) {
+                            browserEffect.put("soundUrl",
+                                    com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl));
+                        }
+                    }
+                    browserConfig.put("explosionEffect", browserEffect);
+                    String configJson = new org.json.JSONObject(browserConfig).toString();
+                    String winJson = winPayload.toString();
+                    String script = "window.setSupportChestBlastOnly&&window.setSupportChestBlastOnly(true);"
+                            + "window.applySupportChestData&&window.applySupportChestData("
+                            + configJson + ",{});"
+                            + "window.applySupportChestWin&&window.applySupportChestWin("
+                            + winJson + ");";
+                    view.evaluateJavascript(script, null);
+                } catch (Exception error) {
+                    android.util.Log.w("SupportChest", "Could not start custom chest blast", error);
+                }
+            }
+        });
+        blastWeb.loadUrl("file:///android_asset/support-chest.html");
+        long duration = 6000L;
+        try {
+            duration = Math.max(6000L, Math.min(14000L,
+                    2500L + (long) numberForChest(effect.get("durationMs"), 1800L)));
+        } catch (Exception ignored) { }
+        // Give uploaded MP4/WebM media enough time to finish before destroying its WebView.
+        Object mediaKind = effect.get("mediaType") != null ? effect.get("mediaType")
+                : (effect.get("mimeType") != null ? effect.get("mimeType") : effect.get("type"));
+        boolean uploadedVideo = (media != null
+                && String.valueOf(media).matches("(?i).*\\.(mp4|webm|m4v)(?:[?#].*)?$"))
+                || (mediaKind != null && (String.valueOf(mediaKind).toLowerCase(java.util.Locale.ROOT).startsWith("video/")
+                || String.valueOf(mediaKind).matches("(?i)video|mp4|webm|m4v")));
+        if (uploadedVideo) {
+            // Keep the WebView alive long enough for dashboard videos, including signed URLs.
+            duration = 60000L;
+        }
+        final WebView overlayWeb = blastWeb;
+        handler.postDelayed(() -> {
+            try {
+                if (overlayWeb.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) overlayWeb.getParent()).removeView(overlayWeb);
+                }
+                overlayWeb.stopLoading();
+                overlayWeb.loadUrl("about:blank");
+                overlayWeb.destroy();
+            } catch (Exception ignored) { }
+        }, duration);
+    }
+
+    private void showSupportChestSheet() {
+        if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
+        final String chestRoomId = roomId;
+        final BottomSheetDialog dialog = new BottomSheetDialog(this);
+
+        // Restore the original rich HTML chest UI. The WebView is created only
+        // after the user taps the chest, so it does not slow down room startup.
+        WebView web = new WebView(this);
+        activeSupportChestWeb = web;
+        activeSupportChestRoomId = chestRoomId;
+        web.setBackgroundColor(Color.TRANSPARENT);
+        web.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setDefaultTextEncodingName("UTF-8");
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setVerticalScrollBarEnabled(false);
+        web.setHorizontalScrollBarEnabled(false);
+        web.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (!isFinishing() && !isDestroyed() && dialog.isShowing()
+                        && chestRoomId.equals(roomId)) {
+                    loadSupportChestState(view, chestRoomId);
+                }
+            }
+        });
+
+        dialog.setContentView(web);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+
+        final Runnable refreshChest = new Runnable() {
+            @Override public void run() {
+                if (!dialog.isShowing() || isFinishing() || isDestroyed()
+                        || !chestRoomId.equals(roomId)) return;
+                if (web.getProgress() >= 100) loadSupportChestState(web, chestRoomId);
+                handler.postDelayed(this, 5000L);
+            }
+        };
+        dialog.setOnDismissListener(d -> {
+            handler.removeCallbacks(refreshChest);
+            handler.removeCallbacks(supportChestEventRefresh);
+            if (activeSupportChestWeb == web) {
+                activeSupportChestWeb = null;
+                activeSupportChestRoomId = null;
+                activeSupportChestAsset = null;
+            }
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+        });
+        dialog.setOnShowListener(d -> {
+            android.view.View bottomSheet = dialog.findViewById(
+                    com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackground(new ColorDrawable(Color.TRANSPARENT));
+                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.76f);
+                bottomSheet.getLayoutParams().height = height;
+                bottomSheet.requestLayout();
+                com.google.android.material.bottomsheet.BottomSheetBehavior<?> behavior =
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet);
+                behavior.setPeekHeight(height);
+                behavior.setFitToContents(true);
+                behavior.setHideable(true);
+                behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
+            }
+            activeSupportChestAsset = null;
+            loadSupportChestState(web, chestRoomId);
+            handler.removeCallbacks(refreshChest);
+            handler.postDelayed(refreshChest, 5000L);
+        });
+        dialog.show();
+    }
+
+    private int chestDp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private LinearLayout.LayoutParams chestParams(int width, int height, int topMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(width, height);
+        params.topMargin = chestDp(topMarginDp);
+        return params;
+    }
+
+    private TextView chestText(String value, float sizeSp, int color, boolean bold) {
+        TextView text = new TextView(this);
+        text.setText(value);
+        text.setTextSize(sizeSp);
+        text.setTextColor(color);
+        text.setGravity(Gravity.CENTER_VERTICAL);
+        if (bold) text.setTypeface(null, android.graphics.Typeface.BOLD);
+        return text;
+    }
+
+    private void loadSupportChestStateNative(@NonNull String targetRoomId,
+            @NonNull TextView level, @NonNull TextView metric, @NonNull ProgressBar progress,
+            @NonNull TextView stats, @NonNull TextView instructions) {
+        try {
+            ContainerProvider.from(this).getGiftApi().supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(
+                        retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                        retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null
+                            || response.body().data == null || isFinishing() || isDestroyed()
+                            || !targetRoomId.equals(roomId)) return;
+                    Map<String, Object> data = response.body().data;
+                    Object rawConfig = data.get("config");
+                    Object rawState = data.get("state");
+                    Map<?, ?> config = rawConfig instanceof Map ? (Map<?, ?>) rawConfig : java.util.Collections.emptyMap();
+                    Map<?, ?> state = rawState instanceof Map ? (Map<?, ?>) rawState : java.util.Collections.emptyMap();
+                    boolean enabled = Boolean.parseBoolean(String.valueOf(config.get("enabled")));
+                    boolean iconVisible = !Boolean.FALSE.equals(config.get("iconVisible"));
+                    if (!enabled || !iconVisible) {
+                        metric.setText("صندوق الدعم غير مفعّل حالياً");
+                        progress.setProgress(0);
+                        stats.setText("سيظهر التقدّم عند تفعيل الصندوق من الداشبورد.");
+                        return;
+                    }
+                    boolean diamonds = "diamonds".equalsIgnoreCase(String.valueOf(config.get("goalMode")));
+                    String unit = diamonds ? "ماسات" : "كوينزات";
+                    Object currentValue = state.get(diamonds ? "diamonds" : "coins");
+                    Object targetValue = config.get(diamonds ? "diamondTarget" : "coinTarget");
+                    long current = 0L, target = 0L;
+                    try { current = Math.max(0L, Math.round(Double.parseDouble(String.valueOf(currentValue)))); }
+                    catch (Exception ignored) { }
+                    try { target = Math.max(0L, Math.round(Double.parseDouble(String.valueOf(targetValue)))); }
+                    catch (Exception ignored) { }
+                    int percent = target > 0L ? (int) Math.min(100L, (current * 100L) / target) : 0;
+                    level.setText("المستوى " + Math.max(1, (int) numberForChest(state.get("level"), 1)) + " · صندوق الروم");
+                    metric.setText("تقدّم " + unit + " · " + percent + "%");
+                    progress.setProgress(percent);
+                    stats.setText("المجموع: " + String.format(java.util.Locale.US, "%,d", current)
+                            + "     الهدف: " + (target > 0L ? String.format(java.util.Locale.US, "%,d", target) : "—")
+                            + "     المتبقي: " + (target > 0L ? String.format(java.util.Locale.US, "%,d", Math.max(0L, target - current)) : "—"));
+                    Object help = config.get("instructions");
+                    instructions.setText(help instanceof String && !((String) help).trim().isEmpty()
+                            ? (String) help : "تعتمد قواعد الصندوق ومكافآته على إعدادات الداشبورد.");
+                }
+                @Override public void onFailure(
+                        retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                    metric.setText("تعذر تحديث بيانات الصندوق حالياً");
+                }
+            });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Native support chest request failed", error);
+        }
+    }
+
+    private long numberForChest(@Nullable Object value, long fallback) {
+        try { return Math.round(Double.parseDouble(String.valueOf(value))); }
+        catch (Exception ignored) { return fallback; }
     }
 
     private void ensureMusicUiReady() {
@@ -1642,10 +2583,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String avatar = u != null ? u.avatarUrl : null;
         long wealth = u != null ? Math.max(u.wealthScore, u.totalSentCoins) : 0L;
         long charm = u != null ? Math.max(0L, u.charmScore) : 0L;
-        String vipFrame = u != null ? u.vipBadgeUrl : null;
+        String vipFrame = u != null ? com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(u) : null;
         String hostFrame = u != null ? u.hostBadgeUrl : null;
-        // Agency rooms show host signal; personal rooms show VIP frame.
-        String frame = isAgencyRoom ? hostFrame : vipFrame;
+        // Chat avatar always carries the user's equipped personal frame in every room.
+        String frame = vipFrame;
         JsonObject payload = new JsonObject();
         payload.addProperty("t", "chat");
         payload.addProperty("text", text);
@@ -1712,14 +2653,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && RoomRtcEngine.getInstance().sendRoomChatMessage(
                         roomId, payload.toString(), (ok, err) -> {
                             if (!ok) {
-                                runOnUiThread(() -> {
-                                    boolean sent = RealtimeClient.getInstance()
-                                            .emitRoomEvent(roomId, "chat:message", payload);
-                                    if (!sent) {
-                                        Toast.makeText(this, "تعذر إرسال الرسالة", Toast.LENGTH_SHORT)
-                                                .show();
-                                    }
-                                });
+                                // Zego may deliver successfully before a delayed confirmation timeout.
+                                // Keep this callback silent: retrying or showing a failure toast here
+                                // creates false alarms and can make users resend an already delivered line.
+                                android.util.Log.w("RoomChat", "Zego chat confirmation timed out; delivery may already have succeeded");
                             }
                         });
         if (!zegoOk) {
@@ -1786,7 +2723,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Restore gift/games/settings row under the tip pill.
         if (binding.bottomBar != null) {
             binding.bottomBar.setVisibility(View.VISIBLE);
+            // Keep the bottom actions above chat/effect overlays after the composer closes.
+            binding.bottomBar.bringToFront();
         }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.GONE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        // The mic button is intentionally controlled only by syncMicUi() and seat state.
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
         }
@@ -1804,6 +2748,135 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Marker name for game/luck celebration rows (no white name / no profile photo). */
     private static final String CHAT_NAME_GAME_CEL = "\u200B#game_cel";
+
+    /** Refresh dashboard-owned shared media without blocking room entry. */
+    private void refreshMysteriousManMedia() {
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                Result<MiscDtos.MysteriousManConfigDto> result =
+                        ApiCall.execute(c.getConfigApi().mysteriousMan());
+                if (result == null || !result.success || result.data == null) return;
+                MiscDtos.MysteriousManConfigDto cfg = result.data;
+                mysteriousAvatarUrl = cfg.avatarUrl;
+                mysteriousEntryMode = cfg.entryMode;
+                mysteriousEntryText = cfg.entryText;
+                mysteriousEntryEffectUrl = cfg.entryEffectUrl;
+                mysteriousMessageEffectUrl = cfg.messageEffectUrl;
+                android.content.SharedPreferences prefs =
+                        getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE);
+                prefs.edit()
+                        .putString("avatar_url", cfg.avatarUrl == null ? "" : cfg.avatarUrl)
+                        .putString("entry_mode", cfg.entryMode == null ? "video" : cfg.entryMode)
+                        .putString("entry_text", cfg.entryText == null ? "دخل الرجل الغامض" : cfg.entryText)
+                        .putString("entry_effect_url", cfg.entryEffectUrl == null ? "" : cfg.entryEffectUrl)
+                        .putString("message_effect_url", cfg.messageEffectUrl == null ? "" : cfg.messageEffectUrl)
+                        .apply();
+            } catch (Exception ignored) {
+                // Retain last known dashboard media if the network is temporarily unavailable.
+            }
+        });
+    }
+
+    private boolean mysteriousEntranceIsText() {
+        String mode = mysteriousEntryMode;
+        if (mode == null) mode = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("entry_mode", "video");
+        return "text".equalsIgnoreCase(mode);
+    }
+
+    @NonNull
+    private String configuredMysteriousEntryText() {
+        String value = mysteriousEntryText;
+        if (value == null || value.trim().isEmpty()) {
+            value = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                    .getString("entry_text", "دخل الرجل الغامض");
+        }
+        return value == null || value.trim().isEmpty() ? "دخل الرجل الغامض" : value.trim();
+    }
+
+    @Nullable
+    private String configuredMysteriousEntryEffectUrl() {
+        String url = mysteriousEntryEffectUrl;
+        if (url != null && !url.trim().isEmpty()) return url.trim();
+        String cached = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("entry_effect_url", "");
+        return cached == null || cached.trim().isEmpty() ? null : cached.trim();
+    }
+
+    @Nullable
+    private String configuredMysteriousAvatarUrl() {
+        String url = mysteriousAvatarUrl;
+        if (url != null && !url.trim().isEmpty()) return url.trim();
+        String cached = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("avatar_url", "");
+        return cached == null || cached.trim().isEmpty() ? null : cached.trim();
+    }
+
+    /** Resolve the VIP name treatment from the latest room payload for seated speakers. */
+    @Nullable
+    private java.util.Map<String, Object> roomNameStyleForUser(@Nullable String userId) {
+        if (userId == null || userId.trim().isEmpty() || viewModel == null) return null;
+        RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+        if (room == null) return null;
+        if (room.host != null && sameUser(userId, room.host.id)) return room.host.nameStyle;
+        if (room.seats != null) {
+            for (RoomDtos.SeatDto seat : room.seats) {
+                if (seat == null || seat.user == null) continue;
+                String uid = seat.userId != null ? seat.userId : seat.user.id;
+                if (uid != null && sameUser(userId, uid)) return seat.user.nameStyle;
+            }
+        }
+        return null;
+    }
+
+    /** Room-local agency identity for the chat name chip. */
+    @Nullable
+    private String agencyRoleLabelForRoomUser(@Nullable String userId) {
+        if (userId == null || userId.trim().isEmpty()) return null;
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        if (room == null) return null;
+        AuthDtos.UserDto user = null;
+        if (room.host != null && sameUser(userId, room.hostId)) user = room.host;
+        if (user == null && room.seats != null) {
+            for (RoomDtos.SeatDto seat : room.seats) {
+                if (seat != null && seat.user != null && sameUser(userId, seat.userId)) {
+                    user = seat.user;
+                    break;
+                }
+            }
+        }
+        if (user == null && myUserId != null && sameUser(userId, myUserId)) {
+            try { user = ContainerProvider.from(this).getSessionManager().getUser(); }
+            catch (Exception ignored) { }
+        }
+        String role = "";
+        String agencyId = "";
+        if (user != null && user.agency != null && user.agency.role != null) {
+            role = user.agency.role.trim().toLowerCase(java.util.Locale.ROOT);
+            agencyId = user.agency.id == null ? "" : user.agency.id.trim();
+        }
+        if ((role.isEmpty() || "member".equals(role)) && user != null && user.agencyClub != null) {
+            role = user.agencyClub.role == null ? "" : user.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+            agencyId = user.agencyClub.agencyId == null ? "" : user.agencyClub.agencyId.trim();
+        }
+        role = role.replace('-', '_').replace("agency_", "");
+        boolean female = user != null && "female".equalsIgnoreCase(user.gender);
+        // Agency leader is a permanent identity. Agency host/manager are scoped to
+        // the exact agency room, never inferred from being the owner of a personal room.
+        if ("owner".equals(role) || "leader".equals(role)) return "قائد وكالة";
+        if (isAgencyRoom && room.agencyId != null && !room.agencyId.trim().isEmpty()
+                && room.agencyId.trim().equals(agencyId)) {
+            if ("host".equals(role)) return female ? "مضيفة" : "مضيف";
+            if ("manager".equals(role) || "staff".equals(role) || "admin".equals(role)) {
+                return female ? "مشرفة" : "مشرف";
+            }
+        }
+        if (isAgencyRoom && roomModeratorIds.contains(userId)) {
+            return female ? "مشرفة" : "مشرف";
+        }
+        return null;
+    }
 
     private void appendChatLine(String name, String text, int vipLevel, int userLevel) {
         appendChatLine(name, text, vipLevel, userLevel, null);
@@ -1855,8 +2928,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String giftIconUrl,
             long wealthScore,
             long charmScore) {
+        boolean localMysterious = userId != null && myUserId != null && sameUser(userId, myUserId)
+                && getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE).getBoolean("enabled", false);
+        if (localMysterious) {
+            name = "الرجل الغامض";
+            avatarUrl = null;
+            frameUrl = null;
+            vipLevel = 0;
+            userLevel = 1;
+            wealthScore = 0L;
+            charmScore = 0L;
+        }
+        boolean mysteriousLine = "الرجل الغامض".equals(name);
         boolean system = "النظام".equals(name) || getString(R.string.official_news).equals(name);
         boolean gameCel = CHAT_NAME_GAME_CEL.equals(name);
+        // Deduplicate identical user lines arriving through multiple room transports
+        // or a rapid double tap. System announcements remain unaffected.
+        if (!system && !gameCel && userId != null && !userId.trim().isEmpty()) {
+            String dedupeKey = userId.trim().toLowerCase(java.util.Locale.ROOT)
+                    + "|" + (text != null ? text.trim() : "");
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (dedupeKey.equals(lastRoomChatLineKey) && now - lastRoomChatLineAtMs < 1800L) return;
+            lastRoomChatLineKey = dedupeKey;
+            lastRoomChatLineAtMs = now;
+        }
         if (!system && !gameCel && vipLevel <= 0) {
             var session = ContainerProvider.from(this).getSessionManager();
             // Only enrich cosmetics for the local user by id — never by display name.
@@ -1866,19 +2961,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 userLevel = Math.max(1, session.getUserLevel());
                 if (avatarUrl == null) avatarUrl = session.getAvatarUrl();
                 AuthDtos.UserDto selfUser = session.getUser();
-                if (frameUrl == null && selfUser != null) {
-                    if (isAgencyRoom) {
-                        frameUrl = selfUser.hostBadgeUrl;
-                        if (frameUrl == null || frameUrl.isEmpty()) frameUrl = selfUser.vipBadgeUrl;
-                    } else {
-                        frameUrl = selfUser.vipBadgeUrl;
-                    }
-                }
-                if ((frameUrl == null || frameUrl.isEmpty()) && isAgencyRoom) {
-                    frameUrl = session.getHostBadgeUrl();
-                }
                 if ((frameUrl == null || frameUrl.isEmpty()) && selfUser != null) {
-                    frameUrl = selfUser.vipBadgeUrl;
+                    frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
                 }
                 if (selfUser != null) {
                     if (wealthScore <= 0) wealthScore = Math.max(selfUser.wealthScore, selfUser.totalSentCoins);
@@ -1892,27 +2976,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuthDtos.UserDto selfUser = session.getUser();
             if (selfUser != null) {
                 if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
-                if (frameUrl == null || frameUrl.isEmpty()) {
-                    if (isAgencyRoom && selfUser.hostBadgeUrl != null && !selfUser.hostBadgeUrl.isEmpty()) {
-                        frameUrl = selfUser.hostBadgeUrl;
-                    } else if (selfUser.vipBadgeUrl != null && !selfUser.vipBadgeUrl.isEmpty()) {
-                        frameUrl = selfUser.vipBadgeUrl;
-                    } else if (isAgencyRoom) {
-                        frameUrl = session.getHostBadgeUrl();
-                    }
-                }
+                // The signed-in user's currently equipped frame is authoritative,
+                // even when an older room event carries a legacy hostBadge frameUrl.
+                frameUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(selfUser);
+            }
+        }
+        // The message payload's legacy frameUrl may contain an agency host badge.
+        // Resolve the actual equipped avatar frame from the sender profile cache instead.
+        if (!system && !gameCel && !mysteriousLine && userId != null && !userId.trim().isEmpty()) {
+            RoomChatDecoration cachedWear = roomChatDecorationCache.get(userId);
+            if (cachedWear != null) {
+                frameUrl = cachedWear.vipBadgeUrl;
+            } else if (myUserId == null || !sameUser(userId, myUserId)) {
+                // First message for this sender: wait for the profile lookup below rather
+                // than briefly displaying a host badge as if it were the user's frame.
+                frameUrl = null;
             }
         }
         View row = getLayoutInflater().inflate(R.layout.item_room_chat_line, binding.chatLog, false);
-        View bubble = row.findViewById(R.id.chatBubbleRoot);
+        ViewGroup bubble = row.findViewById(R.id.chatBubbleRoot);
         ImageView avatar = row.findViewById(R.id.imgChatAvatar);
         ImageView frameView = row.findViewById(R.id.imgChatFrame);
+        if (frameView != null) frameView.setTag(userId);
         ImageView giftIcon = row.findViewById(R.id.imgChatGift);
         TextView hostChip = row.findViewById(R.id.tvHostChip);
         TextView vipChip = row.findViewById(R.id.tvVipChip);
-        TextView levelChip = row.findViewById(R.id.tvLevelChip);
-        TextView charmChip = row.findViewById(R.id.tvCharmChip);
-        TextView wealthChip = row.findViewById(R.id.tvWealthChip);
         TextView nameView = row.findViewById(R.id.tvChatName);
         TextView meta = row.findViewById(R.id.tvChatMeta);
         TextView line = row.findViewById(R.id.tvChatLine);
@@ -1920,14 +3008,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View avatarWrap = row.findViewById(R.id.chatAvatarWrap);
 
         VipStyle.applyBubble(bubble, Math.max(0, vipLevel));
+        // Keep all message content safely inside the VIP frame artwork.
+        if (vipLevel > 0) {
+            bubble.setPadding(dp(18), dp(13), dp(18), dp(11));
+        } else {
+            bubble.setPadding(dp(11), dp(7), dp(11), dp(7));
+        }
+        bubble.setClipChildren(true);
+        bubble.setClipToPadding(true);
         line.setTextColor(VipStyle.messageColor(Math.max(0, vipLevel)));
         if (gameCel) {
             if (nameView != null) nameView.setVisibility(View.GONE);
             if (hostChip != null) hostChip.setVisibility(View.GONE);
             if (vipChip != null) vipChip.setVisibility(View.GONE);
-            if (levelChip != null) levelChip.setVisibility(View.GONE);
-            if (charmChip != null) charmChip.setVisibility(View.GONE);
-            if (wealthChip != null) wealthChip.setVisibility(View.GONE);
             HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
             if (hostSignal != null) {
                 hostSignal.clearSignal();
@@ -1962,6 +3055,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             nameView.setText(name != null && !name.isEmpty() ? name : "—");
             nameView.setTextColor(VipStyle.nameColor(vipLevel));
+            VipNameStyle.bind(nameView, roomNameStyleForUser(userId));
             if (avatar != null) {
                 HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
                 if (system) {
@@ -1972,33 +3066,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     avatar.setPadding(dp(4), dp(4), dp(4), dp(4));
                     resetChatWear(avatar, frameView, hostSignal);
+                } else if (mysteriousLine) {
+                    avatar.setVisibility(View.VISIBLE);
+                    String sharedMysteriousAvatar = configuredMysteriousAvatarUrl();
+                    if (sharedMysteriousAvatar != null) {
+                        Glide.with(avatar).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(sharedMysteriousAvatar))
+                                .apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
+                                .placeholder(R.drawable.ic_mysterious_man)
+                                .error(R.drawable.ic_mysterious_man).into(avatar);
+                    } else {
+                        avatar.setImageResource(R.drawable.ic_mysterious_man);
+                    }
+                    avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    if (frameView != null) {
+                        frameView.setVisibility(View.GONE);
+                        frameView.setImageDrawable(null);
+                    }
+                    if (hostSignal != null) {
+                        hostSignal.clearSignal();
+                        hostSignal.setVisibility(View.GONE);
+                    }
                 } else {
+                    if (avatar != null) avatar.setTag(avatarUrl);
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
-            boolean creator = !system && userId != null && roomHostId != null && userId.equals(roomHostId);
-            if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
-
-            if (vipLevel > 0) {
-                vipChip.setVisibility(View.VISIBLE);
-                vipChip.setText("VIP" + vipLevel);
-                VipStyle.applyChip(vipChip, vipLevel);
-                vipChip.setTextColor(VipStyle.chipTextColor(vipLevel));
-            } else {
-                vipChip.setVisibility(View.GONE);
+            // Administrative roles are rendered once as the wide dashboard-configured
+            // badge in chatBadgesRow; never duplicate them as the legacy tiny host chip.
+            if (hostChip != null) {
+                hostChip.setVisibility(View.GONE);
+                hostChip.setText("");
+                hostChip.setOnClickListener(null);
             }
 
-            if (system) {
-                levelChip.setVisibility(View.GONE);
-                charmChip.setVisibility(View.GONE);
-                wealthChip.setVisibility(View.GONE);
-            } else {
-                AvatarCosmetics.styleBadges(levelChip, charmChip, wealthChip, vipLevel, userLevel,
-                        Math.max(0L, charmScore), Math.max(0L, wealthScore));
-                if (!roomCharmEnabled() && charmChip != null) {
-                    charmChip.setVisibility(View.GONE);
-                }
-            }
+            // VIP/CP/ID/medals now sit inline beside the display name.
+            // Legacy moon/heart/level counters are intentionally not shown in chat.
+            if (vipChip != null) vipChip.setVisibility(View.GONE);
         }
         if (meta != null) meta.setVisibility(View.GONE);
         line.setText(text != null ? text : "");
@@ -2020,14 +3123,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         final String tapName = gameCel ? null : name;
-        final String tapUserId = gameCel ? null : userId;
-        final String tapAvatar = gameCel ? null : avatarUrl;
-        final String tapFrame = gameCel ? null : frameUrl;
+        final String tapUserId = (gameCel || mysteriousLine) ? null : userId;
+        final String tapAvatar = (gameCel || mysteriousLine) ? null : avatarUrl;
+        final String tapFrame = (gameCel || mysteriousLine) ? null : frameUrl;
         final int tapVip = vipLevel;
         final int tapLv = userLevel;
         final String tapText = text;
         final View rowRef = row;
-        final boolean noUserMenu = system || gameCel;
+        final boolean noUserMenu = system || gameCel || mysteriousLine;
         View.OnClickListener openUserMenu = v -> {
             if (noUserMenu) return;
             showChatUserActions(v, tapUserId, tapName, tapAvatar, tapFrame, tapVip, tapLv, tapText, rowRef);
@@ -2046,6 +3149,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             avatar.setOnClickListener(openUserMenu);
             avatar.setOnLongClickListener(openUserMenuLong);
         }
+        // The avatar frame/signal can cover the ImageView visually, so bind the
+        // same user menu to the whole avatar hit-area as well.
+        if (avatarWrap != null) {
+            avatarWrap.setClickable(true);
+            avatarWrap.setFocusable(true);
+            avatarWrap.setOnClickListener(openUserMenu);
+            avatarWrap.setOnLongClickListener(openUserMenuLong);
+        }
+        if (frameView != null) {
+            frameView.setOnClickListener(openUserMenu);
+            frameView.setOnLongClickListener(openUserMenuLong);
+        }
         bubble.setOnClickListener(null);
         bubble.setOnLongClickListener(openUserMenuLong);
         if (userMore != null) userMore.setVisibility(View.GONE);
@@ -2055,30 +3170,345 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.topMargin = 1;
         row.setLayoutParams(lp);
-        // Mikoo room chat: all public lines start-aligned (no mine-on-right).
+        // Keep each message bubble on the opposite side of the feed while its
+        // internal content remains LTR: avatar on the left, name/badges beside it,
+        // and the message text directly underneath. Do not move the feed tabs/panel.
         if (row instanceof android.widget.LinearLayout) {
             android.widget.LinearLayout rowLl = (android.widget.LinearLayout) row;
             rowLl.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            rowLl.setGravity(android.view.Gravity.START);
+            rowLl.setGravity(android.view.Gravity.END);
         }
+        // Tag each rendered row so the three feed tabs can filter without touching RTC.
+        row.setTag(gameCel ? "event" : (giftIconUrl != null && !giftIconUrl.isEmpty()
+                ? "gift" : (system ? "event" : "chat")));
+        row.setVisibility(activeRoomFeed == 0
+                || (activeRoomFeed == 1 && "chat".equals(row.getTag()))
+                || (activeRoomFeed == 2 && "gift".equals(row.getTag()))
+                ? View.VISIBLE : View.GONE);
         binding.chatLog.addView(row);
+        if (!system && !gameCel && !mysteriousLine && userId != null && !userId.trim().isEmpty()) {
+            bindRoomChatDecorations(row, userId, vipLevel);
+        }
         // Keep all live-session messages — never drop mid-broadcast (only end live clears).
         if (roomId != null && !restoringRoomChat) {
             RoomChatMemory.append(roomId, new RoomChatMemory.Line(
                     name, text, vipLevel, userLevel, frameUrl, userId, avatarUrl, giftIconUrl,
                     wealthScore, charmScore));
         }
-        // Soft memory safety only (very high); still never auto-wipe mid-session intentionally.
-        while (binding.chatLog.getChildCount() > 800) {
+        // Keep the active view hierarchy small on mid-range phones. Full session
+        // history remains in RoomChatMemory; only old rendered rows are recycled away.
+        while (binding.chatLog.getChildCount() > 240) {
             binding.chatLog.removeViewAt(0);
         }
         // TikTok-style: always stick to latest comments.
         scrollChatToBottom(true);
     }
 
+    private static final class RoomChatDecoration {
+        String userId;
+        String agencyId;
+        String agencyName;
+        String agencyRole;
+        String gender;
+        String vipBadgeUrl;
+        int vipLevel;
+        String staffRoleKey = "";
+        String staffRoleLabel = "";
+        String staffBadgeUrl = "";
+        boolean cpActive;
+        final List<String> medalUrls = new ArrayList<>();
+    }
+
+    private final java.util.Map<String, RoomChatDecoration> roomChatDecorationCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> roomChatDecorationLoading =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private void bindRoomChatDecorations(@NonNull View row, @NonNull String userId, int fallbackVip) {
+        RoomChatDecoration cached = roomChatDecorationCache.get(userId);
+        if (cached != null) {
+            applyRoomChatDecorations(row, cached, fallbackVip);
+            return;
+        }
+        if (!roomChatDecorationLoading.add(userId)) return;
+        final AppContainer container;
+        try {
+            container = ContainerProvider.from(this);
+        } catch (Exception error) {
+            roomChatDecorationLoading.remove(userId);
+            return;
+        }
+        container.getLuckyCannonExecutor().execute(() -> {
+            RoomChatDecoration decoration = new RoomChatDecoration();
+            decoration.userId = userId;
+            Result<AuthDtos.UserDto> profile = ApiCall.execute(container.getUserApi().getUser(userId));
+            if (profile != null && profile.success && profile.data != null) {
+                AuthDtos.UserDto user = profile.data;
+                if (user.agency != null) {
+                    decoration.agencyId = user.agency.id;
+                    decoration.agencyName = user.agency.name;
+                    decoration.agencyRole = user.agency.role;
+                }
+                decoration.gender = user.gender;
+                decoration.staffRoleKey = staffIdentityRoleKey(user);
+                decoration.staffRoleLabel = staffIdentityFallbackLabel(user, decoration.staffRoleKey);
+                decoration.vipBadgeUrl = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(user);
+                decoration.vipLevel = Math.max(0, user.vipLevel);
+                List<String> displayedIds = user.displayedMedalIds == null
+                        ? java.util.Collections.emptyList() : user.displayedMedalIds;
+                Result<List<com.Dramizo.Series.data.remote.dto.BadgeDto>> badges =
+                        ApiCall.execute(container.getUserApi().earnedBadges(userId));
+                if (badges != null && badges.success && badges.data != null) {
+                    // Show the user's selected medals first, then fill the remaining
+                    // chat slots with other earned/granted medals. This covers medals
+                    // awarded by secret tasks as well as medals granted directly.
+                    java.util.Set<String> addedMedalIds = new java.util.HashSet<>();
+                    for (String displayedId : displayedIds) {
+                        if (displayedId == null || decoration.medalUrls.size() >= 100) continue;
+                        for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
+                            if (badge != null && displayedId.equals(badge.id)
+                                    && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                                decoration.medalUrls.add(badge.imageUrl);
+                                addedMedalIds.add(badge.id);
+                                break;
+                            }
+                        }
+                    }
+                    if (decoration.medalUrls.size() < 100) {
+                        for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges.data) {
+                            if (decoration.medalUrls.size() >= 100) break;
+                            if (badge == null || badge.id == null || addedMedalIds.contains(badge.id)
+                                    || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) {
+                                continue;
+                            }
+                            if (badge.earned || badge.source != null) {
+                                decoration.medalUrls.add(badge.imageUrl);
+                                addedMedalIds.add(badge.id);
+                            }
+                        }
+                    }
+                }
+            }
+            Result<List<Map<String, Object>>> cp =
+                    ApiCall.execute(container.getUserApi().cpProfileRelationships(userId));
+            if (cp != null && cp.success && cp.data != null) {
+                for (Map<String, Object> relation : cp.data) {
+                    if (relation == null) continue;
+                    Object rawStatus = relation.get("status");
+                    if (rawStatus == null) rawStatus = relation.get("state");
+                    String status = rawStatus == null ? "" : String.valueOf(rawStatus);
+                    if (status.isEmpty() || "active".equalsIgnoreCase(status)
+                            || "accepted".equalsIgnoreCase(status)
+                            || "approved".equalsIgnoreCase(status)) {
+                        decoration.cpActive = true;
+                        break;
+                    }
+                }
+            }
+            roomChatDecorationLoading.remove(userId);
+            roomChatDecorationCache.put(userId, decoration);
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed() && row.getParent() != null) {
+                    // Rebind the sender avatar with the server-confirmed equipped frame.
+                    // This also replaces stale/mislabelled frameUrl values from old room events.
+                    ImageView chatAvatar = row.findViewById(R.id.imgChatAvatar);
+                    ImageView chatFrame = row.findViewById(R.id.imgChatFrame);
+                    HostSignalView chatSignal = row.findViewById(R.id.webChatHostSignal);
+                    if (chatAvatar != null) {
+                        AvatarCosmetics.bindStacked(chatAvatar, chatFrame, chatSignal,
+                                chatAvatar.getTag() instanceof String ? (String) chatAvatar.getTag() : null,
+                                decoration.vipBadgeUrl, null);
+                    }
+                    applyRoomChatDecorations(row, decoration, fallbackVip);
+                }
+            });
+        });
+    }
+
+    private void applyRoomChatDecorations(
+            @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
+        if (decoration.staffRoleKey != null && !decoration.staffRoleKey.isEmpty()) {
+            com.Dramizo.Series.util.StaffIdentityConfigCache.load(this, () -> {
+                com.Dramizo.Series.util.StaffIdentityConfigCache.RoleIdentity identity =
+                        com.Dramizo.Series.util.StaffIdentityConfigCache.get(decoration.staffRoleKey);
+                if (identity.badgeUrl != null) decoration.staffBadgeUrl = identity.badgeUrl;
+                if (identity.label != null && !identity.label.trim().isEmpty()) {
+                    decoration.staffRoleLabel = com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel(
+                            identity.label, decoration.gender);
+                }
+                renderRoomChatDecorations(row, decoration, fallbackVip);
+            });
+            return;
+        }
+        renderRoomChatDecorations(row, decoration, fallbackVip);
+    }
+
+    private void renderRoomChatDecorations(
+            @NonNull View row, @NonNull RoomChatDecoration decoration, int fallbackVip) {
+        LinearLayout inline = row.findViewById(R.id.chatBadgesRow);
+        LinearLayout overflow = row.findViewById(R.id.chatBadgesOverflowRow);
+        if (inline == null || overflow == null) return;
+        inline.removeAllViews();
+        overflow.removeAllViews();
+        inline.setVisibility(View.GONE);
+        overflow.setOrientation(LinearLayout.VERTICAL);
+        overflow.setGravity(android.view.Gravity.RIGHT);
+        overflow.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        // The bubble is capped at 340dp; subtract avatar, gap and horizontal padding.
+        // Give every badge row the exact remaining width so Android cannot wrap a
+        // single badge unexpectedly inside an already-created row.
+        overflow.setLayoutParams(new LinearLayout.LayoutParams(
+                dp(262), LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView chatName = row.findViewById(R.id.tvChatName);
+        float measuredName = chatName != null && chatName.getText() != null
+                ? chatName.getPaint().measureText(chatName.getText().toString()) : dp(72);
+        int firstLineLimit = Math.max(dp(42), dp(270) - Math.min(dp(116), (int) measuredName) - dp(18));
+        int overflowLineLimit = dp(262);
+        int[] inlineUsed = new int[] { 0 };
+        int[] overflowUsed = new int[] { 0 };
+        LinearLayout[] overflowLine = new LinearLayout[] { null };
+
+        int total = 0;
+        if (decoration.staffRoleKey != null && !decoration.staffRoleKey.isEmpty()) {
+            String roleLabel = decoration.staffRoleLabel == null || decoration.staffRoleLabel.trim().isEmpty()
+                    ? decoration.staffRoleKey : decoration.staffRoleLabel;
+            if (decoration.staffBadgeUrl != null && !decoration.staffBadgeUrl.trim().isEmpty()) {
+                ImageView roleBadge = new ImageView(this);
+                roleBadge.setContentDescription(roleLabel);
+                roleBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                roleBadge.setLayoutParams(roomBadgeImageParams(108, 25, 2));
+                Glide.with(roleBadge).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(decoration.staffBadgeUrl.trim()))
+                        .fitCenter().into(roleBadge);
+                addRoomChatBadge(inline, overflow, roleBadge, total++, firstLineLimit, inlineUsed,
+                        overflowLineLimit, overflowUsed, overflowLine);
+            } else {
+                TextView roleBadge = new TextView(this);
+                roleBadge.setText(roleLabel);
+                roleBadge.setContentDescription(roleLabel);
+                roleBadge.setTextColor(Color.WHITE);
+                roleBadge.setTextSize(9f);
+                roleBadge.setTypeface(null, android.graphics.Typeface.BOLD);
+                roleBadge.setIncludeFontPadding(false);
+                roleBadge.setSingleLine(true);
+                roleBadge.setPadding(dp(7), dp(2), dp(7), dp(2));
+                GradientDrawable roleBg = new GradientDrawable();
+                roleBg.setColor("super".equals(decoration.staffRoleKey) ? 0xFF6D3CC8
+                        : "admin".equals(decoration.staffRoleKey) || "manager".equals(decoration.staffRoleKey)
+                                ? 0xFF245D9B : 0xFF8A5A24);
+                roleBg.setCornerRadius(dp(7));
+                roleBadge.setBackground(roleBg);
+                roleBadge.setLayoutParams(roomBadgeTextParams(2));
+                addRoomChatBadge(inline, overflow, roleBadge, total++, firstLineLimit, inlineUsed,
+                        overflowLineLimit, overflowUsed, overflowLine);
+            }
+        }
+        // Agency and competition marks are intentionally omitted from chat identity.
+        int effectiveVipLevel = Math.max(Math.max(0, fallbackVip), Math.max(0, decoration.vipLevel));
+        if (effectiveVipLevel > 0) {
+            TextView vip = new TextView(this);
+            vip.setText("VIP " + effectiveVipLevel);
+            vip.setContentDescription("VIP " + effectiveVipLevel);
+            vip.setTextSize(9f);
+            vip.setTypeface(null, android.graphics.Typeface.BOLD);
+            vip.setIncludeFontPadding(false);
+            vip.setSingleLine(true);
+            vip.setPadding(dp(4), dp(1), dp(4), dp(1));
+            com.Dramizo.Series.util.VipStyle.applyChip(vip, effectiveVipLevel);
+            vip.setTextColor(com.Dramizo.Series.util.VipStyle.chipTextColor(effectiveVipLevel));
+            vip.setLayoutParams(roomBadgeTextParams(2));
+            addRoomChatBadge(inline, overflow, vip, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
+        }
+        if (decoration.cpActive) {
+            TextView cp = new TextView(this);
+            cp.setText("CP");
+            cp.setTextColor(Color.WHITE);
+            cp.setTextSize(9f);
+            cp.setTypeface(null, android.graphics.Typeface.BOLD);
+            cp.setIncludeFontPadding(false);
+            cp.setPadding(dp(4), dp(1), dp(4), dp(1));
+            cp.setBackgroundResource(R.drawable.bg_cp_cv_badge);
+            cp.setLayoutParams(roomBadgeTextParams(2));
+            addRoomChatBadge(inline, overflow, cp, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
+        }
+        for (String medalUrl : decoration.medalUrls) {
+            if (medalUrl == null || medalUrl.trim().isEmpty()) continue;
+            ImageView medal = new ImageView(this);
+            medal.setContentDescription("ميدالية");
+            medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            medal.setLayoutParams(roomBadgeImageParams(22, 22, 1));
+            Glide.with(medal).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(medalUrl))
+                    .placeholder(R.drawable.ic_medal_default)
+                    .error(R.drawable.ic_medal_default)
+                    .fitCenter().into(medal);
+            addRoomChatBadge(inline, overflow, medal, total++, firstLineLimit, inlineUsed, overflowLineLimit, overflowUsed, overflowLine);
+        }
+        inline.setVisibility(inline.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        overflow.setVisibility(overflow.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void addRoomChatBadge(
+            @NonNull LinearLayout inline, @NonNull LinearLayout overflow,
+            @NonNull View badge, int index, int firstLineLimit, int[] inlineUsed,
+            int overflowLineLimit, int[] overflowUsed, LinearLayout[] overflowLine) {
+        ViewGroup.LayoutParams existing = badge.getLayoutParams();
+        int badgeWidth = existing != null && existing.width > 0
+                ? existing.width : ViewGroup.LayoutParams.WRAP_CONTENT;
+        int badgeHeight = existing != null && existing.height > 0
+                ? existing.height : ViewGroup.LayoutParams.WRAP_CONTENT;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(badgeWidth, badgeHeight);
+        params.setMarginEnd(dp(2));
+        badge.setLayoutParams(params);
+        badge.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int width = Math.max(dp(12), badge.getMeasuredWidth()) + dp(2);
+        if (inline.getChildCount() < 6 && inlineUsed[0] + width <= firstLineLimit) {
+            inline.addView(badge);
+            inlineUsed[0] += width;
+            inline.setVisibility(View.VISIBLE);
+            return;
+        }
+        if (overflowLine[0] == null
+                || overflowLine[0].getChildCount() >= 6
+                || overflowUsed[0] + width > overflowLineLimit) {
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            line.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            overflow.addView(line);
+            overflowLine[0] = line;
+            overflowUsed[0] = 0;
+        }
+        overflowLine[0].addView(badge);
+        overflowUsed[0] += width;
+        overflow.setVisibility(View.VISIBLE);
+    }
+
+    private LinearLayout.LayoutParams roomBadgeImageParams(int widthDp, int heightDp, int endMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(widthDp), dp(heightDp));
+        lp.setMarginEnd(dp(endMarginDp));
+        return lp;
+    }
+
+    private LinearLayout.LayoutParams roomBadgeTextParams(int endMarginDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMarginEnd(dp(endMarginDp));
+        return lp;
+    }
+
     private boolean restoringRoomChat;
     private boolean roomChatRestored;
     private int roomChatMemorySyncedCount;
+    private boolean chatScrollPending;
+    private final Runnable coalescedChatScroll = () -> {
+        chatScrollPending = false;
+        if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
+        int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
+        // A direct scroll avoids stacking multiple smooth-scroll animations during chat floods.
+        binding.scrollChat.scrollTo(0, bottom);
+    };
 
     /** Restore chat from this live session after Activity recreate / minimize return. */
     private void restoreRoomChatIfNeeded() {
@@ -2093,7 +3523,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         restoringRoomChat = true;
         try {
             binding.chatLog.removeAllViews();
-            for (RoomChatMemory.Line line : lines) {
+            // Rebuilding hundreds of richly styled rows on the UI thread can stall
+            // mic/gift controls after returning to a room. Restore only the latest
+            // visible window; the complete session history stays in RoomChatMemory.
+            final int firstVisible = Math.max(0, lines.size() - 120);
+            for (int i = firstVisible; i < lines.size(); i++) {
+                RoomChatMemory.Line line = lines.get(i);
                 appendChatLine(
                         line.name,
                         line.text,
@@ -2109,6 +3544,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } finally {
             restoringRoomChat = false;
             roomChatRestored = true;
+            // Mark the entire snapshot as synced so hidden older rows are not appended later.
             roomChatMemorySyncedCount = lines.size();
         }
         scrollChatToBottom(false);
@@ -2202,21 +3638,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void scrollChatToBottom(boolean animated) {
         if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-        binding.scrollChat.post(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            if (animated) {
-                binding.scrollChat.smoothScrollTo(0, bottom);
-            } else {
-                binding.scrollChat.scrollTo(0, bottom);
-            }
-        });
-        // Second pass after layout settles (keyboard / new bubble height).
-        binding.scrollChat.postDelayed(() -> {
-            if (binding == null || binding.scrollChat == null || binding.chatLog == null) return;
-            int bottom = Math.max(0, binding.chatLog.getHeight() - binding.scrollChat.getHeight());
-            binding.scrollChat.scrollTo(0, bottom);
-        }, 120);
+        // Coalesce bursts: gift + chat + room-event messages can arrive together.
+        // One scheduled layout adjustment is enough; never queue two callbacks per line.
+        if (chatScrollPending) return;
+        chatScrollPending = true;
+        handler.postDelayed(coalescedChatScroll, 32L);
     }
 
     private void showChatUserActions(
@@ -2238,7 +3664,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || userId.equals(liveHostId)
                 || (liveRoom != null && userId.equals(liveRoom.activeHostId));
         boolean targetModerator = roomModeratorIds.contains(userId);
-        boolean canTarget = anotherUser && !protectedHost && (isOwner || !targetModerator);
+        // Room owner may manage co-hosts/moderators; platform super retains platform-level override.
+        boolean canTarget = anotherUser
+                && (!protectedHost || isOwner || isPlatformSuper())
+                && (isOwner || isHost || isPlatformManager() || isPlatformSuper() || !targetModerator);
         RoomDtos.SeatDto targetSeat = null;
         if (currentSeats != null) {
             for (RoomDtos.SeatDto seat : currentSeats) {
@@ -2266,15 +3695,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (canInviteMic && canTarget && anotherUser && isHost) {
             menu.getMenu().add(0, i++, 0, "دعوة مهمة (+40 ماسة)");
         }
-        if (canMuteUsers && canTarget && seatRef != null) {
-            menu.getMenu().add(0, i++, 0,
-                    (seatRef.isMuted || seatRef.isModeratorMuted) ? "فك كتم المايك" : "كتم المايك");
+        if (canMuteUsers && canTarget && seatRef != null
+                && !seatRef.isMuted && !seatRef.isModeratorMuted) {
+            // Moderators may mute another user, but only that user controls reopening their mic.
+            menu.getMenu().add(0, i++, 0, "كتم المايك");
         }
-        if (canManageSeats && canTarget && seatRef != null) {
-            menu.getMenu().add(0, i++, 0, "إنزال من المايك");
+        boolean canRemoveFromMic = canManageSeats || canKickUsers || (myUserId != null && roomModeratorIds.contains(myUserId)) || isPlatformManager() || isPlatformSuper();
+        if (canRemoveFromMic && canTarget && seatRef != null) {
+            menu.getMenu().add(0, i++, 0, "إزالة من المايك");
         }
-        if ((canKickUsers || canBanUsers) && canTarget) {
+        if ((canKickUsers || canBanUsers || isPlatformManager() || isPlatformAdmin() || isPlatformSuper()) && canTarget) {
             menu.getMenu().add(0, i++, 0, "طرد / إخراج");
+        }
+        // Platform-level account actions are available directly from the tapped profile/chat row.
+        // The backend still validates role permissions and the target UUID.
+        if (canTarget && (isPlatformAdmin() || isPlatformSuper())) {
+            menu.getMenu().add(0, i++, 0, "حظر مؤقت للحساب");
+        }
+        if (canTarget && isPlatformSuper()) {
+            menu.getMenu().add(0, i++, 0, "حظر الحساب نهائياً");
+            menu.getMenu().add(0, i++, 0, "إلغاء حظر الحساب");
         }
         if (messageText != null && !messageText.trim().isEmpty()) {
             menu.getMenu().add(0, i++, 0, "ترجمة التعليق");
@@ -2314,10 +3754,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     boolean currentlyMuted = seatRef.isMuted || seatRef.isModeratorMuted;
                     viewModel.setMic(roomId, !currentlyMuted, userId);
                 }
-            } else if ("إنزال من المايك".equals(t)) {
-                if (userId != null) viewModel.forceLeaveSeat(roomId, userId);
+            } else if ("إزالة من المايك".equals(t)) {
+                if (userId != null) viewModel.removeMemberFromMic(roomId, userId);
             } else if ("طرد / إخراج".equals(t)) {
                 showKickAndBanDialog(userId);
+            } else if ("حظر مؤقت للحساب".equals(t)) {
+                promptTemporaryPlatformBan(userId, name);
+            } else if ("حظر الحساب نهائياً".equals(t)) {
+                confirmPlatformAccountBan(userId, name, true);
+            } else if ("إلغاء حظر الحساب".equals(t)) {
+                confirmPlatformAccountBan(userId, name, false);
             } else if ("ترجمة التعليق".equals(t)) {
                 translateRoomComment(messageText);
             } else if ("حذف التعليق".equals(t)) {
@@ -2328,6 +3774,91 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return true;
         });
         menu.show();
+    }
+
+    /** Global account ban/unban from a user already visible in the room; no manual ID entry. */
+    private void confirmPlatformAccountBan(String userId, @Nullable String displayName, boolean ban) {
+        if (!isPlatformSuper()) {
+            Toast.makeText(this, "هذا الإجراء للسوبر أدمن فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String name = displayName == null || displayName.trim().isEmpty() ? "هذا المستخدم" : displayName.trim();
+        new AlertDialog.Builder(this)
+                .setTitle(ban ? "حظر الحساب نهائياً" : "إلغاء حظر الحساب")
+                .setMessage(ban
+                        ? "سيتم حظر حساب " + name + " على مستوى المنصة، وليس من هذا الروم فقط. هل أنت متأكد؟"
+                        : "هل تريد إعادة تفعيل حساب " + name + "؟")
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(ban ? "تأكيد الحظر" : "إلغاء الحظر", (dialog, which) -> {
+                    retrofit2.Call<ApiResponse<Object>> call = ban
+                            ? ContainerProvider.from(this).getAdminApi().banUser(userId)
+                            : ContainerProvider.from(this).getAdminApi().unbanUser(userId);
+                    runPlatformUserAction(call, ban ? "تم حظر الحساب على مستوى المنصة" : "تم إلغاء حظر الحساب");
+                })
+                .show();
+    }
+
+    /** Admin and Super Admin can issue a reasoned global temporary ban (backend caps at 24h). */
+    private void promptTemporaryPlatformBan(String userId, @Nullable String displayName) {
+        if (!(isPlatformAdmin() || isPlatformSuper())) {
+            Toast.makeText(this, "الحظر المؤقت للإدارة المخولة فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String[] durations = {"1 ساعة", "6 ساعات", "12 ساعة", "24 ساعة"};
+        final int[] hours = {1, 6, 12, 24};
+        final int[] selected = {3};
+        new AlertDialog.Builder(this)
+                .setTitle("مدة الحظر المؤقت")
+                .setSingleChoiceItems(durations, selected[0], (dialog, which) -> selected[0] = which)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton("متابعة", (dialog, which) -> {
+                    EditText reasonInput = new EditText(this);
+                    reasonInput.setHint("سبب الحظر (مطلوب)");
+                    reasonInput.setMinLines(2);
+                    reasonInput.setGravity(Gravity.TOP | Gravity.START);
+                    int pad = Math.round(16 * getResources().getDisplayMetrics().density);
+                    reasonInput.setPadding(pad, pad, pad, pad);
+                    new AlertDialog.Builder(this)
+                            .setTitle("سبب الحظر")
+                            .setMessage("الحساب: " + (displayName == null ? "المستخدم المحدد" : displayName)
+                                    + "\nالمدة: " + durations[selected[0]])
+                            .setView(reasonInput)
+                            .setNegativeButton(R.string.cancel, null)
+                            .setPositiveButton("تنفيذ الحظر", (d, w) -> {
+                                String reason = reasonInput.getText() == null ? "" : reasonInput.getText().toString().trim();
+                                if (reason.isEmpty()) {
+                                    Toast.makeText(this, "اكتب سبب الحظر أولاً", Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                Map<String, Object> body = new HashMap<>();
+                                body.put("hours", hours[selected[0]]);
+                                body.put("reason", reason);
+                                runPlatformUserAction(ContainerProvider.from(this).getAdminApi()
+                                        .temporaryBanUser(userId, body), "تم تنفيذ الحظر المؤقت");
+                            })
+                            .show();
+                })
+                .show();
+    }
+
+    private void runPlatformUserAction(retrofit2.Call<ApiResponse<Object>> call, String successMessage) {
+        call.enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                             retrofit2.Response<ApiResponse<Object>> response) {
+                ApiResponse<Object> result = response.body();
+                if (response.isSuccessful() && result != null && result.success) {
+                    Toast.makeText(VoiceRoomActivity.this, successMessage, Toast.LENGTH_LONG).show();
+                } else {
+                    String message = result != null && result.message != null
+                            ? result.message : "رفض الخادم الإجراء؛ لم يتم تأكيد التغيير";
+                    Toast.makeText(VoiceRoomActivity.this, message, Toast.LENGTH_LONG).show();
+                }
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                Toast.makeText(VoiceRoomActivity.this,
+                        "تعذر الاتصال بالخادم؛ لم يتم تأكيد الإجراء", Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     /** Small seat controls when the user taps their own occupied mic. */
@@ -2521,7 +4052,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         // Host / owner: end live + summon (restored on side panel).
-        boolean hostActions = isHost || isOwner || canManageRoom;
+        boolean hostActions = isHost || isOwner || canManageRoom || isPlatformSuper() || isPlatformAdmin();
         if (rowHostActions != null) {
             rowHostActions.setVisibility(hostActions ? View.VISIBLE : View.GONE);
         }
@@ -2749,16 +4280,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         exitRoom(true);
     }
 
-    /** Confirm before host ends broadcast and closes the room for everyone. */
+    /** Staff uses the authenticated platform close endpoint; ordinary members still use host rules. */
+    private void endBroadcastAsPlatformStaff() {
+        if (exiting || roomId == null || roomId.trim().isEmpty()) return;
+        Toast.makeText(this, "جارٍ إنهاء البث وإغلاق الروم…", Toast.LENGTH_SHORT).show();
+        ContainerProvider.from(this).getAdminApi().endStream(roomId)
+                .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                           retrofit2.Response<ApiResponse<Object>> response) {
+                        ApiResponse<Object> envelope = response.body();
+                        if (response.isSuccessful() && envelope != null && envelope.success) {
+                            clearRoomChatSession();
+                            exitRoom(true);
+                        } else {
+                            String message = envelope != null && envelope.message != null
+                                    ? envelope.message : "تعذر إنهاء البث (HTTP " + response.code() + ")";
+                            Toast.makeText(VoiceRoomActivity.this, message, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                    @Override
+                    public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "تعذر الاتصال بالخادم؛ لم يتم تأكيد إنهاء البث", Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    /** Host/owner or authorized platform Admin/Super Admin may end the live room. */
     private void confirmEndBroadcast() {
-        if (!(isHost || isOwner || canManageRoom)) {
-            Toast.makeText(this, "إنهاء البث لصاحب الغرفة فقط", Toast.LENGTH_SHORT).show();
+        boolean platformCanEnd = isPlatformSuper() || isPlatformAdmin();
+        if (!(isHost || isOwner || canManageRoom || platformCanEnd)) {
+            Toast.makeText(this, "إنهاء البث لصاحب الغرفة أو الإدارة المخولة فقط", Toast.LENGTH_SHORT).show();
             return;
         }
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(R.string.room_side_end_live)
-                .setMessage("هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
-                .setPositiveButton(R.string.room_side_end_live, (d, w) -> endBroadcastAndExit())
+                .setMessage(platformCanEnd
+                        ? "سيتم إنهاء البث وإغلاق الروم للجميع عبر صلاحية الإدارة. هل تريد المتابعة؟"
+                        : "هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
+                .setPositiveButton(R.string.room_side_end_live, (d, w) -> {
+                    if (platformCanEnd) endBroadcastAsPlatformStaff();
+                    else endBroadcastAndExit();
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
@@ -2786,19 +4350,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         captureActiveRoomSession();
         ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
+        // Minimizing is only a UI transition: preserve the exact microphone/seat state.
+        // Do not mute or rewrite the session mic flag here; the room and all occupied seats
+        // must remain unchanged while the Activity is hidden and recreated.
         ensureMinimizedListeningState();
-        // Handoff: fade Exo to FGS, keep Zego local music alive, then leave UI.
-        try {
-            if (roomMusicPlayer != null
-                    && "playing".equalsIgnoreCase(currentMusicStatus)
-                    && currentMusicUrl != null
-                    && !currentMusicUrl.isEmpty()
-                    && !isLocalMusicUrl(currentMusicUrl)) {
-                // Avoid dual play: FGS will take over; dip volume briefly then finish.
-                roomMusicPlayer.setVolume(0.35f);
-            }
-        } catch (Exception ignored) {
-        }
+        captureActiveRoomSession();
+        // Keep the Activity player at full volume during handoff. The foreground
+        // player is checked for actual playback below; only then do we cross-fade.
+        // Dimming here caused an audible drop (and sounded like a music interruption)
+        // whenever background preparation took longer than expected.
         try {
             if (canManageMusic
                     && currentMusicUrl != null
@@ -2809,24 +4369,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomRtcEngine.getInstance().boostMusicMixVolume();
                 if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()
                         && RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
-                    RoomRtcEngine.getInstance().resumeLocalMusic();
+                    if (!externalCaptureMusicPaused && !externalCaptureMusicSuspended) RoomRtcEngine.getInstance().resumeLocalMusic();
                 }
             }
         } catch (Exception ignored) {
         }
-        Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
-                Toast.LENGTH_SHORT).show();
-        // Small delay so FGS can start mediaPlayback before Activity releases Exo.
-        handler.postDelayed(() -> {
-            if (isFinishing() || exiting) return;
-            navigateHomeAndFinish();
-        }, 280L);
+        // Wait for the foreground player to be READY before releasing the Activity player.
+        // This is a media handoff, not an arbitrary sleep: it avoids cutting the song on minimize.
+        minimizeHandoffPending = true;
+        completeRoomMinimizeWhenMusicReady(System.currentTimeMillis());
     }
 
+    private void completeRoomMinimizeWhenMusicReady(long startedAtMs) {
+        if (!minimizeHandoffPending || isFinishing() || exiting) return;
+        // The foreground service now owns the same ExoPlayer instance; no decoder
+        // preparation, second stream, wait loop, or cross-fade is required.
+        minimizeHandoffPending = false;
+        Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
+                Toast.LENGTH_SHORT).show();
+        navigateHomeAndFinish();
+    }
     /**
-     * While UI is gone but room session stays: hear the room, own mic off.
-     * Never call setSpeakerMuted(true) here — that stops remote play streams.
-     * Never stop YouTube/room music here — FGS continues playback.
+     * While the room UI is hidden, keep the live RTC session and every occupied seat intact.
+     * Minimize is not a leave/mute action: changing local mic state here can make the RTC
+     * seat UI desynchronize from the room roster when the Activity is recreated.
      */
     private void ensureMinimizedListeningState() {
         try {
@@ -2835,14 +4401,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             speakerMutedBeforeBackground = false;
             RoomSoundFx.setMuted(false);
             RoomRtcEngine.getInstance().setSpeakerMuted(false);
-            // Mute own mic while minimized (notification / mini player can unmute).
-            micOn = false;
-            RoomRtcEngine.getInstance().setMicEnabled(false);
-            if (roomId != null && !roomId.isEmpty()) {
-                final String rid = roomId;
-                ContainerProvider.from(this).getIoExecutor().execute(() ->
-                        ContainerProvider.from(this).getRoomRepository().setMic(rid, true));
-            }
+            // Deliberately preserve micOn and RTC microphone state. Only an explicit user
+            // mute, room moderation, or actual room exit may change it.
         } catch (Exception ignored) {
         }
     }
@@ -2859,27 +4419,79 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ActiveRoomSession.get().setMinimized(true);
         }
         long musicPosition = 0L;
+        String handoffMusicUrl = currentMusicUrl;
+        String handoffStartedAt = currentMusicStartedAt;
+        // musicPosition is sampled from the live ExoPlayer below. Do not add the
+        // original start-time delta again, or the background player jumps ahead.
+        if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null
+                && roomMusicPlayer.getMediaItemCount() > 0) {
+            handoffStartedAt = null;
+        }
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
                     ? RoomRtcEngine.getInstance().getLocalMusicPositionMs()
                     : (roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L);
+            // For YouTube the Activity has already resolved the yt:// reference into the
+            // exact playable CDN stream. Pass that stream to the foreground service so the
+            // minimize handoff never performs a second resolver/network lookup.
+            if (isYoutubeMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
+                try {
+                    if (roomMusicPlayer.getMediaItemCount() > 0
+                            && roomMusicPlayer.getCurrentMediaItem() != null
+                            && roomMusicPlayer.getCurrentMediaItem().localConfiguration != null) {
+                        String preparedStream = roomMusicPlayer.getCurrentMediaItem()
+                                .localConfiguration.uri.toString();
+                        if (preparedStream != null && !preparedStream.isEmpty()) {
+                            handoffMusicUrl = preparedStream;
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
         } else if (roomMusicPlayer != null) {
             musicPosition = roomMusicPlayer.getCurrentPosition();
         }
         CharSequence roomTitle = binding != null && binding.tvRoomTitle != null
                 ? binding.tvRoomTitle.getText() : null;
         try {
-            ContextCompat.startForegroundService(
+            currentMusicHandoffUrl = handoffMusicUrl;
+            boolean transferMusicPlayer = roomMusicPlayer != null
+                    && currentMusicUrl != null && !currentMusicUrl.isEmpty()
+                    && !isLocalMusicUrl(currentMusicUrl)
+                    && ("playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus));
+            if (transferMusicPlayer) {
+                if (binding != null && binding.musicVideoSurface != null) musicVideoSetPlayer(null);
+                if (binding != null && binding.musicFloatVideo != null) musicFloatSetPlayer(null);
+                if (roomMusicPlayerListener != null) {
+                    roomMusicPlayer.removeListener(roomMusicPlayerListener);
+                    roomMusicPlayerListener = null;
+                }
+                VoiceRoomForegroundService.offerMusicPlayer(
+                        roomMusicPlayer, roomId, currentMusicUrl, handoffMusicUrl, currentMusicStatus);
+            }
+            try {
+                ContextCompat.startForegroundService(
                     this,
                     VoiceRoomForegroundService.startIntent(
                             this,
                             roomId,
                             roomTitle != null ? roomTitle.toString() : "الغرفة الصوتية",
                             currentRoomCoverUrl,
-                            currentMusicUrl,
+                            handoffMusicUrl,
                             currentMusicStatus,
                             musicPosition,
-                            currentMusicStartedAt));
+                            handoffStartedAt));
+                if (transferMusicPlayer) roomMusicPlayer = null;
+            } catch (RuntimeException startError) {
+                if (transferMusicPlayer) {
+                    VoiceRoomForegroundService.cancelOfferedMusicPlayer(roomMusicPlayer);
+                    if (roomMusicPlayerListener != null) roomMusicPlayer.addListener(roomMusicPlayerListener);
+                    if (binding != null && binding.musicVideoSurface != null) musicVideoSetPlayer(roomMusicPlayer);
+                    if (binding != null && binding.musicFloatVideo != null) musicFloatSetPlayer(roomMusicPlayer);
+                }
+                throw startError;
+            }
         } catch (RuntimeException ignored) {
         }
     }
@@ -2946,6 +4558,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
                 return room == null || room.micInteractEnabled;
             }
+            @Override public boolean micRequestOn() {
+                RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+                return room != null && room.micRequestEnabled;
+            }
             @Override public boolean roomSpeakerMuted() { return roomSpeakerMuted; }
             @Override public boolean canControlMusic() {
                 return canManageMusic || isHost || isOwner || isRoomStaff();
@@ -2954,7 +4570,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return canManageRoom || isHost || isOwner;
             }
             @Override public boolean canReviewSeatRequests() {
-                return canInviteMic && !isFreeMicEnabled();
+                return (canInviteMic || canManageSeats || isHost || isOwner)
+                        && (!isFreeMicEnabled() || isMicRequestEnabled());
             }
             @Override public int chatAutoClearMinutes() {
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
@@ -2983,7 +4600,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "seat_requests":
-                if (canInviteMic && !isFreeMicEnabled()) showSeatRequestsDialog();
+                if ((canInviteMic || canManageSeats || isHost || isOwner)
+                        && (!isFreeMicEnabled() || isMicRequestEnabled())) showSeatRequestsDialog();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "lock":
@@ -3076,6 +4694,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (isOwner || isHost) showModeratorTools();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
+            case "mic_request": {
+                if (!isOwner) {
+                    Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                RoomDtos.RoomDto r = viewModel.getRoom().getValue();
+                boolean next = !(r != null && r.micRequestEnabled);
+                if (r != null) r.micRequestEnabled = next;
+                patchDisplaySetting("micRequestEnabled", next);
+                Toast.makeText(this, withOnOff(R.string.room_more_mic_request, next), Toast.LENGTH_SHORT).show();
+                break;
+            }
             case "mic_interact": {
                 if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
@@ -3107,6 +4737,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomMoreOperatorSheet.shareWhatsApp(this, roomId, title);
                 break;
             }
+            case "challenge_wheel":
+                showChallengeWheelDialog(canModerateRoom());
+                break;
+            case "pk_challenge":
+                if (!isOwner) {
+                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدٍّ PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                showRoomPkChallengeDialog();
+                break;
             case "entry_effect": {
                 if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
@@ -3161,12 +4810,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null) return;
         // "منطقة الدردشة" = أيقونة الرسائل الخاصة (btnPrivateMsg) فقط —
         // لا تخفي بث الشات العام ولا صندوق "اكتب…".
-        roomChatZoneVisible = enabled;
-        int vis = enabled ? View.VISIBLE : View.GONE;
+        // Keep the private-message shortcut available in the room toolbar.
+        // The room chat-zone setting controls the chat panel, not the bottom action button.
+        roomChatZoneVisible = true;
         if (binding.btnPrivateMsg != null) {
-            binding.btnPrivateMsg.setVisibility(vis);
-            binding.btnPrivateMsg.setEnabled(enabled);
-            binding.btnPrivateMsg.setClickable(enabled);
+            binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+            binding.btnPrivateMsg.setEnabled(true);
+            binding.btnPrivateMsg.setClickable(true);
         }
         // Ensure public room chat UI stays available.
         if (binding.chatPanel != null && binding.chatPanel.getVisibility() != View.VISIBLE) {
@@ -3215,6 +4865,507 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return true;
     }
 
+    private int luckyCannonDp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void setupLuckyCannonUi() {
+        ConstraintLayout root = binding.getRoot();
+        FrameLayout layer = new FrameLayout(this);
+        layer.setClipChildren(false);
+        layer.setClipToPadding(false);
+        layer.setClickable(false);
+        layer.setFocusable(false);
+        // Never expose the sender's draggable launcher to other room members on room entry.
+        // It becomes visible only after this device successfully arms its own lucky gift.
+        layer.setVisibility(View.GONE);
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
+                luckyCannonDp(96), luckyCannonDp(96));
+        // Default position: horizontally centered, slightly below the room midpoint.
+        // Keep clear of the bottom controls while avoiding the old side placement near btnGift.
+        lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.verticalBias = 0.62f;
+        root.addView(layer, lp);
+        // Nudge the launcher slightly toward the physical right side without changing its
+        // vertical placement or drag bounds. Positive translationX is screen-right in LTR/RTL.
+        com.Dramizo.Series.util.LuckyCannonView cannon =
+                new com.Dramizo.Series.util.LuckyCannonView(this);
+        // The enclosing layer owns touch/click so the uploaded icon overlay and drag gesture
+        // share one hit target without intercepting the existing gift send action.
+        cannon.setClickable(false);
+        cannon.setFocusable(false);
+        FrameLayout.LayoutParams cannonLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        cannonLp.gravity = Gravity.CENTER;
+        layer.addView(cannon, cannonLp);
+        ImageView uploadedIcon = new ImageView(this);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
+                luckyCannonDp(52), luckyCannonDp(52), Gravity.CENTER);
+        uploadedIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        uploadedIcon.setClickable(false);
+        uploadedIcon.setFocusable(false);
+        uploadedIcon.setVisibility(View.GONE);
+        layer.addView(uploadedIcon, iconLp);
+        TextView countView = new TextView(this);
+        countView.setGravity(Gravity.CENTER);
+        countView.setTextColor(Color.WHITE);
+        countView.setTextSize(11f);
+        countView.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        countView.setPadding(luckyCannonDp(10), 0, luckyCannonDp(10), 0);
+        GradientDrawable countBackground = new GradientDrawable();
+        countBackground.setColor(0xE61A2233);
+        countBackground.setCornerRadius(luckyCannonDp(14));
+        countBackground.setStroke(luckyCannonDp(1), 0xFFFFD978);
+        countView.setBackground(countBackground);
+        countView.setVisibility(View.GONE);
+        FrameLayout.LayoutParams countLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, luckyCannonDp(22), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        countLp.bottomMargin = luckyCannonDp(1);
+        layer.addView(countView, countLp);
+        layer.setElevation(luckyCannonDp(80));
+        // INVISIBLE preserves measured bounds so the initial draggable position is stable.
+        layer.setVisibility(View.INVISIBLE);
+        // Hold-to-combo: count while held, then submit one batch on ACTION_UP.
+        // Touch is consumed here so ACTION_UP cannot trigger a second click send.
+        layer.setOnTouchListener(new View.OnTouchListener() {
+            private float downRawX, downRawY, startTx, startTy;
+            private boolean dragging;
+            private final int touchSlop = luckyCannonDp(6);
+            @Override public boolean onTouch(View touchedView, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawX = event.getRawX();
+                        downRawY = event.getRawY();
+                        startTx = layer.getTranslationX();
+                        startTy = layer.getTranslationY();
+                        dragging = false;
+                        startLuckyCannonHold();
+                        return true;
+                    case MotionEvent.ACTION_MOVE: {
+                        float dx = event.getRawX() - downRawX;
+                        float dy = event.getRawY() - downRawY;
+                        if (!dragging && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
+                            dragging = true;
+                            stopLuckyCannonHold(false);
+                            if (layer.getParent() != null) layer.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                        if (dragging && root.getWidth() > 0 && root.getHeight() > 0) {
+                            float minX = -layer.getLeft();
+                            float maxX = root.getWidth() - layer.getRight();
+                            float minY = -layer.getTop();
+                            float maxY = root.getHeight() - layer.getBottom();
+                            layer.setTranslationX(Math.max(minX, Math.min(maxX, startTx + dx)));
+                            layer.setTranslationY(Math.max(minY, Math.min(maxY, startTy + dy)));
+                        }
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP:
+                        stopLuckyCannonHold(true);
+                        showLuckyCannonAndScheduleHide();
+                        if (dragging && layer.getParent() != null) {
+                            layer.getParent().requestDisallowInterceptTouchEvent(false);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        stopLuckyCannonHold(false);
+                        showLuckyCannonAndScheduleHide();
+                        if (dragging && layer.getParent() != null) {
+                            layer.getParent().requestDisallowInterceptTouchEvent(false);
+                        }
+                        return true;
+                    default:
+                        return true;
+                }
+            }
+        });
+        luckyCannonLayer = layer;
+        luckyCannonView = cannon;
+        luckyCannonIconView = uploadedIcon;
+        luckyCannonCountView = countView;
+        updateLuckyCannonCounter();
+        refreshLuckyToastButtonStyle();
+    }
+
+    /** One lightweight config fetch per room setup; animation stays local on this device. */
+    @SuppressWarnings("unchecked")
+    private void refreshLuckyToastButtonStyle() {
+        try {
+            AppContainer container = ContainerProvider.from(this);
+            container.getConfigApi().toastStyle(System.currentTimeMillis()).enqueue(
+                    new retrofit2.Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null || response.body().data == null) return;
+                    Map<String, Object> config = response.body().data;
+                    Object buttonValue = config.get("luckyButton");
+                    if (!(buttonValue instanceof Map)) return;
+                    Map<String, Object> button = (Map<String, Object>) buttonValue;
+                    String iconUrl = button.get("iconUrl") instanceof String ? ((String) button.get("iconUrl")).trim() : "";
+                    int duration = luckyCannonDurationSeconds;
+                    try { duration = Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(button.get("durationSeconds")))))); }
+                    catch (Exception ignored) { }
+                    final int nextDuration = duration;
+                    final String nextIconUrl = iconUrl;
+                    final boolean nextPulseEnabled = !Boolean.FALSE.equals(button.get("pulseEnabled"));
+                    final boolean nextEnabled = !Boolean.FALSE.equals(button.get("enabled"));
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        luckyCannonDurationSeconds = nextDuration;
+                        luckyCannonPulseEnabled = nextPulseEnabled;
+                        luckyCannonRemoteIconUrl = nextIconUrl;
+                        if (luckyCannonLayer != null) {
+                            // Dashboard enablement only permits the cannon; it must not
+                            // expose the floating launcher on room entry. The launcher is
+                            // shown exclusively by armLuckyGiftCannon after a confirmed send.
+                            if (!nextEnabled) {
+                                stopLuckyCannonHold(false);
+                                luckyCannonLayer.setVisibility(View.GONE);
+                            } else if (luckyCannonLayer.getVisibility() != View.VISIBLE
+                                    || luckyCannonGiftId == null || luckyCannonTargets.isEmpty()) {
+                                luckyCannonLayer.setVisibility(View.GONE);
+                            }
+                        }
+                        if (luckyCannonIconView == null) return;
+                        if (nextIconUrl.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        String absolute = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(nextIconUrl);
+                        if (absolute == null || absolute.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        try {
+                            com.bumptech.glide.Glide.with(getApplicationContext())
+                                    .load(absolute).override(128, 128).fitCenter().dontAnimate()
+                                    .into(luckyCannonIconView);
+                            luckyCannonIconView.setVisibility(View.VISIBLE);
+                        } catch (Exception ignored) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                        }
+                    });
+                }
+                @Override public void onFailure(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        Throwable error) {
+                    // Keep the locally drawn gem and existing duration if the free host is asleep.
+                }
+            });
+        } catch (Exception ignored) { }
+    }
+
+    /** Called only after the existing gift endpoint confirms a successful lucky gift send. */
+    public void armLuckyGiftCannon(@Nullable String giftId, @Nullable String giftIcon,
+                                   @Nullable String giftName, int unitPrice, int quantity,
+                                   @Nullable List<String> targetIds) {
+        if (!luckyCannonEnabled || isFinishing() || isDestroyed()
+                || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
+        luckyCannonRequestId = null;
+        luckyCannonGiftId = giftId;
+        luckyCannonGiftIcon = giftIcon;
+        luckyCannonGiftName = giftName;
+        luckyCannonGiftPrice = Math.max(0, unitPrice);
+        luckyCannonTargets.clear();
+        for (String id : targetIds) {
+            if (id != null && !id.isEmpty() && !luckyCannonTargets.contains(id)) luckyCannonTargets.add(id);
+        }
+        if (luckyCannonTargets.isEmpty()) return;
+        showLuckyCannonAndScheduleHide();
+    }
+
+    private void updateLuckyCannonCounter() {
+        // The multiplier belongs to the centered gift-send toast, never on the cannon.
+        if (luckyCannonCountView != null) luckyCannonCountView.setVisibility(View.GONE);
+    }
+
+    private void showLuckyCannonSendToast(int count, boolean live) {
+        if (binding == null || binding.comboGiftView == null) return;
+        String giftName = luckyCannonGiftName != null && !luckyCannonGiftName.isEmpty()
+                ? luckyCannonGiftName : "هدية حظ";
+        AuthDtos.UserDto self = ContainerProvider.from(this).getSessionManager().getUser();
+        String senderAvatar = self != null ? self.avatarUrl
+                : ContainerProvider.from(this).getSessionManager().getAvatarUrl();
+        binding.comboGiftView.showCannonLive("أنت", giftName, senderAvatar,
+                luckyCannonGiftIcon, Math.max(1, count), 0);
+        if (!live) binding.comboGiftView.finishCannonLive(2200L);
+    }
+
+    private void showLuckyCannonAndScheduleHide() {
+        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        // Bring the cannon forward only when it first becomes visible. Repeating
+        // requestLayout()/invalidate() for every 120 ms send tick causes avoidable
+        // measure/draw work while the user is holding the control.
+        boolean becomingVisible = luckyCannonLayer.getVisibility() != View.VISIBLE;
+        if (becomingVisible) {
+            luckyCannonLayer.setVisibility(View.VISIBLE);
+            luckyCannonLayer.setElevation(luckyCannonDp(80));
+            luckyCannonLayer.bringToFront();
+        }
+        if (luckyCannonLayer.getAlpha() != 1f) luckyCannonLayer.setAlpha(1f);
+        hideLuckyCannonRunnable = this::hideLuckyCannon;
+        handler.postDelayed(hideLuckyCannonRunnable, Math.max(1, luckyCannonDurationSeconds) * 1000L);
+    }
+
+    private void hideLuckyCannon() {
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        hideLuckyCannonRunnable = null;
+        // The cannon remains visible during the hold; the X counter is shown in the centered toast.
+        if (luckyCannonHoldActive) {
+            hideLuckyCannonRunnable = this::hideLuckyCannon;
+            handler.postDelayed(hideLuckyCannonRunnable,
+                    Math.max(1, luckyCannonDurationSeconds) * 1000L);
+            return;
+        }
+        if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
+        luckyCannonComboCount = 0;
+        updateLuckyCannonCounter();
+        if (!luckyCannonSending) {
+            luckyCannonGiftId = null;
+            luckyCannonTargets.clear();
+        }
+    }
+
+    private void startLuckyCannonHold() {
+        stopLuckyCannonHold(false);
+        if (!luckyCannonEnabled || luckyCannonGiftId == null || roomId == null || roomId.isEmpty()) return;
+        luckyCannonHoldActive = true;
+        luckyCannonHoldGeneration++;
+        luckyCannonComboCount = 0;
+        updateLuckyCannonCounter();
+
+        // A quick tap sends one gift; continued holding switches to the faster two-unit repeat.
+        if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
+            sendLuckyCannonBatch(1);
+        }
+        if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+        handler.removeCallbacks(luckyCannonRepeatRunnable);
+        handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+    }
+
+    /**
+     * ACTION_UP / ACTION_CANCEL stop the repeat loop immediately.
+     * Any request already accepted by the executor is allowed to finish safely;
+     * no additional gift is scheduled after the finger is released.
+     */
+    private void stopLuckyCannonHold(boolean sendAccumulated) {
+        boolean wasHolding = luckyCannonHoldActive;
+        luckyCannonHoldActive = false;
+        luckyCannonHoldGeneration++;
+        handler.removeCallbacks(luckyCannonRepeatRunnable);
+        if (wasHolding && binding != null && binding.comboGiftView != null) {
+            binding.comboGiftView.finishCannonLive(2200L);
+        }
+    }
+
+    private void sendLuckyCannonBatch(int requestedQuantity) {
+        if (!luckyCannonEnabled || luckyCannonGiftId == null
+                || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
+        // Resolve only the recipients selected when the lucky gift was armed.
+        // Their current seat positions are resolved later for the center-to-seat flight.
+        // currentSeats is a presentation cache and may be empty/stale during
+        // room entry or a seat refresh. Keep the explicitly selected recipient IDs
+        // and let the backend validate live seat occupancy before charging/sending.
+        java.util.LinkedHashSet<String> liveTargets = new java.util.LinkedHashSet<>();
+        for (String selectedId : luckyCannonTargets) {
+            if (selectedId != null && !selectedId.trim().isEmpty()) liveTargets.add(selectedId);
+        }
+        if (liveTargets.isEmpty()) {
+            Toast.makeText(this, "حدد مستخدماً لإرسال الهدية", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final List<String> targets = new ArrayList<>(liveTargets);
+        final String giftId = luckyCannonGiftId;
+        final String currentRoom = roomId;
+        final String requestId = java.util.UUID.randomUUID().toString();
+        final int quantity = Math.max(1, Math.min(
+                LUCKY_CANNON_MAX_BATCH_QUANTITY, requestedQuantity));
+        final long requestHoldGeneration = luckyCannonHoldGeneration;
+        final AppContainer container;
+        try {
+            container = ContainerProvider.from(this);
+        } catch (Exception ignored) {
+            return;
+        }
+        luckyCannonRequestId = requestId;
+        luckyCannonInFlight++;
+        luckyCannonSending = true;
+        Runnable sendTask = () -> {
+            // Drop executor-queued shots if the finger was released before network dispatch.
+            if (!luckyCannonHoldActive || requestHoldGeneration != luckyCannonHoldGeneration) {
+                runOnUiThread(() -> {
+                    luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+                    luckyCannonSending = luckyCannonInFlight > 0;
+                });
+                return;
+            }
+            runOnUiThread(() -> {
+                luckyCannonComboCount += quantity;
+                updateLuckyCannonCounter();
+                showLuckyCannonSendToast(luckyCannonComboCount, luckyCannonHoldActive);
+            });
+            GiftDtos.SendAllMicRequest request =
+                    new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+            request.cannonLaunch = true;
+            request.requestId = requestId;
+            Result<GiftDtos.SendGiftResult> result =
+                    ApiCall.execute(container.getGiftApi().sendAllMic(request));
+            if (result != null && !result.success && isTransientLuckyCannonFailure(result.error)
+                    && luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
+                // Retry only while the same press remains active, with the same idempotency key.
+                try { Thread.sleep(120L); } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                if (luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
+                    result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
+                }
+            }
+
+            // Keep compatibility with an older pinned API schema, reusing the same
+            // idempotency key so the rejected first attempt cannot be charged twice.
+            if (result != null && !result.success && result.error != null) {
+                String errorText = result.error.toLowerCase(java.util.Locale.ROOT);
+                if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")
+                        && luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
+                    GiftDtos.SendAllMicRequest retry =
+                            new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+                    retry.cannonLaunch = null;
+                    retry.requestId = requestId;
+                    result = ApiCall.execute(container.getGiftApi().sendAllMic(retry));
+                }
+            }
+            final Result<GiftDtos.SendGiftResult> finalResult = result;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+                luckyCannonSending = luckyCannonInFlight > 0;
+                if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
+                // A confirmed success payload wins over a transport wrapper timeout.
+                if (finalResult == null || finalResult.data == null || !finalResult.data.success) {
+                    String failure = finalResult != null ? finalResult.error : null;
+                    if (isTransientLuckyCannonFailure(failure)) {
+                        android.util.Log.w("LuckyCannon", "Gift send remains uncertain after idempotent retry: " + failure);
+                        // The same idempotency key was retried once. Stop this gesture
+                        // quietly rather than issuing a new key that could double-charge
+                        // a shot whose first server response was lost.
+                        if (luckyCannonHoldActive) stopLuckyCannonHold(false);
+                    } else {
+                        if (luckyCannonHoldActive) stopLuckyCannonHold(false);
+                        BalanceRedirect.handle(VoiceRoomActivity.this,
+                                failure != null && !failure.trim().isEmpty()
+                                        ? failure : "تعذر إرسال دفعة الهدية");
+                    }
+                    return;
+                }
+                showLuckyCannonAndScheduleHide();
+            });
+        };
+        try {
+            container.getLuckyCannonExecutor().execute(sendTask);
+        } catch (RuntimeException rejected) {
+            // Saturation is back-pressure, not a user-facing gift failure. Keep the
+            // first tap pending and resume as soon as a sender slot becomes available.
+            luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+            luckyCannonSending = luckyCannonInFlight > 0;
+            if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
+            android.util.Log.w("LuckyCannon", "Gift send rejected by executor", rejected);
+            if (luckyCannonHoldActive) {
+                handler.removeCallbacks(luckyCannonRepeatRunnable);
+                handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
+            }
+        }
+    }
+
+    private boolean isTransientLuckyCannonFailure(@Nullable String message) {
+        if (message == null || message.trim().isEmpty()) return true;
+        String value = message.toLowerCase(java.util.Locale.ROOT);
+        return value.contains("timeout") || value.contains("timed out")
+                || value.contains("socket") || value.contains("connection")
+                || value.contains("network") || value.contains("failed to connect")
+                || value.contains("unexpected end") || value.contains("تعذر الاتصال")
+                || value.contains("انقطع الاتصال") || value.contains("مهلة")
+                || value.contains("temporarily unavailable");
+    }
+
+
+    private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
+                                      long totalCoins, int quantity, int personCount,
+                                      boolean localSender, @Nullable String senderId) {
+        if (!luckyCannonEnabled || binding == null || binding.giftOverlay == null) return;
+        // Keep the existing cannon control exactly as-is; only its gift-flight path is shared.
+        boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
+        if (localSender && luckyCannonLayer != null) {
+            luckyCannonLayer.setVisibility(keepVisible ? View.VISIBLE : View.GONE);
+        }
+        if (!localSender && luckyCannonPulseEnabled && luckyCannonView != null) {
+            luckyCannonView.fire();
+        }
+        if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
+        playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount, senderId);
+        if (!keepVisible && luckyCannonLayer != null) {
+            handler.postDelayed(() -> {
+                if (luckyCannonLayer != null && luckyCannonTargets.isEmpty()) {
+                    luckyCannonLayer.setVisibility(View.GONE);
+                }
+            }, 1800L);
+        }
+    }
+
+    private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets,
+                                        long totalCoins, int quantity, int personCount,
+                                        @Nullable String senderId) {
+        if (binding == null || binding.giftOverlay == null || targets.isEmpty()) return;
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        for (String id : targets) {
+            if (id != null && !id.isEmpty()) unique.add(id);
+        }
+        if (unique.isEmpty()) return;
+        final List<String> recipients = new ArrayList<>(unique);
+        binding.giftOverlay.setVisibility(View.VISIBLE);
+        binding.giftOverlay.bringToFront();
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
+            if (binding == null || binding.giftOverlay == null) return;
+            List<PointF> destinations = resolveMicCenters(recipients);
+            if (destinations.isEmpty()) return;
+            // Cannon gift reveal must be centered in the actual gift overlay,
+            // never anchored to a seat or pushed toward a screen edge.
+            // The stage animator's null revealCenter resolves to overlay width/2, height/2.
+            PointF cannonSource = resolveLuckyCannonSource(senderId);
+            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
+                    binding.giftOverlay, icon, destinations, totalCoins,
+                    Math.max(1, quantity), Math.max(1, recipients.size()),
+                    resolveLuckyGiftRevealCenter(), cannonSource, true, null, null);
+        };
+        if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
+            binding.giftOverlay.post(launch);
+        } else {
+            launch.run();
+        }
+    }
+
+    /**
+     * Returns the reveal point slightly below guest seat 18, in giftOverlay coordinates.
+     * The seat view is resolved from the same sorted guest list used by the grid adapter.
+     */
+    /**
+     * Fixed lucky-gift reveal anchor: independent of seat numbers or room layout.
+     * The anchor stays around the visual middle of the screen, slightly below center,
+     * matching the familiar placement used by global live-room apps.
+     */
+    @Nullable
+    private PointF resolveLuckyGiftRevealCenter() {
+        if (binding == null || binding.giftOverlay == null) return null;
+        int w = Math.max(binding.giftOverlay.getWidth(), 1);
+        int h = Math.max(binding.giftOverlay.getHeight(), 1);
+        return new PointF(w * 0.50f, h * 0.52f);
+    }
+
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
     public void setGiftSeatSelection(@Nullable java.util.Collection<String> userIds) {
         if (seatAdapter == null) return;
@@ -3239,6 +5390,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomMicInteractEnabled() {
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         return room == null || room.micInteractEnabled;
+    }
+
+    private boolean isMicRequestEnabled() {
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        return room != null && room.micRequestEnabled;
     }
 
     private boolean roomEntryEffectsEnabled() {
@@ -3462,7 +5618,53 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void setupMusicUi() {
         if (roomMusicPlayer != null) return;
-        roomMusicPlayer = new ExoPlayer.Builder(this)
+        roomMusicPlayer = VoiceRoomForegroundService.takeMusicPlayerForUi();
+        if (roomMusicPlayer != null) {
+            if (externalCaptureMusicSuspended) {
+                try { roomMusicPlayer.pause(); } catch (RuntimeException ignored) {}
+            }
+            String restoredSourceUrl = VoiceRoomForegroundService.consumeReturnedMusicSourceUrl();
+            String restoredPlayableUrl = VoiceRoomForegroundService.consumeReturnedMusicPlayableUrl();
+            String restoredStatus = VoiceRoomForegroundService.consumeReturnedMusicStatus();
+            if (restoredSourceUrl != null && !restoredSourceUrl.isEmpty()) {
+                // The foreground service is authoritative during the Activity handoff.
+                // Restore its track metadata too, so a partial room snapshot cannot hide
+                // a song that is still audibly playing in the same decoder.
+                currentMusicUrl = restoredSourceUrl;
+                if (restoredStatus != null && !restoredStatus.trim().isEmpty()) {
+                    currentMusicStatus = restoredStatus;
+                }
+                preparedMusicUrl = isYoutubeMusicUrl(restoredSourceUrl)
+                        ? restoredSourceUrl : AssetCatalog.absoluteUrl(restoredSourceUrl);
+                currentMusicHandoffUrl = restoredPlayableUrl;
+                youtubeUsingEmbed = false;
+                if ("playing".equalsIgnoreCase(currentMusicStatus)
+                        || "paused".equalsIgnoreCase(currentMusicStatus)) {
+                    boolean showMusic = !restoredSourceUrl.equals(dismissedMusicUrl);
+                    if (canManageMusic && binding != null && binding.musicCard != null) {
+                        musicPanelExpanded = showMusic;
+                        binding.musicCard.setVisibility(showMusic ? View.VISIBLE : View.GONE);
+                        if (showMusic && binding.tvMusicTitle != null) {
+                            binding.tvMusicTitle.setText("موسيقى الغرفة");
+                            binding.tvMusicArtist.setText("من هاتف المضيف");
+                        }
+                    }
+                    if (!canManageMusic) showMusicReopenChip(showMusic
+                            && "playing".equalsIgnoreCase(currentMusicStatus));
+                }
+            }
+        }
+        if (roomMusicPlayer == null) roomMusicPlayer = new ExoPlayer.Builder(this)
+                // The room Music Player is handed to VoiceRoomForegroundService when the
+                // Activity is minimized. Do not let ExoPlayer's automatic audio-focus
+                // handling pause that decoder just because JEHO releases VoIP focus for
+                // another app. WhatsApp handoff is controlled explicitly by AuraLiveApp.
+                .setAudioAttributes(
+                        new androidx.media3.common.AudioAttributes.Builder()
+                                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC)
+                                .build(),
+                        false)
                 .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
                         .setDataSourceFactory(
                                 new androidx.media3.datasource.DefaultHttpDataSource.Factory()
@@ -3487,7 +5689,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 skipMusicTrack();
             });
         });
-        roomMusicPlayer.addListener(new Player.Listener() {
+        roomMusicPlayerListener = new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_ENDED
@@ -3526,7 +5728,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onRenderedFirstFrame() {
                 showMusicVideoSurface(true);
             }
-        });
+        };
+        roomMusicPlayer.addListener(roomMusicPlayerListener);
         if (binding.musicVideoSurface != null) {
             musicVideoSetPlayer(roomMusicPlayer);
         }
@@ -3603,6 +5806,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 viewModel.updateMusic(roomId, "seek", null, null, null, position);
             }
         });
+        if (binding.seekMusicVolume != null) {
+            binding.seekMusicVolume.setMax(100);
+            binding.seekMusicVolume.setProgress(100);
+            final float[] volumeBeforeSeek = {sharedMusicVolume};
+            binding.seekMusicVolume.setOnSeekBarChangeListener(
+                    new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(
+                        android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    if (!canManageMusic) {
+                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
+                        return;
+                    }
+                    sharedMusicVolume = Math.max(0f, Math.min(1f, progress / 100f));
+                    applySharedMusicVolume();
+                }
+
+                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                    volumeBeforeSeek[0] = sharedMusicVolume;
+                    if (!canManageMusic) {
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "التحكم بصوت الموسيقى للمضيف أو المشرف المخوّل",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                    if (!canManageMusic || roomId == null) {
+                        sharedMusicVolume = volumeBeforeSeek[0];
+                        applySharedMusicVolume();
+                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
+                        return;
+                    }
+                    broadcastSharedMusicVolume(sharedMusicVolume, volumeBeforeSeek[0]);
+                }
+            });
+        }
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setOnClickListener(v -> adjustSharedMusicVolumeBy(-0.1f));
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setOnClickListener(v -> adjustSharedMusicVolumeBy(0.1f));
+        }
         handler.post(musicProgressRunnable);
     }
 
@@ -3685,7 +5931,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (binding != null) {
                 updateMusicProgressUi();
             }
-            handler.postDelayed(this, 500);
+            // Keep the progress clock responsive while playing, but reduce idle UI work
+            // when the room has no active track. Room events refresh state immediately.
+            boolean activeTrack = "playing".equalsIgnoreCase(currentMusicStatus)
+                    || "paused".equalsIgnoreCase(currentMusicStatus);
+            handler.postDelayed(this, activeTrack ? 1_000L : 5_000L);
         }
     };
 
@@ -3791,9 +6041,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ensureMusicUiReady();
         }
         String incomingMusicUrl = url != null ? url.trim() : null;
-        boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
         String prevStatus = currentMusicStatus;
         String prevUrl = currentMusicUrl != null ? currentMusicUrl.trim() : null;
+        // Some room refresh payloads omit musicUrl while the foreground decoder
+        // continues playing. Treat a missing field as partial data, not a stop;
+        // an explicit empty URL or stopped status still clears the music normally.
+        if (incomingMusicUrl == null && prevUrl != null
+                && (status == null || status.trim().isEmpty())
+                && ("playing".equalsIgnoreCase(prevStatus)
+                    || "paused".equalsIgnoreCase(prevStatus))
+                && ((roomMusicPlayer != null && roomMusicPlayer.getMediaItemCount() > 0)
+                    || RoomRtcEngine.getInstance().isLocalMusicPlaying())) {
+            incomingMusicUrl = prevUrl;
+        }
+        boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
+        if (!java.util.Objects.equals(prevUrl, incomingMusicUrl)) currentMusicHandoffUrl = null;
         // Never treat a missing status as "stopped" during room refresh (lock/settings).
         // That was killing YouTube mid-song when getRoom omitted or nulled musicStatus.
         if (urlEmpty) {
@@ -3832,7 +6094,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && "playing".equalsIgnoreCase(currentMusicStatus)) {
             clearDismissedMusic();
         }
-        currentMusicUrl = url;
+        currentMusicUrl = incomingMusicUrl;
         boolean playing = "playing".equalsIgnoreCase(currentMusicStatus);
         boolean paused = "paused".equalsIgnoreCase(currentMusicStatus);
         boolean stopped = urlEmpty || "stopped".equalsIgnoreCase(currentMusicStatus);
@@ -3894,10 +6156,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         binding.tvMusicTitle.setText(title != null && !title.isEmpty() ? title : "موسيقى الغرفة");
         binding.tvMusicArtist.setText(artist != null && !artist.isEmpty() ? artist : "من هاتف المضيف");
+        // Room music is controlled only by the host/cohost or a moderator explicitly
+        // granted canManageMusic. Hide controls for listeners instead of merely disabling
+        // them, so no play/skip/seek/volume affordance appears on their devices.
+        int musicControlVisibility = canManageMusic ? View.VISIBLE : View.GONE;
+        binding.btnMusicPlayPause.setVisibility(musicControlVisibility);
+        binding.btnMusicSkip.setVisibility(musicControlVisibility);
+        binding.btnMusicStop.setVisibility(musicControlVisibility);
+        binding.seekMusic.setVisibility(musicControlVisibility);
+        if (binding.seekMusicVolume != null) {
+            binding.seekMusicVolume.setVisibility(musicControlVisibility);
+        }
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setVisibility(musicControlVisibility);
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setVisibility(musicControlVisibility);
+        }
         binding.btnMusicPlayPause.setEnabled(canManageMusic);
         binding.btnMusicSkip.setEnabled(canManageMusic);
         binding.btnMusicStop.setEnabled(canManageMusic);
         binding.seekMusic.setEnabled(canManageMusic);
+        if (binding.btnMusicVolumeDown != null) binding.btnMusicVolumeDown.setEnabled(canManageMusic);
+        if (binding.btnMusicVolumeUp != null) binding.btnMusicVolumeUp.setEnabled(canManageMusic);
         updateMusicProgressUi();
         binding.btnMusicPlayPause.setImageResource(playing
                 ? android.R.drawable.ic_media_pause
@@ -3976,7 +6257,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(target);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             if ("stopped".equalsIgnoreCase(currentMusicStatus)) {
                 roomMusicPlayer.pause();
                 roomMusicPlayer.seekTo(0);
@@ -4042,7 +6323,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.seekTo(seekTarget);
             }
             applySharedMusicVolume();
-            roomMusicPlayer.setPlayWhenReady(playing);
+            roomMusicPlayer.setPlayWhenReady(playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             bindMusicVideoSurfaces();
             return;
         }
@@ -4063,7 +6344,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (!playing) return;
 
-        final String requestKey = ytUrl + "|stream|" + (playing ? "1" : "0");
+        final String requestKey = ytUrl + "|stream|" + (playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended ? "1" : "0");
         if (requestKey.equals(pendingYtResolveKey)) return;
         pendingYtResolveKey = requestKey;
 
@@ -4101,7 +6382,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomMusicPlayer.prepare();
                 roomMusicPlayer.seekTo(seekTarget);
                 applySharedMusicVolume();
-                roomMusicPlayer.setPlayWhenReady(true);
+                roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused && !externalCaptureMusicSuspended);
                 bindMusicVideoSurfaces();
                 if (hasVideo) {
                     showMusicVideoSurface(true);
@@ -4121,10 +6402,113 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** Shared room music volume (host + guests). Honors "كتم أصوات الغرفة". */
+    /**
+     * Send shared music gain only after the socket has joined the server-side room.
+     * Briefly retry during reconnects instead of surfacing "Join the realtime room first".
+     * This changes music gain only and never changes microphone gain.
+     */
+    private void broadcastSharedMusicVolume(float requestedVolume, float fallbackVolume) {
+        final int requestId = ++sharedMusicVolumeRequestId;
+        broadcastSharedMusicVolumeAttempt(requestId, requestedVolume, fallbackVolume, 0);
+    }
+
+    private void broadcastSharedMusicVolumeAttempt(
+            int requestId, float requestedVolume, float fallbackVolume, int attempt) {
+        if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()
+                || requestId != sharedMusicVolumeRequestId) return;
+
+        RealtimeClient rt = RealtimeClient.getInstance();
+        if (!rt.isConnected() || !rt.isJoinedRoom(roomId)) {
+            connectRealtimeRoom();
+            if (attempt < 12) {
+                handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                        requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+                return;
+            }
+            sharedMusicVolume = fallbackVolume;
+            applySharedMusicVolume();
+            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        JsonObject payload = new JsonObject();
+        payload.addProperty("volume", requestedVolume);
+        boolean sent = rt.emitRoomEvent(roomId, "room:music_volume", payload, (ok, error, code) ->
+                handler.post(() -> {
+                    if (isFinishing() || isDestroyed() || requestId != sharedMusicVolumeRequestId) return;
+                    if (!ok && error != null && error.toLowerCase(java.util.Locale.ROOT)
+                            .contains("join the realtime room") && attempt < 12) {
+                        connectRealtimeRoom();
+                        handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                                requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+                        return;
+                    }
+                    if (!ok) {
+                        sharedMusicVolume = fallbackVolume;
+                        applySharedMusicVolume();
+                        android.util.Log.w("VoiceRoom", "Shared music volume rejected: " + error);
+                        Toast.makeText(this,
+                                error != null && !error.isEmpty()
+                                        ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
+                                        : "رفض الخادم مزامنة صوت الموسيقى",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        if (!sent && attempt < 12) {
+            connectRealtimeRoom();
+            handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                    requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+        } else if (!sent) {
+            sharedMusicVolume = fallbackVolume;
+            applySharedMusicVolume();
+            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** Host-authorized volume buttons update the shared room value for every listener. */
+    private void adjustSharedMusicVolumeBy(float delta) {
+        if (!canManageMusic || roomId == null || roomId.isEmpty()) {
+            Toast.makeText(this, "التحكم بمستوى الموسيقى للمضيف أو المشرف المخوّل", Toast.LENGTH_SHORT).show();
+            if (binding != null && binding.seekMusicVolume != null) {
+                binding.seekMusicVolume.setProgress(Math.round(sharedMusicVolume * 100f));
+            }
+            return;
+        }
+        final float previousVolume = sharedMusicVolume;
+        final float requestedVolume = Math.max(0f, Math.min(1f, previousVolume + delta));
+        sharedMusicVolume = requestedVolume;
+        applySharedMusicVolume();
+        broadcastSharedMusicVolume(requestedVolume, previousVolume);
+    }
+
+    /** Shared music gain; the room speaker mute is local to this listener. */
     private void applySharedMusicVolume() {
-        if (roomMusicPlayer == null) return;
-        roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : 1f);
+        // Apply one effective gain to every playback path. In particular, music mixed
+        // through the ZEGO local media player must also become silent; muting only the
+        // ExoPlayer left that source audible for the local host/publisher.
+        final float effectiveVolume = roomSpeakerMuted
+                ? 0f : Math.max(0f, Math.min(1f, sharedMusicVolume));
+        if (roomMusicPlayer != null) {
+            roomMusicPlayer.setVolume(effectiveVolume);
+        }
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            int percent = Math.round(effectiveVolume * 100f);
+            String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
+                    + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
+                    + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
+                    + percent + ");}}";
+            musicYoutubeWebView.evaluateJavascript(js, null);
+        }
+        // This changes playback gain only. It never changes the microphone capture
+        // gain or the music stream being published to other room members.
+        if (canManageMusic || isHost || isOwner || isRoomStaff()
+                || sameUser(myUserId, currentMusicPublisherId)) {
+            RoomRtcEngine.getInstance().setLocalMusicVolume(effectiveVolume);
+        }
+        if (binding != null && binding.seekMusicVolume != null
+                && !binding.seekMusicVolume.isPressed()) {
+            binding.seekMusicVolume.setProgress(Math.round(sharedMusicVolume * 100f));
+        }
     }
 
     /** @deprecated kept for any remaining call sites — uses shared volume. */
@@ -4219,13 +6603,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         long startSec = Math.max(0L, positionMs / 1000L);
         String html = "<!DOCTYPE html><html><head><meta name='viewport' "
                 + "content='width=device-width,initial-scale=1,maximum-scale=1'/>"
-                + "<style>html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
-                + "iframe{border:0;width:100%;height:100%;}</style></head><body>"
-                + "<iframe src='https://www.youtube.com/embed/" + videoId
-                + "?autoplay=" + (playing ? "1" : "0")
-                + "&controls=0&playsinline=1&rel=0&modestbranding=1&fs=0&start=" + startSec
-                + "' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
-                + "</body></html>";
+                + "<style>html,body,#player{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
+                + "</style></head><body><div id='player'></div>"
+                + "<script src='https://www.youtube.com/iframe_api'></script><script>"
+                + "var musicYtPlayer;function onYouTubeIframeAPIReady(){musicYtPlayer=new YT.Player('player',"
+                + "{height:'100%',width:'100%',videoId:'" + videoId + "',playerVars:{autoplay:"
+                + (playing && !externalCaptureMusicPaused && !externalCaptureMusicSuspended ? "1" : "0")
+                + ",controls:0,playsinline:1,rel:0,modestbranding:1,fs:0,start:" + startSec
+                + "},events:{onReady:function(e){var v=" + Math.round(sharedMusicVolume * 100f)
+                + ";if(v===0)e.target.mute();else{e.target.unMute();e.target.setVolume(v);}}}});}"
+                + "</script></body></html>";
         ensureMusicYoutubeWebView().loadDataWithBaseURL(
                 "https://www.youtube.com", html, "text/html", "utf-8", null);
         showMusicVideoSurface(true);
@@ -4338,7 +6725,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 } else if (roomMusicPlayer != null && currentMusicUrl.equals(preparedMusicUrl)
                         && roomMusicPlayer.getMediaItemCount() > 0) {
                     applySharedMusicVolume();
-                    roomMusicPlayer.setPlayWhenReady(true);
+                    roomMusicPlayer.setPlayWhenReady(!externalCaptureMusicPaused && !externalCaptureMusicSuspended);
                 } else {
                     streamYoutubeInDisc(currentMusicUrl, true, false, pos, null, null, null);
                 }
@@ -4346,7 +6733,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             pos = roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L;
             if (roomMusicPlayer != null) {
-                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying);
+                roomMusicPlayer.setPlayWhenReady(!currentlyPlaying && !externalCaptureMusicPaused && !externalCaptureMusicSuspended);
             }
         }
         currentMusicStatus = currentlyPlaying ? "paused" : "playing";
@@ -4361,14 +6748,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void ensurePublishingForMusic() {
         if (myUserId == null || myUserId.isEmpty()) return;
-        if (myUserId != null) currentMusicPublisherId = myUserId;
-        RoomRtcEngine.getInstance().startPublishingAudio(
-                RoomRtcEngine.audioStreamId(myUserId));
-        // Refresh JWT if needed so publish is allowed for music DJ off-seat.
+        currentMusicPublisherId = myUserId;
+        String streamId = RoomRtcEngine.audioStreamId(myUserId);
+        // Never race a publish attempt against an expired/missing grant. The token callback
+        // starts the music-only publish once isLocalMusicMixNeeded() is true.
         if (!rtcCanPublish
                 || System.currentTimeMillis() >= rtcPublishTokenExpiresAtMs - 20_000L) {
-            refreshRtcPublishToken(RoomRtcEngine.audioStreamId(myUserId));
+            refreshRtcPublishToken(streamId);
+            return;
         }
+        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
     }
 
     /** Host is mixing phone music into Zego — publish must stay up. */
@@ -4678,11 +7067,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         clearDismissedMusic();
-        ensurePublishingForMusic();
-        RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
+        // Publish permission checks depend on the active room-music state. Set that state
+        // before requesting a fresh RTC token; otherwise a fast token response can see
+        // "no music active", stop the DJ stream, and leave the selected phone track local-only.
         preparedMusicUrl = track.url;
         currentMusicUrl = track.url;
         currentMusicStatus = "playing";
+        currentMusicPublisherId = myUserId;
+        ensurePublishingForMusic();
+        RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+        RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
         binding.tvMusicTitle.setText(track.title != null ? track.title : "أغنية");
         binding.tvMusicArtist.setText(track.artist != null && !track.artist.isEmpty()
                 ? track.artist : "فنان غير معروف");
@@ -5965,7 +8359,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        showRoomReaction(myUserId, emojiKey, allowedRes, stickerUrl);
+        // The server broadcasts the reaction only after validating the sticker and its access rules.
     }
 
     private void showRoomReaction(String userId, String emojiKey, int emojiResId) {
@@ -6103,6 +8497,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Runnable luckyFloatHide;
     private Runnable luckyWinHide;
     private boolean luckyFloatDismissed;
+    @Nullable private ExoPlayer luckyVideoPlayer;
+    @Nullable private Player.Listener luckyVideoReadyListener;
+    @Nullable private Runnable luckyVideoStartRunnable;
+    private final Set<String> shownLuckyOpenEvents = new HashSet<>();
 
     private void setupLuckyBoxUi() {
         if (binding.luckyFloatWrap == null) return;
@@ -6114,9 +8512,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 hideLuckyFloat();
                 luckyFloatDismissed = true;
             });
-        }
-        if (binding.luckyWinOverlay != null) {
-            binding.luckyWinOverlay.setOnClickListener(v -> hideLuckyWinOverlay());
         }
         refreshLuckyFloatAvailability();
     }
@@ -6241,23 +8636,118 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showLuckyWinOverlay(String openerName, String rewardLabel) {
-        String title = (openerName != null && !openerName.isEmpty() ? openerName : "مستخدم")
-                + " · صندوق الحظ";
-        // Premium 3D PNG burst — no Lottie / DotLottie.
-        RewardBurstOverlay.showLuckyWin(this,
-                openerName != null ? openerName : "",
-                rewardLabel != null ? rewardLabel : "جائزة");
+        showLuckyWinOverlay(openerName, rewardLabel, null);
+    }
+
+    private void playLuckySupportVideo(@Nullable String videoUrl, long playAtServerMs) {
+        if (binding == null || binding.luckyWinVideo == null) return;
+        if (luckyVideoStartRunnable != null) {
+            handler.removeCallbacks(luckyVideoStartRunnable);
+            luckyVideoStartRunnable = null;
+        }
+        if (videoUrl == null || videoUrl.trim().isEmpty()) {
+            stopLuckySupportVideo();
+            return;
+        }
+        try {
+            String resolved = AssetCatalog.absoluteUrl(videoUrl.trim());
+            if (luckyVideoPlayer == null) {
+                luckyVideoPlayer = new ExoPlayer.Builder(this).build();
+                binding.luckyWinVideo.setPlayer(luckyVideoPlayer);
+            }
+            ExoPlayer player = luckyVideoPlayer;
+            if (luckyVideoReadyListener != null) {
+                player.removeListener(luckyVideoReadyListener);
+                luckyVideoReadyListener = null;
+            }
+            player.stop();
+            binding.luckyWinVideo.setVisibility(View.VISIBLE);
+            player.setMediaItem(MediaItem.fromUri(Uri.parse(resolved)));
+            final boolean[] startScheduled = { false };
+            Player.Listener readyListener = new Player.Listener() {
+                @Override public void onPlaybackStateChanged(int playbackState) {
+                    if (playbackState == Player.STATE_READY && !startScheduled[0]) {
+                        startScheduled[0] = true;
+                        long delay = playAtServerMs > 0L
+                                ? Math.max(0L, playAtServerMs - System.currentTimeMillis())
+                                : 0L;
+                        luckyVideoStartRunnable = () -> {
+                            if (luckyVideoPlayer == player && binding != null
+                                    && binding.luckyWinVideo != null
+                                    && binding.luckyWinVideo.getVisibility() == View.VISIBLE) {
+                                player.play();
+                            }
+                        };
+                        handler.postDelayed(luckyVideoStartRunnable, delay);
+                    } else if (playbackState == Player.STATE_ENDED) {
+                        handler.post(VoiceRoomActivity.this::hideLuckyWinOverlay);
+                    }
+                }
+
+                @Override public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                    android.util.Log.w("VoiceRoom", "Lucky support video playback error", error);
+                    handler.post(VoiceRoomActivity.this::hideLuckyWinOverlay);
+                }
+            };
+            luckyVideoReadyListener = readyListener;
+            player.addListener(readyListener);
+            player.prepare();
+        } catch (Exception e) {
+            binding.luckyWinVideo.setVisibility(View.GONE);
+            android.util.Log.w("VoiceRoom", "Lucky support video failed", e);
+            handler.post(this::hideLuckyWinOverlay);
+        }
+    }
+
+    private void stopLuckySupportVideo() {
+        if (luckyVideoStartRunnable != null) {
+            handler.removeCallbacks(luckyVideoStartRunnable);
+            luckyVideoStartRunnable = null;
+        }
+        try {
+            if (luckyVideoPlayer != null) {
+                if (luckyVideoReadyListener != null) {
+                    luckyVideoPlayer.removeListener(luckyVideoReadyListener);
+                    luckyVideoReadyListener = null;
+                }
+                luckyVideoPlayer.stop();
+            }
+        } catch (Exception ignored) {
+        }
+        if (binding != null && binding.luckyWinVideo != null) {
+            binding.luckyWinVideo.setVisibility(View.GONE);
+        }
+    }
+
+    private void showLuckyWinOverlay(String openerName, String rewardLabel, @Nullable String videoUrl) {
+        showLuckyWinOverlay(openerName, rewardLabel, videoUrl, 0L);
+    }
+
+    private void showLuckyWinOverlay(String openerName, String rewardLabel,
+                                     @Nullable String videoUrl, long playAtServerMs) {
+        String title = openerName != null && !openerName.isEmpty() ? openerName : "مستخدم";
+        // Intentionally do not show the legacy full-screen/center reward burst.
+        // Lucky reward details remain in the room chat; the global top toast is the
+        // only toast surface used for gift/lucky-win announcements.
         if (binding != null && binding.luckyWinOverlay != null) {
             try {
+                playLuckySupportVideo(videoUrl, playAtServerMs);
                 if (binding.lottieLuckyWin != null) {
                     binding.lottieLuckyWin.cancelAnimation();
                     binding.lottieLuckyWin.setVisibility(View.GONE);
                 }
             } catch (Exception ignored) {
             }
-            binding.luckyWinOverlay.setVisibility(View.GONE);
+            binding.luckyWinOverlay.setAlpha(1f);
+            binding.luckyWinOverlay.setVisibility(
+                    videoUrl != null && !videoUrl.trim().isEmpty() ? View.VISIBLE : View.GONE);
         }
-        appendChatLine("النظام", title + " · " + (rewardLabel != null ? rewardLabel : ""), 0, 1);
+        String cleanReward = rewardLabel != null ? rewardLabel
+                .replace("هدية محظوظة", "")
+                .replace("هدية محظوظ", "")
+                .replace("هدية الحظ", "")
+                .trim() : "";
+        appendChatLine("النظام", cleanReward.isEmpty() ? title : title + " · " + cleanReward, 0, 1);
     }
 
     private void hideLuckyWinOverlay() {
@@ -6265,6 +8755,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (luckyWinHide != null) handler.removeCallbacks(luckyWinHide);
         luckyWinHide = null;
         try { binding.lottieLuckyWin.cancelAnimation(); } catch (Exception ignored) {}
+        stopLuckySupportVideo();
         binding.luckyWinOverlay.animate().alpha(0f).setDuration(160)
                 .withEndAction(() -> {
                     if (binding != null && binding.luckyWinOverlay != null) {
@@ -6273,10 +8764,46 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }).start();
     }
 
-    private void showEmojiPicker() {
+    private void showEmojiPicker() { showEmojiPicker(false); }
+
+    private void showSeatStickerPicker() {
+        final AppContainer stickerContainer;
+        try {
+            stickerContainer = ContainerProvider.from(this);
+            // Show the persisted catalog immediately; never block the user on a network round-trip.
+            RemoteSeatStickers.hydrateFromCache(stickerContainer);
+            boolean hasCachedStickers = !SeatReactionEmojis.items().isEmpty();
+            if (hasCachedStickers) showEmojiPickerContent(true);
+            if (seatStickerRefreshInFlight) return;
+            seatStickerRefreshInFlight = true;
+            stickerContainer.getIoExecutor().execute(() -> {
+                RemoteSeatStickers.refreshBlocking(stickerContainer);
+                runOnUiThread(() -> {
+                    seatStickerRefreshInFlight = false;
+                    if (!hasCachedStickers && !isFinishing() && !isDestroyed()) {
+                        showEmojiPickerContent(true);
+                    }
+                });
+            });
+        } catch (Exception ignored) {
+            if (SeatReactionEmojis.items().isEmpty()) showEmojiPickerContent(true);
+        }
+    }
+
+    private void showEmojiPicker(boolean seatOnly) {
+        if (seatOnly) {
+            showSeatStickerPicker();
+            return;
+        }
+        showEmojiPickerContent(false);
+    }
+
+    private void showEmojiPickerContent(boolean seatOnly) {
         Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
+        TextView pickerTitle = sheet.findViewById(R.id.tvEmojiPickerTitle);
+        if (pickerTitle != null) pickerTitle.setText(seatOnly ? "ملصقات" : "إيموجي الشات");
         dialog.setCanceledOnTouchOutside(true);
         Window window = dialog.getWindow();
         if (window != null) {
@@ -6299,13 +8826,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         final java.util.List<SeatReactionEmojis.Item> stickerItems =
                 new java.util.ArrayList<>(SeatReactionEmojis.items());
-        if (stickerItems.isEmpty()) {
-            try {
-                AppContainer c = ContainerProvider.from(this);
-                c.getIoExecutor().execute(() -> RemoteSeatStickers.refreshBlocking(c));
-            } catch (Exception ignored) {
-            }
-            Toast.makeText(this, "جاري تحميل ملصقات المقاعد…", Toast.LENGTH_SHORT).show();
+        if (stickerItems.isEmpty() && seatOnly) {
+            Toast.makeText(this, "لا توجد ملصقات مفعّلة حالياً", Toast.LENGTH_SHORT).show();
         }
         String[] emojis = {
                 "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎",
@@ -6323,10 +8845,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
 
         RecyclerView stickersRv = sheet.findViewById(R.id.recyclerStickers);
-        // Horizontal scroll — stickers from dashboard catalog (remote GIF/WebP).
-        stickersRv.setLayoutManager(new LinearLayoutManager(
-                this, LinearLayoutManager.HORIZONTAL, false));
-        stickersRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        // Seat stickers are displayed vertically and independently from chat emojis.
+        // Four stickers per row; additional rows continue vertically inside each category.
+        stickersRv.setLayoutManager(new GridLayoutManager(this, 4));
+        stickersRv.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
+        View stickersLabel = sheet.findViewById(R.id.tvStickersLabel);
+        if (stickersLabel != null) stickersLabel.setVisibility(seatOnly ? View.VISIBLE : View.GONE);
+        final java.util.List<SeatReactionEmojis.Item> visibleStickerItems =
+                new java.util.ArrayList<>(stickerItems);
+        final RecyclerView.Adapter<RecyclerView.ViewHolder> stickerAdapter =
+                new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
                 View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_emoji_sticker, parent, false);
@@ -6336,9 +8864,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
                 ImageView img = holder.itemView.findViewById(R.id.imgSticker);
                 img.setBackgroundColor(android.graphics.Color.TRANSPARENT);
-                final SeatReactionEmojis.Item item = stickerItems.get(position);
+                final SeatReactionEmojis.Item item = visibleStickerItems.get(position);
                 final String key = item.key;
                 final String uri = item.url;
+                TextView accessBadge = holder.itemView.findViewById(R.id.tvStickerAccess);
+                if (accessBadge != null) {
+                    String type = item.accessType != null ? item.accessType : "free";
+                    String badge = "free".equals(type) ? "" : "paid".equals(type) ? "🔒" :
+                            "vip".equals(type) ? "VIP" : "CP";
+                    accessBadge.setText(badge);
+                    accessBadge.setVisibility(badge.isEmpty() ? View.GONE : View.VISIBLE);
+                }
                 final int resId = SeatReactionEmojis.FALLBACK_DRAWABLE;
                 if (uri != null && SeatReactionEmojis.isWebpUrl(uri)) {
                     com.bumptech.glide.Glide.with(img)
@@ -6369,15 +8905,76 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 "اجلس على المايك أولاً لإرسال رد الفعل", Toast.LENGTH_SHORT).show();
                         return;
                     }
+                    if ("paid".equals(item.accessType)) {
+                        Toast.makeText(VoiceRoomActivity.this, "هذا الملصق مدفوع، يلزم شراؤه أولاً", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     sendSeatReaction(key, resId);
                     dialog.dismiss();
                 });
             }
-            @Override public int getItemCount() { return stickerItems.size(); }
-        });
+            @Override public int getItemCount() { return visibleStickerItems.size(); }
+        };
+        stickersRv.setAdapter(stickerAdapter);
+        android.widget.LinearLayout categoryTabs = sheet.findViewById(R.id.layoutStickerCategories);
+        android.view.View categoryScroll = sheet.findViewById(R.id.scrollStickerCategories);
+        if (categoryTabs != null && seatOnly) {
+            categoryTabs.removeAllViews();
+            java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SeatStickerCategoryDto> packCategories =
+                    SeatReactionEmojis.categories();
+            if (packCategories != null && !packCategories.isEmpty()) {
+                categoryScroll.setVisibility(View.VISIBLE);
+                final java.util.List<TextView> categoryTabViews = new java.util.ArrayList<>();
+                for (com.Dramizo.Series.data.remote.dto.MiscDtos.SeatStickerCategoryDto category : packCategories) {
+                    if (category == null || !category.isActive) continue;
+                    TextView tab = new TextView(this);
+                    tab.setText(category.name != null ? category.name : category.id);
+                    tab.setGravity(android.view.Gravity.CENTER);
+                    tab.setTextColor(0xFFD9E0E8);
+                    tab.setTextSize(14f);
+                    tab.setTypeface(null, android.graphics.Typeface.BOLD);
+                    tab.setPadding(18, 10, 18, 10);
+                    android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                    bg.setColor(0xFF26343B);
+                    bg.setCornerRadius(24f);
+                    bg.setStroke(1, 0xFF46545F);
+                    tab.setBackground(bg);
+                    android.widget.LinearLayout.LayoutParams tabLp = new android.widget.LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    tabLp.setMargins(4, 2, 4, 2);
+                    categoryTabs.addView(tab, tabLp);
+                    categoryTabViews.add(tab);
+                    tab.setOnClickListener(v -> {
+                        visibleStickerItems.clear();
+                        for (SeatReactionEmojis.Item sticker : stickerItems) {
+                            if (category.id != null && category.id.equals(sticker.categoryId)) visibleStickerItems.add(sticker);
+                        }
+                        stickerAdapter.notifyDataSetChanged();
+                        for (TextView categoryTab : categoryTabViews) {
+                            boolean selected = categoryTab == tab;
+                            android.graphics.drawable.GradientDrawable selectedBg =
+                                    new android.graphics.drawable.GradientDrawable();
+                            selectedBg.setColor(selected ? 0xFFB88A45 : 0xFF26343B);
+                            selectedBg.setCornerRadius(24f);
+                            selectedBg.setStroke(1, selected ? 0xFFFFD98A : 0xFF46545F);
+                            categoryTab.setBackground(selectedBg);
+                            categoryTab.setTextColor(selected ? Color.WHITE : 0xFFD9E0E8);
+                        }
+                    });
+                }
+                if (categoryTabs.getChildCount() > 0) categoryTabs.getChildAt(0).performClick();
+            } else if (categoryScroll != null) {
+                categoryScroll.setVisibility(View.GONE);
+            }
+        } else if (categoryScroll != null) {
+            categoryScroll.setVisibility(View.GONE);
+        }
         stickersRv.setNestedScrollingEnabled(false);
 
         RecyclerView emojiRv = sheet.findViewById(R.id.recyclerEmojis);
+        emojiRv.setVisibility(seatOnly ? View.GONE : View.VISIBLE);
+        View chatEmojiLabel = sheet.findViewById(R.id.tvChatEmojisLabel);
+        if (chatEmojiLabel != null) chatEmojiLabel.setVisibility(seatOnly ? View.GONE : View.VISIBLE);
         emojiRv.setLayoutManager(new GridLayoutManager(this, 8));
         emojiRv.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             @NonNull @Override
@@ -6474,6 +9071,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 AuraDialogHelper.message(this, getString(R.string.translate), out);
             });
         });
+    }
+
+    private String roomCpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CB";
+        }
     }
 
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
@@ -6590,6 +9198,99 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private String staffIdentityRoleKey(@Nullable AuthDtos.UserDto user) {
+        if (user == null) return "";
+        if (com.Dramizo.Series.util.StaffRoleHelper.isStaff(user)) {
+            return com.Dramizo.Series.util.StaffRoleHelper.normalize(user);
+        }
+        if (user.isRechargeAgent) return "rechargeAgent";
+        String role = "";
+        if (user.agency != null && user.agency.role != null) {
+            role = user.agency.role.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        if ((role.isEmpty() || "member".equals(role)) && user.agencyClub != null
+                && user.agencyClub.role != null) {
+            role = user.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        role = role.replace('-', '_').replace("agency_", "");
+        if ("owner".equals(role) || "leader".equals(role)) return "agencyLeader";
+        if ("host".equals(role)) return "host";
+        return "";
+    }
+
+    private String staffIdentityFallbackLabel(@Nullable AuthDtos.UserDto user, String roleKey) {
+        if (user != null && com.Dramizo.Series.util.StaffRoleHelper.isStaff(user)) {
+            return com.Dramizo.Series.util.StaffRoleHelper.badgeAr(user);
+        }
+        if ("rechargeAgent".equals(roleKey)) return "وكيل شحن";
+        if ("agencyLeader".equals(roleKey)) return user != null
+                ? com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel("قائد الوكالة", user.gender)
+                : "قائد الوكالة";
+        if ("host".equals(roleKey)) return user != null
+                ? com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel("مضيف", user.gender)
+                : "مضيف";
+        return roleKey;
+    }
+
+    private void bindRoomUserRoleBadges(
+            @Nullable android.widget.LinearLayout container,
+            @Nullable View row,
+            @Nullable AuthDtos.UserDto user) {
+        if (container == null || row == null) return;
+        container.removeAllViews();
+        String roleKey = staffIdentityRoleKey(user);
+        if (roleKey.isEmpty()) {
+            row.setVisibility(View.GONE);
+            return;
+        }
+        row.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.StaffIdentityConfigCache.load(this, () -> {
+            if (container.getParent() == null) return;
+            com.Dramizo.Series.util.StaffIdentityConfigCache.RoleIdentity identity =
+                    com.Dramizo.Series.util.StaffIdentityConfigCache.get(roleKey);
+            String fallback = staffIdentityFallbackLabel(user, roleKey);
+            String label = identity.label == null || identity.label.trim().isEmpty()
+                    ? fallback : com.Dramizo.Series.util.StaffRoleHelper.genderizeLabel(identity.label, user.gender);
+            container.removeAllViews();
+            if (identity.badgeUrl != null && !identity.badgeUrl.trim().isEmpty()) {
+                ImageView badge = new ImageView(this);
+                badge.setContentDescription(label);
+                badge.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                container.addView(badge, new LinearLayout.LayoutParams(dp(124), dp(28)));
+                Glide.with(badge).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(identity.badgeUrl.trim()))
+                        .fitCenter().into(badge);
+            } else {
+                TextView badge = new TextView(this);
+                badge.setText(label);
+                badge.setTextColor(Color.WHITE);
+                badge.setTextSize(11f);
+                badge.setTypeface(null, android.graphics.Typeface.BOLD);
+                badge.setGravity(Gravity.CENTER);
+                badge.setSingleLine(true);
+                badge.setPadding(dp(12), dp(4), dp(12), dp(4));
+                GradientDrawable background = new GradientDrawable();
+                background.setColor("super".equals(roleKey) ? 0xFF6D3CC8
+                        : "admin".equals(roleKey) || "manager".equals(roleKey) ? 0xFF245D9B
+                        : "host".equals(roleKey) ? 0xFF8A5A24 : 0xFF177A68);
+                background.setCornerRadius(dp(8));
+                badge.setBackground(background);
+                container.addView(badge, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
+            }
+            row.setVisibility(View.VISIBLE);
+        });
+    }
+
+    private static String roomCpTopSymbol(String type) {
+        if (type == null) return "♥";
+        String value = type.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value.contains("marriage") || value.contains("زوج") || value.contains("wedding")) return "💍";
+        if (value.contains("engage") || value.contains("خطوب")) return "💎";
+        if (value.contains("friend") || value.contains("صدا")) return "♡";
+        if (value.contains("sibling") || value.contains("اخو") || value.contains("أخو")) return "✦";
+        return "♥";
+    }
+
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
                               String hostBadgeUrl, int vipLevel, int userLevel) {
         BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
@@ -6600,6 +9301,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuraDialogHelper.configureShown(dialog);
             View bs = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bs != null) bs.setBackgroundResource(android.R.color.transparent);
+            // Keep the last moderation controls above Android's gesture/navigation area.
+            if (sheet instanceof androidx.core.widget.NestedScrollView) {
+                androidx.core.widget.NestedScrollView scroll =
+                        (androidx.core.widget.NestedScrollView) sheet;
+                final int baseBottom = scroll.getPaddingBottom();
+                scroll.setClipToPadding(false);
+                ViewCompat.setOnApplyWindowInsetsListener(scroll, (view, insets) -> {
+                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    // Reserve a larger scroll tail so moderator controls never sit behind
+                    // Android's Home / Back / gesture-navigation area on short screens.
+                    int densityPadding = (int) (56 * getResources().getDisplayMetrics().density);
+                    int safeBottom = Math.max(baseBottom + densityPadding,
+                            systemBars.bottom + densityPadding);
+                    view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
+                            view.getPaddingRight(), safeBottom);
+                    view.setVerticalScrollBarEnabled(true);
+                    return insets;
+                });
+                ViewCompat.requestApplyInsets(scroll);
+            }
         });
         TextView tvName = sheet.findViewById(R.id.tvUserName);
         TextView tvUserId = sheet.findViewById(R.id.tvUserId);
@@ -6615,6 +9336,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView tvPropFriends = sheet.findViewById(R.id.tvPropFriendsCount);
         View propFamily = sheet.findViewById(R.id.propFamily);
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
+        ImageView imgVipMainIcon = sheet.findViewById(R.id.imgVipMainIcon);
+        ImageView imgVipHorizontalBadge = sheet.findViewById(R.id.imgVipHorizontalBadge);
         ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
@@ -6632,10 +9355,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        View actCpRequest = sheet.findViewById(R.id.actCpRequest);
+        View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
+        View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
+        ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        ImageView imgCpPartnerTopFrame = sheet.findViewById(R.id.imgCpPartnerTopFrame);
+        TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
                 chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
+        if (chipVip != null) {
+            chipVip.setVisibility(View.GONE);
+            chipVip.setText(null);
+        }
         if (chipMember != null) {
             chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         }
@@ -6644,22 +9379,144 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
                     this, sheet, userId, myUserId, dialog::dismiss);
         }
-        com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
-        bindVipUserCardMedal(imgVipMedal, vipLevel, null);
-        ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
-        // In-room profile card: always fixed VIP nobility frame (ud_vip_tou_N) when VIP.
-        // Mall/SVGA wear stays on seat mics via wearFrameUrl — not here.
-        final String[] chatVipFrame = {
-                VipStyle.profileNobilityFrameUrl(vipLevel, null)
-        };
-        bindVipUserCardHead(vipHead, vipLevel, null);
-        AvatarCosmetics.bindStacked(img, frame, avatarUrl, chatVipFrame[0]);
-        // Agency room: host signal only as overlay; VIP frame still fixed ud_vip_tou.
-        if (isAgencyRoom) {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], hostBadgeUrl, null, null);
-        } else {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], null, null, null);
+        // CB initiation is room-only: the selected CB gift creates a pending request.
+        if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
+        if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
+        AppContainer cpContainer = ContainerProvider.from(this);
+        // CB relationship requests must originate from sending a CB gift in the gift sheet.
+        if (actCpRequest != null) {
+            actCpRequest.setVisibility(View.GONE);
+            actCpRequest.setOnClickListener(null);
         }
+        if (userId != null && !userId.trim().isEmpty()) {
+            cpContainer.getIoExecutor().execute(() -> {
+                Result<List<Map<String, Object>>> cpResult = ApiCall.execute(
+                        cpContainer.getUserApi().cpProfileRelationships(userId));
+                if (!cpResult.success || cpResult.data == null || cpResult.data.isEmpty()) return;
+                Map<String, Object> rel = cpResult.data.get(0);
+                Object partnerObject = rel.get("partner");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("partnerUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("linkedUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("relatedUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("otherUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("counterpart");
+                Map<?, ?> cpPartner = partnerObject instanceof Map ? (Map<?, ?>) partnerObject : null;
+                String type = rel.get("type") == null ? "" : String.valueOf(rel.get("type"));
+                String status = firstNonEmpty(rel.get("status") == null ? null : String.valueOf(rel.get("status")),
+                        rel.get("state") == null ? null : String.valueOf(rel.get("state")),
+                        rel.get("relationshipStatus") == null ? null : String.valueOf(rel.get("relationshipStatus")), "");
+                String statusLower = status == null ? "" : status.trim().toLowerCase(java.util.Locale.ROOT);
+                boolean inactive = Boolean.FALSE.equals(rel.get("isActive")) || Boolean.FALSE.equals(rel.get("active"))
+                        || rel.get("endedAt") != null || statusLower.contains("ended")
+                        || statusLower.contains("reject") || statusLower.contains("expired")
+                        || statusLower.contains("pending") || statusLower.contains("inactive");
+                if (inactive) return;
+                String cpName = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerDisplayName") == null ? null : String.valueOf(rel.get("partnerDisplayName")),
+                                rel.get("partnerUsername") == null ? null : String.valueOf(rel.get("partnerUsername")), "")
+                        : firstNonEmpty(cpPartner.get("displayName") == null ? null : String.valueOf(cpPartner.get("displayName")),
+                                cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")),
+                                cpPartner.get("name") == null ? null : String.valueOf(cpPartner.get("name")), "");
+                String cpAvatar = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerAvatarUrl") == null ? null : String.valueOf(rel.get("partnerAvatarUrl")),
+                                rel.get("partner_avatar_url") == null ? null : String.valueOf(rel.get("partner_avatar_url")),
+                                rel.get("partnerProfileImageUrl") == null ? null : String.valueOf(rel.get("partnerProfileImageUrl")),
+                                rel.get("partnerPhotoUrl") == null ? null : String.valueOf(rel.get("partnerPhotoUrl")),
+                                rel.get("partnerPicture") == null ? null : String.valueOf(rel.get("partnerPicture")),
+                                rel.get("partnerImageUrl") == null ? null : String.valueOf(rel.get("partnerImageUrl")), "")
+                        : firstNonEmpty(cpPartner.get("avatarUrl") == null ? null : String.valueOf(cpPartner.get("avatarUrl")),
+                                cpPartner.get("avatar") == null ? null : String.valueOf(cpPartner.get("avatar")),
+                                cpPartner.get("profileImageUrl") == null ? null : String.valueOf(cpPartner.get("profileImageUrl")),
+                                cpPartner.get("photoUrl") == null ? null : String.valueOf(cpPartner.get("photoUrl")),
+                                cpPartner.get("picture") == null ? null : String.valueOf(cpPartner.get("picture")),
+                                cpPartner.get("imageUrl") == null ? null : String.valueOf(cpPartner.get("imageUrl")),
+                                cpPartner.get("profilePicture") == null ? null : String.valueOf(cpPartner.get("profilePicture")),
+                                cpPartner.get("photo") == null ? null : String.valueOf(cpPartner.get("photo")),
+                                cpPartner.get("avatar_url") == null ? null : String.valueOf(cpPartner.get("avatar_url")), "");
+                String cpFrame = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerFrameUrl") == null ? null : String.valueOf(rel.get("partnerFrameUrl")),
+                                rel.get("partnerVipBadgeUrl") == null ? null : String.valueOf(rel.get("partnerVipBadgeUrl")), "")
+                        : firstNonEmpty(cpPartner.get("vipBadgeUrl") == null ? null : String.valueOf(cpPartner.get("vipBadgeUrl")),
+                                cpPartner.get("profileFrameUrl") == null ? null : String.valueOf(cpPartner.get("profileFrameUrl")),
+                                cpPartner.get("frameUrl") == null ? null : String.valueOf(cpPartner.get("frameUrl")),
+                                cpPartner.get("avatarFrameUrl") == null ? null : String.valueOf(cpPartner.get("avatarFrameUrl")),
+                                cpPartner.get("vipTouUrl") == null ? null : String.valueOf(cpPartner.get("vipTouUrl")), "");
+                String cpVipTou = cpPartner == null || cpPartner.get("vipTouUrl") == null ? "" : String.valueOf(cpPartner.get("vipTouUrl"));
+                int cpVipLevel = 0;
+                try { Object vip = cpPartner == null ? rel.get("partnerVipLevel") : cpPartner.get("vipLevel");
+                    cpVipLevel = vip == null ? 0 : Integer.parseInt(String.valueOf(vip));
+                } catch (Exception ignored) { }
+                if (cpFrame == null || cpFrame.trim().isEmpty()) {
+                    String vipFrame = VipStyle.profileNobilityFrameUrl(cpVipLevel, cpVipTou);
+                    cpFrame = vipFrame == null ? "" : vipFrame;
+                }
+                final String partnerAvatarUrl = cpAvatar == null ? "" : cpAvatar.trim();
+                final String partnerFrameUrl = cpFrame == null ? "" : cpFrame.trim();
+                final String relationshipType = type;
+                final String partnerName = cpName == null ? "" : cpName;
+                Object cpLevelTitleValue = rel.get("profileTitle");
+                if (cpLevelTitleValue == null || String.valueOf(cpLevelTitleValue).trim().isEmpty()) cpLevelTitleValue = rel.get("levelName");
+                final String cpLevelTitle = cpLevelTitleValue == null ? "Lv." + rel.getOrDefault("level", 1) : String.valueOf(cpLevelTitleValue);
+                final String cpDurationLabel = rel.get("durationLabel") == null ? "" : String.valueOf(rel.get("durationLabel"));
+                runOnUiThread(() -> {
+                    // Network may return before the bottom-sheet Window exists; still bind the views.
+                    if (isFinishing() || isDestroyed()) return;
+                    if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(relationshipType)
+                            + (partnerName.isEmpty() ? "" : " · " + partnerName)
+                            + " · " + cpLevelTitle
+                            + (cpDurationLabel.isEmpty() ? "" : " · معاً منذ " + cpDurationLabel));
+                    String resolvedPartnerAvatar = partnerAvatarUrl.isEmpty() ? null : AssetCatalog.absoluteUrl(partnerAvatarUrl);
+                    if (imgCpPartnerAvatar != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
+                            .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    // Show the linked portrait from either nested partner objects or flattened API fields.
+                    if (cpTopPartnerWrap != null && !partnerAvatarUrl.isEmpty()) {
+                        cpTopPartnerWrap.setVisibility(View.VISIBLE);
+                        if (imgCpPartnerTop != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
+                                .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerTop);
+                        if (imgCpPartnerTopFrame != null) {
+                            if (partnerFrameUrl.isEmpty()) { imgCpPartnerTopFrame.setImageDrawable(null); imgCpPartnerTopFrame.setVisibility(View.GONE); }
+                            else { imgCpPartnerTopFrame.setVisibility(View.VISIBLE);
+                                Glide.with(VoiceRoomActivity.this).load(AssetCatalog.absoluteUrl(partnerFrameUrl)).into(imgCpPartnerTopFrame); }
+                        }
+                        if (tvCpTopHeart != null) {
+                            tvCpTopHeart.setText(roomCpTopSymbol(relationshipType));
+                            tvCpTopHeart.setVisibility(View.VISIBLE);
+                            tvCpTopHeart.setTextColor(android.graphics.Color.parseColor("#FFFF6FA9"));
+                            tvCpTopHeart.setShadowLayer(8f, 0f, 0f, android.graphics.Color.parseColor("#FFFF8DB9"));
+                            android.animation.ObjectAnimator sx = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_X, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator sy = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_Y, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator alpha = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.ALPHA, 0.78f, 1f, 0.78f);
+                            android.animation.AnimatorSet heartMotion = new android.animation.AnimatorSet();
+                            heartMotion.playTogether(sx, sy, alpha); heartMotion.setDuration(900L);
+                            heartMotion.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+                            sx.setRepeatCount(android.animation.ValueAnimator.INFINITE); sy.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            alpha.setRepeatCount(android.animation.ValueAnimator.INFINITE); heartMotion.start();
+                            dialog.setOnDismissListener(d -> heartMotion.cancel());
+                        }
+                    }
+                    if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
+                });
+            });
+        }
+                com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
+        // Retire the legacy VIP banner/medal in the viewer card. The configured
+        // primary icon and horizontal level badge are bound from the selected user's data.
+        if (vipHead != null) { vipHead.setVisibility(View.GONE); vipHead.setImageDrawable(null); }
+        if (imgVipMedal != null) { imgVipMedal.setVisibility(View.GONE); imgVipMedal.setImageDrawable(null); }
+        if (imgVipMainIcon != null) { imgVipMainIcon.setVisibility(View.GONE); imgVipMainIcon.setImageDrawable(null); }
+        if (imgVipHorizontalBadge != null) { imgVipHorizontalBadge.setVisibility(View.GONE); imgVipHorizontalBadge.setImageDrawable(null); }
+        ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
+        HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
+        // Show the actual equipped mall frame first; fixed VIP art is only the fallback.
+        final String[] chatVipFrame = {
+                frameUrl != null && !frameUrl.trim().isEmpty()
+                        ? frameUrl : VipStyle.profileNobilityFrameUrl(vipLevel, null)
+        };
+        AvatarCosmetics.bindProfileWear(
+                userCardHostSignal, img, frame, avatarUrl, chatVipFrame[0],
+                null, null, Math.max(1, vipLevel));
         if (rowAgency != null) rowAgency.setVisibility(View.GONE);
         if (btnCopyId != null) {
             btnCopyId.setOnClickListener(v -> {
@@ -6688,21 +9545,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 runOnUiThread(() -> {
                     if (!dialog.isShowing()) return;
                     int liveVip = Math.max(0, r.data.vipLevel);
-                    chatVipFrame[0] = VipStyle.profileNobilityFrameUrl(liveVip, r.data.vipTouUrl);
-                    AvatarCosmetics.bindAvatar(img,
-                            r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl);
-                    AvatarCosmetics.applyHostWear(
-                            frame,
-                            hostBadge,
-                            img,
-                            chatVipFrame[0],
-                            isAgencyRoom ? r.data.hostBadgeUrl : null,
-                            null,
-                            isAgencyRoom ? r.data.hostBadgeMeta : null);
-                    bindVipUserCardHead(vipHead, liveVip,
-                            r.data.vipHeadUrl != null ? r.data.vipHeadUrl
-                                    : VipStyle.fixedHeadPath(liveVip));
-                    // Head owns: entry ride + VIP medal.
+                    chatVipFrame[0] = r.data.vipBadgeUrl != null
+                            && !r.data.vipBadgeUrl.trim().isEmpty()
+                            ? r.data.vipBadgeUrl
+                            : (frameUrl != null && !frameUrl.trim().isEmpty()
+                                    ? frameUrl : VipStyle.profileNobilityFrameUrl(liveVip, r.data.vipTouUrl));
+                    AvatarCosmetics.bindProfileWear(
+                            userCardHostSignal, img, frame,
+                            r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl,
+                            chatVipFrame[0], null, null, Math.max(1, liveVip));
+                    // Never render the retired legacy VIP banner or medal.
+                    if (vipHead != null) { vipHead.setVisibility(View.GONE); vipHead.setImageDrawable(null); }
+                    if (imgVipMedal != null) { imgVipMedal.setVisibility(View.GONE); imgVipMedal.setImageDrawable(null); }
+                    String mainVipIconUrl = r.data.vipMainIconUrl;
+                    if (imgVipMainIcon != null && liveVip > 0
+                            && mainVipIconUrl != null && !mainVipIconUrl.trim().isEmpty()) {
+                        imgVipMainIcon.setVisibility(View.VISIBLE);
+                        com.Dramizo.Series.util.ServerAssets.load(imgVipMainIcon, mainVipIconUrl.trim());
+                    } else if (imgVipMainIcon != null) {
+                        imgVipMainIcon.setVisibility(View.GONE);
+                        imgVipMainIcon.setImageDrawable(null);
+                    }
+                    if (imgVipHorizontalBadge != null && r.data.vipHorizontalBadgeUrl != null
+                            && !r.data.vipHorizontalBadgeUrl.trim().isEmpty()) {
+                        imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                        com.Dramizo.Series.util.ServerAssets.load(imgVipHorizontalBadge, r.data.vipHorizontalBadgeUrl.trim());
+                    } else if (imgVipHorizontalBadge != null) {
+                        imgVipHorizontalBadge.setVisibility(View.GONE);
+                        imgVipHorizontalBadge.setImageDrawable(null);
+                    }
+                    // Entry ride is separate from the retired VIP medal.
                     if (imgEntryRide != null) {
                         String ride = r.data.entryAnimationUrl != null
                                 && !r.data.entryAnimationUrl.isEmpty()
@@ -6727,8 +9599,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             imgEntryRide.setVisibility(View.GONE);
                         }
                     }
-                    bindVipUserCardMedal(imgVipMedal, liveVip, r.data.levelBadgeUrl);
                     bindUserCardAgency(rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, r.data.agency);
+                    bindRoomUserRoleBadges((android.widget.LinearLayout) sheet.findViewById(R.id.roleBadgesContainer), sheet.findViewById(R.id.rowRoleBadges), r.data);
                     com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(
                             userCardBg, moreActionsBlock, liveVip);
                     if (r.data.displayName != null && !r.data.displayName.isEmpty()) {
@@ -6791,6 +9663,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         if (!pid.isEmpty()) {
                             tvUserId.setVisibility(View.VISIBLE);
                             tvUserId.setText("ID:" + pid);
+                            com.Dramizo.Series.util.VanityIdStyle.bind(
+                                    tvUserId, cpContainer.getVanityApi(), pid, liveVip);
                             if (btnCopyId != null) btnCopyId.setVisibility(View.VISIBLE);
                         } else {
                             tvUserId.setVisibility(View.GONE);
@@ -6878,33 +9752,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         TextView actMute = sheet.findViewById(R.id.actMute);
         if (actMute != null) {
-            boolean showMute = canMuteUsers && canTarget && targetSeat != null;
+            boolean showMute = canMuteUsers && canTarget && targetSeat != null
+                    && !targetSeat.isMuted && !targetSeat.isModeratorMuted;
             actMute.setVisibility(showMute ? View.VISIBLE : View.GONE);
             if (showMute) {
-                final boolean currentlyMuted = targetSeat.isMuted || targetSeat.isModeratorMuted;
-                actMute.setText(currentlyMuted ? "فك كتم المايك" : "كتم المايك");
+                actMute.setText("كتم المايك");
                 actMute.setOnClickListener(v -> {
                     dialog.dismiss();
-                    viewModel.setMic(roomId, !currentlyMuted, userId);
+                    viewModel.setMic(roomId, true, userId);
                 });
             }
         }
 
         TextView actForceLeaveSeat = sheet.findViewById(R.id.actForceLeaveSeat);
         if (actForceLeaveSeat != null) {
-            boolean showForceLeave = canManageSeats && canTarget && targetSeat != null;
+            boolean canRemoveFromMic = canManageSeats || canKickUsers || (myUserId != null && roomModeratorIds.contains(myUserId)) || isPlatformManager() || isPlatformSuper();
+            boolean showForceLeave = canRemoveFromMic && canTarget && targetSeat != null;
             actForceLeaveSeat.setVisibility(showForceLeave ? View.VISIBLE : View.GONE);
             if (showForceLeave) {
-                actForceLeaveSeat.setText("إنزال من المايك");
+                actForceLeaveSeat.setText("إزالة من المايك");
                 actForceLeaveSeat.setOnClickListener(v -> {
                     dialog.dismiss();
-                    AuraDialogHelper.confirm(this,
-                            "إنزال من المايك",
-                            "إنزال هذا المستخدم من المايك؟ سيبقى داخل الغرفة كمستمع.",
-                            "إنزال",
-                            () -> viewModel.forceLeaveSeat(roomId, userId),
-                            "إلغاء",
-                            null);
+                    if (roomId == null || userId == null || userId.trim().isEmpty()) {
+                        Toast.makeText(this, "تعذر تحديد المستخدم أو الغرفة", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    // Run the server action immediately; the room:seat_left event stops
+                    // the target's mic publisher while keeping them in the room.
+                    viewModel.removeMemberFromMic(roomId, userId);
                 });
             }
         }
@@ -6953,6 +9828,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return;
             }
             final String giftTarget = target;
+            refreshSelfGiftPolicy();
             // Open gifts after the user-card sheet fully dismisses.
             binding.getRoot().post(() ->
                     GiftBottomSheet.show(getSupportFragmentManager(), giftTarget, null, roomId));
@@ -7234,10 +10110,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private boolean canModerateRoom() {
-        // Full room settings / admin panel: host, owner, or explicit canManageRoom only.
-        // Presence in moderatorIds alone must NOT unlock room admin for everyone.
-        if (isPlatformSuper()) return true;
-        if (isPlatformManager()) return true;
+        // Platform Admin/Super/Manager get only the staff actions enforced by backend;
+        // appointed room moderators never inherit platform-wide privileges.
+        if (isPlatformStaff()) return true;
         if (isHost || isOwner) return true;
         return canManageRoom;
     }
@@ -7271,8 +10146,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean isPlatformAdmin() {
+        try {
+            return com.Dramizo.Series.util.StaffRoleHelper.ADMIN.equals(
+                    com.Dramizo.Series.util.StaffRoleHelper.normalize(
+                            ContainerProvider.from(this).getSessionManager().getUser()));
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private boolean isPlatformStaff() {
-        return isPlatformSuper() || isPlatformManager();
+        return isPlatformSuper() || isPlatformAdmin() || isPlatformManager();
     }
 
     private boolean isFreeMicEnabled() {
@@ -7304,7 +10189,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.llMusicLibraryChip.setVisibility(View.GONE);
         }
         // Keep request list warm so tools / host dialogs stay current.
-        if (canInviteMic && !isFreeMicEnabled() && roomId != null) {
+        if ((canInviteMic || canManageSeats || isHost || isOwner)
+                && (!isFreeMicEnabled() || isMicRequestEnabled()) && roomId != null) {
             viewModel.loadSeatRequests(roomId);
         } else {
             updateSeatRequestBadge(null);
@@ -7315,17 +10201,77 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private boolean canReviewMicRequests() {
+        return (canInviteMic || canManageSeats || isHost || isOwner)
+                && (!isFreeMicEnabled() || isMicRequestEnabled());
+    }
+
     private void updateSeatRequestBadge(List<RoomDtos.SeatRequestDto> list) {
-        // Header badge removed — mic requests open from أدوات → طلبات المايك.
         if (binding == null) return;
         if (binding.btnPlusWrap != null) binding.btnPlusWrap.setVisibility(View.GONE);
-        if (binding.tvSeatRequestBadge != null) {
-            binding.tvSeatRequestBadge.setVisibility(View.GONE);
-            int count = list != null ? list.size() : 0;
-            if (count > 0) {
-                binding.tvSeatRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
-            }
+        if (binding.tvSeatRequestBadge != null) binding.tvSeatRequestBadge.setVisibility(View.GONE);
+
+        TextView requestToast = binding.tvMicRequestToast;
+        if (requestToast == null) return;
+        int count = list != null ? list.size() : 0;
+        boolean visible = canReviewMicRequests() && count > 0;
+        if (!visible) {
+            requestToast.animate().cancel();
+            requestToast.setVisibility(View.GONE);
+            requestToast.setOnClickListener(null);
+            return;
         }
+
+        RoomDtos.SeatRequestDto first = list.get(0);
+        String firstName = first != null && first.displayName != null
+                && !first.displayName.trim().isEmpty() ? first.displayName.trim() : "ضيف";
+        String label = count == 1
+                ? ("✋ " + firstName + " يطلب المايك")
+                : ("✋ " + count + " طلبات صعود للمايك");
+        requestToast.setText(label);
+        requestToast.setContentDescription("طلبات الصعود إلى المايك: " + count);
+        android.graphics.drawable.GradientDrawable surface =
+                new android.graphics.drawable.GradientDrawable();
+        surface.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        surface.setCornerRadius(getResources().getDisplayMetrics().density * 13f);
+        surface.setColor(Color.argb(238, 27, 31, 43));
+        surface.setStroke(Math.max(1, (int) (getResources().getDisplayMetrics().density * 1.2f)),
+                Color.rgb(224, 184, 91));
+        requestToast.setBackground(surface);
+        requestToast.setElevation(getResources().getDisplayMetrics().density * 12f);
+        requestToast.setVisibility(View.VISIBLE);
+        requestToast.setOnClickListener(v -> {
+            if (!canReviewMicRequests()) {
+                requestToast.setVisibility(View.GONE);
+                return;
+            }
+            showSeatRequestsDialog();
+        });
+    }
+
+    /**
+     * The room is edge-to-edge so its background stays full bleed, but the bottom
+     * action row must sit above Android's transparent navigation/gesture bar.
+     */
+    private void applyRoomBottomSafeArea() {
+        if (binding == null || binding.bottomBar == null) return;
+        ViewGroup.LayoutParams initial = binding.bottomBar.getLayoutParams();
+        final int originalBottomMargin = initial instanceof ConstraintLayout.LayoutParams
+                ? ((ConstraintLayout.LayoutParams) initial).bottomMargin : 0;
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (root, insets) -> {
+            Insets navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            ViewGroup.LayoutParams raw = binding.bottomBar.getLayoutParams();
+            if (raw instanceof ConstraintLayout.LayoutParams) {
+                ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) raw;
+                int safeBottomMargin = Math.max(originalBottomMargin, navBars.bottom);
+                if (lp.bottomMargin != safeBottomMargin) {
+                    lp.bottomMargin = safeBottomMargin;
+                    binding.bottomBar.setLayoutParams(lp);
+                }
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(binding.getRoot());
     }
 
     private void syncMicUi() {
@@ -7341,14 +10287,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             updateHostMuteBadge();
             return;
         }
-        if (seatAdapter != null) seatAdapter.setSelfMicMuted(!micOn);
-        if (!Objects.equals(lastMicUiState, micOn)) {
-            lastMicUiState = micOn;
-            binding.imgMicIcon.setImageResource(
-                    micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
-            // Keep the professional mic art without a colored circle behind it.
-            binding.btnMic.setBackgroundResource(android.R.color.transparent);
+        // The SDK is the source of truth. A local toggle can be rejected while another
+        // recorder owns capture; never paint an open mic until RTC confirms publishing input.
+        try {
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+        } catch (Exception ignored) {
+            micOn = false;
         }
+        if (seatAdapter != null) seatAdapter.setSelfMicMuted(!micOn);
+        lastMicUiState = micOn;
+        binding.imgMicIcon.setImageResource(
+                micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
+        binding.btnMic.setBackgroundResource(android.R.color.transparent);
         updateHostMuteBadge();
     }
 
@@ -7366,14 +10316,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
-        if (roomMusicPlayer != null) {
-            if (isYoutubeMusicUrl(currentMusicUrl)
-                    || (currentMusicUrl != null && !isLocalMusicUrl(currentMusicUrl))) {
-                applySharedMusicVolume();
-            } else {
-                roomMusicPlayer.setVolume(muted ? 0f : 1f);
-            }
-        }
+        // Reapply local playback mute to every active music source (ExoPlayer,
+        // YouTube and the ZEGO local media player), while preserving its saved slider
+        // value and leaving microphone capture/published audio unchanged.
+        applySharedMusicVolume();
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
             activateSeatAudio(currentSeats);
@@ -7501,7 +10447,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 int total = Math.max(top.size(), all.size());
                 binding.tvSupportersCount.setText(total > 99 ? "99+" : String.valueOf(total));
                 binding.tvSupportersCount.setVisibility(View.VISIBLE);
+                // Tap the supporter count to open the room wealth/contribution ranking.
+                binding.tvSupportersCount.setOnClickListener(v -> showSupportersBoard());
+                binding.tvSupportersCount.setClickable(true);
             } else {
+                binding.tvSupportersCount.setOnClickListener(null);
+                binding.tvSupportersCount.setClickable(false);
                 binding.tvSupportersCount.setVisibility(View.GONE);
             }
         }
@@ -7516,7 +10467,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!hasAny) return;
         for (int i = 0; i < top.size(); i++) {
             RoomDtos.SupporterDto supporter = top.get(i);
-            bindTop(slots[i], imgs[i], frames[i], supporter.avatarUrl, null);
+            bindTop(slots[i], imgs[i], frames[i], supporter.avatarUrl, supporter.vipBadgeUrl);
             // Front avatar (left) highest elevation — Mikoo cascade.
             if (slots[i] != null) slots[i].setElevation(dp(8 - i * 2));
             slots[i].setContentDescription(
@@ -7577,7 +10528,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!visible) return;
         for (int i = 0; i < Math.min(3, supporters.size()); i++) {
             RoomDtos.SupporterDto supporter = supporters.get(i);
-            bindTop(slots[i], images[i], frames[i], supporter.avatarUrl, null);
+            bindTop(slots[i], images[i], frames[i], supporter.avatarUrl, supporter.vipBadgeUrl);
             slots[i].setContentDescription(
                     "داعم الوكالة " + (i + 1) + " " + supporter.displayName);
             slots[i].setOnClickListener(v -> showUserCard(
@@ -7599,15 +10550,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         slot.setVisibility(View.VISIBLE);
-        // Top supporters: avatar only — no worn host frame.
-        if (frame != null) {
-            frame.setVisibility(View.GONE);
-            frame.setImageDrawable(null);
-        }
-        img.setPadding(0, 0, 0, 0);
-        img.setBackground(null);
-        AvatarImageLoader.applyCircularClip(img);
-        AvatarImageLoader.load(img, url);
+        // Keep the user's equipped frame visible on supporter avatars as well.
+        AvatarCosmetics.bindWear(img, frame, url, frameUrl);
     }
 
     private void clearTopSupportersUi() {
@@ -7676,6 +10620,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         clearSeatRequestsUi();
         clearTopSupportersUi();
+        // A full room exit ends this device's local chat session. Do not send
+        // a server-wide wipe: other users who remain in the room keep their chat.
+        clearRoomChatSession();
         handler.removeCallbacks(refreshRunnable);
         handler.removeCallbacks(retryRealtimeJoinRunnable);
         handler.removeCallbacks(retryHttpJoinRunnable);
@@ -7792,6 +10739,70 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         VoiceRoomActivity room = sAliveRoom != null ? sAliveRoom.get() : null;
         if (room == null || room.isFinishing() || room.isDestroyed()) return null;
         return room;
+    }
+
+    /** Refresh the mic control after the external recorder releases a previously-open mic. */
+    public static void onExternalMicRestored(boolean enabled) {
+        VoiceRoomActivity room = getAliveInstance();
+        if (room == null) return;
+        room.runOnUiThread(() -> {
+            room.micOn = enabled;
+            room.syncMicUi();
+        });
+    }
+
+    /** Pause only this device's Activity-owned music decoder while an external app records. */
+    public static void suspendMusicForExternalCapture() {
+        // Set synchronously before posting to the Activity thread. Realtime music
+        // events and lifecycle callbacks can arrive before the UI task is executed.
+        externalCaptureMusicSuspended = true;
+        // RTC speaker mute also silences Zego's local music monitor without
+        // stopping the host's published music stream for the other room members.
+        VoiceRoomActivity room = getAliveInstance();
+        if (room != null) room.runOnUiThread(room::pauseMusicForExternalCapture);
+    }
+
+    /** Resume the same room track after the external recorder has released the microphone. */
+    public static void restoreMusicAfterExternalCapture() {
+        externalCaptureMusicSuspended = false;
+        VoiceRoomActivity room = getAliveInstance();
+        if (room != null) room.runOnUiThread(room::resumeMusicAfterExternalCapture);
+    }
+
+    private void pauseMusicForExternalCapture() {
+        externalCaptureMusicPaused = true;
+        if (roomMusicPlayer != null) {
+            try { roomMusicPlayer.pause(); } catch (RuntimeException ignored) {}
+        }
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try {
+                musicYoutubeWebView.evaluateJavascript(
+                        "if(window.musicYtPlayer&&musicYtPlayer.pauseVideo)musicYtPlayer.pauseVideo();",
+                        null);
+            } catch (RuntimeException ignored) {}
+        }
+    }
+
+    private void resumeMusicAfterExternalCapture() {
+        externalCaptureMusicPaused = false;
+        if (roomSpeakerMuted || RoomRtcEngine.getInstance().isSpeakerMuted()) return;
+        RoomSoundFx.setMuted(false);
+        if (!"playing".equalsIgnoreCase(currentMusicStatus)) return;
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            try {
+                musicYoutubeWebView.evaluateJavascript(
+                        "if(window.musicYtPlayer&&musicYtPlayer.playVideo)musicYtPlayer.playVideo();",
+                        null);
+            } catch (RuntimeException ignored) {}
+        } else if (!isLocalMusicUrl(currentMusicUrl) && roomMusicPlayer != null) {
+            try { roomMusicPlayer.play(); } catch (RuntimeException ignored) {}
+        }
+    }
+
+    /** True when a celebration belongs to the room currently represented by this activity. */
+    public boolean isSameRoom(@Nullable String candidateRoomId) {
+        return candidateRoomId != null && !candidateRoomId.trim().isEmpty()
+                && roomId != null && roomId.equals(candidateRoomId);
     }
 
     private void navigateHomeAndFinish() {
@@ -7962,6 +10973,58 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && y >= loc[1] && y <= loc[1] + view.getHeight();
     }
 
+    // Room feed tabs filter presentation only; they do not change room events or audio state.
+    private int activeRoomFeed = 0; // 0 = all activity, 1 = text chat, 2 = gifts only
+
+    /**
+     * Keep the room feed tabs in normal layout flow. Their position must not
+     * depend on seat-count animations or gift/coin updates.
+     */
+    private void applyRoomFeedTabsSeatOffset() {
+        if (binding == null || binding.rowOfficialNews == null) return;
+        binding.rowOfficialNews.setTranslationY(0f);
+    }
+
+    private void initRoomFeedTabs() {
+        View all = findViewById(R.id.tabRoomAll);
+        View chat = findViewById(R.id.tabRoomChat);
+        View gifts = findViewById(R.id.tabRoomGifts);
+        if (all != null) all.setOnClickListener(v -> applyRoomFeedFilter(0));
+        if (chat != null) chat.setOnClickListener(v -> applyRoomFeedFilter(1));
+        if (gifts != null) gifts.setOnClickListener(v -> applyRoomFeedFilter(2));
+        applyRoomFeedFilter(0);
+    }
+
+    private void applyRoomFeedFilter(int filter) {
+        activeRoomFeed = Math.max(0, Math.min(2, filter));
+        setRoomFeedTabSelected(R.id.tabRoomAll, activeRoomFeed == 0);
+        setRoomFeedTabSelected(R.id.tabRoomChat, activeRoomFeed == 1);
+        setRoomFeedTabSelected(R.id.tabRoomGifts, activeRoomFeed == 2);
+        if (binding == null || binding.chatLog == null) return;
+        for (int i = 0; i < binding.chatLog.getChildCount(); i++) {
+            View row = binding.chatLog.getChildAt(i);
+            Object value = row.getTag();
+            String kind = value instanceof String ? (String) value : "event";
+            boolean visible = activeRoomFeed == 0
+                    || (activeRoomFeed == 1 && "chat".equals(kind))
+                    || (activeRoomFeed == 2 && "gift".equals(kind));
+            row.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+        if (binding.scrollChat != null) binding.scrollChat.post(() -> {
+            if (binding != null && binding.scrollChat != null) binding.scrollChat.scrollTo(0, 0);
+        });
+    }
+
+    private void setRoomFeedTabSelected(int id, boolean selected) {
+        View view = findViewById(id);
+        if (view instanceof TextView) {
+            TextView tab = (TextView) view;
+            tab.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            tab.setTextColor(selected ? 0xFFFFFFFF : 0xFFD6E6DF);
+            tab.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+    }
+
     private void switchRoomFeed(int direction) {
         if (isHost || roomId == null || switchingRoom || hoppingRoom || exiting) return;
         switchingRoom = true;
@@ -8063,7 +11126,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         applyRoomBanner(false);
         binding.tvRoomRules.setVisibility(shortScreen ? View.GONE : View.VISIBLE);
         // Give chat more vertical room so bubbles stay readable while typing.
-        binding.chatPanel.setMinimumHeight(dp(shortScreen ? 180 : tablet ? 260 : 220));
+        boolean thirtySeatRoom = currentSeats != null && guestSeatsOnly(currentSeats).size() > 20;
+        binding.chatPanel.setMinimumHeight(dp(thirtySeatRoom
+                ? (shortScreen ? 132 : 158)
+                : shortScreen ? 180 : tablet ? 260 : 220));
         // Keep private-msg icon sync with host toggle (does not hide public chat).
         applyChatZone(roomChatZoneVisible);
 
@@ -8088,10 +11154,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         setViewSize(binding.hostStageAvatarWrap, hostFrameSize, hostFrameSize);
         // webHostSignal is match_parent inside the wrap — size the wrap only.
 
-        ViewGroup.MarginLayoutParams hostStageParams =
-                (ViewGroup.MarginLayoutParams) binding.hostStage.getLayoutParams();
-        hostStageParams.topMargin = dp(shortScreen ? 0 : 2);
-        binding.hostStage.setLayoutParams(hostStageParams);
+        ViewGroup.LayoutParams hostStageRaw = binding.hostStage.getLayoutParams();
+        if (hostStageRaw instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams hostStageParams = (ViewGroup.MarginLayoutParams) hostStageRaw;
+            hostStageParams.topMargin = dp(shortScreen ? 0 : 2);
+            binding.hostStage.setLayoutParams(hostStageParams);
+        } else if (hostStageRaw != null) {
+            // hostStage is a LinearLayout in the current room XML; never cast it to a margin type.
+            ViewGroup.LayoutParams safe = new ViewGroup.LayoutParams(hostStageRaw);
+            binding.hostStage.setLayoutParams(safe);
+        }
 
         if (currentSeats != null && !currentSeats.isEmpty()) {
             applyMikooSeatGrid(guestSeatsOnly(currentSeats).size());
@@ -8107,7 +11179,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.luckyFloatWrap.setScaleX(shortScreen ? 0.84f : 1f);
         binding.luckyFloatWrap.setScaleY(shortScreen ? 0.84f : 1f);
 
-        binding.btnTools.setVisibility(View.VISIBLE);
+        binding.btnTools.setVisibility(View.GONE);
+        binding.btnGames.setVisibility(View.GONE);
         int controlMargin = narrow ? 3 : 6;
         setStartMargin(binding.btnMic, controlMargin);
         setStartMargin(binding.btnGift, controlMargin);
@@ -8179,32 +11252,43 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void applyRoomBackground(String url) {
-        String backgroundKey = url != null ? url : "";
-        if (Objects.equals(lastBoundBackgroundUrl, backgroundKey)) return;
+        String themeBg = (url == null || url.isEmpty())
+                ? com.Dramizo.Series.util.RemoteTheme.roomDefaultBackgroundUrl(this) : null;
+        String backgroundKey = (url == null || url.isEmpty())
+                ? "default:" + (themeBg != null ? themeBg : "") : url;
+        boolean sameBackground = Objects.equals(lastBoundBackgroundUrl, backgroundKey);
+        if (sameBackground) {
+            if (url != null && url.startsWith("drawable://")) return;
+            if (binding.imgRoomBg != null
+                    && binding.imgRoomBg.getTag(R.id.tag_image_url) instanceof String) return;
+            if ((url == null || url.isEmpty()) && (themeBg == null || themeBg.isEmpty())) return;
+        }
         lastBoundBackgroundUrl = backgroundKey;
+
         if (url == null || url.isEmpty()) {
-            String themeBg = com.Dramizo.Series.util.RemoteTheme.roomDefaultBackgroundUrl(this);
             if (themeBg != null && !themeBg.isEmpty()) {
-                // Keep XML android:src as fallback (hams_background).
-                com.Dramizo.Series.util.RemoteTheme.loadInto(binding.imgRoomBg, themeBg, 0);
+                com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                        binding.imgRoomBg, themeBg, R.drawable.voice_room_bg);
+            } else {
+                try { Glide.with(binding.imgRoomBg).clear(binding.imgRoomBg); } catch (Exception ignored) {}
+                binding.imgRoomBg.setTag(R.id.tag_image_url, null);
+                binding.imgRoomBg.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                binding.imgRoomBg.setImageResource(R.drawable.voice_room_bg);
             }
-            // else leave activity_voice_room.xml android:src
             return;
         }
         if (url.startsWith("drawable://")) {
+            try { Glide.with(binding.imgRoomBg).clear(binding.imgRoomBg); } catch (Exception ignored) {}
+            binding.imgRoomBg.setTag(R.id.tag_image_url, null);
+            binding.imgRoomBg.setTag(R.id.tag_image_loaded, Boolean.FALSE);
             String name = url.substring("drawable://".length());
             int resId = getResources().getIdentifier(name, "drawable", getPackageName());
-            if (resId != 0) binding.imgRoomBg.setImageResource(resId);
+            binding.imgRoomBg.setImageResource(resId != 0 ? resId : R.drawable.voice_room_bg);
             return;
         }
-        Glide.with(this)
-                .load(AssetCatalog.absoluteUrl(url))
-                .placeholder(binding.imgRoomBg.getDrawable())
-                .error(binding.imgRoomBg.getDrawable())
-                .centerCrop()
-                .into(binding.imgRoomBg);
+        com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                binding.imgRoomBg, url, R.drawable.voice_room_bg);
     }
-
     private void showRoomBackgroundPicker() {
         showRoomCosmeticPicker("room_background", false, false);
     }
@@ -8231,6 +11315,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         View progress = sheet.findViewById(R.id.progressBgPicker);
         TextView empty = sheet.findViewById(R.id.tvBgPickerEmpty);
+        TextView chooseFromPhone = sheet.findViewById(R.id.btnChooseRoomBackgroundFromPhone);
+        if (chooseFromPhone != null) {
+            boolean showPhonePicker = "room_background".equals(cosmeticType) && canManageRoom;
+            chooseFromPhone.setVisibility(showPhonePicker ? View.VISIBLE : View.GONE);
+            chooseFromPhone.setOnClickListener(v -> {
+                dialog.dismiss();
+                roomBackgroundPicker.launch("image/*");
+            });
+        }
         androidx.recyclerview.widget.RecyclerView recycler = sheet.findViewById(R.id.recyclerRoomBackgrounds);
         recycler.setLayoutManager(new GridLayoutManager(this, 2));
         int maxListH = Math.round(getResources().getDisplayMetrics().heightPixels * 0.48f);
@@ -8422,42 +11515,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showSeatCountSheet() {
-        if (!canManageRoom && !isHost) {
-            // Guests: home/minimize shortcut instead of seat admin.
-            keepRoomInBackground();
+        if (!canManageRoom && !isHost && !isOwner) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
             return;
         }
-        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
-        View sheet = getLayoutInflater().inflate(R.layout.dialog_room_settings, null);
-        AuraDialogHelper.applyContent(sheet);
-        dialog.setContentView(sheet);
+        showRoomSeatCountPicker();
+    }
 
-        TextView title = sheet.findViewById(R.id.tvDialogTitle);
-        if (title != null) title.setText("ضبط المقاعد");
+    private int currentGuestSeatCount() {
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        int total = room != null ? room.seatCount : 0;
+        int guests = total > 1 ? total - 1 : 10;
+        return guests;
+    }
 
-        // Hide non-seat admin rows for a focused seats sheet.
-        int[] hideIds = {
-                R.id.btnChangeRoomName,
-                R.id.btnChangeRoomPhoto,
-                R.id.btnSeatRequests,
-                R.id.btnToggleLock,
-                R.id.rowGiftSounds,
-                R.id.tvGiftSoundsHint,
-                R.id.btnPickRoomBackground,
-                R.id.btnManageSeats,
-                R.id.btnManageMods
-        };
-        for (int id : hideIds) {
-            View row = sheet.findViewById(id);
-            if (row != null) row.setVisibility(View.GONE);
-        }
-        View close = sheet.findViewById(R.id.btnDialogClose);
-        if (close != null) {
-            close.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        wireSeatCountButtons(sheet, dialog::dismiss);
-        dialog.show();
+    private void showRoomSeatCountPicker() {
+        RoomSeatCountPicker.show(this, currentGuestSeatCount(), guestMics -> {
+            viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
+            Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
+        });
     }
 
     private void showHostTools() {
@@ -8504,6 +11580,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         TextView btnChangePhoto = sheet.findViewById(R.id.btnChangeRoomPhoto);
         if (btnChangePhoto != null) {
+            btnChangePhoto.setText("خلفية الغرفة");
             btnChangePhoto.setVisibility(canManageRoom ? View.VISIBLE : View.GONE);
             btnChangePhoto.setOnClickListener(v -> {
                 dialog.dismiss();
@@ -8547,16 +11624,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 dialog.dismiss();
             });
         }
-        if (canManageRoom) {
-            wireSeatCountButtons(sheet, dialog::dismiss);
-        } else {
-            View rowCounts = sheet.findViewById(R.id.rowSeatCounts);
-            if (rowCounts != null) rowCounts.setVisibility(View.GONE);
+        View rowCounts = sheet.findViewById(R.id.rowSeatCounts);
+        TextView chooseSeatCount = sheet.findViewById(R.id.btnChooseSeatCount);
+        boolean canAdjustSeatCount = canManageRoom || isHost || isOwner;
+        if (canAdjustSeatCount && chooseSeatCount != null) {
+            if (rowCounts != null) rowCounts.setVisibility(View.VISIBLE);
+            chooseSeatCount.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
+            chooseSeatCount.setOnClickListener(v -> {
+                dialog.dismiss();
+                // Do not post from the dismissed sheet view; open the shared visual picker
+                // from the activity after the settings sheet has finished closing.
+                handler.postDelayed(() -> {
+                    if (!isFinishing() && !isDestroyed()) showRoomSeatCountPicker();
+                }, 250);
+            });
+        } else if (rowCounts != null) {
+            rowCounts.setVisibility(View.GONE);
         }
 
         View pickBg = sheet.findViewById(R.id.btnPickRoomBackground);
         if (pickBg != null) {
-            pickBg.setVisibility(canChangeFrames ? View.VISIBLE : View.GONE);
+            // The duplicate theme/background action is intentionally hidden; use the single
+            // clearly named "خلفية الغرفة" entry above.
+            pickBg.setVisibility(View.GONE);
             pickBg.setOnClickListener(v -> {
                 dialog.dismiss();
                 showRoomBackgroundPicker();
@@ -8577,6 +11667,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             btnMods.setOnClickListener(v -> {
                 dialog.dismiss();
                 showModeratorTools();
+            });
+        }
+        // Keep PK challenges in the Room Settings section beside room/seat controls.
+        // Respect both the dashboard feature switch and the existing host-only permission.
+        TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
+        if (btnRoomPk != null) {
+            boolean canStartRoomPk = isOwner && roomPkFeatureEnabled
+                    && (roomPkCurrentContestId == null || roomPkCurrentContestId.isEmpty()
+                    || "pending".equals(roomPkCurrentContestId));
+            btnRoomPk.setVisibility(canManageRoom || isOwner ? View.VISIBLE : View.GONE);
+            btnRoomPk.setEnabled(canStartRoomPk);
+            btnRoomPk.setAlpha(canStartRoomPk ? 1f : 0.55f);
+            btnRoomPk.setText(!roomPkFeatureEnabled
+                    ? "تحديات PK (معطّلة من لوحة التحكم)"
+                    : (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                    && !"pending".equals(roomPkCurrentContestId)
+                    ? "تحديات PK (يوجد تحدٍّ جارٍ)" : "تحديات PK"));
+            btnRoomPk.setOnClickListener(v -> {
+                if (!isOwner) {
+                    Toast.makeText(this, "تحديات PK متاحة لمضيف الغرفة فقط", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحديات PK معطّلة من لوحة التحكم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (roomPkCurrentContestId != null && !roomPkCurrentContestId.isEmpty()
+                        && !"pending".equals(roomPkCurrentContestId)) {
+                    Toast.makeText(this, "يوجد تحدّي PK جارٍ في هذه الغرفة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                dialog.dismiss();
+                showRoomPkChallengeDialog();
             });
         }
         wireGiftSoundsSwitch(sheet);
@@ -8897,7 +12020,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // 1) Pin the live host first when giftable (skip if that host is me).
         if (liveHostId != null && !liveHostId.isEmpty()
-                && (myUserId == null || !myUserId.equals(liveHostId))) {
+                && (myUserId == null || !myUserId.equals(liveHostId) || selfGiftAllowed)) {
             String name = null;
             String avatar = null;
             String hostBadge = null;
@@ -8944,7 +12067,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             for (RoomDtos.SeatDto seat : ordered) {
                 String uid = seatUserId(seat);
                 if (uid == null || uid.isEmpty()) continue;
-                if (myUserId != null && myUserId.equals(uid)) continue;
+                if (myUserId != null && myUserId.equals(uid) && !selfGiftAllowed) continue;
                 if (!seen.add(uid)) continue;
                 String name = seat.user != null
                         ? (seat.user.displayName != null ? seat.user.displayName : seat.user.username)
@@ -8960,6 +12083,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         uid, name, avatar, hostBadge, vipBadge,
                         seat.seatIndex, host, support, level));
             }
+        }
+        // When enabled, also expose the current user as a selectable target even when not seated.
+        // The server verifies the dashboard policy before accepting the self-gift.
+        if (selfGiftAllowed && myUserId != null && !myUserId.isEmpty() && seen.add(myUserId)) {
+            AuthDtos.UserDto me = null;
+            try { me = ContainerProvider.from(this).getSessionManager().getUser(); } catch (Exception ignored) {}
+            String selfName = me != null ? firstNonEmpty(me.displayName, me.username) : "أنا";
+            out.add(new GiftRecipient(myUserId, selfName != null ? selfName : "أنا",
+                    me != null ? me.avatarUrl : null,
+                    me != null ? me.hostBadgeUrl : null,
+                    me != null ? me.vipBadgeUrl : null,
+                    -1, false, seatAdapter != null ? seatAdapter.getGiftCoins(myUserId) : 0L,
+                    me != null ? Math.max(0, me.level) : 0));
         }
         return out;
     }
@@ -8979,13 +12115,52 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Live host / owner / cohost may send gifts to themselves (room support). */
     private boolean canHostGiftSelf() {
-        if (myUserId == null || myUserId.isEmpty()) return false;
-        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
-        String liveHostId = resolveLiveHostId(room);
-        return sameUser(myUserId, liveHostId)
-                || sameUser(myUserId, roomHostId)
-                || sameUser(myUserId, roomCohostId)
-                || (room != null && sameUser(myUserId, room.activeHostId));
+        return myUserId != null && !myUserId.isEmpty() && selfGiftAllowed;
+    }
+
+    /** Read the live self-gift switch; failures fail closed and the server remains authoritative. */
+    private void refreshSelfGiftPolicy() {
+        final AppContainer container;
+        try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
+            boolean allowed = false;
+            // Keep the room cannon available when an older backend omits these optional fields.
+            // An explicit dashboard value of false still disables it.
+            boolean cannonEnabled = true;
+            boolean cannonSound = true;
+            int cannonDuration = 5;
+            if (result.success && result.data != null) {
+                Object value = result.data.get("selfGiftAllowed");
+                allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
+                        || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
+                Object ce = result.data.get("luckyCannonEnabled");
+                if (ce != null) {
+                    cannonEnabled = Boolean.TRUE.equals(ce)
+                            || "true".equalsIgnoreCase(String.valueOf(ce))
+                            || "1".equals(String.valueOf(ce));
+                }
+                Object cs = result.data.get("luckyCannonSoundEnabled");
+                cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
+                Object cd = result.data.get("luckyCannonDurationSeconds");
+                try { cannonDuration = Math.max(1, Math.min(10, Integer.parseInt(String.valueOf(cd)))); } catch (Exception ignored) { cannonDuration = 5; }
+            }
+            final boolean next = allowed;
+            final boolean nextCannonEnabled = cannonEnabled;
+            final boolean nextCannonSound = cannonSound;
+            final int nextCannonDuration = cannonDuration;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (selfGiftAllowed != next) {
+                    selfGiftAllowed = next;
+                    notifyGiftSheetRecipientsChanged();
+                }
+                luckyCannonEnabled = nextCannonEnabled;
+                luckyCannonSoundEnabled = nextCannonSound;
+                luckyCannonDurationSeconds = nextCannonDuration;
+                if (!luckyCannonEnabled) hideLuckyCannon();
+            });
+        });
     }
 
     @Override
@@ -9161,7 +12336,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    /** Small join-style toast for lucky win (never a full-screen dialog). */
+    /** Lucky-win toast intentionally removed: no "حظ سعيد" popup is shown in rooms. */
     public void showLuckyResultToast(
             @Nullable String displayName,
             @Nullable String avatarUrl,
@@ -9169,25 +12344,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int vipLevel,
             @Nullable String message
     ) {
-        if (areCelebrationPopupsMuted()) return;
-        // Lucky gift result uses game-style crawl bubble — not ComingMsg (personal join strip).
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
-        String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
-        if (bubbleFx != null) {
-            bubbleFx.showSlotWinBubble(who, null, Math.max(1L, extractCoinsFromBody(msg)), "حظ", null);
-            if (binding != null && binding.giftChatEffects != null) {
-                binding.giftChatEffects.setVisibility(View.VISIBLE);
-                binding.giftChatEffects.bringToFront();
-            }
-        } else if (binding != null && binding.comingMsgView != null) {
-            binding.comingMsgView.setupView(displayName, avatarUrl, userLevel, vipLevel, msg);
-            binding.comingMsgView.bringToFront();
-            binding.comingMsgView.play(3600L);
-        }
-        if (roomBannerEnabled()) {
-            appendGameCelebrationLine(msg, null);
-        }
+        // Lucky results remain reflected by the wallet/reward flow; no toast/banner.
     }
 
     /** World celebration while inside a room — Migo bubble (name/avatar/game/win) + chat. */
@@ -9231,8 +12388,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String gameTitle,
             @Nullable String targetRoomId
     ) {
+        onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
+                coinsWon, gameTitle, targetRoomId,
+                parseLuckyMultiplierFromText(body != null ? body : title), null);
+    }
+
+    /** Explicit event metadata avoids relying on translated toast text to detect a high-X win. */
+    public void onGlobalCelebration(
+            @Nullable String kind,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            long coinsWon,
+            @Nullable String gameTitle,
+            @Nullable String targetRoomId,
+            double suppliedMultiplier,
+            @Nullable String winnerUserId
+    ) {
         if (areCelebrationPopupsMuted()) return;
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
+        String safeAvatar = "الرجل الغامض".equals(who) ? configuredMysteriousAvatarUrl() : avatarUrl;
         String line = body != null && !body.isEmpty()
                 ? body
                 : (title != null ? title : "مبروك!");
@@ -9248,18 +12426,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (otherRoom) {
                 // Other room summons keep a Go chip — still not a system Toast.
                 GlobalCelebrationToast.show(
-                        this, title, line, avatarUrl, badgeUrl, dedupeKey,
+                        this, title, line, safeAvatar, badgeUrl, dedupeKey,
                         56, 0, 0L, who, kind, targetRoomId);
             } else if (bubbleFx != null) {
                 String msg = title != null && !title.isEmpty() ? title : line;
-                bubbleFx.showRoomEventBubble(who, avatarUrl, msg, badgeUrl);
+                bubbleFx.showRoomEventBubble(who, safeAvatar, msg, badgeUrl);
                 if (binding != null && binding.giftChatEffects != null) {
                     binding.giftChatEffects.setVisibility(View.VISIBLE);
                     binding.giftChatEffects.bringToFront();
                 }
             }
             if (roomBannerEnabled()) {
-                appendChatLine(who, line, 0, 1, null, null, avatarUrl, badgeUrl);
+                appendChatLine(who, line, 0, 1, null, null, safeAvatar, badgeUrl);
             }
             return;
         }
@@ -9280,9 +12458,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             String chat = "مبروك " + who + " حصل على " + Math.max(1L, coins)
                     + (game != null && !game.isEmpty() ? (" · " + game) : "");
-            if (roomBannerEnabled()) {
-                appendGameCelebrationLine(chat, badgeUrl);
-            }
+            // Reward results are mandatory in-room text announcements, independent
+            // of the optional decorative room banner setting.
+            appendGameCelebrationLine(chat, badgeUrl);
             return;
         }
 
@@ -9290,31 +12468,48 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String chat;
         if (isLucky) {
             long coins = coinsWon > 0 ? coinsWon : extractCoinsFromBody(line);
+            double eventMultiplier = suppliedMultiplier > 0d
+                    ? suppliedMultiplier : parseLuckyMultiplierFromText(body != null ? body : line);
+            String multiplierLabel = eventMultiplier > 0d
+                    ? " · ×" + String.format(java.util.Locale.US, "%.0f", eventMultiplier) : "";
             toastMsg = coins > 0
-                    ? ("أرسل هدايا حظ وفاز بـ " + coins)
+                    ? ("أرسل هدايا حظ وفاز بـ " + String.format(java.util.Locale.US, "%,d", coins))
                     : "أرسل هدايا حظ وفاز";
             chat = coins > 0
-                    ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
+                    ? ("مبروك " + who + " ربح " + String.format(java.util.Locale.US, "%,d", coins)
+                        + " كوين" + multiplierLabel + " · حظ")
                     : ("مبروك " + who + " · حظ");
-            if (bubbleFx != null && coins > 0) {
-                bubbleFx.showSlotWinBubble(who, null, coins, "حظ", badgeUrl);
-                if (binding != null && binding.giftChatEffects != null) {
-                    binding.giftChatEffects.setVisibility(View.VISIBLE);
-                    binding.giftChatEffects.bringToFront();
-                }
-            } else if (bubbleFx != null) {
-                bubbleFx.showRoomEventBubble(null, null, who + " · " + toastMsg, badgeUrl);
+            String toastKey = dedupeKey != null ? dedupeKey
+                    : ("lucky-room-" + System.currentTimeMillis());
+            boolean highWin = coins >= 1000L || eventMultiplier >= 10d;
+            boolean sameTargetRoom = isSameRoom(targetRoomId);
+            // The center celebration is private: require an explicit sender ID match AND
+            // the originating room. Missing winner metadata must never expose it to others.
+            boolean winnerMatches = sameTargetRoom
+                    && winnerUserId != null && !winnerUserId.trim().isEmpty()
+                    && myUserId != null && sameUser(winnerUserId, myUserId);
+            // Every lucky outcome gets the same top toast in every connected room.
+            // Keep the additional center toast private to the winner and only for high wins.
+            GlobalCelebrationToast.show(
+                    this, who, chat, safeAvatar, badgeUrl, toastKey,
+                    28, eventMultiplier, Math.max(0L, coins), who,
+                    highWin ? "lucky_hit_high" : (eventMultiplier > 0d && eventMultiplier < 1d
+                            ? "lucky_hit_return" : "lucky_hit_normal"), targetRoomId);
+            if (highWin && winnerMatches) {
+                GlobalCelebrationToast.showRoomCenter(
+                        this, who, body != null && !body.trim().isEmpty() ? body : chat,
+                        safeAvatar, badgeUrl, toastKey, eventMultiplier, Math.max(0L, coins),
+                        who, "lucky_hit_high", targetRoomId);
             }
-            if (roomBannerEnabled()) {
-                appendGameCelebrationLine(chat, badgeUrl);
-            }
+            // Keep one readable in-room result line for every lucky win.
+            appendGameCelebrationLine(chat, badgeUrl);
             return;
         } else {
             toastMsg = line;
             chat = line;
         }
         if (bubbleFx != null) {
-            bubbleFx.showRoomEventBubble(who, avatarUrl, toastMsg, badgeUrl);
+            bubbleFx.showRoomEventBubble(who, safeAvatar, toastMsg, badgeUrl);
             if (binding != null && binding.giftChatEffects != null) {
                 binding.giftChatEffects.setVisibility(View.VISIBLE);
                 binding.giftChatEffects.bringToFront();
@@ -9322,6 +12517,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (roomBannerEnabled()) {
             appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
+        }
+    }
+
+    private static double parseLuckyMultiplierFromText(@Nullable String text) {
+        if (text == null || text.isEmpty()) return 0d;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("[×xX]\\s*(\\d+(?:[.,]\\d+)?)")
+                .matcher(text);
+        if (!matcher.find()) return 0d;
+        try {
+            return Double.parseDouble(matcher.group(1).replace(',', '.'));
+        } catch (Exception ignored) {
+            return 0d;
         }
     }
 
@@ -9415,17 +12623,47 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /** Start the hero at the sender's occupied mic, or at the bottom when the sender is off-seat. */
+    @Nullable
+    private PointF resolveLuckyGiftSource(@Nullable String senderId) {
+        if (binding == null || binding.giftOverlay == null) return null;
+        View senderSeat = findSeatViewForUser(senderId);
+        if (senderSeat != null && senderSeat.getWidth() > 0 && senderSeat.getHeight() > 0) {
+            PointF seatPoint = GiftFlyAnimator.centerInOverlay(binding.giftOverlay, senderSeat);
+            if (seatPoint != null) return seatPoint;
+        }
+        int width = Math.max(1, binding.giftOverlay.getWidth());
+        int height = Math.max(1, binding.giftOverlay.getHeight());
+        // Align the sender-off-seat launch point to the bottom-center edge.
+        return new PointF(width * 0.5f, height - luckyCannonDp(56));
+    }
+
+    /** Both lucky and cannon launches follow the sender: occupied mic, otherwise bottom-center. */
+    @Nullable
+    private PointF resolveLuckyCannonSource(@Nullable String senderId) {
+        return resolveLuckyGiftSource(senderId);
+    }
+
     @NonNull
     private List<android.graphics.PointF> resolveMicCenters(@Nullable List<String> userIds) {
         List<android.graphics.PointF> targets = new ArrayList<>();
         if (binding == null || binding.giftOverlay == null || userIds == null) return targets;
+        // A recipient must still occupy a real mic at animation time. Never fall back
+        // to all room seats, hidden seat placeholders, or guessed screen coordinates.
+        Set<String> occupiedNow = new HashSet<>(collectOccupiedMicUserIds());
+        Set<String> resolvedUsers = new HashSet<>();
         for (String uid : userIds) {
-            if (uid == null || uid.isEmpty()) continue;
+            if (uid == null || uid.isEmpty() || !occupiedNow.contains(uid)
+                    || !resolvedUsers.add(uid)) continue;
             View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
+            if (seat == null || !seat.isShown()
+                    || seat.getWidth() <= 0 || seat.getHeight() <= 0) continue;
             android.graphics.PointF p =
                     GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
-            if (p != null) targets.add(p);
+            if (p == null || p.x < 0f || p.y < 0f
+                    || p.x > binding.giftOverlay.getWidth()
+                    || p.y > binding.giftOverlay.getHeight()) continue;
+            targets.add(p);
         }
         return targets;
     }
@@ -9484,81 +12722,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String senderName,
             @Nullable Runnable onScatterStart
     ) {
+        playLuckyGiftStage(giftIconUrl, targetIds, coinsSpent, quantity, personCount,
+                senderName, null, onScatterStart);
+    }
+
+    public void playLuckyGiftStage(
+            @Nullable String giftIconUrl,
+            @Nullable List<String> targetIds,
+            long coinsSpent,
+            int quantity,
+            int personCount,
+            @Nullable String senderName,
+            @Nullable String senderId,
+            @Nullable Runnable onScatterStart
+    ) {
         if (binding == null || binding.giftOverlay == null) {
             if (onScatterStart != null) {
                 try { onScatterStart.run(); } catch (Exception ignored) {}
             }
             return;
         }
-        List<String> ids = targetIds;
-        if (ids == null || ids.isEmpty()) {
-            ids = collectOccupiedMicUserIds();
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        if (targetIds != null) {
+            for (String id : targetIds) {
+                if (id != null && !id.isEmpty()) unique.add(id);
+            }
         }
-        final List<String> rainIds = ids != null ? new ArrayList<>(ids) : new ArrayList<>();
-        if (rainIds.isEmpty()) {
-            List<String> all = collectOccupiedMicUserIds();
-            if (all != null) rainIds.addAll(all);
-        }
+        if (unique.isEmpty()) return;
+        final List<String> ids = new ArrayList<>(unique);
+        if (ids.isEmpty()) return;
 
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        binding.giftOverlay.setElevation(36f);
-        markLuckyOverlayActive(5600L);
-
-        final List<String> pulseIds = rainIds;
-        final int qtyShow = Math.max(1, quantity);
-        final int people = Math.max(1, rainIds.isEmpty() ? personCount : rainIds.size());
-        final long totalScore = Math.max(0L, coinsSpent > 0 ? coinsSpent : (long) qtyShow * people);
-        final long hold = Math.min(1600L, 620L + Math.max(1, quantity) * 70L);
-        final String who = senderName != null && !senderName.isEmpty()
-                ? senderName
-                : (myUserId != null ? displayNameForSeatUser(myUserId) : "مستخدم");
-        final String icon = giftIconUrl;
-        final Runnable scatterCb = onScatterStart;
-
-        Runnable startClone = () -> {
-            if (binding == null || binding.giftOverlay == null) {
-                if (scatterCb != null) {
-                    try { scatterCb.run(); } catch (Exception ignored) {}
-                }
-                return;
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
+            if (binding == null || binding.giftOverlay == null) return;
+            List<PointF> destinations = resolveMicCenters(ids);
+            if (destinations.isEmpty()) return;
+            PointF from = resolveLuckyGiftRevealCenter();
+            if (from == null) {
+                int w = Math.max(binding.giftOverlay.getWidth(), 1);
+                int h = Math.max(binding.giftOverlay.getHeight(), 1);
+                from = new PointF(w / 2f, h * 0.40f);
             }
-            List<android.graphics.PointF> seatPts = resolveMicCenters(pulseIds);
-            if (seatPts.isEmpty()) {
-                List<String> all = collectOccupiedMicUserIds();
-                seatPts = resolveMicCenters(all);
-            }
-            int w = Math.max(binding.giftOverlay.getWidth(), 1);
-            int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-            GiftFlyAnimator.allMicClone(
-                    binding.giftOverlay,
-                    icon,
-                    center,
-                    seatPts,
-                    qtyShow,
-                    totalScore,
-                    who,
-                    hold,
-                    () -> {
-                        if (scatterCb != null) {
-                            try { scatterCb.run(); } catch (Exception ignored) {}
-                        }
-                        for (String uid : pulseIds) {
-                            View seat = findSeatViewForUser(uid);
-                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                        }
-                    },
-                    () -> {
-                        if (coinsSpent >= 200 && !pulseIds.isEmpty()) {
-                            playCoinRainToUsers(pulseIds, 6);
-                        }
-                    });
+            // Lucky gifts must first appear as one hero exactly at the room center.
+            // The old flyTogether path immediately created seat-bound copies, making
+            // the gift look as if it spawned at the edge when a target seat was there.
+            PointF source = resolveLuckyGiftSource(senderId);
+            com.Dramizo.Series.util.LuckyGiftStageAnimator.play(
+                    binding.giftOverlay, giftIconUrl, destinations, coinsSpent,
+                    Math.max(1, quantity), Math.max(1, personCount),
+                    from, source, false, onScatterStart, null);
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
-            binding.giftOverlay.post(startClone);
+            binding.giftOverlay.post(launch);
         } else {
-            startClone.run();
+            launch.run();
         }
     }
 
@@ -9580,48 +12799,32 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String senderName
     ) {
         if (binding == null || binding.giftOverlay == null) return;
-        List<String> ids = targetIds != null && !targetIds.isEmpty()
-                ? targetIds : collectOccupiedMicUserIds();
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        if (targetIds != null) {
+            for (String id : targetIds) {
+                if (id != null && !id.isEmpty()) unique.add(id);
+            }
+        }
+        if (unique.isEmpty()) return;
+        final List<String> ids = new ArrayList<>(unique);
+        if (ids.isEmpty()) return;
+
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(4800L);
-        final List<String> finalIds = ids;
-        final int qtyShow = Math.max(1, quantity > 1 ? quantity : Math.max(1, comboCount));
-        final long total = coinValuePerPerson > 0
-                ? coinValuePerPerson * Math.max(1, ids.size())
-                : (long) qtyShow * Math.max(1, ids.size());
-        final String who = senderName != null && !senderName.isEmpty()
-                ? senderName
-                : displayNameForSeatUser(myUserId);
-        final String icon = giftIconUrl;
-        Runnable startClone = () -> {
+        markLuckyOverlayActive(1500L);
+        Runnable launch = () -> {
             if (binding == null || binding.giftOverlay == null) return;
-            List<android.graphics.PointF> seats = resolveMicCenters(finalIds);
-            if (seats.isEmpty()) return;
+            List<PointF> destinations = resolveMicCenters(ids);
+            if (destinations.isEmpty()) return;
             int w = Math.max(binding.giftOverlay.getWidth(), 1);
             int h = Math.max(binding.giftOverlay.getHeight(), 1);
-            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-            GiftFlyAnimator.allMicClone(
-                    binding.giftOverlay,
-                    icon,
-                    center,
-                    seats,
-                    qtyShow,
-                    total,
-                    who,
-                    780L,
-                    () -> {
-                        for (String uid : finalIds) {
-                            View seat = findSeatViewForUser(uid);
-                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                        }
-                    },
-                    null);
+            PointF from = new PointF(w / 2f, Math.max(h * 0.72f, h - luckyCannonDp(110)));
+            GiftFlyAnimator.flyTogether(binding.giftOverlay, giftIconUrl, from, destinations, 620L, Math.max(1, quantity));
         };
         if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
-            binding.giftOverlay.post(startClone);
+            binding.giftOverlay.post(launch);
         } else {
-            startClone.run();
+            launch.run();
         }
     }
 
@@ -9639,20 +12842,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                        String senderUserId, int senderVipLevel,
                                        String senderAvatarUrl, List<String> targetIds, long coinValue) {
         if (targetIds == null || targetIds.isEmpty()) return;
-        String playTo = null;
-        for (String tid : targetIds) {
-            if (tid == null || tid.isEmpty()) continue;
-            if (playTo == null) {
-                playTo = tid;
-            } else if (coinValue > 0) {
-                creditGiftCoinsOnSeat(tid, coinValue);
-            }
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        for (String id : targetIds) {
+            if (id != null && !id.isEmpty()) unique.add(id);
         }
-        if (playTo == null) return;
-        scatterGiftToMics(iconUrl, targetIds, comboCount, Math.max(1, quantity), coinValue, senderName);
-        // First target: seat credit + effect queue / media (clones already flying).
-        playGiftToRecipient(giftName, iconUrl, animationUrl, senderName, comboCount,
-                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue, true);
+        if (unique.isEmpty()) return;
+        List<String> recipients = new ArrayList<>(unique);
+        scatterGiftToMics(iconUrl, recipients, comboCount, Math.max(1, quantity),
+                coinValue, senderName);
+        // The group flight is the visual for every recipient; update seat totals once
+        // without enqueueing a second full-screen gift effect for the first seat.
+        if (coinValue > 0) {
+            for (String id : recipients) creditGiftCoinsOnSeat(id, coinValue);
+        }
     }
 
     /** @deprecated Big center ×N card removed. */
@@ -9690,72 +12892,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Float "+N" above the winner seat only (sender), not every mic. */
     public void showLuckyReturnOnMics(@Nullable List<String> userIds, long coinsWon) {
-        if (binding == null || binding.giftOverlay == null || coinsWon <= 0) return;
-        List<String> ids = userIds;
-        if (ids == null || ids.isEmpty()) return;
-        binding.giftOverlay.setVisibility(View.VISIBLE);
-        binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(4200L);
-        float density = getResources().getDisplayMetrics().density;
-        int index = 0;
-        for (String uid : ids) {
-            View seat = findSeatViewForUser(uid);
-            if (seat == null) continue;
-            android.graphics.PointF p =
-                    GiftFlyAnimator.centerInOverlay(binding.giftOverlay, seat);
-            if (p == null) continue;
-            android.widget.TextView tv = new android.widget.TextView(this);
-            tv.setText("+" + coinsWon);
-            tv.setTextColor(0xFFFFE082);
-            tv.setTextSize(14f);
-            tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            tv.setShadowLayer(5f, 0f, 2f, 0xF0000000);
-            tv.setMaxLines(1);
-            tv.setPadding((int) (10 * density), (int) (4 * density),
-                    (int) (10 * density), (int) (4 * density));
-            android.graphics.drawable.GradientDrawable bg =
-                    new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(14f * density);
-            bg.setColor(0xCC1A0A00);
-            bg.setStroke((int) (1.5f * density), 0xFFFFC107);
-            tv.setBackground(bg);
-            tv.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-            tv.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-            tv.setX(Math.max(8f * density,
-                    Math.min(p.x - tv.getMeasuredWidth() / 2f,
-                            (binding.giftOverlay.getWidth() > 0
-                                    ? binding.giftOverlay.getWidth()
-                                    : getResources().getDisplayMetrics().widthPixels)
-                                    - tv.getMeasuredWidth() - 8f * density)));
-            tv.setY(p.y - 36f * density);
-            tv.setAlpha(0f);
-            tv.setScaleX(0.55f);
-            tv.setScaleY(0.55f);
-            binding.giftOverlay.addView(tv);
-            long stagger = index * 120L;
-            index++;
-            tv.animate()
-                    .alpha(1f)
-                    .scaleX(1.08f)
-                    .scaleY(1.08f)
-                    .translationYBy(-28f * density)
-                    .setStartDelay(stagger)
-                    .setDuration(560)
-                    .withEndAction(() -> tv.animate()
-                            .alpha(0f)
-                            .translationYBy(-18f * density)
-                            .setDuration(480)
-                            .setStartDelay(1800)
-                            .withEndAction(() -> {
-                                if (tv.getParent() instanceof android.view.ViewGroup parent) {
-                                    parent.removeView(tv);
-                                }
-                            })
-                            .start())
-                    .start();
-        }
+        // Lucky rewards are credited to the wallet by the backend. Their numeric
+        // amount is intentionally not rendered over seats inside the live room.
     }
 
     @NonNull
@@ -9787,22 +12925,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return collectOccupiedMicUserIds();
     }
 
-    /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
-    public void showLuckyHitBanner(@Nullable String displayName, @Nullable String avatarUrl,
-                                   long wonCoins, int multiplier) {
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "مستخدم";
-        String line;
-        if (multiplier <= 0) {
-            line = "ضرب حظه · مردود +" + Math.max(0L, wonCoins);
-        } else {
-            int mul = Math.max(1, multiplier);
-            line = "ضرب حظه وربح ×" + mul + " · +" + Math.max(0L, wonCoins);
+    /** Lucky-win notification removed at the room surface as requested. */
+    public void showLuckyHitBanner(@Nullable String senderId, @Nullable String displayName,
+                                   @Nullable String avatarUrl, long wonCoins,
+                                   double multiplier, @Nullable String eventKey) {
+        // Deliberately silent: do not show the "حظ سعيد" winner toast.
+    }
+
+    private static String formatLuckyMultiplier(double multiplier) {
+        if (Math.abs(multiplier - Math.rint(multiplier)) < 0.0001d) {
+            return String.format(java.util.Locale.US, "%.0f", multiplier);
         }
-        // Small join-style toast only — never the big crawling overlay.
-        showLuckyResultToast(who, avatarUrl, 1, 0, line);
-        if (roomBannerEnabled()) {
-            appendChatLine(who, line, 0, 1, null, null, avatarUrl, null);
-        }
+        return String.format(java.util.Locale.US, "%.2f", multiplier)
+                .replaceAll("0+$", "").replaceAll("\\.$", "");
     }
 
     /** Official-news style crawl — disabled (too large). Use ComingMsgView instead. */
@@ -9971,6 +13106,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 senderUserId, senderVipLevel, senderAvatarUrl, 1, null);
     }
 
+    /**
+     * Animated send-count toast for quantity gifts. Counts up quickly while the send is
+     * being presented, then leaves the final selected quantity visible in the normal toast.
+     */
+    public void showGiftSendToastCountUp(
+            @Nullable String senderName,
+            @Nullable String giftName,
+            @Nullable String senderAvatarUrl,
+            @Nullable String giftIconUrl,
+            int quantity
+    ) {
+        final int target = Math.max(1, quantity);
+        // A new send owns the counter; prevent an older batch from overwriting it.
+        if (giftCountUpAnimator != null) {
+            giftCountUpAnimator.cancel();
+            giftCountUpAnimator = null;
+        }
+        showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                1, 0, "أرسل هدية");
+        if (target <= 1) {
+            if (binding != null && binding.comboGiftView != null) {
+                binding.comboGiftView.updateCountUp(1);
+            }
+            return;
+        }
+        final android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofInt(1, target);
+        giftCountUpAnimator = animator;
+        // Let the 900 ms entrance finish first so users can actually see X1, X2, X3…
+        // Keep larger batches fast but readable; the strip remains parked while counting.
+        long durationMs = target <= 7 ? 500L
+                : target <= 17 ? 700L
+                : target <= 77 ? 1200L
+                : 1800L;
+        animator.setDuration(durationMs);
+        animator.setInterpolator(new android.view.animation.LinearInterpolator());
+        animator.addUpdateListener(a -> {
+            if (isFinishing() || isDestroyed()) {
+                a.cancel();
+                return;
+            }
+            if (binding != null && binding.comboGiftView != null) {
+                binding.comboGiftView.updateCountUp((Integer) a.getAnimatedValue());
+            }
+        });
+        if (binding != null && binding.comboGiftView != null) {
+            binding.comboGiftView.postDelayed(() -> {
+                if (giftCountUpAnimator == animator && !isFinishing() && !isDestroyed()) {
+                    animator.start();
+                }
+            }, 850L);
+        } else {
+            animator.start();
+        }
+    }
+
     /** Gift send toast — profile + gift icon + combo xN (Mikoo crawl strip). */
     public void showGiftSendToast(@Nullable String senderName,
                                   @Nullable String giftName,
@@ -10021,12 +13212,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (comboCount >= 2 && binding.giftOverlay != null) {
             binding.giftOverlay.setVisibility(View.VISIBLE);
             float d = getResources().getDisplayMetrics().density;
+            int w = Math.max(binding.giftOverlay.getWidth(),
+                    getResources().getDisplayMetrics().widthPixels);
             int h = Math.max(binding.giftOverlay.getHeight(),
                     getResources().getDisplayMetrics().heightPixels);
             GiftFlyAnimator.showComboBurst(
                     binding.giftOverlay,
                     comboCount,
-                    new android.graphics.PointF(56f * d, h * 0.60f),
+                    new android.graphics.PointF(w * 0.50f, h * 0.60f),
                     null);
             // Short overlay hold for gift combo only — do not mark as lucky/mardood.
             try {
@@ -10065,7 +13258,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (effectQueue != null) effectQueue.notifyFinished();
             if (binding == null) return;
             if (isVideoGift) {
-                showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+                showGiftSendToastCountUp(senderName, giftName, senderAvatarUrl, iconUrl, comboCount);
             }
             if (binding.webVisualEffects != null
                     && binding.webVisualEffects.getChildCount() == 0) {
@@ -10108,9 +13301,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && binding.giftOverlay.getChildCount() == 0) {
             binding.giftOverlay.setVisibility(View.GONE);
         }
-        // Non-video: Mikoo toast immediately. Video: after stage ends (see onDone).
+        // Show the same visible X1/X7/X17/X77/X177 count-up for every gift type.
+        // Video gifts start counting after their stage finishes (see onDone); other gifts start now.
         if (!isVideoGift) {
-            showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+            showGiftSendToastCountUp(senderName, giftName, senderAvatarUrl, iconUrl, comboCount);
         }
 
         String me = senderName;
@@ -10150,20 +13344,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Result<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftList> r =
                         c.getGiftsUseCase.execute();
                 if (!r.success || r.data == null || r.data.isEmpty()) return;
-                java.util.ArrayList<String> urls = new java.util.ArrayList<>();
+                java.util.LinkedHashSet<String> uniqueUrls = new java.util.LinkedHashSet<>();
+                // Warm only the first small slice of the catalog. Preloading every gift
+                // animation at room entry competes with mic setup and can spike memory/network.
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : r.data) {
                     if (g == null) continue;
                     String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                             g.name, g.iconUrl, g.animationUrl);
                     if (resolved != null && !resolved.isEmpty()) {
-                        urls.add(resolved);
+                        uniqueUrls.add(resolved);
                     } else if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
-                        urls.add(g.animationUrl);
+                        uniqueUrls.add(g.animationUrl);
                     }
-                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) urls.add(g.iconUrl);
-                    if (urls.size() > 100) break;
+                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) uniqueUrls.add(g.iconUrl);
+                    if (uniqueUrls.size() >= 24) break;
                 }
-                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(this, urls);
+                if (isFinishing() || isDestroyed() || binding == null || uniqueUrls.isEmpty()) return;
+                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                        this, new java.util.ArrayList<>(uniqueUrls));
             } catch (Exception ignored) {
             }
         });
@@ -10248,6 +13446,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         super.onStart();
         sRoomUiVisible = true;
         sAliveRoom = new java.lang.ref.WeakReference<>(this);
+        if (!unreadBadgeReceiverRegistered) {
+            androidx.core.content.ContextCompat.registerReceiver(
+                    this, unreadBadgeReceiver,
+                    new android.content.IntentFilter(com.Dramizo.Series.util.UnreadMessageBadge.ACTION_CHANGED),
+                    androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
+            unreadBadgeReceiverRegistered = true;
+        }
+        updateRoomUnreadDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this));
         if (binding != null && binding.webHostSignal != null) {
             binding.webHostSignal.resumeMotion();
         }
@@ -10262,7 +13468,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Waiting until onStop often causes SecurityException with microphone type.
         if (!exiting && !isChangingConfigurations()
                 && roomId != null && !roomId.isEmpty()
-                && pendingSession != null) {
+                && (pendingSession != null
+                    || ActiveRoomSession.get().canResumeUi(roomId))) {
             ensuringRoomKeepAlive(true);
         }
         super.onUserLeaveHint();
@@ -10270,16 +13477,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        // A backgrounded room must never keep a hold-to-fire gesture running.
+        stopLuckyCannonHold(false);
+        handler.removeCallbacks(luckyButtonStylePoll);
+        handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
+        if (unreadBadgeReceiverRegistered) {
+            try { unregisterReceiver(unreadBadgeReceiver); } catch (Exception ignored) {}
+            unreadBadgeReceiverRegistered = false;
+        }
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
         if (binding != null && binding.webHostSignal != null) {
             binding.webHostSignal.pauseMotion();
         }
         stopMusicDiscAnimation();
+        // A resumed LiveKit room may have its session only in ActiveRoomSession.
+        // Do not treat a missing Activity field as a real leave: the selected RTC
+        // provider may still own the live connection and the user's occupied seat.
         boolean keepAlive = !exiting && !isChangingConfigurations()
                 && roomId != null && !roomId.isEmpty()
-                && pendingSession != null;
+                && (minimizing || pendingSession != null
+                    || ActiveRoomSession.get().canResumeUi(roomId));
         if (keepAlive) {
+            // Keep a durable copy of our seat roster before the UI/session can be refreshed
+            // by a partial server response while minimized. Never send a seat leave here.
+            if (currentSeats != null && !currentSeats.isEmpty()) {
+                restoreSeatSnapshot = new ArrayList<>(currentSeats);
+                RoomDtos.RoomDto cachedRoom = ActiveRoomSession.get().latestRoom();
+                if (cachedRoom != null) {
+                    cachedRoom.seats = new ArrayList<>(currentSeats);
+                    ActiveRoomSession.get().updateRoom(cachedRoom);
+                }
+            }
             // Mikoo minimize / leave-UI: keep hearing others; mute only own mic.
             ensuringRoomKeepAlive(true);
             ensureMinimizedListeningState();
@@ -10292,12 +13521,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onResume() {
         super.onResume();
+        com.Dramizo.Series.util.UnreadMessageBadge.refresh(this);
+        updateRoomUnreadDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this));
+        // Cosmetics store returns through the room activity; rebind the current user's
+        // equipped/unequipped frame on seats from the freshly updated session profile.
+        refreshSelfHostWearOnSeats();
+        refreshSelfRoomChatFrames();
         sRoomUiVisible = true;
+        handler.removeCallbacks(luckyButtonStylePoll);
+        handler.postDelayed(luckyButtonStylePoll, 15_000L);
+        handler.removeCallbacks(roomPkInvitationPoll);
+        if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;
+        // A resumed room UI must clear the session's minimized marker as well.
+        // This is lifecycle-only: never call seat leave/join or change server seat indices.
+        ActiveRoomSession.get().setMinimized(false);
         // UI is back — stop FGS owner and restore intended mic (never force open).
         try {
             VoiceRoomForegroundService.attachUi(this);
         } catch (RuntimeException ignored) {
+        }
+        // This Activity can survive while another app is foregrounded. The background
+        // handoff moved its ExoPlayer into the service and nulled roomMusicPlayer, while
+        // musicUiReady stayed true. Rebind now to reclaim that same decoder and restore
+        // the Activity listener and controls instead of leaving a stale music panel.
+        if (roomMusicPlayer == null && musicUiReady) {
+            musicUiReady = false;
+            ensureMusicUiReady();
         }
         unmuteAudioAfterBackground();
         try {
@@ -10340,8 +13590,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomSpeakerMuted = true;
             RoomSoundFx.setMuted(true);
             RoomRtcEngine.getInstance().setSpeakerMuted(true);
-            // Re-assert music mix after speaker mute (mute stops remote pulls only).
-            if (canManageMusic
+            // Re-assert music mix after speaker mute (mute stops remote pulls only),
+            // but never restart it while an external recorder owns the microphone.
+            if (!externalCaptureMusicSuspended && canManageMusic
                     && currentMusicUrl != null
                     && !currentMusicUrl.isEmpty()
                     && "playing".equalsIgnoreCase(currentMusicStatus)) {
@@ -10360,7 +13611,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!mutedForBackground) return;
         mutedForBackground = false;
         try {
-            boolean keepMuted = speakerMutedBeforeBackground;
+            boolean keepMuted = externalCaptureMusicSuspended || speakerMutedBeforeBackground;
             roomSpeakerMuted = keepMuted;
             RoomSoundFx.setMuted(keepMuted);
             RoomRtcEngine.getInstance().setSpeakerMuted(keepMuted);
@@ -10391,6 +13642,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent == null) return;
+        // A singleTask room can be reopened with fresher card/notification metadata.
+        String incomingDisplayId = intent.getStringExtra(EXTRA_ROOM_DISPLAY_ID);
+        if (incomingDisplayId != null && !incomingDisplayId.trim().isEmpty()
+                && binding != null && binding.tvRoomId != null) {
+            String label = intent.getBooleanExtra(EXTRA_ROOM_IS_AGENCY, false) ? "GID:" : "ID:";
+            binding.tvRoomId.setText(label + incomingDisplayId.trim());
+        }
         // singleTask: re-entering same activity — either restore UI or hop to another room.
         String incomingRoomId = intent.getStringExtra(EXTRA_ROOM_ID);
         if (incomingRoomId != null && !incomingRoomId.isEmpty()
@@ -10444,11 +13702,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         rtcCanPublish = false;
         rtcPublishTokenExpiresAtMs = 0L;
         micOn = false;
-        userChoseMute = false;
+        // Reload the account-level mute preference when the next room session attaches.
+        userChoseMute = myUserId != null && getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                .getBoolean("muted:" + myUserId, false);
+        lastSelfSeatConfirmedAtMs = 0L;
         zegoLoggedIn = false;
         realtimeJoined = false;
         realtimeJoinInFlight = false;
         resumedFromActiveSession = false;
+        restoreSeatSnapshot = null;
+        restoreSeatSnapshotUntilMs = 0L;
         currentMusicUrl = null;
         currentMusicStatus = "stopped";
         preparedMusicUrl = null;
@@ -10486,18 +13749,239 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
-        viewModel.join(targetRoomId, password);
+        // Adopt the Home/Search prefetch when a singleTask room is hopped in place.
+        // Otherwise the prefetch runs unused and this issues a second HTTP join.
+        RoomDtos.JoinRoomResult prefetched = RoomJoinPrefetch.takeReady(targetRoomId);
+        if (prefetched != null) {
+            viewModel.restoreLocalSession(prefetched, prefetched.room);
+        } else if (RoomJoinPrefetch.isInFlight(targetRoomId)) {
+            final String expectedRoomId = targetRoomId;
+            RoomJoinPrefetch.await(expectedRoomId, (session, err) -> {
+                if (isFinishing() || isDestroyed() || exiting
+                        || !expectedRoomId.equals(roomId)) return;
+                if (session != null) {
+                    viewModel.restoreLocalSession(session, session.room);
+                } else {
+                    // Soft prefetch failure: preserve the normal join fallback.
+                    viewModel.join(expectedRoomId, password);
+                }
+            });
+        } else {
+            viewModel.join(targetRoomId, password);
+        }
         // hoppingRoom stays true until the new session arrives (see session observer).
+    }
+
+    /** Show only current room members who are not seated; each row has its own invite action. */
+    private void showSeatInvitePickerDialog(int seatIndex) {
+        if (isFinishing() || roomId == null || !(canInviteMic || canManageSeats)) return;
+        java.util.ArrayList<JsonObject> eligible = new java.util.ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        List<JsonObject> source = !roomMembersAll.isEmpty() ? roomMembersAll : roomAudience;
+        for (JsonObject member : source) {
+            if (member == null) continue;
+            String uid = memberStr(member, "userId");
+            if (uid == null || uid.isEmpty() || !seen.add(normalizeUserId(uid))) continue;
+            if (sameUser(uid, myUserId) || sameUser(uid, roomHostId)
+                    || sameUser(uid, roomCohostId) || isUserSeated(uid)) continue;
+            eligible.add(member);
+        }
+        if (eligible.isEmpty()) {
+            Toast.makeText(this, "لا يوجد أعضاء غير جالسين على المقاعد داخل الروم", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("دعوة للجلوس على المايك " + Math.max(1, seatIndex))
+                .setNegativeButton("إغلاق", null)
+                .create();
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout rows = new android.widget.LinearLayout(this);
+        rows.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = dp(12);
+        rows.setPadding(pad, dp(4), pad, dp(8));
+        for (JsonObject member : eligible) {
+            final String targetId = memberStr(member, "userId");
+            String name = memberStr(member, "displayName");
+            if (name == null || name.trim().isEmpty()) name = memberStr(member, "username");
+            if (name == null || name.trim().isEmpty()) name = "عضو";
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(8), dp(7), dp(8), dp(7));
+            row.setBackgroundResource(R.drawable.bg_seat_avatar_clip);
+
+            // Professional invite row: circular real avatar with a subtle frame, then name.
+            android.widget.FrameLayout avatarWrap = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams avatarWrapLp =
+                    new android.widget.LinearLayout.LayoutParams(dp(48), dp(48));
+            avatarWrapLp.setMargins(0, 0, dp(10), 0);
+            avatarWrap.setBackgroundResource(R.drawable.bg_seat_ring);
+            avatarWrap.setPadding(dp(3), dp(3), dp(3), dp(3));
+            android.widget.ImageView avatarView = new android.widget.ImageView(this);
+            avatarView.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            avatarView.setBackgroundResource(R.drawable.bg_seat_avatar_clip);
+            avatarView.setClipToOutline(true);
+            android.widget.FrameLayout.LayoutParams avatarImageLp =
+                    new android.widget.FrameLayout.LayoutParams(
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+            avatarWrap.addView(avatarView, avatarImageLp);
+            String avatarUrl = memberStr(member, "avatarUrl");
+            if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+                avatarUrl = memberStr(member, "avatar");
+            }
+            try {
+                if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
+                    Glide.with(this)
+                            .load(AssetCatalog.absoluteUrl(avatarUrl))
+                            .circleCrop()
+                            .placeholder(R.drawable.ic_tab_me)
+                            .error(R.drawable.ic_tab_me)
+                            .into(avatarView);
+                } else {
+                    avatarView.setImageResource(R.drawable.ic_tab_me);
+                }
+            } catch (Exception ignored) {
+                avatarView.setImageResource(R.drawable.ic_tab_me);
+            }
+            row.addView(avatarWrap, avatarWrapLp);
+
+            android.widget.TextView nameView = new android.widget.TextView(this);
+            nameView.setText(name);
+            nameView.setTextSize(15);
+            nameView.setTypeface(nameView.getTypeface(), android.graphics.Typeface.BOLD);
+            nameView.setTextColor(0xFF202124);
+            nameView.setMaxLines(1);
+            nameView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            nameView.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.widget.LinearLayout.LayoutParams nameLp =
+                    new android.widget.LinearLayout.LayoutParams(0, dp(48), 1f);
+            nameLp.setMargins(0, 0, dp(4), 0);
+            row.addView(nameView, nameLp);
+
+            if (canManageSeats || canManageRoom || isHost || isOwner) {
+                android.widget.Button assign = new android.widget.Button(this);
+                assign.setText("رفع");
+                assign.setContentDescription("رفع المستخدم مباشرة إلى المايك");
+                assign.setAllCaps(false);
+                assign.setTextColor(0xFFFFFFFF);
+                assign.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFF6D3BE8));
+                assign.setMinWidth(dp(56));
+                assign.setEnabled(targetId != null && !targetId.isEmpty());
+                assign.setOnClickListener(v -> {
+                    if (targetId == null || targetId.isEmpty()) return;
+                    viewModel.assignSeat(roomId, targetId, seatIndex);
+                    dialog.dismiss();
+                });
+                android.widget.LinearLayout.LayoutParams assignLp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
+                assignLp.setMargins(dp(4), 0, 0, 0);
+                row.addView(assign, assignLp);
+            }
+            if (canInviteMic) {
+                android.widget.Button invite = new android.widget.Button(this);
+                invite.setText("دعوة");
+                invite.setAllCaps(false);
+                invite.setTextColor(0xFFFFFFFF);
+                invite.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFDE4D91));
+                invite.setMinWidth(dp(64));
+                invite.setEnabled(targetId != null && !targetId.isEmpty());
+                invite.setOnClickListener(v -> {
+                    if (targetId == null || targetId.isEmpty()) return;
+                    viewModel.inviteSeat(roomId, targetId, seatIndex);
+                    dialog.dismiss();
+                });
+                android.widget.LinearLayout.LayoutParams inviteLp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
+                inviteLp.setMargins(dp(4), 0, 0, 0);
+                row.addView(invite, inviteLp);
+            }
+            rows.addView(row, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            android.view.View divider = new android.view.View(this);
+            divider.setBackgroundColor(0xFFE8E8E8);
+            rows.addView(divider, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+        }
+        scroll.addView(rows);
+        dialog.setView(scroll);
+        dialog.show();
+    }
+
+    /** Context menu for an empty mic: move, invite someone already in the room, or lock it. */
+    private void takeEmptySeat(int seatIndex) {
+        // Authorized staff can move seats even while already seated.
+        boolean freeMic = isFreeMicEnabled();
+        boolean canHop = isHost || isOwner || canInviteMic || canManageSeats || isOnSeat(currentSeats)
+                        || (freeMic && !isMicRequestEnabled());
+        if (!PermissionHelper.hasAudioPermission(VoiceRoomActivity.this)) {
+            PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
+            Toast.makeText(VoiceRoomActivity.this, "فعّل إذن الميكروفون أولاً", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            if (canHop) {
+                optimisticTakeSeat(seatIndex);
+                viewModel.takeSeat(roomId, seatIndex);
+            } else {
+                viewModel.requestSeat(roomId, seatIndex);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("VoiceRoom", "takeSeat click failed", e);
+            Toast.makeText(VoiceRoomActivity.this, "تعذر الانتقال للمقعد", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showEmptySeatActionMenu(@Nullable View anchor, @NonNull RoomDtos.SeatDto seat) {
+        if (roomId == null) return;
+        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> actions = new java.util.ArrayList<>();
+        labels.add("انتقال");
+        actions.add(0);
+        if (canInviteMic || canManageSeats) {
+            labels.add("اختيار مستخدم للمايك");
+            actions.add(1);
+        }
+        if (canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff()) {
+            labels.add(seat.locked() ? "فتح" : "قفل");
+            actions.add(2);
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("المقعد " + (seat.seatIndex + 1))
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    if (which < 0 || which >= actions.size()) return;
+                    switch (actions.get(which)) {
+                        case 0:
+                            takeEmptySeat(seat.seatIndex);
+                            break;
+                        case 1:
+                            showSeatInvitePickerDialog(seat.seatIndex);
+                            break;
+                        case 2:
+                            if (!(canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) return;
+                            viewModel.lockSeat(roomId, seat.seatIndex, !seat.locked());
+                            Toast.makeText(this, seat.locked() ? "تم فتح المقعد" : "تم قفل المقعد",
+                                    Toast.LENGTH_SHORT).show();
+                            break;
+                        default:
+                            break;
+                    }
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
     }
 
     private void showPendingSeatInviteDialog() {
         if (isFinishing() || roomId == null) return;
         AuraDialogHelper.confirm(this,
                 "دعوة إلى المايك",
-                "دعاك مشرف الغرفة للصعود إلى المايك. هل تقبل؟",
-                "قبول",
+                "تم دعوتك للجلوس على المايك. هل ترغب بالموافقة؟",
+                "موافقة",
                 () -> viewModel.respondSeatInvite(roomId, true),
-                "رفض",
+                "إلغاء",
                 () -> viewModel.respondSeatInvite(roomId, false));
     }
 
@@ -10557,6 +14041,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onDestroy() {
+        stopLuckySupportVideo();
+        if (luckyVideoPlayer != null) {
+            try { luckyVideoPlayer.release(); } catch (Exception ignored) {}
+            luckyVideoPlayer = null;
+        }
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        // Avoid retaining destroyed room activities through the recurring music UI tick.
+        handler.removeCallbacks(musicProgressRunnable);
+        if (luckyCannonView != null) luckyCannonView.release();
         unregisterAudioRouteReceiver();
         if (sAliveRoom != null && sAliveRoom.get() == this) {
             sAliveRoom.clear();
@@ -10586,13 +14079,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         } else {
             mutedForBackground = false;
-            roomSpeakerMuted = false;
-            RoomSoundFx.setMuted(false);
+            // Activity teardown must not undo the external-recorder handoff or a
+            // user-selected speaker mute. The application restores this state only
+            // after Android confirms that WhatsApp released microphone capture.
+            boolean keepSpeakerMuted = externalCaptureMusicSuspended
+                    || RoomRtcEngine.getInstance().isSpeakerMuted();
+            roomSpeakerMuted = keepSpeakerMuted;
+            RoomSoundFx.setMuted(keepSpeakerMuted);
             GiftAudioFx.resetRoomGiftSounds();
-            try {
-                RoomRtcEngine.getInstance().setSpeakerMuted(false);
-            } catch (Exception ignored) {
+            if (!keepSpeakerMuted) {
+                try { RoomRtcEngine.getInstance().setSpeakerMuted(false); }
+                catch (Exception ignored) {}
             }
+        }
+        if (relationshipSeatEffectsOverlay != null) {
+            relationshipSeatEffectsOverlay.destroy();
+            relationshipSeatEffectsOverlay = null;
         }
         if (seatAdapter != null) seatAdapter.cleanup();
         clearHostStageReaction();
@@ -10683,7 +14185,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomEvent(String rid, String event, JsonObject payload, String fromUserId, String fromUsername) {
                 if (rid == null || roomId == null || !roomId.equals(rid) || event == null) return;
-                handler.post(() -> handleRoomEvent(event, payload, fromUserId, fromUsername));
+                handler.post(() -> {
+                    if (exiting || isFinishing() || isDestroyed() || binding == null) return;
+                    try {
+                        handleRoomEvent(event, payload, fromUserId, fromUsername);
+                    } catch (RuntimeException crash) {
+                        // A malformed realtime payload must not kill the Android process.
+                        android.util.Log.e("VoiceRoom", "Room event ignored after UI exception: " + event, crash);
+                    }
+                });
             }
 
             @Override
@@ -10712,18 +14222,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String name = displayName != null && !displayName.isEmpty()
                             ? displayName
                             : (username != null && !username.isEmpty() ? username : "مستخدم");
+                    boolean localMysteryEnabled = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                            .getBoolean("enabled", false);
+                    boolean mysteriousJoin = "الرجل الغامض".equals(name)
+                            || (selfJoin && localMysteryEnabled);
+                    if (mysteriousJoin) name = "الرجل الغامض";
+                    String shownAvatarUrl = mysteriousJoin
+                            ? configuredMysteriousAvatarUrl() : avatarUrl;
                     int level = Math.max(1, userLevel);
                     if (!selfJoin) {
                         RoomSoundFx.playJoin(VoiceRoomActivity.this);
                         bumpRoomViewers(1);
                     }
 
-                    // Mikoo: owner does NOT see their own entry effect — only other users.
-                    if (selfJoin || myUserId == null || myUserId.isEmpty()) {
+                    // Play the equipped entrance for the joining user too. The server
+                    // broadcasts room:user_joined to the entire room, including this
+                    // client's socket; previously the self-join guard silently skipped
+                    // the buyer's own entrance every time they entered/re-entered.
+                    if (myUserId == null || myUserId.isEmpty()) {
                         return;
                     }
 
-                    // Always show join entry for others so equipped rides play in-room.
+                    // Queue the same equipped entrance on every room client, including the entrant.
                     if (effectQueue != null) {
                         RoomEffectQueue.EffectType entryType;
                         if ("supporter".equals(supporterTier) || "legendary".equals(supporterTier)) {
@@ -10733,8 +14253,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         } else {
                             entryType = RoomEffectQueue.EffectType.NORMAL_ENTRY;
                         }
-                        String rideAnim = entryAnimationUrl;
-                        String ridePreview = entryEffectUrl;
+                        String rideAnim = mysteriousJoin ? null : entryAnimationUrl;
+                        String ridePreview = mysteriousJoin
+                                ? (mysteriousEntranceIsText() ? null : configuredMysteriousEntryEffectUrl())
+                                : entryEffectUrl;
+                        if (mysteriousJoin && mysteriousEntranceIsText()) {
+                            appendChatLine("الرجل الغامض", configuredMysteriousEntryText(), 0, 1,
+                                    null, userId, shownAvatarUrl, null, 0L, 0L);
+                        }
                         String ride = firstNonEmpty(rideAnim, ridePreview);
                         long hold = durationMs > 0
                                 ? Math.min(durationMs, 5500L)
@@ -10742,7 +14268,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         effectQueue.enqueue(new RoomEffectQueue.Builder()
                                 .type(entryType)
                                 .displayName(name)
-                                .avatarUrl(avatarUrl)
+                                .avatarUrl(shownAvatarUrl)
                                 .entryEffectUrl(ridePreview)
                                 .entryAnimationUrl(rideAnim)
                                 .vipLevel(vipLevel)
@@ -10777,77 +14303,95 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomMembers(String rid, com.google.gson.JsonArray members) {
                 if (rid == null || roomId == null || !roomId.equals(rid)) return;
+                // Snapshot the small, UI-owned state first, then parse/normalize the full
+                // member payload away from the main thread. Large rooms must not block frames.
                 handler.post(() -> {
-                    roomAudience.clear();
-                    roomMembersAll.clear();
-                    List<RecentJoinersAdapter.Joiner> audienceRows = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> framedFirst = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> seatedNext = new ArrayList<>();
-                    List<RecentJoinersAdapter.Joiner> others = new ArrayList<>();
-                    Set<String> seenAudience = new HashSet<>();
-                    Set<String> seenAll = new HashSet<>();
-                    if (members != null) {
-                        for (int i = 0; i < members.size(); i++) {
-                            if (!members.get(i).isJsonObject()) continue;
-                            JsonObject member = members.get(i).getAsJsonObject();
-                            String uid = memberStr(member, "userId");
-                            if (uid == null || uid.isEmpty()) continue;
-                            String normalizedUid = normalizeUserId(uid);
-                            if (normalizedUid.isEmpty()) continue;
-                            if (seenAll.add(normalizedUid)) {
-                                roomMembersAll.add(member);
-                            }
-                            if (!seenAudience.add(normalizedUid)) continue;
-                            if (sameUser(uid, myUserId)) continue;
-                            boolean seated = sameUser(uid, roomHostId)
-                                    || sameUser(uid, roomCohostId)
-                                    || isUserSeated(uid);
-                            if (!seated) {
-                                roomAudience.add(member);
-                            }
-                            String displayName = memberStr(member, "displayName");
-                            if (displayName == null || displayName.isEmpty()) {
-                                displayName = memberStr(member, "username");
-                            }
-                            int vip = Math.max(0, memberInt(member, "vipLevel", 0));
-                            int level = Math.max(1, memberInt(member, "userLevel", 1));
-                            String hostFrame = memberStr(member, "hostBadgeUrl");
-                            String vipFrame = memberStr(member, "vipBadgeUrl");
-                            String frame = isAgencyRoom ? hostFrame : vipFrame;
-                            RecentJoinersAdapter.Joiner row = new RecentJoinersAdapter.Joiner(
-                                    uid,
-                                    displayName != null ? displayName : "مستخدم",
-                                    memberStr(member, "avatarUrl"),
-                                    hostFrame,
-                                    vipFrame,
-                                    vip,
-                                    level);
-                            if (frame != null && !frame.trim().isEmpty()) {
-                                framedFirst.add(row);
-                            } else if (seated) {
-                                seatedNext.add(row);
-                            } else {
-                                others.add(row);
+                    if (exiting || isFinishing() || isDestroyed() || binding == null
+                            || !rid.equals(roomId)) return;
+                    final int sequence = ++roomMembersBindSeq;
+                    final String hostIdSnapshot = roomHostId;
+                    final String cohostIdSnapshot = roomCohostId;
+                    final boolean agencySnapshot = isAgencyRoom;
+                    final Set<String> seatedIds = new HashSet<>();
+                    if (currentSeats != null) {
+                        for (RoomDtos.SeatDto seat : currentSeats) {
+                            if (seat == null) continue;
+                            String seatedId = normalizeUserId(seatUserId(seat));
+                            if (!seatedId.isEmpty()) seatedIds.add(seatedId);
+                        }
+                    }
+                    final com.google.gson.JsonArray payload = members;
+                    ContainerProvider.from(VoiceRoomActivity.this).getIoExecutor().execute(() -> {
+                        List<JsonObject> allRows = new ArrayList<>();
+                        List<JsonObject> audience = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> framedFirst = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> seatedNext = new ArrayList<>();
+                        List<RecentJoinersAdapter.Joiner> others = new ArrayList<>();
+                        Set<String> seenAudience = new HashSet<>();
+                        Set<String> seenAll = new HashSet<>();
+                        int payloadCount = payload != null ? payload.size() : 0;
+                        if (payload != null) {
+                            for (int i = 0; i < payload.size(); i++) {
+                                if (!payload.get(i).isJsonObject()) continue;
+                                JsonObject member = payload.get(i).getAsJsonObject();
+                                String uid = memberStr(member, "userId");
+                                if (uid == null || uid.isEmpty()) continue;
+                                String normalizedUid = normalizeUserId(uid);
+                                if (normalizedUid.isEmpty()) continue;
+                                if (seenAll.add(normalizedUid)) allRows.add(member);
+                                if (!seenAudience.add(normalizedUid) || sameUser(uid, myUserId)) continue;
+                                boolean seated = sameUser(uid, hostIdSnapshot)
+                                        || sameUser(uid, cohostIdSnapshot)
+                                        || seatedIds.contains(normalizedUid);
+                                if (!seated) audience.add(member);
+                                String displayName = memberStr(member, "displayName");
+                                if (displayName == null || displayName.isEmpty()) {
+                                    displayName = memberStr(member, "username");
+                                }
+                                int vip = Math.max(0, memberInt(member, "vipLevel", 0));
+                                int level = Math.max(1, memberInt(member, "userLevel", 1));
+                                String hostFrame = memberStr(member, "hostBadgeUrl");
+                                String vipFrame = memberStr(member, "vipBadgeUrl");
+                                String frame = agencySnapshot ? hostFrame : vipFrame;
+                                RecentJoinersAdapter.Joiner row = new RecentJoinersAdapter.Joiner(
+                                        uid, displayName != null ? displayName : "مستخدم",
+                                        memberStr(member, "avatarUrl"), hostFrame, vipFrame, vip, level);
+                                if (frame != null && !frame.trim().isEmpty()) framedFirst.add(row);
+                                else if (seated) seatedNext.add(row);
+                                else others.add(row);
                             }
                         }
-                        setRoomViewerCount(Math.max(1, members.size()));
-                    }
-                    audienceRows.addAll(framedFirst);
-                    audienceRows.addAll(seatedNext);
-                    audienceRows.addAll(others);
-                    if (audienceRows.size() > 10) {
-                        audienceRows = new ArrayList<>(audienceRows.subList(0, 10));
-                    }
-                    updateViewerStack(roomAudience);
-                    if (audienceAdapter != null) audienceAdapter.submit(audienceRows);
-                    binding.recyclerRecentJoiners.setVisibility(
-                            audienceRows.isEmpty() ? View.GONE : View.VISIBLE);
-                    if (binding.rowAudienceStrip != null) {
-                        binding.rowAudienceStrip.setVisibility(View.VISIBLE);
-                    }
+                        List<RecentJoinersAdapter.Joiner> audienceRows = new ArrayList<>(
+                                framedFirst.size() + seatedNext.size() + others.size());
+                        audienceRows.addAll(framedFirst);
+                        audienceRows.addAll(seatedNext);
+                        audienceRows.addAll(others);
+                        if (audienceRows.size() > 10) {
+                            audienceRows = new ArrayList<>(audienceRows.subList(0, 10));
+                        }
+                        final List<JsonObject> allResult = allRows;
+                        final List<JsonObject> audienceResult = audience;
+                        final List<RecentJoinersAdapter.Joiner> visibleRows = audienceRows;
+                        final int viewerCount = Math.max(1, payloadCount);
+                        handler.post(() -> {
+                            if (sequence != roomMembersBindSeq || exiting || isFinishing()
+                                    || isDestroyed() || binding == null || !rid.equals(roomId)) return;
+                            roomMembersAll.clear();
+                            roomMembersAll.addAll(allResult);
+                            roomAudience.clear();
+                            roomAudience.addAll(audienceResult);
+                            setRoomViewerCount(viewerCount);
+                            updateViewerStack(roomAudience);
+                            if (audienceAdapter != null) audienceAdapter.submit(visibleRows);
+                            binding.recyclerRecentJoiners.setVisibility(
+                                    visibleRows.isEmpty() ? View.GONE : View.VISIBLE);
+                            if (binding.rowAudienceStrip != null) {
+                                binding.rowAudienceStrip.setVisibility(View.VISIBLE);
+                            }
+                        });
+                    });
                 });
             }
-
             @Override
             public void onConnected() {
                 connectRealtimeRoom();
@@ -10868,11 +14412,86 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             moderationUserListener = new RealtimeClient.UserListener() {
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
-                    if (payload == null || event == null) return;
+                    if (event == null) return;
+                    if ("cp:config-updated".equals(event)) {
+                        handler.post(() -> {
+                            if (isFinishing() || isDestroyed() || exiting) return;
+                            // Dashboard CP artwork/level changes must refresh the live room
+                            // without waiting for another seat event or disturbing RTC state.
+                            lastRelationshipEffectsSeatSignature = null;
+                            lastRelationshipEffectsFetchMs = 0L;
+                            List<RoomDtos.SeatDto> latestSeats = lastRelationshipEffectsSeats;
+                            if (latestSeats != null) refreshRoomRelationshipEffects(latestSeats);
+                        });
+                        return;
+                    }
+                    if ("cp:request".equals(event)) {
+                        String targetRoomId = memberStr(payload, "roomId");
+                        if (targetRoomId != null && targetRoomId.equals(roomId)) {
+                            handler.post(() -> showCpRoomRequestDialog(payload));
+                        }
+                        return;
+                    }
+                    if ("config:updated".equals(event)) {
+                        String scope = payload != null && payload.has("scope")
+                                && !payload.get("scope").isJsonNull()
+                                ? payload.get("scope").getAsString() : "";
+                        if ("toast-style".equals(scope)) {
+                            handler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                refreshLuckyToastButtonStyle();
+                                GlobalCelebrationToast.refreshStyleNow(VoiceRoomActivity.this);
+                            });
+                        } else if ("app-theme".equals(scope)) {
+                            try {
+                                AppContainer container = ContainerProvider.from(VoiceRoomActivity.this);
+                                container.getIoExecutor().execute(() ->
+                                        RemoteTheme.refreshFromApi(
+                                                getApplicationContext(), container.getConfigApi()));
+                            } catch (Exception error) {
+                                android.util.Log.w("VoiceRoom", "Could not refresh dashboard theme", error);
+                            }
+                        }
+                        return;
+                    }
+                    if ("contest:pk-status".equals(event)) {
+                        boolean enabled = payload != null && payload.has("enabled")
+                                && !payload.get("enabled").isJsonNull()
+                                && payload.get("enabled").getAsBoolean();
+                        handler.post(() -> {
+                            roomPkFeatureEnabled = enabled;
+                            if (!enabled) {
+                                handler.removeCallbacks(hideRoomPkScoreBanner);
+                                handler.removeCallbacks(updateRoomPkBannerClock);
+                                roomPkCurrentContestId = null;
+                                if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                            }
+                            ensureRoomPkActionButton();
+                            if (enabled) handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
+                        });
+                        return;
+                    }
+                    if (payload == null) return;
                     String rid = payload.has("roomId") && !payload.get("roomId").isJsonNull()
                             ? payload.get("roomId").getAsString() : null;
                     if (roomId == null || rid == null || !roomId.equals(rid)) return;
                     handler.post(() -> {
+                        // User-targeted room events are wrapped as room:event by the gateway.
+                        // Handle them here as well as the room channel so kick/seat removal still
+                        // reaches the target when its room socket subscription is stale.
+                        if ("room:event".equals(event)) {
+                            String innerEvent = payload.has("event") && !payload.get("event").isJsonNull()
+                                    ? payload.get("event").getAsString() : null;
+                            JsonObject innerPayload = payload.has("payload") && payload.get("payload").isJsonObject()
+                                    ? payload.getAsJsonObject("payload") : null;
+                            // The room listener handles events while joined; this direct
+                            // delivery is a fallback for a stale/missing room subscription only.
+                            if (innerEvent != null && innerPayload != null
+                                    && !RealtimeClient.getInstance().isJoinedRoom(roomId)) {
+                                handleRoomEvent(innerEvent, innerPayload, null, null);
+                            }
+                            return;
+                        }
                         if ("moderation:blocked".equals(event) || "moderation:action".equals(event)) {
                             String action = payload.has("action") && !payload.get("action").isJsonNull()
                                     ? payload.get("action").getAsString() : "";
@@ -10963,14 +14582,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void connectRealtimeRoom() {
-        if (roomId == null || realtimeJoined || realtimeJoinInFlight) return;
+        if (roomId == null || roomId.isEmpty()) return;
         RealtimeClient rt = RealtimeClient.getInstance();
-        // Already in the socket room from minimize — skip rejoin / "اتصال ضعيف".
+        // Trust actual server-room membership; Activity flags can be stale after reconnect.
         if (rt.isJoinedRoom(roomId)) {
             realtimeJoined = true;
             realtimeJoinAttempts = 0;
             return;
         }
+        realtimeJoined = false;
+        if (realtimeJoinInFlight) return;
         if (!rt.isConnected()) {
             // Socket still connecting — retry softly; never eject the user.
             scheduleRealtimeJoinRetry(1_800L);
@@ -11068,10 +14689,2270 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return o.optDouble(key, fallback);
     }
 
+    /** PK challenge is launched from Room Settings, not floated over the room header. */
+    private void ensureRoomPkActionButton() {
+        if (roomPkActionButton != null) {
+            ViewGroup parent = (ViewGroup) roomPkActionButton.getParent();
+            if (parent != null) parent.removeView(roomPkActionButton);
+            roomPkActionButton = null;
+        }
+    }
+
+    private void showRoomPkChallengeDialog() {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
+            Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show(); return;
+        }
+        androidx.appcompat.app.AlertDialog chooser = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("اختيار نوع تحدّي PK")
+            .setItems(new String[]{"🔴 شخص ضد شخص", "⚔ فريق ضد فريق", "🏠 روم ضد روم"}, (d, which) -> {
+                if (which == 2) showRoomVsRoomPkChallengeDialog();
+                else showInRoomPkSetup(which == 0 ? "person_vs_person" : "team_vs_team");
+            }).setNegativeButton("إلغاء", null).create();
+        chooser.show();
+        makeRoomPkDialogCompactDraggable(chooser);
+    }
+
+    private void showInRoomPkSetup(String type) {
+        java.util.List<RoomDtos.SeatDto> occupied = new java.util.ArrayList<>();
+        if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+            String uid = seatUserId(seat); if (uid != null && !uid.trim().isEmpty()) occupied.add(seat);
+        }
+        if (occupied.size() < 2) { Toast.makeText(this, "يجب وجود مشاركين اثنين على الأقل", Toast.LENGTH_LONG).show(); return; }
+        java.util.List<String> aIds = new java.util.ArrayList<>(), bIds = new java.util.ArrayList<>();
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout root = new android.widget.LinearLayout(this); root.setOrientation(1);
+        root.setPadding(dp(16), dp(12), dp(16), dp(12)); scroll.addView(root);
+        TextView note = new TextView(this); note.setText("اختر أسماء من المقاعد المشغولة. لن تتغير المقاعد أو اتصالات الصوت."); note.setTextColor(0xFF263247); root.addView(note);
+        final int[] mins = {5};
+        android.widget.RadioGroup rg = new android.widget.RadioGroup(this); rg.setOrientation(0);
+        for (int m : new int[]{5,10,20}) { android.widget.RadioButton rb = new android.widget.RadioButton(this); rb.setText(m+" دقائق"); rb.setTag(m); rg.addView(rb); if(m==5) rb.setChecked(true); }
+        rg.setOnCheckedChangeListener((g,id)->{ android.widget.RadioButton rb=g.findViewById(id); if(rb!=null) mins[0]=(Integer)rb.getTag(); }); root.addView(rg);
+        root.addView(roomPkFormLabel("🔴 الفريق الأحمر"));
+        android.widget.LinearLayout la=new android.widget.LinearLayout(this); la.setOrientation(1); root.addView(la);
+        root.addView(roomPkFormLabel("🔵 الفريق الأزرق"));
+        android.widget.LinearLayout lb=new android.widget.LinearLayout(this); lb.setOrientation(1); root.addView(lb);
+        for (RoomDtos.SeatDto seat : occupied) {
+            final String uid=seatUserId(seat);
+            String name=seat.user!=null && seat.user.displayName!=null && !seat.user.displayName.trim().isEmpty()?seat.user.displayName:"مشارك";
+            String label="مقعد "+(seat.seatIndex+1)+" · "+name;
+            android.widget.CheckBox ca=new android.widget.CheckBox(this), cb=new android.widget.CheckBox(this);
+            ca.setText(label); cb.setText(label); ca.setTextColor(0xFF9D2441); cb.setTextColor(0xFF205AA4);
+            ca.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!aIds.isEmpty())){v.setChecked(false);return;} aIds.add(uid); cb.setEnabled(false);}else{aIds.remove(uid);cb.setEnabled(true);} });
+            cb.setOnCheckedChangeListener((v,on)->{ if(on){ if(aIds.contains(uid)||bIds.contains(uid)||("person_vs_person".equals(type)&&!bIds.isEmpty())){v.setChecked(false);return;} bIds.add(uid);ca.setEnabled(false);}else{bIds.remove(uid);ca.setEnabled(true);} });
+            la.addView(ca); lb.addView(cb);
+        }
+        scroll.setLayoutParams(new android.view.ViewGroup.LayoutParams(-1,
+                Math.min(dp(420), Math.max(dp(260), getResources().getDisplayMetrics().heightPixels * 2 / 3))));
+        androidx.appcompat.app.AlertDialog setupDialog = new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إعداد تحدّي PK").setView(scroll)
+            .setNegativeButton("إلغاء",null).setPositiveButton("بدء التحدّي",(d,w)->{
+                if(aIds.isEmpty()||bIds.isEmpty()){Toast.makeText(this,"اختر مشاركاً لكل فريق",Toast.LENGTH_LONG).show();return;}
+                java.util.Map<String,Object> body=new java.util.HashMap<>(); body.put("roomId",roomId);body.put("challengeType",type);
+                body.put("durationMinutes",mins[0]);body.put("participantIdsA",new java.util.ArrayList<>(aIds));body.put("participantIdsB",new java.util.ArrayList<>(bIds));body.put("scoringMode","coins");
+                ContainerProvider.from(this).getContestsApi().createInRoomPk(body).enqueue(new retrofit2.Callback<ApiResponse<Object>>(){
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,retrofit2.Response<ApiResponse<Object>> res){
+                        if(!res.isSuccessful()||res.body()==null||!res.body().success){Toast.makeText(VoiceRoomActivity.this,res.body()!=null&&res.body().message!=null?res.body().message:"تعذّر بدء تحدّي PK",Toast.LENGTH_LONG).show();return;}
+                        Toast.makeText(VoiceRoomActivity.this, "تم إرسال الدعوة؛ يبدأ التحدّي بعد قبول الطرف الثاني", Toast.LENGTH_LONG).show();
+                        // Socket delivery is realtime-first; refresh from the API as a safe
+                        // fallback so the host still sees the banner after reconnects.
+                        handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 350L);
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call,Throwable e){Toast.makeText(VoiceRoomActivity.this,"تعذّر الاتصال لبدء التحدّي",Toast.LENGTH_LONG).show();}
+                });
+            }).create();
+        setupDialog.show();
+        makeRoomPkDialogCompactDraggable(setupDialog);
+    }
+
+    private void showRoomVsRoomPkChallengeDialog() {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
+            Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final int[] selectedMinutes = {10};
+        final String[] selectedScoring = {"coins"};
+        final String[] scoringModes = {"coins", "diamonds", "gifts", "points"};
+        final String[] scoringLabels = {"🪙 الكوينز", "💎 الألماسات", "🎁 الهدايا", "⭐ النقاط"};
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(18), dp(12), dp(18), dp(16));
+        form.setBackground(roomPkRoundedBackground(0xFFF7F8FC, 0xFFE3E7F0, 22));
+        scroll.addView(form);
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(16), dp(15), dp(16), dp(15));
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
+        ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
+        TextView heroTitle = new TextView(this);
+        heroTitle.setText("⚔  تحديات PK");
+        heroTitle.setTextColor(Color.WHITE);
+        heroTitle.setTextSize(19f);
+        heroTitle.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        hero.addView(heroTitle);
+        TextView heroSubtitle = new TextView(this);
+        heroSubtitle.setText("وجّه الدعوة للروم المنافس، وبعد القبول تبدأ المواجهة والعدّ التنازلي مباشرة.");
+        heroSubtitle.setTextColor(0xFFFCECF3);
+        heroSubtitle.setTextSize(12f);
+        heroSubtitle.setPadding(0, dp(5), 0, 0);
+        hero.addView(heroSubtitle);
+        form.addView(hero, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView roomLabel = roomPkFormLabel("معرّف الروم المنافس");
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+        labelParams.topMargin = dp(18);
+        form.addView(roomLabel, labelParams);
+        EditText targetId = new EditText(this);
+        targetId.setSingleLine(true);
+        targetId.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        targetId.setHint("أدخل Room ID");
+        targetId.setTextSize(15f);
+        targetId.setTextColor(0xFF172033);
+        targetId.setHintTextColor(0xFF8A93A5);
+        targetId.setPadding(dp(14), dp(12), dp(14), dp(12));
+        targetId.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFD7DCE8, 13));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(50));
+        inputParams.topMargin = dp(7);
+        form.addView(targetId, inputParams);
+        TextView idHint = new TextView(this);
+        idHint.setText("أدخل الـ ID العام للروم، وليس اسم المضيف.");
+        idHint.setTextColor(0xFF7A8497);
+        idHint.setTextSize(11f);
+        idHint.setPadding(dp(2), dp(5), dp(2), 0);
+        form.addView(idHint);
+
+        TextView durationLabel = roomPkFormLabel("مدة التحدّي");
+        LinearLayout.LayoutParams durationLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        durationLabelParams.topMargin = dp(17);
+        form.addView(durationLabel, durationLabelParams);
+        TextView[] durationChips = new TextView[5];
+        int[] minuteValues = {5, 10, 15, 30, 60};
+        LinearLayout durationRow = new LinearLayout(this);
+        durationRow.setOrientation(LinearLayout.HORIZONTAL);
+        durationRow.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams choiceRowParams = new LinearLayout.LayoutParams(-1, -2);
+        choiceRowParams.topMargin = dp(8);
+        form.addView(durationRow, choiceRowParams);
+        for (int i = 0; i < minuteValues.length; i++) {
+            final int minutes = minuteValues[i];
+            TextView chip = roomPkChoiceChip(minutes + " د", minutes == selectedMinutes[0]);
+            durationChips[i] = chip;
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (i > 0) chipParams.leftMargin = dp(5);
+            durationRow.addView(chip, chipParams);
+            chip.setOnClickListener(v -> {
+                selectedMinutes[0] = minutes;
+                for (int j = 0; j < durationChips.length; j++) {
+                    boolean chosen = minuteValues[j] == minutes;
+                    durationChips[j].setBackground(roomPkRoundedBackground(
+                            chosen ? 0xFFFFE4EC : Color.WHITE,
+                            chosen ? 0xFFEA416A : 0xFFDCE1EB, 12));
+                    durationChips[j].setTextColor(chosen ? 0xFFC52250 : 0xFF596477);
+                }
+            });
+        }
+
+        TextView scoringLabel = roomPkFormLabel("طريقة احتساب نتيجة الفوز");
+        LinearLayout.LayoutParams scoringLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        scoringLabelParams.topMargin = dp(18);
+        form.addView(scoringLabel, scoringLabelParams);
+        TextView goalLabel = roomPkFormLabel("هدف الفوز بالكوينز");
+        LinearLayout.LayoutParams goalLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        goalLabelParams.topMargin = dp(18);
+        form.addView(goalLabel, goalLabelParams);
+        TextView[] scoringChips = new TextView[4];
+        for (int row = 0; row < 2; row++) {
+            LinearLayout scoringRow = new LinearLayout(this);
+            scoringRow.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+            rowParams.topMargin = dp(7);
+            form.addView(scoringRow, rowParams);
+            for (int col = 0; col < 2; col++) {
+                int index = row * 2 + col;
+                final int choiceIndex = index;
+                TextView chip = roomPkChoiceChip(scoringLabels[index], scoringModes[index].equals(selectedScoring[0]));
+                scoringChips[index] = chip;
+                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+                if (col == 1) chipParams.leftMargin = dp(7);
+                scoringRow.addView(chip, chipParams);
+                chip.setOnClickListener(v -> {
+                    selectedScoring[0] = scoringModes[choiceIndex];
+                    goalLabel.setText("هدف الفوز بال" + ("diamonds".equals(selectedScoring[0]) ? "ألماسات"
+                            : "gifts".equals(selectedScoring[0]) ? "هدايا"
+                            : "points".equals(selectedScoring[0]) ? "نقاط" : "كوينز"));
+                    for (int j = 0; j < scoringChips.length; j++) {
+                        boolean chosen = j == choiceIndex;
+                        scoringChips[j].setBackground(roomPkRoundedBackground(
+                                chosen ? 0xFFFFE4EC : Color.WHITE,
+                                chosen ? 0xFFEA416A : 0xFFDCE1EB, 12));
+                        scoringChips[j].setTextColor(chosen ? 0xFFC52250 : 0xFF596477);
+                    }
+                });
+            }
+        }
+
+        EditText goalScoreInput = new EditText(this);
+        goalScoreInput.setSingleLine(true);
+        goalScoreInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        goalScoreInput.setText("100000");
+        goalScoreInput.setTextSize(15f);
+        goalScoreInput.setTextColor(0xFF172033);
+        goalScoreInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        goalScoreInput.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFD7DCE8, 13));
+        LinearLayout.LayoutParams goalInputParams = new LinearLayout.LayoutParams(-1, dp(50));
+        goalInputParams.topMargin = dp(7);
+        form.addView(goalScoreInput, goalInputParams);
+        TextView goalHint = new TextView(this);
+        goalHint.setText("ينتهي التحدّي عند بلوغ الهدف أو عند انتهاء الوقت، أيهما أسبق.");
+        goalHint.setTextColor(0xFF7A8497);
+        goalHint.setTextSize(11f);
+        goalHint.setPadding(dp(2), dp(5), dp(2), 0);
+        form.addView(goalHint);
+
+        TextView footer = new TextView(this);
+        footer.setText("🔔 سيصل إشعار فوري لمضيف الروم المنافس، ولن يبدأ التحدّي إلا بعد قبول الدعوة.");
+        footer.setTextColor(0xFF586276);
+        footer.setTextSize(12f);
+        footer.setPadding(dp(12), dp(11), dp(12), dp(11));
+        footer.setBackground(roomPkRoundedBackground(0xFFEFF3FA, 0xFFDCE4F2, 12));
+        LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(-1, -2);
+        footerParams.topMargin = dp(18);
+        form.addView(footer, footerParams);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(scroll)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("إرسال الدعوة  ➜", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button send = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+            android.widget.Button cancel = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+            send.setTextColor(0xFFC52250);
+            send.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            cancel.setTextColor(0xFF697386);
+            send.setOnClickListener(v -> {
+                String target = targetId.getText() != null ? targetId.getText().toString().trim() : "";
+                if (target.isEmpty()) {
+                    targetId.setError("أدخل ID الروم المنافس");
+                    targetId.requestFocus();
+                    return;
+                }
+                if (target.equals(roomId)) {
+                    targetId.setError("لا يمكنك تحدّي الروم نفسه");
+                    return;
+                }
+                java.util.Map<String, Object> body = new java.util.HashMap<>();
+                body.put("roomId", roomId);
+                body.put("targetRoomId", target);
+                long goalScore;
+                try {
+                    goalScore = Long.parseLong(goalScoreInput.getText().toString().trim());
+                } catch (Exception invalid) {
+                    goalScore = 0L;
+                }
+                if (goalScore < 1L || goalScore > 1_000_000_000L) {
+                    goalScoreInput.setError("أدخل هدفًا بين 1 و1,000,000,000");
+                    return;
+                }
+                body.put("durationMinutes", selectedMinutes[0]);
+                body.put("scoringMode", selectedScoring[0]);
+                body.put("goalScore", goalScore);
+                send.setEnabled(false);
+                send.setText("جارٍ إرسال الدعوة…");
+                ContainerProvider.from(this).getContestsApi().createRoomPk(body).enqueue(
+                        new retrofit2.Callback<ApiResponse<Object>>() {
+                            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                    retrofit2.Response<ApiResponse<Object>> response) {
+                                boolean ok = response.isSuccessful() && response.body() != null && response.body().success;
+                                if (!ok) {
+                                    send.setEnabled(true);
+                                    send.setText("إرسال الدعوة  ➜");
+                                    Toast.makeText(VoiceRoomActivity.this,
+                                            response.body() != null && response.body().message != null
+                                                    ? response.body().message : "تعذّر إرسال الدعوة، تحقق من ID الروم",
+                                            Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                dialog.dismiss();
+                                roomPkCurrentContestId = "pending";
+                                handler.removeCallbacks(roomPkPendingTimeout);
+                                handler.postDelayed(roomPkPendingTimeout, 60000L);
+                                ensureRoomPkActionButton();
+                                Toast.makeText(VoiceRoomActivity.this,
+                                        "تم إرسال الدعوة إلى مضيف الروم المنافس 🔔", Toast.LENGTH_LONG).show();
+                                handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
+                            }
+                            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                                send.setEnabled(true);
+                                send.setText("إرسال الدعوة  ➜");
+                                Toast.makeText(VoiceRoomActivity.this,
+                                        "تعذّر الاتصال. حاول إرسال الدعوة مرة ثانية.", Toast.LENGTH_LONG).show();
+                            }
+                        });
+            });
+        });
+        dialog.show();
+        makeRoomPkDialogCompactDraggable(dialog, hero);
+    }
+
+    private GradientDrawable roomPkRoundedBackground(int fill, int stroke, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(dp(radiusDp));
+        drawable.setStroke(dp(1), stroke);
+        return drawable;
+    }
+
+    private TextView roomPkFormLabel(String text) {
+        TextView label = new TextView(this);
+        label.setText(text);
+        label.setTextColor(0xFF202A3D);
+        label.setTextSize(14f);
+        label.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        return label;
+    }
+
+    private TextView roomPkChoiceChip(String text, boolean selected) {
+        TextView chip = new TextView(this);
+        chip.setText(text);
+        chip.setGravity(Gravity.CENTER);
+        chip.setSingleLine(true);
+        chip.setTextSize(12f);
+        chip.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        chip.setPadding(dp(4), dp(7), dp(4), dp(7));
+        chip.setBackground(roomPkRoundedBackground(selected ? 0xFFFFE4EC : Color.WHITE,
+                selected ? 0xFFEA416A : 0xFFDCE1EB, 12));
+        chip.setTextColor(selected ? 0xFFC52250 : 0xFF596477);
+        return chip;
+    }
+
+    private void loadRoomPkInvitations() {
+        if (roomId == null || roomId.isEmpty() || !isOwner || isFinishing() || exiting) return;
+        ContainerProvider.from(this).getContestsApi().roomPkInvitations(roomId).enqueue(
+                new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
+                    @Override public void onResponse(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
+                        if (!response.isSuccessful() || response.body() == null || !response.body().success
+                                || response.body().data == null || response.body().data.items == null) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null || response.body().data.roomPkEnabled;
+                        ensureRoomPkActionButton();
+                        for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                            if (contest == null || contest.id == null || !shownRoomPkInvites.add(contest.id)) continue;
+                            handler.post(() -> showRoomPkInviteDialog(contest));
+                            break;
+                        }
+                    }
+                    @Override public void onFailure(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            Throwable error) { }
+                });
+    }
+
+    private void showRoomPkInviteDialog(com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest) {
+        if (isFinishing() || contest == null || contest.id == null) return;
+        String sourceName = contest.sideA != null ? firstNonEmpty(contest.sideA.name, "الروم المنافس") : "الروم المنافس";
+        int minutes = 10;
+        long goalScore = 100000L;
+        String mode = firstNonEmpty(contest.scoringMode, "coins");
+        if (contest.rules != null) {
+            Object duration = contest.rules.get("durationMinutes");
+            if (duration instanceof Number) minutes = Math.max(1, ((Number) duration).intValue());
+            Object scoring = contest.rules.get("scoringMode");
+            if (scoring != null) mode = String.valueOf(scoring);
+            Object goal = contest.rules.get("goalScore");
+            if (goal instanceof Number) goalScore = Math.max(0L, ((Number) goal).longValue());
+        }
+        String modeLabel = "diamonds".equals(mode) ? "💎 الألماسات"
+                : "gifts".equals(mode) ? "🎁 عدد الهدايا"
+                : "points".equals(mode) ? "⭐ النقاط" : "🪙 الكوينز";
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(14), dp(18), dp(12));
+        card.setBackground(roomPkRoundedBackground(0xFFF7F8FC, 0xFFE2E7F0, 20));
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(dp(14), dp(16), dp(14), dp(16));
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
+        ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
+        TextView icon = new TextView(this);
+        icon.setText("⚔");
+        icon.setTextSize(28f);
+        icon.setTextColor(Color.WHITE);
+        hero.addView(icon);
+        TextView title = new TextView(this);
+        title.setText("دعوة تحديات PK");
+        title.setTextSize(18f);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        hero.addView(title);
+        TextView subtitle = new TextView(this);
+        subtitle.setText("وصلتك مواجهة جديدة — هل أنت مستعد؟");
+        subtitle.setTextSize(12f);
+        subtitle.setTextColor(0xFFFFEEF3);
+        subtitle.setPadding(0, dp(4), 0, 0);
+        hero.addView(subtitle);
+        card.addView(hero);
+
+        TextView challenge = new TextView(this);
+        challenge.setText("🏠  " + sourceName + "\nيتحدّى رومك ويريد بدء المواجهة.");
+        challenge.setTextColor(0xFF202A3D);
+        challenge.setTextSize(15f);
+        challenge.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        challenge.setPadding(dp(13), dp(13), dp(13), dp(13));
+        challenge.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFDCE2ED, 13));
+        LinearLayout.LayoutParams challengeParams = new LinearLayout.LayoutParams(-1, -2);
+        challengeParams.topMargin = dp(12);
+        card.addView(challenge, challengeParams);
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setPadding(0, dp(11), 0, 0);
+        TextView duration = new TextView(this);
+        duration.setText("⏱  " + minutes + " دقيقة");
+        duration.setGravity(Gravity.CENTER);
+        duration.setTextColor(0xFF4E5870);
+        duration.setTextSize(12f);
+        duration.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        duration.setPadding(dp(7), dp(10), dp(7), dp(10));
+        stats.addView(duration, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView scoring = new TextView(this);
+        scoring.setText(modeLabel);
+        scoring.setGravity(Gravity.CENTER);
+        scoring.setTextColor(0xFF4E5870);
+        scoring.setTextSize(12f);
+        scoring.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        scoring.setPadding(dp(7), dp(10), dp(7), dp(10));
+        LinearLayout.LayoutParams scoringParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        scoringParams.leftMargin = dp(8);
+        stats.addView(scoring, scoringParams);
+        card.addView(stats);
+        String goalUnit = "diamonds".equals(mode) ? "ألماسة"
+                : "gifts".equals(mode) ? "هدية"
+                : "points".equals(mode) ? "نقطة" : "كوينز";
+        TextView goal = new TextView(this);
+        goal.setText("🏁  هدف الفوز: " + String.format(java.util.Locale.US, "%,d", goalScore) + " " + goalUnit);
+        goal.setGravity(Gravity.CENTER);
+        goal.setTextColor(0xFFC52250);
+        goal.setTextSize(13f);
+        goal.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        goal.setPadding(dp(8), dp(11), dp(8), dp(11));
+        goal.setBackground(roomPkRoundedBackground(0xFFFFEAF0, 0xFFF4C2D0, 11));
+        LinearLayout.LayoutParams goalParams = new LinearLayout.LayoutParams(-1, -2);
+        goalParams.topMargin = dp(9);
+        card.addView(goal, goalParams);
+
+        TextView note = new TextView(this);
+        note.setText("عند القبول يبدأ التحدّي مباشرة ويظهر شريط النتيجة والوقت في الرومين.");
+        note.setTextColor(0xFF727C8F);
+        note.setTextSize(11f);
+        note.setPadding(dp(3), dp(11), dp(3), 0);
+        card.addView(note);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(card)
+                .setPositiveButton("قبول التحدّي", (d, which) -> respondToRoomPkInvite(contest.id, true))
+                .setNegativeButton("رفض الدعوة", (d, which) -> respondToRoomPkInvite(contest.id, false))
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setTextColor(0xFFC52250);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                    .setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).setTextColor(0xFF687386);
+        });
+        dialog.show();
+    }
+
+    private void respondToRoomPkInvite(String contestId, boolean accept) {
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("accept", accept);
+        ContainerProvider.from(this).getContestsApi().respondRoomPk(contestId, body).enqueue(
+                new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                            retrofit2.Response<ApiResponse<Object>> response) {
+                        boolean ok = response.isSuccessful() && response.body() != null && response.body().success;
+                        Toast.makeText(VoiceRoomActivity.this,
+                                ok ? (accept ? "تم قبول التحدّي" : "تم رفض الدعوة")
+                                        : "تعذّرت معالجة دعوة التحدّي",
+                                Toast.LENGTH_SHORT).show();
+                        if (ok && accept) handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لمعالجة الدعوة", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void loadRoomPkChallenge() {
+        if (roomId == null || roomId.isEmpty() || isFinishing() || exiting) return;
+        ensureRoomPkActionButton();
+        loadRoomPkInvitations();
+        ContainerProvider.from(this).getContestsApi().listScoped(roomId, null)
+                .enqueue(new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
+                    @Override
+                    public void onResponse(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
+                        if (!response.isSuccessful() || response.body() == null || response.body().data == null
+                                || response.body().data.items == null || isFinishing() || exiting) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null
+                                || response.body().data.roomPkEnabled;
+                        handler.post(VoiceRoomActivity.this::ensureRoomPkActionButton);
+                        for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                            if (contest == null || !"active".equalsIgnoreCase(contest.status)
+                                    || contest.sideA == null || contest.sideB == null) continue;
+                            boolean inRoomPk = "person_vs_person".equals(contest.challengeType)
+                                    || "team_vs_team".equals(contest.challengeType);
+                            boolean belongs = inRoomPk
+                                    ? roomId.equals(contest.roomId)
+                                    : "room_vs_room".equals(contest.challengeType)
+                                        && ((contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
+                                            || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId)));
+                            if (!belongs) continue;
+                            JsonObject payload = new JsonObject();
+                            if (contest.id != null) payload.addProperty("contestId", contest.id);
+                            if (contest.endAt != null) payload.addProperty("endAt", contest.endAt);
+                            // Preserve the challenge type when restoring from the API, not only
+                            // from the live socket event; in-room PK must never split/move seats.
+                            if (contest.challengeType != null) payload.addProperty("challengeType", contest.challengeType);
+                            if (contest.roomId != null) payload.addProperty("roomId", contest.roomId);
+                            if (contest.startAt != null) payload.addProperty("startAt", contest.startAt);
+                            if (contest.scoringMode != null) payload.addProperty("scoringMode", contest.scoringMode);
+                            payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
+                            payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
+                            roomPkCurrentContestId = contest.id;
+                            handler.removeCallbacks(roomPkRosterPoll);
+                            handler.postDelayed(roomPkRosterPoll, 300L);
+                            handler.post(() -> {
+                                ensureRoomPkActionButton();
+                                showRoomPkScoreBanner("contest:team-score", payload);
+                            });
+                            return;
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            Throwable error) {
+                        // PK status is optional UI; a network issue must never affect room voice.
+                    }
+                });
+    }
+
+
+    /** Reads actual rival-room seats without entering or changing its voice connection. */
+    private void loadRoomPkRosters() {
+        final String contestId = roomPkCurrentContestId;
+        if (contestId == null || contestId.isEmpty() || "pending".equals(contestId)
+                || isFinishing() || exiting) return;
+        ContainerProvider.from(this).getContestsApi().roomPkRosters(contestId)
+                .enqueue(new retrofit2.Callback<ApiResponse<JsonObject>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<JsonObject>> call,
+                            retrofit2.Response<ApiResponse<JsonObject>> response) {
+                        if (isFinishing() || exiting || !response.isSuccessful()
+                                || response.body() == null || response.body().data == null
+                                || !contestId.equals(roomPkCurrentContestId)) return;
+                        JsonObject data = response.body().data;
+                        JsonObject a = data.has("roomA") && data.get("roomA").isJsonObject()
+                                ? data.getAsJsonObject("roomA") : new JsonObject();
+                        JsonObject b = data.has("roomB") && data.get("roomB").isJsonObject()
+                                ? data.getAsJsonObject("roomB") : new JsonObject();
+                        String aId = a.has("id") && !a.get("id").isJsonNull() ? a.get("id").getAsString() : "";
+                        JsonObject rival = roomId != null && roomId.equals(aId) ? b : a;
+                        String rivalName = rival.has("title") && !rival.get("title").isJsonNull()
+                                ? rival.get("title").getAsString() : "الروم المنافس";
+                        JsonArray seats = rival.has("seats") && rival.get("seats").isJsonArray()
+                                ? rival.getAsJsonArray("seats") : new JsonArray();
+                        handler.post(() -> renderRoomPkOpponentSeats(rivalName, seats));
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<JsonObject>> call, Throwable error) {
+                        // Keep the latest roster if a temporary network error occurs.
+                    }
+                });
+    }
+
+    private void renderRoomPkOpponentSeats(String rivalName, JsonArray roster) {
+        if (roomPkOpponentSeatPanel == null || isFinishing() || exiting) return;
+        View title = roomPkOpponentSeatPanel.findViewWithTag("room_pk_opponent_title");
+        if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(rivalName, "الروم المنافس"));
+        if (roomPkOpponentSeatPanel.getChildCount() < 2) return;
+        View rowsView = roomPkOpponentSeatPanel.getChildAt(1);
+        if (!(rowsView instanceof android.widget.LinearLayout)) return;
+        android.widget.LinearLayout rows = (android.widget.LinearLayout) rowsView;
+        rows.removeAllViews();
+
+        java.util.List<JsonObject> occupied = new java.util.ArrayList<>();
+        for (int i = 0; i < roster.size(); i++) {
+            if (!roster.get(i).isJsonObject()) continue;
+            JsonObject seat = roster.get(i).getAsJsonObject();
+            if (!seat.has("user") || !seat.get("user").isJsonObject()) continue;
+            JsonObject user = seat.getAsJsonObject("user");
+            String uid = user.has("id") && !user.get("id").isJsonNull() ? user.get("id").getAsString() : "";
+            String displayName = user.has("displayName") && !user.get("displayName").isJsonNull()
+                    ? user.get("displayName").getAsString().trim() : "";
+            String username = user.has("username") && !user.get("username").isJsonNull()
+                    ? user.get("username").getAsString().trim() : "";
+            if (uid.isEmpty() && displayName.isEmpty() && username.isEmpty()) continue;
+            occupied.add(seat);
+        }
+
+        for (int i = 0; i < occupied.size(); i += 2) {
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER);
+            for (int col = 0; col < 2 && i + col < occupied.size(); col++) {
+                JsonObject seat = occupied.get(i + col);
+                JsonObject user = seat.getAsJsonObject("user");
+                String name = user.has("displayName") && !user.get("displayName").isJsonNull()
+                        ? user.get("displayName").getAsString() : "";
+                if (name.trim().isEmpty() && user.has("username") && !user.get("username").isJsonNull())
+                    name = user.get("username").getAsString();
+                if (name.trim().isEmpty()) name = "مستخدم";
+                String avatarUrl = user.has("avatarUrl") && !user.get("avatarUrl").isJsonNull()
+                        ? user.get("avatarUrl").getAsString() : "";
+
+                android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+                card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                card.setGravity(Gravity.CENTER_VERTICAL);
+                card.setPadding(dp(4), dp(4), dp(4), dp(4));
+                card.setBackground(roundRoomPkDrawable(0xCC18385F, 0xCC18385F, 10));
+                android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(
+                        0, dp(50), 1f);
+                cardLp.setMargins(dp(2), dp(2), dp(2), dp(2));
+
+                FrameLayout avatar = new FrameLayout(this);
+                avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 20));
+                if (!avatarUrl.trim().isEmpty()) {
+                    ImageView photo = new ImageView(this);
+                    photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    avatar.addView(photo, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+                    try { com.bumptech.glide.Glide.with(VoiceRoomActivity.this).load(avatarUrl).circleCrop().into(photo); }
+                    catch (Exception ignored) { }
+                } else {
+                    TextView fallback = new TextView(this);
+                    fallback.setText(name.substring(0, 1));
+                    fallback.setTextColor(0xFFEAF4FF);
+                    fallback.setTextSize(12f);
+                    fallback.setGravity(Gravity.CENTER);
+                    avatar.addView(fallback, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+                }
+                card.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(34), dp(34)));
+                TextView label = new TextView(this);
+                label.setText(name);
+                label.setTextColor(Color.WHITE);
+                label.setTextSize(10f);
+                label.setMaxLines(1);
+                label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                label.setGravity(Gravity.CENTER_VERTICAL);
+                android.widget.LinearLayout.LayoutParams labelLp = new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                labelLp.setMargins(dp(5), 0, 0, 0);
+                card.addView(label, labelLp);
+                row.addView(card, cardLp);
+            }
+            if (occupied.size() % 2 == 1 && i + 1 >= occupied.size()) {
+                View spacer = new View(this);
+                row.addView(spacer, new android.widget.LinearLayout.LayoutParams(0, dp(50), 1f));
+            }
+            rows.addView(row, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(54)));
+        }
+        if (roomPkOpponentSeatPanel.getChildCount() > 2
+                && roomPkOpponentSeatPanel.getChildAt(2) instanceof TextView) {
+            TextView note = (TextView) roomPkOpponentSeatPanel.getChildAt(2);
+            note.setText(occupied.isEmpty() ? "لا توجد مقاعد مشغولة حالياً" : occupied.size() + " مقعد مشغول");
+            note.setVisibility(occupied.isEmpty() ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private String formatRoomPkMembers(JsonObject side) {
+        if (side == null || !side.has("participantIds") || !side.get("participantIds").isJsonArray()) return "";
+        JsonArray ids = side.getAsJsonArray("participantIds");
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i).isJsonNull() ? "" : ids.get(i).getAsString();
+            String name = "مشارك";
+            if (roomPkLatestGridSeats != null) for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+                if (id.equals(seatUserId(seat))) {
+                    if (seat.user != null && seat.user.displayName != null && !seat.user.displayName.trim().isEmpty()) name = seat.user.displayName;
+                    else if (seat.user != null && seat.user.username != null && !seat.user.username.trim().isEmpty()) name = seat.user.username;
+                    else name = "مقعد " + (seat.seatIndex + 1);
+                    break;
+                }
+            }
+            names.add(name);
+        }
+        return android.text.TextUtils.join(" · ", names);
+    }
+
+    private void confirmEndInRoomPk() {
+        if (!isOwner || !roomPkCanEndChallenge || roomPkCurrentContestId == null || roomPkCurrentContestId.trim().isEmpty()
+                || "pending".equals(roomPkCurrentContestId)) {
+            Toast.makeText(this, "إنهاء التحدّي متاح لمضيف أحد الرومين أثناء جولة نشطة فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("إنهاء تحدّي PK")
+                .setMessage("سيتم إيقاف احتساب النقاط وتثبيت النتيجة الحالية وإظهار الفائز. هل تريد الإنهاء الآن؟")
+                .setNegativeButton("متابعة التحدّي", null)
+                .setPositiveButton("إنهاء وتثبيت النتيجة", (d, w) -> {
+                    final String contestId = roomPkCurrentContestId;
+                    roomPkAutoEndRequested = true;
+                    if (roomPkEndButton != null) { roomPkEndButton.setEnabled(false); roomPkEndButton.setText("جارٍ الإنهاء…"); }
+                    ContainerProvider.from(VoiceRoomActivity.this).getContestsApi().endInRoomPk(contestId)
+                            .enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+                                @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> response) {
+                                    if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                                        roomPkAutoEndRequested = false;
+                                        if (roomPkEndButton != null) { roomPkEndButton.setEnabled(true); roomPkEndButton.setText("إنهاء التحدّي  ×"); }
+                                        Toast.makeText(VoiceRoomActivity.this, response.body() != null && response.body().message != null ? response.body().message : "تعذّر إنهاء التحدّي", Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    Toast.makeText(VoiceRoomActivity.this, "تم إنهاء التحدّي وتثبيت النتيجة", Toast.LENGTH_SHORT).show();
+                                    handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 250L);
+                                }
+                                @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                                    roomPkAutoEndRequested = false;
+                                    if (roomPkEndButton != null) { roomPkEndButton.setEnabled(true); roomPkEndButton.setText("إنهاء التحدّي  ×"); }
+                                    Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لإنهاء التحدّي", Toast.LENGTH_LONG).show();
+                                }
+                            });
+                }).show();
+    }
+
+    private void makeRoomPkDialogCompactDraggable(android.app.Dialog dialog) {
+        makeRoomPkDialogCompactDraggable(dialog, dialog != null ? dialog.findViewById(androidx.appcompat.R.id.alertTitle) : null);
+    }
+
+    private void makeRoomPkDialogCompactDraggable(android.app.Dialog dialog, @Nullable View dragHandle) {
+        if (dialog == null || dialog.getWindow() == null) return;
+        android.view.Window window = dialog.getWindow();
+        int width = Math.max(dp(260), Math.min(getResources().getDisplayMetrics().widthPixels - dp(32), dp(440)));
+        window.setLayout(width, android.view.WindowManager.LayoutParams.WRAP_CONTENT);
+        // An opaque panel is essential: transparent dialog windows make challenge choices
+        // unreadable over the room background on multiple Android themes.
+        window.setBackgroundDrawable(roundRoomPkDrawable(0xFFF8FAFF, 0xFFD7DCE8, 18));
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.setDimAmount(0.42f);
+        window.setGravity(Gravity.TOP | Gravity.START);
+        android.content.SharedPreferences prefs = getSharedPreferences("room_pk_ui", MODE_PRIVATE);
+        android.view.WindowManager.LayoutParams attrs = window.getAttributes();
+        attrs.x = prefs.getInt("dialog_x", dp(16));
+        attrs.y = prefs.getInt("dialog_y", dp(72));
+        window.setAttributes(attrs);
+        if (dialog instanceof androidx.appcompat.app.AlertDialog) {
+            androidx.appcompat.app.AlertDialog alert = (androidx.appcompat.app.AlertDialog) dialog;
+            TextView title = alert.findViewById(androidx.appcompat.R.id.alertTitle);
+            if (title != null) title.setTextColor(0xFF172033);
+            android.widget.ListView list = alert.getListView();
+            if (list != null) {
+                list.setBackgroundColor(0xFFF8FAFF);
+                list.setCacheColorHint(0xFFF8FAFF);
+                list.setDivider(new android.graphics.drawable.ColorDrawable(0xFFE2E7F0));
+                list.setDividerHeight(dp(1));
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    View child = list.getChildAt(i);
+                    if (child instanceof TextView) ((TextView) child).setTextColor(0xFF172033);
+                }
+            }
+            android.widget.Button positive = alert.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+            android.widget.Button negative = alert.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+            if (positive != null) positive.setTextColor(0xFFC52250);
+            if (negative != null) negative.setTextColor(0xFF596477);
+        }
+        if (dragHandle == null) return;
+        dragHandle.setOnTouchListener(new View.OnTouchListener() {
+            private float downX, downY; private int startX, startY;
+            @Override public boolean onTouch(View v, android.view.MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        android.view.WindowManager.LayoutParams p = window.getAttributes();
+                        downX = event.getRawX(); downY = event.getRawY(); startX = p.x; startY = p.y; return true;
+                    case android.view.MotionEvent.ACTION_MOVE:
+                        android.view.WindowManager.LayoutParams move = window.getAttributes();
+                        move.x = Math.max(0, Math.min(Math.max(0, getResources().getDisplayMetrics().widthPixels - width), startX + Math.round(event.getRawX() - downX)));
+                        move.y = Math.max(dp(24), Math.min(Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(100)), startY + Math.round(event.getRawY() - downY)));
+                        window.setAttributes(move); return true;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        android.view.WindowManager.LayoutParams saved = window.getAttributes();
+                        prefs.edit().putInt("dialog_x", saved.x).putInt("dialog_y", saved.y).apply();
+                        return true;
+                    default: return false;
+                }
+            }
+        });
+    }
+
+    private boolean roomPkSideContainsUser(@Nullable JsonObject side, @Nullable String userId) {
+        if (side == null || userId == null || userId.trim().isEmpty()
+                || !side.has("participantIds") || !side.get("participantIds").isJsonArray()) return false;
+        for (com.google.gson.JsonElement item : side.getAsJsonArray("participantIds")) {
+            if (item != null && !item.isJsonNull() && userId.equals(item.getAsString())) return true;
+        }
+        return false;
+    }
+
+    private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
+        if (payload == null || binding == null) return;
+        JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
+                ? payload.getAsJsonObject("sideA") : new JsonObject();
+        JsonObject sideB = payload.has("sideB") && payload.get("sideB").isJsonObject()
+                ? payload.getAsJsonObject("sideB") : new JsonObject();
+        String nameA = firstNonEmpty(memberStr(sideA, "name"), "الروم الأحمر");
+        String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الأزرق");
+        boolean inRoomBattle = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                || "team_vs_team".equals(memberStr(payload, "challengeType"));
+        boolean participantListsPresent = sideA.has("participantIds") || sideB.has("participantIds");
+        boolean currentUserIsParticipant = roomPkSideContainsUser(sideA, myUserId)
+                || roomPkSideContainsUser(sideB, myUserId);
+        // Nonparticipants receive a read-only live scoreboard; only a participating host
+        // may see the end/cancel control. Room-vs-room keeps host control as before.
+        roomPkCanEndChallenge = isOwner && (!inRoomBattle || !participantListsPresent || currentUserIsParticipant);
+        long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
+        long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
+        boolean ended = "contest:team-ended".equals(event);
+        String label = "⚔ تحدّي PK مباشر";
+        if (ended) {
+            String winner = memberStr(payload, "winner");
+            label = "sideA".equals(winner) ? "🏆 فاز الفريق الأحمر"
+                    : "sideB".equals(winner) ? "🏆 فاز الفريق الأزرق"
+                    : "🤝 انتهى التحدّي بالتعادل";
+        }
+        if (payload.has("endAt") && !payload.get("endAt").isJsonNull()) {
+            long parsed = parseRoomPkEndAt(memberStr(payload, "endAt"));
+            if (parsed > 0L) roomPkEndsAtMs = parsed;
+        }
+        roomPkBannerEnded = ended;
+
+        if (roomPkSplitContainer == null) {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            panel.setPadding(dp(6), dp(5), dp(6), dp(6));
+            panel.setElevation(dp(18));
+            panel.setBackground(roundRoomPkDrawable(0xF0181B2B, 0xFFFFD166, 18));
+            panel.setClickable(false);
+            panel.setContentDescription("واجهة تحدّي PK مقسومة بين الفريق الأحمر والفريق الأزرق");
+
+            roomPkScoreBanner = new TextView(this);
+            roomPkScoreBanner.setTextColor(Color.WHITE);
+            roomPkScoreBanner.setTextSize(11f);
+            roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkScoreBanner.setGravity(Gravity.CENTER);
+            roomPkScoreBanner.setPadding(dp(3), dp(1), dp(3), dp(2));
+            panel.addView(roomPkScoreBanner, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            roomPkMinimizeButton = new TextView(this);
+            roomPkMinimizeButton.setText("— تصغير");
+            roomPkMinimizeButton.setTextColor(0xFFE8EDF7);
+            roomPkMinimizeButton.setTextSize(10f);
+            roomPkMinimizeButton.setGravity(Gravity.CENTER);
+            roomPkMinimizeButton.setPadding(dp(8), dp(2), dp(8), dp(2));
+            roomPkMinimizeButton.setBackground(roundRoomPkDrawable(0xFF30394B, 0xFF58657B, 10));
+            android.widget.LinearLayout.LayoutParams minimizeLp = new android.widget.LinearLayout.LayoutParams(-2, -2);
+            minimizeLp.gravity = Gravity.CENTER;
+            minimizeLp.bottomMargin = dp(3);
+            panel.addView(roomPkMinimizeButton, minimizeLp);
+            roomPkMinimizeButton.setOnClickListener(v -> {
+                roomPkOverlayMinimized = !roomPkOverlayMinimized;
+                roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
+                for (int i = 2; i < panel.getChildCount(); i++) panel.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
+                if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!roomPkBannerEnded && roomPkCanEndChallenge && roomPkCurrentContestId != null
+                        && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId) ? View.VISIBLE : View.GONE);
+                updateRoomPkBannerClock.run();
+            });
+            roomPkEndButton = new TextView(this);
+            roomPkEndButton.setText("إنهاء التحدّي  ×");
+            roomPkEndButton.setTextColor(Color.WHITE);
+            roomPkEndButton.setTextSize(10f);
+            roomPkEndButton.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkEndButton.setGravity(Gravity.CENTER);
+            roomPkEndButton.setPadding(dp(8), dp(4), dp(8), dp(4));
+            roomPkEndButton.setBackground(roundRoomPkDrawable(0xFFB91C3B, 0xFFFF8297, 18));
+            android.widget.LinearLayout.LayoutParams endButtonLp = new android.widget.LinearLayout.LayoutParams(-2, -2);
+            endButtonLp.gravity = Gravity.CENTER;
+            endButtonLp.bottomMargin = dp(4);
+            panel.addView(roomPkEndButton, endButtonLp);
+            roomPkEndButton.setOnClickListener(v -> confirmEndInRoomPk());
+
+            android.widget.LinearLayout teams = new android.widget.LinearLayout(this);
+            teams.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            teams.setGravity(Gravity.CENTER);
+            android.widget.LinearLayout.LayoutParams teamsLp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            teamsLp.bottomMargin = dp(4);
+            panel.addView(teams, teamsLp);
+
+            android.widget.LinearLayout cardA = new android.widget.LinearLayout(this);
+            cardA.setOrientation(android.widget.LinearLayout.VERTICAL);
+            cardA.setGravity(Gravity.CENTER);
+            cardA.setPadding(dp(5), dp(4), dp(5), dp(4));
+            cardA.setBackground(roundRoomPkDrawable(0xFF5A1725, 0xFFFF5268, 14));
+            android.widget.LinearLayout cardB = new android.widget.LinearLayout(this);
+            cardB.setOrientation(android.widget.LinearLayout.VERTICAL);
+            cardB.setGravity(Gravity.CENTER);
+            cardB.setPadding(dp(5), dp(4), dp(5), dp(4));
+            cardB.setBackground(roundRoomPkDrawable(0xFF142D5A, 0xFF54A8FF, 14));
+            android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            teams.addView(cardA, cardLp);
+            android.widget.LinearLayout.LayoutParams gapLp = new android.widget.LinearLayout.LayoutParams(dp(8), 1);
+            teams.addView(new android.view.View(this), gapLp);
+            teams.addView(cardB, new android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            roomPkTeamAName = new TextView(this);
+            roomPkTeamAName.setTextColor(Color.WHITE);
+            roomPkTeamAName.setTextSize(10f);
+            roomPkTeamAName.setGravity(Gravity.CENTER);
+            roomPkTeamAName.setMaxLines(1);
+            roomPkTeamAName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            roomPkTeamAScore = new TextView(this);
+            roomPkTeamAScore.setTextColor(Color.WHITE);
+            roomPkTeamAScore.setTextSize(18f);
+            roomPkTeamAScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkTeamAScore.setGravity(Gravity.CENTER);
+            cardA.addView(roomPkTeamAName);
+            cardA.addView(roomPkTeamAScore);
+
+            roomPkTeamBName = new TextView(this);
+            roomPkTeamBName.setTextColor(Color.WHITE);
+            roomPkTeamBName.setTextSize(10f);
+            roomPkTeamBName.setGravity(Gravity.CENTER);
+            roomPkTeamBName.setMaxLines(1);
+            roomPkTeamBName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            roomPkTeamBScore = new TextView(this);
+            roomPkTeamBScore.setTextColor(Color.WHITE);
+            roomPkTeamBScore.setTextSize(18f);
+            roomPkTeamBScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkTeamBScore.setGravity(Gravity.CENTER);
+            cardB.addView(roomPkTeamBName);
+            cardB.addView(roomPkTeamBScore);
+
+            android.widget.LinearLayout progress = new android.widget.LinearLayout(this);
+            progress.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            progress.setBackground(roundRoomPkDrawable(0xFF303746, 0xFF303746, 4));
+            progress.setClipToOutline(true);
+            roomPkProgressA = new android.view.View(this);
+            roomPkProgressA.setBackground(roundRoomPkDrawable(0xFFFF405D, 0xFFFF405D, 4));
+            roomPkProgressB = new android.view.View(this);
+            roomPkProgressB.setBackground(roundRoomPkDrawable(0xFF398BFF, 0xFF398BFF, 4));
+            progress.addView(roomPkProgressA, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
+            progress.addView(roomPkProgressB, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
+            panel.addView(progress, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+            android.widget.LinearLayout membersRow = new android.widget.LinearLayout(this);
+            membersRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            membersRow.setGravity(Gravity.CENTER_VERTICAL);
+            roomPkTeamAMembers = new TextView(this);
+            roomPkTeamAMembers.setTextColor(0xFFFFC1CB);
+            roomPkTeamAMembers.setTextSize(10f);
+            roomPkTeamAMembers.setMaxLines(2);
+            roomPkTeamAMembers.setGravity(Gravity.CENTER);
+            roomPkTeamBMembers = new TextView(this);
+            roomPkTeamBMembers.setTextColor(0xFFB9D9FF);
+            roomPkTeamBMembers.setTextSize(10f);
+            roomPkTeamBMembers.setMaxLines(2);
+            roomPkTeamBMembers.setGravity(Gravity.CENTER);
+            membersRow.addView(roomPkTeamAMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            membersRow.addView(roomPkTeamBMembers, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+            panel.addView(membersRow, new android.widget.LinearLayout.LayoutParams(-1, -2));
+            membersRow.setVisibility(View.GONE);
+
+            androidx.constraintlayout.widget.ConstraintLayout root = (androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot();
+            android.content.SharedPreferences pkPrefs = getSharedPreferences("room_pk_ui", MODE_PRIVATE);
+            int overlayWidth = Math.min(Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(24)), dp(360));
+            int initialX = pkPrefs.getInt("overlay_x", dp(12));
+            int initialY = pkPrefs.getInt("overlay_y", dp(64));
+            initialX = Math.max(0, Math.min(initialX, Math.max(0, getResources().getDisplayMetrics().widthPixels - overlayWidth)));
+            initialY = Math.max(dp(24), Math.min(initialY, Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(150))));
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp = new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                    overlayWidth, androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.setMarginStart(initialX); lp.topMargin = initialY;
+            root.addView(panel, lp);
+            roomPkSplitContainer = panel;
+            final int[] savedX = {initialX}; final int[] savedY = {initialY};
+            roomPkScoreBanner.setOnTouchListener(new View.OnTouchListener() {
+                private float downRawX, downRawY; private int startX, startY;
+                @Override public boolean onTouch(View v, android.view.MotionEvent event) {
+                    switch (event.getActionMasked()) {
+                        case android.view.MotionEvent.ACTION_DOWN:
+                            downRawX = event.getRawX(); downRawY = event.getRawY(); startX = savedX[0]; startY = savedY[0]; return true;
+                        case android.view.MotionEvent.ACTION_MOVE:
+                            int maxX = Math.max(0, getResources().getDisplayMetrics().widthPixels - panel.getWidth());
+                            int maxY = Math.max(dp(24), getResources().getDisplayMetrics().heightPixels - dp(150));
+                            savedX[0] = Math.max(0, Math.min(maxX, startX + Math.round(event.getRawX() - downRawX)));
+                            savedY[0] = Math.max(dp(24), Math.min(maxY, startY + Math.round(event.getRawY() - downRawY)));
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams moved = (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) panel.getLayoutParams();
+                            moved.setMarginStart(savedX[0]); moved.topMargin = savedY[0]; panel.setLayoutParams(moved); return true;
+                        case android.view.MotionEvent.ACTION_UP: case android.view.MotionEvent.ACTION_CANCEL:
+                            pkPrefs.edit().putInt("overlay_x", savedX[0]).putInt("overlay_y", savedY[0]).apply(); return true;
+                        default: return false;
+                    }
+                }
+            });
+        }
+
+        if (inRoomBattle) hideRoomPkSeatSplit();
+        else if (!ended) showRoomPkSeatSplit(nameA, nameB);
+        else hideRoomPkSeatSplit();
+
+        roomPkBannerBaseText = label;
+        roomPkTeamAName.setText("🔴 " + nameA);
+        roomPkTeamAScore.setText(String.format(java.util.Locale.US, "%,d", scoreA));
+        roomPkTeamBName.setText("🔵 " + nameB);
+        roomPkTeamBScore.setText(String.format(java.util.Locale.US, "%,d", scoreB));
+        if (roomPkTeamAMembers != null) roomPkTeamAMembers.setText(formatRoomPkMembers(sideA));
+        if (roomPkTeamBMembers != null) roomPkTeamBMembers.setText(formatRoomPkMembers(sideB));
+        float ratioA = scoreA + scoreB <= 0L ? 0.5f
+                : Math.max(0.04f, Math.min(0.96f, (float) ((double) scoreA / ((double) scoreA + (double) scoreB))));
+        float ratioB = 1f - ratioA;
+        android.widget.LinearLayout.LayoutParams progressA =
+                new android.widget.LinearLayout.LayoutParams(1, dp(6), ratioA);
+        android.widget.LinearLayout.LayoutParams progressB =
+                new android.widget.LinearLayout.LayoutParams(1, dp(6), ratioB);
+        roomPkProgressA.setLayoutParams(progressA);
+        roomPkProgressB.setLayoutParams(progressB);
+
+        roomPkScoreBanner.setVisibility(View.VISIBLE);
+        if (roomPkEndButton != null) {
+            roomPkEndButton.setVisibility(!ended && isOwner && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId)
+                    ? View.VISIBLE : View.GONE);
+            roomPkEndButton.setEnabled(!roomPkAutoEndRequested);
+        }
+        if (roomPkMinimizeButton != null) {
+            roomPkMinimizeButton.setText(roomPkOverlayMinimized ? "▣ توسيع" : "— تصغير");
+            for (int i = 2; i < roomPkSplitContainer.getChildCount(); i++) roomPkSplitContainer.getChildAt(i).setVisibility(roomPkOverlayMinimized ? View.GONE : View.VISIBLE);
+            if (!roomPkOverlayMinimized && roomPkEndButton != null) roomPkEndButton.setVisibility(!ended && isOwner && roomPkCurrentContestId != null
+                    && !roomPkCurrentContestId.trim().isEmpty() && !"pending".equals(roomPkCurrentContestId)
+                    ? View.VISIBLE : View.GONE);
+        }
+        roomPkSplitContainer.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(hideRoomPkScoreBanner);
+        handler.removeCallbacks(updateRoomPkBannerClock);
+        if (ended) {
+            roomPkScoreBanner.setText(label);
+            handler.postDelayed(hideRoomPkScoreBanner, 12000L);
+        } else {
+            updateRoomPkBannerClock.run();
+        }
+    }
+
+
+    /**
+     * PK presentation only: the current room's real seats stay backed by the existing SeatAdapter.
+     * The rival side deliberately shows unoccupied placeholders until the backend provides a
+     * trustworthy rival-room seat roster; it never fabricates user identities or changes ZEGO.
+     */
+    private void showRoomPkSeatSplit(String nameA, String nameB) {
+        if (binding == null || !(binding.getRoot() instanceof androidx.constraintlayout.widget.ConstraintLayout)) return;
+        androidx.constraintlayout.widget.ConstraintLayout root =
+                (androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot();
+        if (roomPkOpponentSeatPanel == null) {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setId(View.generateViewId());
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            panel.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            panel.setPadding(dp(5), dp(7), dp(5), dp(7));
+            panel.setBackground(roundRoomPkDrawable(0xD8122A4A, 0xD8122A4A, 12));
+            panel.setContentDescription("مقاعد الروم المنافس في وضع PK");
+            panel.setClipChildren(false);
+            panel.setClipToPadding(false);
+
+            TextView title = new TextView(this);
+            title.setTextColor(Color.WHITE);
+            title.setTextSize(11f);
+            title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            title.setGravity(Gravity.CENTER);
+            title.setMaxLines(1);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            title.setTag("room_pk_opponent_title");
+            panel.addView(title, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(28)));
+
+            android.widget.LinearLayout seats = new android.widget.LinearLayout(this);
+            seats.setOrientation(android.widget.LinearLayout.VERTICAL);
+            seats.setTag("room_pk_opponent_seat_rows");
+            panel.addView(seats, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            TextView note = new TextView(this);
+            note.setText("لا توجد مقاعد مشغولة حالياً");
+            note.setTextColor(0xFFB8D8FF);
+            note.setTextSize(10f);
+            note.setGravity(Gravity.CENTER);
+            note.setPadding(0, dp(4), 0, 0);
+            panel.addView(note, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams panelLp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(0,
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            panelLp.startToEnd = binding.recyclerSeats.getId();
+            panelLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            panelLp.topToTop = binding.recyclerSeats.getId();
+            panelLp.setMargins(dp(3), 0, dp(5), 0);
+            root.addView(panel, panelLp);
+            roomPkOpponentSeatPanel = panel;
+
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
+                    (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
+            localLp.endToStart = panel.getId();
+            localLp.endToEnd = -1;
+            localLp.width = 0;
+            localLp.setMargins(dp(4), dp(4), dp(3), 0);
+            binding.recyclerSeats.setLayoutParams(localLp);
+            binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, 2) {
+                @Override public boolean canScrollVertically() { return false; }
+            });
+            roomPkSeatSplitApplied = true;
+            if (seatAdapter != null && roomPkLatestGridSeats != null) {
+                java.util.List<RoomDtos.SeatDto> occupiedLocal = new java.util.ArrayList<>();
+                for (RoomDtos.SeatDto seat : roomPkLatestGridSeats) {
+                    String occupant = seatUserId(seat);
+                    if (occupant != null && !occupant.trim().isEmpty()) occupiedLocal.add(seat);
+                }
+                seatAdapter.setScaleMode(SeatAdapter.SCALE_COMPACT);
+                seatAdapter.submit(occupiedLocal);
+                applyMikooSeatGrid(occupiedLocal.size());
+            }
+        }
+        View title = roomPkOpponentSeatPanel.findViewWithTag("room_pk_opponent_title");
+        if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(nameB, "الروم المنافس"));
+        roomPkOpponentSeatPanel.setVisibility(View.VISIBLE);
+        binding.recyclerSeats.setVisibility(View.VISIBLE);
+    }
+
+    private void hideRoomPkSeatSplit() {
+        if (!roomPkSeatSplitApplied || binding == null) {
+            if (roomPkOpponentSeatPanel != null) roomPkOpponentSeatPanel.setVisibility(View.GONE);
+            return;
+        }
+        if (roomPkOpponentSeatPanel != null) {
+            android.view.ViewParent parent = roomPkOpponentSeatPanel.getParent();
+            if (parent instanceof android.view.ViewGroup) ((android.view.ViewGroup) parent).removeView(roomPkOpponentSeatPanel);
+            roomPkOpponentSeatPanel = null;
+        }
+        androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
+                (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
+        localLp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        localLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        localLp.endToStart = -1;
+        localLp.width = 0;
+        localLp.setMargins(0, dp(4), 0, 0);
+        binding.recyclerSeats.setLayoutParams(localLp);
+        binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
+            @Override public boolean canScrollVertically() { return false; }
+        });
+        roomPkSeatSplitApplied = false;
+        if (seatAdapter != null && roomPkLatestGridSeats != null) {
+            seatAdapter.setScaleMode(SeatAdapter.SCALE_NORMAL);
+            seatAdapter.submit(roomPkLatestGridSeats);
+            applyMikooSeatGrid(roomPkLatestGridSeats.size());
+        }
+    }
+
+    private GradientDrawable roundRoomPkDrawable(int fill, int stroke, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(dp(radiusDp));
+        if (stroke != fill) drawable.setStroke(dp(1), stroke);
+        return drawable;
+    }
+
+    private long parseRoomPkEndAt(@Nullable String value) {
+        if (value == null || value.length() < 19) return 0L;
+        try {
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US);
+            format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            java.util.Date date = format.parse(value.substring(0, 19));
+            return date != null ? date.getTime() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private void respondToPersonPkInvite(String id, boolean accept) {
+        Map<String,Object> body = new HashMap<>(); body.put("accept", accept);
+        ContainerProvider.from(this).getContestsApi().respondInRoomPk(id, body).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> res) {
+                if (!res.isSuccessful() || res.body() == null || !res.body().success) {
+                    Toast.makeText(VoiceRoomActivity.this, res.body()!=null && res.body().message!=null ? res.body().message : "تعذّر معالجة دعوة PK", Toast.LENGTH_LONG).show(); return;
+                }
+                Toast.makeText(VoiceRoomActivity.this, accept ? "تم قبول الدعوة" : "تم رفض الدعوة", Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable e) {
+                Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لمعالجة دعوة PK", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    /** Shows CB gift requests as an in-room modal; the same request may arrive on both
+     * the room channel and the user channel, so requestId is deduplicated here. */
+    private void showCpRoomRequestDialog(@Nullable JsonObject payload) {
+        if (payload == null || isFinishing() || isDestroyed() || exiting) return;
+        String targetUserId = memberStr(payload, "targetUserId");
+        if (targetUserId == null || targetUserId.isEmpty()) targetUserId = memberStr(payload, "recipientId");
+        String requestId = memberStr(payload, "requestId");
+        if (myUserId == null || !myUserId.equals(targetUserId)
+                || requestId == null || requestId.isEmpty()
+                || !shownCpRoomRequests.add(requestId)) return;
+
+        String senderName = firstNonEmpty(memberStr(payload, "senderName"), "أحد الموجودين");
+        String giftName = firstNonEmpty(memberStr(payload, "giftName"), "هدية ارتباط");
+        String giftIconUrl = firstNonEmpty(memberStr(payload, "giftIconUrl"), memberStr(payload, "giftAnimationUrl"));
+        String relation = memberStr(payload, "relationshipType");
+        String relationLabel;
+        if ("love".equalsIgnoreCase(relation)) relationLabel = "الحب";
+        else if ("friendship".equalsIgnoreCase(relation)) relationLabel = "الصداقة";
+        else if ("brotherhood".equalsIgnoreCase(relation)) relationLabel = "الأخوّة";
+        else if ("engagement".equalsIgnoreCase(relation)) relationLabel = "الخطوبة";
+        else if ("marriage".equalsIgnoreCase(relation)) relationLabel = "الزواج";
+        else relationLabel = relation == null || relation.isEmpty() ? "CB" : relation;
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(22), dp(20), dp(22), dp(18));
+        GradientDrawable panel = new GradientDrawable();
+        panel.setColor(0xFF21182E);
+        panel.setCornerRadius(dp(24));
+        panel.setStroke(dp(1), 0xFFB987D8);
+        root.setBackground(panel);
+
+        TextView heart = new TextView(this);
+        heart.setText("❤️");
+        heart.setTextSize(30);
+        heart.setGravity(Gravity.CENTER);
+        root.addView(heart, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+
+        TextView title = new TextView(this);
+        title.setText("طلب ارتباط جديد");
+        title.setTextColor(0xFFFFD6F0);
+        title.setTextSize(20);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = dp(5);
+        root.addView(title, titleLp);
+
+        ImageView gift = new ImageView(this);
+        gift.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams giftLp = new LinearLayout.LayoutParams(dp(92), dp(92));
+        giftLp.topMargin = dp(12);
+        giftLp.bottomMargin = dp(8);
+        root.addView(gift, giftLp);
+        if (giftIconUrl != null && !giftIconUrl.trim().isEmpty()) {
+            Glide.with(this).load(AssetCatalog.absoluteUrl(giftIconUrl))
+                    .placeholder(R.drawable.ic_screen_chat_lottery)
+                    .error(R.drawable.ic_screen_chat_lottery).into(gift);
+        } else {
+            gift.setImageResource(R.drawable.ic_screen_chat_lottery);
+        }
+
+        TextView message = new TextView(this);
+        message.setText(senderName + " أرسل لك " + giftName + " لبدء علاقة " + relationLabel
+                + ". هل توافق على الارتباط؟");
+        message.setTextColor(0xFFF4EDF8);
+        message.setTextSize(15);
+        message.setGravity(Gravity.CENTER);
+        message.setLineSpacing(dp(3), 1f);
+        root.addView(message, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionsLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        actionsLp.topMargin = dp(20);
+        root.addView(actions, actionsLp);
+
+        TextView reject = new TextView(this);
+        reject.setText("رفض");
+        reject.setTextColor(0xFFFFFFFF);
+        reject.setTextSize(15);
+        reject.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        reject.setGravity(Gravity.CENTER);
+        GradientDrawable rejectBg = new GradientDrawable();
+        rejectBg.setColor(0xFF57475F);
+        rejectBg.setCornerRadius(dp(14));
+        reject.setBackground(rejectBg);
+        actions.addView(reject, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        View actionGap = new View(this);
+        actions.addView(actionGap, new LinearLayout.LayoutParams(dp(10), 1));
+
+        TextView accept = new TextView(this);
+        accept.setText("قبول ❤️");
+        accept.setTextColor(0xFF35142D);
+        accept.setTextSize(15);
+        accept.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        accept.setGravity(Gravity.CENTER);
+        GradientDrawable acceptBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFFFB5D9, 0xFFFFD98C});
+        acceptBg.setCornerRadius(dp(14));
+        accept.setBackground(acceptBg);
+        actions.addView(accept, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        final boolean[] answered = {false};
+        reject.setOnClickListener(v -> {
+            if (answered[0]) return;
+            answered[0] = true;
+            dialog.dismiss();
+            respondToCpRoomRequest(requestId, false);
+        });
+        accept.setOnClickListener(v -> {
+            if (answered[0]) return;
+            answered[0] = true;
+            dialog.dismiss();
+            respondToCpRoomRequest(requestId, true);
+        });
+        dialog.setContentView(root);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnCancelListener(d -> {
+            if (!answered[0]) {
+                answered[0] = true;
+                respondToCpRoomRequest(requestId, false);
+            }
+        });
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            int screen = getResources().getDisplayMetrics().widthPixels;
+            window.setLayout(Math.min(screen - dp(40), dp(380)), ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.dimAmount = 0.58f;
+            window.setAttributes(attrs);
+        }
+    }
+
     @SuppressLint("NewApi")
+    private void respondToCpRoomRequest(String requestId, boolean accept) {
+        if (requestId == null || requestId.isEmpty()) return;
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            java.util.Map<String, Boolean> body = new java.util.HashMap<>();
+            body.put("accept", accept);
+            com.Dramizo.Series.domain.model.Result<java.util.Map<String, Object>> result =
+                    ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result.success) {
+                    Toast.makeText(this, accept ? "تم قبول الارتباط ❤️" : "تم رفض طلب الارتباط", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذرت معالجة طلب الارتباط", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+
+    private void showChallengeWheelDialog(boolean canSpin) {
+        if (isFinishing() || isDestroyed()) return;
+        if (challengeWheelDialog != null && challengeWheelDialog.isShowing()) {
+            if (challengeWheelSpinButton != null) {
+                challengeWheelSpinButton.setVisibility(canSpin ? View.VISIBLE : View.GONE);
+            }
+            if (challengeWheelCloseButton != null) {
+                challengeWheelCloseButton.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
+            }
+            return;
+        }
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(8), dp(8), dp(8), dp(8));
+        root.setBackgroundColor(Color.TRANSPARENT);
+
+        // Native top bar: large, easy-to-hit minimize and close controls.
+        FrameLayout header = new FrameLayout(this);
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        root.addView(header, headerLp);
+
+        TextView title = new TextView(this);
+        title.setText("عجلة التحديات");
+        title.setTextColor(0xFFF2F0FF);
+        title.setTextSize(19);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(dp(18), dp(5), dp(18), dp(5));
+        GradientDrawable titleBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFB51F68, 0xFF67318F, 0xFF32164F});
+        titleBg.setCornerRadius(dp(16));
+        titleBg.setStroke(dp(1), 0xFF8073B8);
+        title.setBackground(titleBg);
+        FrameLayout.LayoutParams titleLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(42), Gravity.CENTER);
+        header.addView(title, titleLp);
+
+        LinearLayout topControls = new LinearLayout(this);
+        topControls.setOrientation(LinearLayout.HORIZONTAL);
+        topControls.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams controlsLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        header.addView(topControls, controlsLp);
+
+        TextView minimize = new TextView(this);
+        minimize.setText("−");
+        minimize.setTextColor(0xFFFFFFFF);
+        minimize.setTextSize(34);
+        minimize.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        minimize.setGravity(Gravity.CENTER);
+        minimize.setIncludeFontPadding(false);
+        GradientDrawable minimizeBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF7660B5, 0xFF39285F});
+        minimizeBg.setCornerRadius(dp(16));
+        minimizeBg.setStroke(dp(2), 0xFFB7A8F0);
+        minimize.setBackground(minimizeBg);
+        minimize.setElevation(dp(4));
+        LinearLayout.LayoutParams minimizeLp = new LinearLayout.LayoutParams(dp(48), dp(44));
+        minimizeLp.setMarginEnd(dp(6));
+        topControls.addView(minimize, minimizeLp);
+
+        TextView close = new TextView(this);
+        close.setText("×");
+        close.setTextColor(0xFFFFFFFF);
+        close.setTextSize(34);
+        close.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        close.setGravity(Gravity.CENTER);
+        close.setIncludeFontPadding(false);
+        GradientDrawable closeBg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFF5578, 0xFFB8144B});
+        closeBg.setCornerRadius(dp(16));
+        closeBg.setStroke(dp(2), 0xFFFFB0C1);
+        close.setBackground(closeBg);
+        close.setElevation(dp(4));
+        topControls.addView(close, new LinearLayout.LayoutParams(dp(48), dp(44)));
+        close.setVisibility(canModerateRoom() ? View.VISIBLE : View.GONE);
+
+        // The challenge result remains visible while expanded and is hidden in compact mode.
+        TextView challengeBanner = new TextView(this);
+        challengeBanner.setText("نوع التحدي: بانتظار النتيجة");
+        challengeBanner.setTextColor(0xFFFFFFFF);
+        challengeBanner.setTextSize(13);
+        challengeBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        challengeBanner.setGravity(Gravity.CENTER);
+        challengeBanner.setPadding(dp(12), dp(8), dp(12), dp(8));
+        GradientDrawable bannerBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFF8B174E, 0xFF493078, 0xFF173F50});
+        bannerBg.setCornerRadius(dp(12));
+        bannerBg.setStroke(dp(1), 0xFF9B8BD0);
+        challengeBanner.setBackground(bannerBg);
+        LinearLayout.LayoutParams bannerLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bannerLp.topMargin = dp(5);
+        root.addView(challengeBanner, bannerLp);
+
+        FrameLayout wheelHost = new FrameLayout(this);
+        LinearLayout.LayoutParams wheelHostLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(370));
+        wheelHostLp.topMargin = dp(5);
+        root.addView(wheelHost, wheelHostLp);
+
+        ChallengeWheelView wheel = new ChallengeWheelView(this);
+        wheelHost.addView(wheel, new FrameLayout.LayoutParams(dp(354), dp(354), Gravity.CENTER));
+
+        TextView resultCaption = new TextView(this);
+        resultCaption.setText("نوع الفقرة");
+        resultCaption.setTextColor(0xFFDCD7F4);
+        resultCaption.setTextSize(13);
+        resultCaption.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        resultCaption.setGravity(Gravity.CENTER);
+        resultCaption.setPadding(dp(12), dp(5), dp(12), dp(5));
+        GradientDrawable captionBg = new GradientDrawable();
+        captionBg.setColor(0xFF28233F);
+        captionBg.setCornerRadius(dp(12));
+        captionBg.setStroke(dp(1), 0xFF61568E);
+        resultCaption.setBackground(captionBg);
+        LinearLayout.LayoutParams captionLp = new LinearLayout.LayoutParams(
+                dp(150), ViewGroup.LayoutParams.WRAP_CONTENT);
+        captionLp.gravity = Gravity.CENTER_HORIZONTAL;
+        captionLp.topMargin = dp(2);
+        root.addView(resultCaption, captionLp);
+
+        TextView result = new TextView(this);
+        result.setText("بانتظار تدوير العجلة");
+        result.setTextColor(0xFFF4F2FF);
+        result.setTextSize(15);
+        result.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        result.setGravity(Gravity.CENTER);
+        result.setMinHeight(dp(32));
+        result.setPadding(dp(12), dp(6), dp(12), dp(6));
+        GradientDrawable resultBg = new GradientDrawable();
+        resultBg.setColor(0xFF19172B);
+        resultBg.setCornerRadius(dp(13));
+        resultBg.setStroke(dp(1), 0xFF4F4776);
+        result.setBackground(resultBg);
+        LinearLayout.LayoutParams resultLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        resultLp.topMargin = dp(4);
+        root.addView(result, resultLp);
+
+        TextView spin = new TextView(this);
+        spin.setText("تدوير");
+        spin.setTextColor(0xFFFFFFFF);
+        spin.setTextSize(14);
+        spin.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        spin.setGravity(Gravity.CENTER);
+        GradientDrawable spinBg = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFFF1744, 0xFFD5003F, 0xFF8E0038});
+        spinBg.setCornerRadius(dp(20));
+        spinBg.setStroke(dp(1), 0xFF9B91D8);
+        spin.setBackground(spinBg);
+        spin.setVisibility(canSpin ? View.VISIBLE : View.GONE);
+        LinearLayout.LayoutParams spinLp = new LinearLayout.LayoutParams(dp(164), dp(40));
+        spinLp.gravity = Gravity.CENTER_HORIZONTAL;
+        spinLp.topMargin = dp(7);
+        root.addView(spin, spinLp);
+        spin.setOnClickListener(v -> requestChallengeWheelSpin());
+
+        Runnable updateCompactMode = () -> {
+            int detailVisibility = challengeWheelMinimized ? View.GONE : View.VISIBLE;
+            challengeBanner.setVisibility(detailVisibility);
+            wheelHost.setVisibility(detailVisibility);
+            resultCaption.setVisibility(detailVisibility);
+            result.setVisibility(detailVisibility);
+            spin.setVisibility(challengeWheelMinimized ? View.GONE : (canSpin ? View.VISIBLE : View.GONE));
+            minimize.setText(challengeWheelMinimized ? "+" : "−");
+
+            Window w = dialog.getWindow();
+            if (w == null) return;
+            if (challengeWheelMinimized) {
+                // Do not let the compact wheel window own IME focus. Touches outside
+                // its small header pass through to the room composer and gift controls.
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+                w.setGravity(Gravity.TOP | Gravity.END);
+                w.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels - dp(20), dp(250)),
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                WindowManager.LayoutParams attrs = w.getAttributes();
+                attrs.x = dp(8);
+                attrs.y = dp(70);
+                w.setAttributes(attrs);
+            } else {
+                w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+                w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+                w.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                w.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels - dp(20), dp(390)),
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                WindowManager.LayoutParams attrs = w.getAttributes();
+                attrs.x = 0;
+                attrs.y = dp(88);
+                w.setAttributes(attrs);
+            }
+        };
+
+        minimize.setOnClickListener(v -> {
+            challengeWheelMinimized = !challengeWheelMinimized;
+            updateCompactMode.run();
+        });
+        title.setOnClickListener(v -> {
+            if (challengeWheelMinimized) {
+                challengeWheelMinimized = false;
+                updateCompactMode.run();
+            }
+        });
+        challengeBanner.setOnClickListener(v -> {
+            if (challengeWheelMinimized) {
+                challengeWheelMinimized = false;
+                updateCompactMode.run();
+            }
+        });
+
+        close.setOnClickListener(v -> {
+            if (!canModerateRoom() || roomId == null || roomId.isEmpty()) return;
+            RealtimeClient realtime = RealtimeClient.getInstance();
+            if (!realtime.isConnected() || !realtime.isJoinedRoom(roomId)) {
+                Toast.makeText(this, "تعذر الاتصال بالغرفة لإغلاق العجلة عند الجميع", Toast.LENGTH_SHORT).show();
+                connectRealtimeRoom();
+                return;
+            }
+            close.setEnabled(false);
+            realtime.emitRoomEvent(roomId, "challenge:wheel:close", new JsonObject(),
+                    (ok, error, code) -> handler.post(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        if (!ok) {
+                            close.setEnabled(true);
+                            Toast.makeText(this, error != null && !error.isEmpty()
+                                    ? error : "تعذر إغلاق العجلة عند الجميع", Toast.LENGTH_LONG).show();
+                        } else {
+                            dismissChallengeWheelDialog();
+                        }
+                    }));
+        });
+
+        dialog.setContentView(root);
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setOnDismissListener(d -> {
+            wheel.stop();
+            if (challengeWheelDialog == dialog) {
+                challengeWheelDialog = null;
+                challengeWheelView = null;
+                challengeWheelResult = null;
+                challengeWheelSpinButton = null;
+                challengeWheelCloseButton = null;
+                challengeWheelBanner = null;
+                challengeWheelMinimized = false;
+                challengeWheelSpinPending = false;
+            }
+        });
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.dimAmount = 0f;
+            attrs.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            attrs.y = dp(88);
+            window.setAttributes(attrs);
+            int screen = getResources().getDisplayMetrics().widthPixels;
+            window.setLayout(Math.min(screen - dp(20), dp(390)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        challengeWheelDialog = dialog;
+        challengeWheelView = wheel;
+        challengeWheelResult = result;
+        challengeWheelSpinButton = spin;
+        challengeWheelCloseButton = close;
+        challengeWheelBanner = challengeBanner;
+        challengeWheelMinimized = false;
+    }
+
+    private void requestChallengeWheelSpin() {
+        if (!canModerateRoom()) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (roomId == null || roomId.isEmpty()) return;
+        if (challengeWheelSpinPending) return;
+        RealtimeClient realtime = RealtimeClient.getInstance();
+        if (!realtime.isConnected() || !realtime.isJoinedRoom(roomId)) {
+            Toast.makeText(this, "جارٍ الاتصال بالغرفة… حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+            connectRealtimeRoom();
+            return;
+        }
+        challengeWheelSpinPending = true;
+        if (challengeWheelSpinButton != null) {
+            challengeWheelSpinButton.setEnabled(false);
+            challengeWheelSpinButton.setAlpha(0.65f);
+            challengeWheelSpinButton.setText("جارٍ طلب التدوير…");
+        }
+        boolean sent = realtime.emitRoomEvent(roomId, "challenge:wheel:spin",
+                new JsonObject(), (ok, error, code) -> handler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!ok) {
+                        challengeWheelSpinPending = false;
+                        if (challengeWheelSpinButton != null) {
+                            challengeWheelSpinButton.setEnabled(true);
+                            challengeWheelSpinButton.setAlpha(1f);
+                            challengeWheelSpinButton.setText("تدوير العجلة");
+                        }
+                        Toast.makeText(this,
+                                error != null && !error.isEmpty() ? error : "تعذر تدوير العجلة",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        if (!sent) {
+            challengeWheelSpinPending = false;
+            if (challengeWheelSpinButton != null) {
+                challengeWheelSpinButton.setEnabled(true);
+                challengeWheelSpinButton.setAlpha(1f);
+                challengeWheelSpinButton.setText("تدوير العجلة");
+            }
+            Toast.makeText(this, "تعذر الاتصال بخدمة التحديات", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleChallengeWheelResult(JsonObject payload) {
+        String spinId = memberStr(payload, "spinId");
+        if (spinId != null && spinId.equals(lastChallengeWheelSpinId)) return;
+        if (spinId != null) lastChallengeWheelSpinId = spinId;
+        int index = memberInt(payload, "index", -1);
+        String label = memberStr(payload, "label");
+        if (index < 0 || index >= 10 || label == null || label.isEmpty()) return;
+
+        // Every room participant receives the authoritative result and sees the wheel/toast;
+        // only authorized room staff can spin or close it.
+        showChallengeWheelDialog(canModerateRoom());
+        challengeWheelSpinPending = false;
+        if (challengeWheelResult != null) {
+            challengeWheelResult.setText("العجلة تدور…");
+        }
+        if (challengeWheelSpinButton != null) {
+            challengeWheelSpinButton.setEnabled(false);
+            challengeWheelSpinButton.setAlpha(0.65f);
+            challengeWheelSpinButton.setText("جارٍ التدوير…");
+        }
+        long startAt = memberLong(payload, "startAt", System.currentTimeMillis());
+        long delay = Math.max(0L, Math.min(4000L, startAt - System.currentTimeMillis()));
+        handler.postDelayed(() -> {
+            if (challengeWheelView == null || challengeWheelDialog == null
+                    || !challengeWheelDialog.isShowing()) return;
+            challengeWheelView.spinTo(index, 7000L, () -> {
+                if (challengeWheelResult != null) {
+                    challengeWheelResult.setText(label);
+                }
+                if (challengeWheelBanner != null) {
+                    challengeWheelBanner.setText("نوع التحدي: " + label);
+                }
+                showChallengeWheelWinnerToast(label);
+                if (challengeWheelSpinButton != null) {
+                    challengeWheelSpinButton.setEnabled(true);
+                    challengeWheelSpinButton.setAlpha(1f);
+                    challengeWheelSpinButton.setText("تدوير مرة أخرى");
+                }
+            });
+        }, delay);
+    }
+
+    private void showChallengeWheelWinnerToast(@NonNull String label) {
+        try {
+            View content = findViewById(android.R.id.content);
+            if (!(content instanceof ViewGroup)) return;
+            ViewGroup host = (ViewGroup) content;
+            Object old = host.getTag();
+            if (old instanceof View && ((View) old).getParent() == host) {
+                host.removeView((View) old);
+            }
+
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setGravity(Gravity.CENTER);
+            card.setPadding(dp(18), dp(12), dp(18), dp(14));
+            GradientDrawable background = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFF9E174D, 0xFF7A174F, 0xFF4D123D});
+            background.setCornerRadius(dp(18));
+            background.setStroke(dp(2), 0xFFE85A9B);
+            card.setBackground(background);
+            card.setElevation(dp(14));
+
+            TextView heading = new TextView(this);
+            heading.setText("🏆  التحدي الفائز  🏆");
+            heading.setTextColor(0xFFFFA6D0);
+            heading.setTextSize(13);
+            heading.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            heading.setGravity(Gravity.CENTER);
+            card.addView(heading, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView result = new TextView(this);
+            result.setText(label);
+            result.setTextColor(Color.WHITE);
+            result.setTextSize(18);
+            result.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            result.setGravity(Gravity.CENTER);
+            result.setPadding(0, dp(4), 0, 0);
+            card.addView(result, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            int statusBarInset = 0;
+            try {
+                android.graphics.Rect visibleFrame = new android.graphics.Rect();
+                content.getWindowVisibleDisplayFrame(visibleFrame);
+                statusBarInset = Math.max(0, visibleFrame.top);
+                androidx.core.view.WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(content);
+                if (insets != null) {
+                    statusBarInset = Math.max(statusBarInset,
+                            insets.getInsets(WindowInsetsCompat.Type.statusBars()).top);
+                }
+            } catch (Exception ignored) {
+            }
+            lp.setMargins(dp(16), statusBarInset + dp(12), dp(16), 0);
+            host.addView(card, lp);
+            host.setTag(card);
+            card.setAlpha(0f);
+            card.setTranslationY(-dp(80));
+            card.animate().alpha(1f).translationY(0f).setDuration(320L).start();
+            handler.postDelayed(() -> {
+                if (card.getParent() == host) {
+                    card.animate().alpha(0f).translationY(-dp(60)).setDuration(240L)
+                            .withEndAction(() -> {
+                                if (card.getParent() == host) host.removeView(card);
+                                if (host.getTag() == card) host.setTag(null);
+                            }).start();
+                }
+            }, 4200L);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void dismissChallengeWheelDialog() {
+        if (challengeWheelDialog != null && challengeWheelDialog.isShowing()) {
+            challengeWheelDialog.dismiss();
+        } else {
+            if (challengeWheelView != null) challengeWheelView.stop();
+            challengeWheelDialog = null;
+            challengeWheelView = null;
+            challengeWheelResult = null;
+            challengeWheelSpinButton = null;
+            challengeWheelCloseButton = null;
+            challengeWheelSpinPending = false;
+        }
+        View content = findViewById(android.R.id.content);
+        if (content instanceof ViewGroup) {
+            ViewGroup host = (ViewGroup) content;
+            Object old = host.getTag();
+            if (old instanceof View && ((View) old).getParent() == host) {
+                host.removeView((View) old);
+                host.setTag(null);
+            }
+        }
+    }
+
+    private void showAgencyClubEntryBanner(@Nullable String memberName,
+                                           @Nullable String agencyName,
+                                           @Nullable String agencyLogoUrl,
+                                           @Nullable String badgeLabel) {
+        if (isFinishing() || isDestroyed()) return;
+        String safeMember = memberName == null || memberName.trim().isEmpty() ? "عضو النادي" : memberName.trim();
+        String safeAgency = agencyName == null || agencyName.trim().isEmpty() ? "الوكالة" : agencyName.trim();
+        String safeBadge = badgeLabel == null || badgeLabel.trim().isEmpty() ? "عضو نادي الوكالة" : badgeLabel.trim();
+        View contentView = findViewById(android.R.id.content);
+        if (!(contentView instanceof ViewGroup)) return;
+        ViewGroup host = (ViewGroup) contentView;
+        View previous = host.findViewWithTag("agency-club-entry-banner");
+        if (previous != null) host.removeView(previous);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setTag("agency-club-entry-banner");
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(11), dp(14), dp(11));
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.rgb(48, 29, 83), Color.rgb(91, 53, 112), Color.rgb(132, 91, 48)}
+        );
+        background.setCornerRadius(dp(18));
+        background.setStroke(dp(1), Color.argb(190, 232, 194, 119));
+        card.setBackground(background);
+        card.setElevation(dp(12));
+
+        ImageView logo = new ImageView(this);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        logoParams.setMarginEnd(dp(12));
+        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable logoBackground = new GradientDrawable();
+        logoBackground.setColor(Color.rgb(255, 255, 255));
+        logoBackground.setShape(GradientDrawable.OVAL);
+        logo.setBackground(logoBackground);
+        logo.setClipToOutline(true);
+        card.addView(logo, logoParams);
+        if (agencyLogoUrl != null && !agencyLogoUrl.trim().isEmpty()) {
+            try {
+                Glide.with(this).load(AssetCatalog.absoluteUrl(agencyLogoUrl.trim()))
+                        .circleCrop().into(logo);
+            } catch (Exception ignored) { }
+        }
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView title = new TextView(this);
+        title.setText("دخول عضو نادي الوكالة");
+        title.setTextColor(Color.rgb(255, 224, 165));
+        title.setTextSize(12);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        labels.addView(title);
+
+        TextView member = new TextView(this);
+        member.setText(safeMember + "  •  " + safeBadge);
+        member.setTextColor(Color.WHITE);
+        member.setTextSize(14);
+        member.setMaxLines(1);
+        member.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        member.setTypeface(member.getTypeface(), android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams memberParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        memberParams.topMargin = dp(3);
+        labels.addView(member, memberParams);
+
+        TextView agency = new TextView(this);
+        agency.setText(safeAgency);
+        agency.setTextColor(Color.rgb(232, 220, 241));
+        agency.setTextSize(11);
+        LinearLayout.LayoutParams agencyParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        agencyParams.topMargin = dp(2);
+        labels.addView(agency, agencyParams);
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        params.setMargins(dp(14), dp(68), dp(14), 0);
+        host.addView(card, params);
+        card.setAlpha(0f);
+        card.setTranslationY(-dp(46));
+        card.animate().alpha(1f).translationY(0f).setDuration(360L)
+                .setInterpolator(new DecelerateInterpolator()).start();
+        handler.postDelayed(() -> {
+            if (card.getParent() == host) {
+                card.animate().alpha(0f).translationY(-dp(30)).setDuration(260L)
+                        .withEndAction(() -> {
+                            if (card.getParent() == host) host.removeView(card);
+                        }).start();
+            }
+        }, 4400L);
+    }
+
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
-        if ("chat:message".equals(event)) {
+        if ("agency:club_member_entered".equals(event)) {
+            String enteredId = memberStr(payload, "userId");
+            String enteredName = memberStr(payload, "displayName");
+            String badgeLabel = memberStr(payload, "clubBadgeLabel");
+            if (enteredName == null || enteredName.trim().isEmpty()) enteredName = "عضو";
+            if (badgeLabel == null || badgeLabel.trim().isEmpty()) badgeLabel = "عضو نادي الوكالة";
+            showAgencyClubEntryBanner(
+                    enteredName,
+                    memberStr(payload, "agencyName"),
+                    memberStr(payload, "agencyLogoUrl"),
+                    badgeLabel
+            );
+            appendChatLine("نادي الوكالة", "✨ " + enteredName + " دخل الروم بصفة " + badgeLabel,
+                    0, 1, null, enteredId, null);
+            return;
+        }
+        if ("support_chest:config_updated".equals(event)) {
+            JsonElement updatedConfig = payload.get("config");
+            if (updatedConfig != null && updatedConfig.isJsonObject()) {
+                try {
+                    supportChestRuntimeConfig = new HashMap<>(
+                            new com.google.gson.Gson().fromJson(updatedConfig, Map.class));
+                } catch (Exception ignored) { }
+            }
+            refreshSupportChestIcon();
+            if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                handler.removeCallbacks(supportChestEventRefresh);
+                handler.postDelayed(supportChestEventRefresh, 120L);
+            }
+            return;
+        }
+        if ("support_chest:updated".equals(event)) {
+            JsonElement updatedConfig = payload.get("config");
+            if (updatedConfig != null && updatedConfig.isJsonObject()) {
+                try {
+                    supportChestRuntimeConfig = new HashMap<>(
+                            new com.google.gson.Gson().fromJson(updatedConfig, Map.class));
+                } catch (Exception ignored) { }
+            }
+            if (activeSupportChestWeb != null && roomId != null && roomId.equals(activeSupportChestRoomId)) {
+                handler.removeCallbacks(supportChestEventRefresh);
+                handler.postDelayed(supportChestEventRefresh, 350L);
+            }
+            return;
+        }
+        if ("support_chest:contribution".equals(event)) {
+            String sender = memberStr(payload, "senderName");
+            if (sender == null || sender.trim().isEmpty()) sender = "أحد الداعمين";
+            String levelTitle = memberStr(payload, "levelTitle");
+            if (levelTitle == null || levelTitle.trim().isEmpty()) levelTitle = "صندوق الدعم";
+            View chestIcon = findViewById(R.id.btnRoomSupportChest);
+            if (chestIcon != null) {
+                chestIcon.animate().cancel();
+                chestIcon.setRotation(0f);
+                android.animation.ObjectAnimator shake = android.animation.ObjectAnimator.ofFloat(
+                        chestIcon, "rotation", 0f, -13f, 13f, -9f, 9f, 0f);
+                shake.setDuration(620L);
+                shake.start();
+                chestIcon.animate().scaleX(1.12f).scaleY(1.12f).setDuration(180L)
+                        .withEndAction(() -> {
+                            if (!isFinishing() && !isDestroyed()) {
+                                chestIcon.animate().scaleX(1f).scaleY(1f).setDuration(180L).start();
+                            }
+                        }).start();
+            }
+            String eventId = "support-chest-progress:" + roomId + ":"
+                    + memberStr(payload, "senderId") + ":" + memberStr(payload, "cycle")
+                    + ":" + memberStr(payload, "giftCount");
+            // Contributions update the chest progress and icon only. No center-screen live toast.
+            return;
+        }
+        if ("support_chest:blast".equals(event)) {
+            String blastRoomId = memberStr(payload, "roomId");
+            if (blastRoomId == null || blastRoomId.trim().isEmpty()) blastRoomId = roomId;
+            if (roomId == null || !roomId.equals(blastRoomId)) return;
+            String blastKey = "support-chest-blast:" + blastRoomId + ":"
+                    + memberStr(payload, "cycle") + ":" + memberStr(payload, "level");
+            long blastAtMs = android.os.SystemClock.elapsedRealtime();
+            if (blastKey.equals(lastSupportChestBlastKey)
+                    && blastAtMs - lastSupportChestBlastAtMs < 12000L) return;
+            lastSupportChestBlastKey = blastKey;
+            lastSupportChestBlastAtMs = blastAtMs;
+            long delayMs = 2000L;
+            try {
+                if (payload.has("delayMs") && !payload.get("delayMs").isJsonNull()) {
+                    delayMs = Math.max(0L, Math.min(5000L, payload.get("delayMs").getAsLong()));
+                }
+            } catch (Exception ignored) { }
+            final String expectedRoomId = blastRoomId;
+            handler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed() || !expectedRoomId.equals(roomId)) return;
+                // The uploaded video/audio is played by the shared custom blast overlay.
+                // Keep the built-in explosion sound only as a fallback when no custom media is configured.
+                Map<String, Object> cfg = supportChestRuntimeConfig;
+                Map<?, ?> effect = cfg != null && cfg.get("explosionEffect") instanceof Map
+                        ? (Map<?, ?>) cfg.get("explosionEffect") : null;
+                String customMedia = effect == null ? null : String.valueOf(effect.get("mediaUrl"));
+                String customSound = effect == null ? null : String.valueOf(effect.get("soundUrl"));
+                boolean customEnabled = effect != null && Boolean.TRUE.equals(effect.get("enabled"))
+                        && ((customMedia != null && !customMedia.trim().isEmpty())
+                        || (customSound != null && !customSound.trim().isEmpty()));
+                boolean dashboardSoundEnabled = cfg == null || !Boolean.FALSE.equals(cfg.get("soundEnabled"));
+                if (!customEnabled && dashboardSoundEnabled) RoomSoundFx.playChestExplosion(this);
+            }, delayMs);
+            return;
+        }
+        if ("support_chest:opened".equals(event)) {
+            String openedCycle = memberStr(payload, "cycle");
+            String openedLevel = memberStr(payload, "level");
+            String openedEventKey = "support-chest:" + String.valueOf(roomId) + ":"
+                    + (openedCycle == null ? memberStr(payload, "eventId") : openedCycle)
+                    + ":" + String.valueOf(openedLevel);
+            long openedAtMs = android.os.SystemClock.elapsedRealtime();
+            if (openedEventKey.equals(lastSupportChestOpenedKey)
+                    && openedAtMs - lastSupportChestOpenedAtMs < 12000L) {
+                return;
+            }
+            lastSupportChestOpenedKey = openedEventKey;
+            lastSupportChestOpenedAtMs = openedAtMs;
+            View openedChestIcon = findViewById(R.id.btnRoomSupportChest);
+            if (openedChestIcon != null) {
+                openedChestIcon.animate().cancel();
+                openedChestIcon.setRotation(0f);
+                openedChestIcon.setScaleX(1f);
+                openedChestIcon.setScaleY(1f);
+                // Two-second suspense: the chest swells and trembles before bursting.
+                android.animation.ObjectAnimator chargeShake = android.animation.ObjectAnimator.ofFloat(
+                        openedChestIcon, "rotation", 0f, -2f, 2f, -3f, 3f, -4f, 4f, -2f, 0f);
+                chargeShake.setDuration(1900L);
+                chargeShake.start();
+                openedChestIcon.animate().scaleX(1.14f).scaleY(1.14f)
+                        .setDuration(1950L)
+                        .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+                        .start();
+                handler.postDelayed(() -> {
+                    if (isFinishing() || isDestroyed() || openedChestIcon.getParent() == null) return;
+                    android.animation.ObjectAnimator blastShake = android.animation.ObjectAnimator.ofFloat(
+                            openedChestIcon, "rotation", 0f, -22f, 22f, -16f, 16f, 0f);
+                    blastShake.setDuration(520L);
+                    blastShake.start();
+                    openedChestIcon.animate().scaleX(1.30f).scaleY(1.30f).setDuration(180L)
+                            .withEndAction(() -> openedChestIcon.animate().scaleX(1f).scaleY(1f)
+                                    .setDuration(260L).start()).start();
+                }, 2000L);
+            }
+            handler.removeCallbacks(supportChestEventRefresh);
+            handler.postDelayed(supportChestEventRefresh, 3700L);
+            // Always render the uploaded blast in the room-level transparent overlay.
+            // Do not route it into the optional chest sheet WebView: that would confine the
+            // video to the bottom sheet for users who happen to have it open.
+            Map<String, Object> cachedConfig = supportChestRuntimeConfig;
+            if (cachedConfig != null) {
+                showSupportChestBlastOverlay(cachedConfig, payload);
+            } else {
+                final String expectedRoom = roomId;
+                final JsonObject winPayload = payload.deepCopy();
+                try {
+                    ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                            .supportChest(expectedRoom)
+                            .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                                @Override public void onResponse(
+                                        retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                        retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                                    if (isFinishing() || isDestroyed() || !expectedRoom.equals(roomId)
+                                            || !response.isSuccessful() || response.body() == null
+                                            || response.body().data == null) return;
+                                    Object cfg = response.body().data.get("config");
+                                    if (cfg instanceof Map) {
+                                        supportChestRuntimeConfig = new HashMap<>((Map<String, Object>) cfg);
+                                        showSupportChestBlastOverlay(supportChestRuntimeConfig, winPayload);
+                                    }
+                                }
+                                @Override public void onFailure(
+                                        retrofit2.Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                                    android.util.Log.w("SupportChest", "Could not load custom blast config", error);
+                                }
+                            });
+                } catch (Exception error) {
+                    android.util.Log.w("SupportChest", "Could not request custom blast config", error);
+                }
+            }
+            String winner = memberStr(payload, "winnerName");
+            if (winner == null || winner.trim().isEmpty()) winner = "أحد الداعمين";
+            final String chestWinnerName = winner;
+            String levelTitle = memberStr(payload, "levelTitle");
+            java.util.ArrayList<String> rewardNames = new java.util.ArrayList<>();
+            String rewardImage = null;
+            try {
+                if (payload.has("rewards") && payload.get("rewards").isJsonArray()) {
+                    for (JsonElement rewardElement : payload.getAsJsonArray("rewards")) {
+                        if (rewardElement == null || !rewardElement.isJsonObject()) continue;
+                        JsonObject reward = rewardElement.getAsJsonObject();
+                        String rewardName = memberStr(reward, "name");
+                        if (rewardName == null || rewardName.trim().isEmpty()) rewardName = memberStr(reward, "type");
+                        if (rewardName != null && !rewardName.trim().isEmpty()) rewardNames.add(rewardName);
+                        if (rewardImage == null || rewardImage.trim().isEmpty()) {
+                            rewardImage = memberStr(reward, "imageUrl");
+                            if (rewardImage == null || rewardImage.trim().isEmpty()) {
+                                rewardImage = memberStr(reward, "iconUrl");
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+            rewardImage = resolveSupportChestMediaUrl(rewardImage);
+            String message = (levelTitle == null || levelTitle.trim().isEmpty() ? "صندوق الدعم" : levelTitle)
+                    + " · " + (rewardNames.isEmpty() ? "تم فتح الصندوق" : android.text.TextUtils.join("، ", rewardNames));
+            String roomEventId = memberStr(payload, "cycle");
+            String levelId = memberStr(payload, "level");
+            // Wait for the two-second chest charge-up before the shared room blast.
+            final String chestToastKey = "support-chest:" + roomId + ":"
+                    + (roomEventId == null ? "1" : roomEventId)
+                    + ":" + (levelId == null ? "1" : levelId);
+            final String chestRewardImage = rewardImage;
+            handler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                Map<String, Object> runtimeConfig = supportChestRuntimeConfig;
+                Map<String, Object> toastConfig = runtimeConfig != null
+                        && runtimeConfig.get("toast") instanceof Map
+                        ? (Map<String, Object>) runtimeConfig.get("toast") : null;
+                GlobalCelebrationToast.setSupportChestToastConfig(toastConfig);
+                boolean toastEnabled = toastConfig == null || !Boolean.FALSE.equals(toastConfig.get("enabled"));
+                if (toastEnabled) {
+                    boolean showWinner = toastConfig == null || !Boolean.FALSE.equals(toastConfig.get("showWinnerName"));
+                    GlobalCelebrationToast.showRoomTop(
+                            this, showWinner ? chestWinnerName : "💥 انفجار صندوق الدعم!", message, null, chestRewardImage,
+                            chestToastKey, 0d, 0L, null, "support_chest", roomId);
+                }
+                // Custom room-wide media replaces the legacy built-in burst.
+            }, 2000L);
+            return;
+        }
+        if ("challenge:wheel:closed".equals(event)) {
+            dismissChallengeWheelDialog();
+            return;
+        }
+        if ("challenge:wheel:result".equals(event)) {
+            handleChallengeWheelResult(payload);
+            return;
+        }
+        if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)
+                || "contest:pk-started".equals(event)) {
+            handler.removeCallbacks(roomPkPendingTimeout);
+            if (payload.has("contestId") && !payload.get("contestId").isJsonNull()) {
+                roomPkCurrentContestId = payload.get("contestId").getAsString();
+            }
+            roomPkInRoomChallenge = "person_vs_person".equals(memberStr(payload, "challengeType"))
+                    || "team_vs_team".equals(memberStr(payload, "challengeType"));
+            if ("contest:pk-started".equals(event)) roomPkAutoEndRequested = false;
+            ensureRoomPkActionButton();
+            showRoomPkScoreBanner("contest:pk-started".equals(event) ? "contest:team-score" : event, payload);
+            if ("contest:team-ended".equals(event)) {
+                roomPkCurrentContestId = null;
+                roomPkInRoomChallenge = false;
+                roomPkCanEndChallenge = false;
+                roomPkAutoEndRequested = false;
+                handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
+            }
+            return;
+        }
+        if ("contest:person-pk-invite".equals(event)) {
+            String target = memberStr(payload, "targetUserId"), inviteId = memberStr(payload, "contestId");
+            if (myUserId == null || !myUserId.equals(target) || inviteId == null || inviteId.isEmpty()) return;
+            String inviter = memberStr(payload, "inviterName"); int duration = memberInt(payload, "durationMinutes", 5);
+            new AlertDialog.Builder(this).setTitle("دعوة تحدّي PK")
+                .setMessage((inviter == null ? "مستخدم" : inviter) + " يدعوك إلى تحدّي شخص ضد شخص لمدة " + duration + " دقائق. لن يبدأ التحدّي إلا إذا قبلت.")
+                .setNegativeButton("رفض", (dialog, which) -> respondToPersonPkInvite(inviteId, false))
+                .setPositiveButton("قبول", (dialog, which) -> respondToPersonPkInvite(inviteId, true))
+                .setOnCancelListener(dialog -> respondToPersonPkInvite(inviteId, false)).show();
+            return;
+        }
+        if ("contest:pk-invite".equals(event)) {
+            String targetRoomId = memberStr(payload, "targetRoomId");
+            if (isOwner && roomId != null && roomId.equals(targetRoomId)) {
+                String id = memberStr(payload, "contestId");
+                if (id != null && shownRoomPkInvites.add(id)) {
+                    com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto invite =
+                            new com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto();
+                    invite.id = id;
+                    invite.title = memberStr(payload, "title");
+                    invite.sideA = new com.Dramizo.Series.data.remote.dto.ContestDtos.SideDto();
+                    invite.sideA.name = memberStr(payload, "sourceRoomName");
+                    invite.scoringMode = memberStr(payload, "scoringMode");
+                    invite.rules = new java.util.HashMap<>();
+                    if (payload.has("durationMinutes") && !payload.get("durationMinutes").isJsonNull()) {
+                        invite.rules.put("durationMinutes", payload.get("durationMinutes").getAsInt());
+                    }
+                    if (invite.scoringMode != null) invite.rules.put("scoringMode", invite.scoringMode);
+                    if (payload.has("goalScore") && !payload.get("goalScore").isJsonNull()) {
+                        invite.rules.put("goalScore", payload.get("goalScore").getAsLong());
+                    }
+                    handler.post(() -> showRoomPkInviteDialog(invite));
+                }
+            }
+            return;
+        }
+        if ("contest:pk-rejected".equals(event)) {
+            Toast.makeText(this, "تم رفض دعوة تحدّي PK", Toast.LENGTH_LONG).show();
+            handler.removeCallbacks(roomPkPendingTimeout);
+            roomPkCurrentContestId = null;
+            handler.post(this::ensureRoomPkActionButton);
+            return;
+        }
+        if ("cp:request".equals(event)) {
+            showCpRoomRequestDialog(payload);
+            return;
+        }
+        if ("room:music_volume".equals(event)) {
+            // The server broadcasts the room-wide value to every member. Apply it here,
+            // including on the music controller, so all local players and the host mix
+            // follow the same gain without changing microphone volume or ZEGO credentials.
+            float incomingVolume = sharedMusicVolume;
+            try {
+                if (payload.has("volume") && !payload.get("volume").isJsonNull()) {
+                    incomingVolume = payload.get("volume").getAsFloat();
+                }
+            } catch (RuntimeException ignored) {
+                // Ignore malformed volume events and keep the current gain.
+            }
+            sharedMusicVolume = Math.max(0f, Math.min(1f, incomingVolume));
+            applySharedMusicVolume();
+        } else if ("chat:message".equals(event)) {
             String name = memberStr(payload, "name");
             if (name == null) name = memberStr(payload, "displayName");
             if (name == null) name = fromUsername != null ? fromUsername : "مستخدم";
@@ -11169,6 +17050,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (r != null) r.chatAutoClearMinutes = mins;
             long stamp = parseIsoMillis(memberStr(payload, "chatClearedAt"));
             if (stamp > 0) RoomChatMemory.honorServerWipe(roomId, stamp);
+        } else if ("room:music_volume".equals(event)) {
+            sharedMusicVolume = Math.max(0f, Math.min(1f,
+                    memberFloat(payload, "volume", 1.0f)));
+            applySharedMusicVolume();
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
             if (serverTime != null) {
@@ -11189,7 +17074,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String uid = memberStr(payload, "userId");
             if (uid == null) uid = fromUserId;
             if (uid == null || uid.isEmpty()) return;
-            if (myUserId != null && sameUser(myUserId, uid)) return; // already shown locally
             String key = memberStr(payload, "emojiKey");
             String remoteUrl = memberStr(payload, "url");
             int res = SeatReactionEmojis.drawableForKey(key);
@@ -11198,40 +17082,93 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (res != 0) showRoomReaction(uid, key, res, remoteUrl);
         } else if ("lucky:opened".equals(event)) {
-            if (fromUserId != null && fromUserId.equals(myUserId)) return;
+            String openId = memberStr(payload, "openId");
+            String eventKey = openId != null && !openId.isEmpty()
+                    ? openId
+                    : firstNonEmpty(memberStr(payload, "userId"), memberStr(payload, "playAt"));
+            if (eventKey != null && shownLuckyOpenEvents.contains(eventKey)) return;
+            if (shownLuckyOpenEvents.size() > 100) shownLuckyOpenEvents.clear();
+            if (eventKey != null) shownLuckyOpenEvents.add(eventKey);
             String opener = memberStr(payload, "displayName");
             if (opener == null) opener = fromUsername != null ? fromUsername : "مستخدم";
             String rewardLabel = memberStr(payload, "rewardLabel");
             if (rewardLabel == null) rewardLabel = "جائزة";
-            showLuckyWinOverlay(opener, rewardLabel);
+            long playAt = memberLong(payload, "playAt", 0L);
+            long serverNow = memberLong(payload, "serverNow", 0L);
+            if (playAt > 0L && serverNow > 0L) {
+                long localNow = System.currentTimeMillis();
+                playAt = playAt - (serverNow - localNow);
+            }
+            showLuckyWinOverlay(opener, rewardLabel, memberStr(payload, "videoUrl"), playAt);
         } else if ("lucky:hit".equals(event)) {
-            // Lucky gift multiplier rain — show for everyone except the sender (local already did).
+            // The room event is the canonical source for the configured win/return toast.
+            // No local-response toast is emitted elsewhere, so include the sender as well.
             String senderId = memberStr(payload, "senderId");
             if (senderId == null) senderId = fromUserId;
-            if (myUserId != null && sameUser(myUserId, senderId)) return;
             String who = memberStr(payload, "senderName");
             if (who == null || who.isEmpty()) {
                 who = fromUsername != null ? fromUsername : "مستخدم";
             }
             long won = Math.max(0L, memberLong(payload, "luckyCoinsWon", 0L));
-            if (won <= 0) return;
-            int mul = 1;
+            // A zero-payout lucky result is still a real outcome and must show the
+            // configured return/loss toast; only coin rain/audio require a payout.
+            int mul = 0;
             boolean soft = false;
+            double rawMultiplier = 0d;
             if (payload.has("luckyMultiplier") && !payload.get("luckyMultiplier").isJsonNull()) {
                 try {
-                    double raw = payload.get("luckyMultiplier").getAsDouble();
-                    soft = raw > 0 && raw < 1.0;
-                    mul = soft ? 0 : Math.max(1, (int) Math.round(raw));
+                    rawMultiplier = Math.max(0d, payload.get("luckyMultiplier").getAsDouble());
+                    soft = rawMultiplier > 0d && rawMultiplier < 1d;
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 } catch (Exception ignored) {
-                    mul = Math.max(1, memberInt(payload, "luckyMultiplier", 1));
+                    rawMultiplier = Math.max(0d, memberInt(payload, "luckyMultiplier", 0));
+                    mul = rawMultiplier <= 0d ? 0 : Math.max(1, (int) Math.round(rawMultiplier));
                 }
             }
-            showLuckyHitBanner(who, memberStr(payload, "senderAvatarUrl"), won, mul);
-            GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
-            // Only float/rain on the winner's seat.
-            if (senderId != null && !senderId.isEmpty()) {
-                showLuckyReturnOnMics(java.util.Collections.singletonList(senderId), won);
-                playCoinRainToUsers(java.util.Collections.singletonList(senderId), 16);
+            // Lucky celebration toasts are only for actual wins.
+            // No toast for losses or zero-payout outcomes.
+            if (won > 0) {
+                String luckyEventId = firstNonEmpty(memberStr(payload, "eventId"),
+                        memberStr(payload, "openId"), memberStr(payload, "sendId"),
+                        memberStr(payload, "requestId"), memberStr(payload, "createdAt"));
+                String luckyToastKey = luckyEventId != null
+                        ? "lucky-hit-" + luckyEventId
+                        : "lucky-hit-" + String.valueOf(senderId) + "-" + String.valueOf(won)
+                                + "-" + String.valueOf(rawMultiplier) + "-" + (System.currentTimeMillis() / 1000L);
+                String luckyAvatar = firstNonEmpty(memberStr(payload, "senderAvatarUrl"),
+                        memberStr(payload, "avatarUrl"), memberStr(payload, "winnerAvatarUrl"));
+                String luckyBadge = firstNonEmpty(memberStr(payload, "senderBadgeUrl"),
+                        memberStr(payload, "vipBadgeUrl"), memberStr(payload, "badgeUrl"));
+                String luckyBody = firstNonEmpty(memberStr(payload, "message"),
+                        memberStr(payload, "resultText"), memberStr(payload, "body"));
+                if (luckyBody == null) {
+                    luckyBody = "فاز بـ " + won + " عملة"
+                            + (rawMultiplier > 0d ? " · ×" + rawMultiplier : "");
+                }
+                String luckyToastKind = rawMultiplier > 0d && rawMultiplier < 1d
+                        ? "lucky_hit_return"
+                        : (won >= 1000L || rawMultiplier >= 10d
+                                ? "lucky_hit_high" : "lucky_hit_normal");
+                GlobalCelebrationToast.show(
+                        this, who, luckyBody, luckyAvatar, luckyBadge, luckyToastKey,
+                        28, rawMultiplier, won, who, luckyToastKind, roomId);
+
+                // Every winning result also gets one clear in-room text announcement.
+                // Keep the high/center toast private to the actual winner only.
+                String roomWinLine = "مبروك " + who + " ربح "
+                        + String.format(java.util.Locale.US, "%,d", won) + " كوين"
+                        + (rawMultiplier > 0d
+                            ? " · ×" + String.format(java.util.Locale.US, "%.0f", rawMultiplier)
+                            : "");
+                appendGameCelebrationLine(roomWinLine, null);
+                boolean localWinner = senderId != null && myUserId != null
+                        && sameUser(senderId, myUserId);
+                if (localWinner && (won >= 1000L || rawMultiplier >= 10d)) {
+                    GlobalCelebrationToast.showRoomCenter(
+                            this, who, roomWinLine, luckyAvatar, luckyBadge, luckyToastKey,
+                            rawMultiplier, won, who, "lucky_hit_high", roomId);
+                }
+                GiftAudioFx.playLuckyCoins(this, soft ? 2 : Math.min(4, Math.max(2, mul)));
             }
         } else if ("game:update".equals(event) || "game:invite".equals(event)) {
             // XO retired — ignore legacy realtime payloads
@@ -11242,6 +17179,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (myUserId == null || awayId == null || !sameUser(myUserId, awayId)) {
                 Toast.makeText(this, "المضيف غادر مؤقتاً · الغرفة ما زالت مفتوحة",
                         Toast.LENGTH_SHORT).show();
+            }
+        } else if ("room_support_medal:earned".equals(event)) {
+            // The medal is awarded to the supported account, never to the sender.
+            // Refresh the authoritative seat DTO immediately so it appears above that user's mic.
+            requestRoomRefresh(false);
+            String medalUserId = memberStr(payload, "userId");
+            if (medalUserId != null && myUserId != null && sameUser(medalUserId, myUserId)) {
+                try {
+                    Toast.makeText(this, "حصلت على ميدالية دعم الغرفة 🏅", Toast.LENGTH_SHORT).show();
+                } catch (Exception ignored) {}
             }
         } else if ("gift:animation".equals(event)) {
             scheduleSupporterRefresh(1_200L);
@@ -11269,11 +17216,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String receiverId = memberStr(payload, "receiverId");
             String senderId = memberStr(payload, "senderId");
             if (senderId == null) senderId = fromUserId;
-            if (myUserId != null && (myUserId.equals(fromUserId) || myUserId.equals(senderId))) {
-                return; // The successful send response already queued the local effect.
-            }
+            boolean localSenderEcho = myUserId != null
+                    && (myUserId.equals(fromUserId) || myUserId.equals(senderId));
             String giftKind = memberStr(payload, "giftType");
-            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)) {
+            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)
+                    && !memberBool(payload, "cannonLaunch", false)) {
                 GiftAudioFx.playLuckyCoins(this, 3);
             }
             List<String> allReceivers = new ArrayList<>();
@@ -11290,22 +17237,76 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 allReceivers.add(receiverId);
             }
             String giftEventKey = firstNonEmpty(memberStr(payload, "sendId"),
-                    memberStr(payload, "eventId"), memberStr(payload, "at"));
-            if (giftEventKey == null) {
-                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
-                        + '|' + receiverId + '|' + combo + '|' + personCount;
-            }
+                    memberStr(payload, "eventId"), memberStr(payload, "at"),
+                    memberStr(payload, "createdAt"), memberStr(payload, "requestId"));
             long giftNow = System.currentTimeMillis();
+            if (giftEventKey == null) {
+                // Some legacy send paths omit event IDs. Include send-specific fields and
+                // a time component so repeated identical gifts do not suppress each other's
+                // toast for the full 15-second dedupe window.
+                giftEventKey = String.valueOf(senderId) + '|' + memberStr(payload, "giftId")
+                        + '|' + receiverId + '|' + combo + '|' + personCount
+                        + '|' + memberInt(payload, "quantity", 1)
+                        + '|' + memberLong(payload, "totalCoins", 0L)
+                        + '|' + (giftNow / 750L);
+            }
             recentGiftEffects.entrySet().removeIf(entry -> giftNow - entry.getValue() > 15_000L);
             if (recentGiftEffects.put(giftEventKey, giftNow) != null) return;
-            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
+
             int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
+
+            // Show the same configured gift toast to every room member, including the
+            // sender. There is no separate local-send toast path; the room event is canonical.
+            // This is after recentGiftEffects dedupe, so the room/user echo cannot double-show it.
+            boolean senderMysteriousMan = memberBool(payload, "senderMysteriousMan", false)
+                    || "الرجل الغامض".equals(sender);
+            String senderAvatar = senderMysteriousMan
+                    ? configuredMysteriousAvatarUrl()
+                    : firstNonEmpty(memberStr(payload, "senderAvatarUrl"),
+                            memberStr(payload, "avatarUrl"));
+            // Gift-send top toast removed by request. Keep the in-room gift animation.
+
+            // A single-recipient gift must name the receiver in the room chat. Group gifts
+            // intentionally stay anonymous as a group, without listing all recipients.
+            String receiverName = memberStr(payload, "receiverName");
+            if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
+                // Isolate dynamic names/gift text from Arabic RTL ordering so mixed Arabic,
+                // Latin names and numeric IDs can never visually swap sender/receiver.
+                appendGiftEconomyLine("\u2068" + sender + "\u2069 أهدى إلى \u2068" + receiverName
+                        + "\u2069 " + "\u2068" + name + "\u2069");
+            }
+            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
+            boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
+            if (cannonLaunch) {
+                // The canonical room event starts the combo toast only after the release-time
+                // batch has been accepted by the server. X counts sent units, never lucky payout.
+                // The animated X counter is sender-local only. Other room members still
+                // receive the cannon gift flight below, but never get a sender counter.
+                long perSeatSupport = allReceivers.isEmpty()
+                        ? 0L : Math.max(0L, totalCoins / allReceivers.size());
+                if (perSeatSupport > 0L) {
+                    for (String occupiedId : allReceivers) {
+                        creditGiftCoinsOnSeat(occupiedId, perSeatSupport);
+                    }
+                }
+                // The separate lucky:hit room event owns the win toast, so it is never duplicated here.
+                playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
+                        Math.max(1, personCount), localSenderEcho, senderId);
+                return;
+            }
+            if (localSenderEcho) {
+                return; // Local send response already queued the sender's visual effect.
+            }
             // Lucky: Mikoo center-hold → scatter (no JSON/Lottie pulse).
             if (isLuckyGift) {
                 anim = null;
-                List<String> rainTargets = collectOccupiedMicUserIds();
-                if (rainTargets.isEmpty() && !allReceivers.isEmpty()) {
-                    rainTargets = allReceivers;
+                // Respect the recipients selected for this gift first.
+                // Only use every occupied mic when the event carries no explicit targets.
+                List<String> rainTargets = new ArrayList<>();
+                if (allReceivers != null && !allReceivers.isEmpty()) {
+                    rainTargets.addAll(allReceivers);
+                } else {
+                    rainTargets.addAll(collectOccupiedMicUserIds());
                 }
                 playLuckyGiftStage(
                         icon,
@@ -11314,6 +17315,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         qtyRemote,
                         Math.max(1, rainTargets.isEmpty() ? personCount : rainTargets.size()),
                         sender,
+                        senderId,
                         null);
                 int senderVipChat = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevelChat = Math.max(1, memberInt(payload, "senderUserLevel", 1));
@@ -11328,7 +17330,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 announceLuckyGiftChat(
                         name, icon, sender, 1, senderId, senderVipChat,
-                        memberStr(payload, "senderAvatarUrl"), senderLevelChat, senderFrameChat);
+                        senderAvatar, senderLevelChat, senderFrameChat);
             } else if (allMic && !allReceivers.isEmpty()) {
                 // Mikoo: center gift → simultaneous clones to every target mic.
                 String sendName = sender != null && !sender.isEmpty() ? sender : "مستخدم";
@@ -11357,8 +17359,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         ? RoomEffectQueue.EffectType.LEGENDARY_GIFT
                         : RoomEffectQueue.EffectType.GIFT;
                 String playTo = allReceivers.isEmpty() ? receiverId : allReceivers.get(0);
-                // Lucky stage already plays the visual — queue only chat/banner, no second Lottie.
-                if (!isLuckyGift) {
+                // Group gifts already have one synchronized flight per occupied seat.
+                // Do not queue a second full-screen media effect for the first recipient.
+                if (!isLuckyGift && !allMic) {
                 String playAnimRemote = anim;
                 String mappedRemote = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                         name, icon, anim);
@@ -11376,7 +17379,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         .senderUserId(senderId)
                         .senderVipLevel(senderVip)
                         .userLevel(senderLevel)
-                        .avatarUrl(memberStr(payload, "senderAvatarUrl"))
+                        .avatarUrl(senderAvatar)
                         .hostBadgeUrl(senderFrame)
                         .supporterTier(tier)
                         .giftName(name)
@@ -11393,11 +17396,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     applyGiftToSeat(rid, perSeatCoins,
                             rid.equals(playTo) ? receiverRoomGiftTotal : 0L);
                 }
-            } else if (!isLuckyGift) {
+            } else if (!isLuckyGift && !allMic) {
                 int senderVip = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevel = Math.max(1, memberInt(payload, "senderUserLevel", 1));
                 playGiftAnimationRemote(name, icon, anim, sender, combo, senderId, senderVip,
-                        memberStr(payload, "senderAvatarUrl"), senderLevel,
+                        senderAvatar, senderLevel,
                         memberStr(payload, "senderHostBadgeUrl"));
                 for (String rid : allReceivers) {
                     if (perSeatCoins > 0) applyGiftToSeat(rid, perSeatCoins, 0L);
@@ -11445,6 +17448,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 cur.charmEnabled = memberBool(payload, "charmEnabled", cur.charmEnabled);
                 cur.bannerEnabled = memberBool(payload, "bannerEnabled", cur.bannerEnabled);
                 cur.micInteractEnabled = memberBool(payload, "micInteractEnabled", cur.micInteractEnabled);
+                cur.micRequestEnabled = memberBool(payload, "micRequestEnabled", cur.micRequestEnabled);
                 cur.entryEffectsEnabled = memberBool(payload, "entryEffectsEnabled", cur.entryEffectsEnabled);
                 cur.lowGiftEffectsEnabled = memberBool(payload, "lowGiftEffectsEnabled", cur.lowGiftEffectsEnabled);
                 applyRoomDisplaySettings(cur);
@@ -11458,21 +17462,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean moderatorMuted = memberBool(payload, "moderatorMuted", false)
                     || memberBool(payload, "isModeratorMuted", false);
             if (myUserId != null && sameUser(myUserId, targetUserId)) {
-                if (moderatorMuted || muted) {
+                if (moderatorMuted) {
                     RoomSoundFx.playMute(this);
                     micOn = false;
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     syncMicUi();
-                    if (moderatorMuted) {
-                        Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    // Server unmuted us — restore publish so others can hear again.
-                    userChoseMute = false;
-                    micOn = true;
-                    RoomRtcEngine.getInstance().setMicEnabled(true);
+                    Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
+                } else if (System.currentTimeMillis() - lastLocalMicChangeAtMs < 2500L) {
+                    // Ignore a delayed socket echo when a newer local tap already changed the mic.
+                    micOn = !userChoseMute;
+                    RoomRtcEngine.getInstance().setMicEnabled(micOn);
                     syncMicUi();
-                    activateSeatAudio(currentSeats);
+                    if (micOn) activateSeatAudio(currentSeats);
+                } else {
+                    userChoseMute = muted;
+                    getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                            .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
+                    micOn = !muted;
+                    RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                    syncMicUi();
+                    if (micOn) activateSeatAudio(currentSeats);
                 }
             }
             requestRoomRefresh(true);
@@ -11550,23 +17559,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             // Stacked in-room bubble only — no ComingMsg strip / no personal portrait.
         } else if ("room:slot_lose".equals(event)) {
-            String who = firstNonEmpty(memberStr(payload, "displayName"),
-                    shortUserId(memberStr(payload, "userId")));
-            String gameTitle = firstNonEmpty(memberStr(payload, "gameTitle"),
-                    memberStr(payload, "gameId"), "لعبة");
-            long bet = Math.max(0L, memberLong(payload, "betCoins", 0L));
-            if (bet <= 0) return;
-            String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
-                    memberStr(payload, "gameIconUrl"));
-            appendGameCelebrationLine(who + " خسر " + bet + " · " + gameTitle, gameIcon);
-            RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
-            if (bubbleFx != null) {
-                bubbleFx.showSlotLoseBubble(who, null, bet, gameTitle, gameIcon);
-            }
-            if (binding != null && binding.giftChatEffects != null) {
-                binding.giftChatEffects.setVisibility(View.VISIBLE);
-                binding.giftChatEffects.bringToFront();
-            }
+            // Losses are intentionally silent: no chat line, toast, or loss bubble.
+            return;
         } else if ("room:slot_ended".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));
@@ -11627,19 +17621,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 hopToNextRoomOrExit("تم إغلاق الغرفة");
             }
         } else if ("room:hand_raised".equals(event)) {
-            if (isFreeMicEnabled()) {
-                // Free mic: ignore raise-hand queue noise.
+            if (isFreeMicEnabled() && !isMicRequestEnabled()) {
+                // Free mic only ignores requests when the owner has not enabled the request gate.
                 return;
             }
             String name = memberStr(payload, "displayName");
             if (name == null) name = "ضيف";
             appendChatLine("النظام", name + " يطلب الانضمام للمايك ✋", 0, 1);
-            if (canInviteMic && roomId != null) {
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) {
                 viewModel.loadSeatRequests(roomId);
-                Toast.makeText(this, name + " يطلب المايك — اضغط الجرس للموافقة", Toast.LENGTH_LONG).show();
+                // The persistent in-room request toast is driven by the authoritative pending list.
             }
         } else if ("room:hand_lowered".equals(event)) {
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(false);
         } else if ("room:seat_approved".equals(event) || "room:seat_taken".equals(event)) {
             String approvedId = memberStr(payload, "userId");
@@ -11647,7 +17641,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (approvedName == null) approvedName = "مستخدم";
             // Free-mic sit uses room:seat_taken — still show climb line for others.
             if (!sameUser(myUserId, approvedId) || "room:seat_approved".equals(event)) {
-                appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
+                boolean anonymousSeat = memberBool(payload, "mysteriousMan", false)
+                        || "الرجل الغامض".equals(approvedName);
+                if (anonymousSeat) {
+                    appendChatLine("الرجل الغامض", "صعد إلى المايك 🎤", 0, 1,
+                            null, approvedId, configuredMysteriousAvatarUrl());
+                } else {
+                    appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
+                }
             }
             if (myUserId != null && sameUser(myUserId, approvedId)) {
                 if ("room:seat_approved".equals(event)) {
@@ -11656,28 +17657,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!PermissionHelper.hasAudioPermission(this)) {
                     PermissionHelper.ensureMediaPermissions(this, false);
                 }
-                userChoseMute = false;
-                micOn = true;
-                RoomRtcEngine.getInstance().setMicEnabled(true);
-                if (roomId != null) viewModel.setMic(roomId, false);
+                // Never let a delayed seat event bypass a moderator mute. The optimistic
+                // seat snapshot already carries the moderator flag across a hop.
+                RoomDtos.SeatDto selfSeat = findMySeat(currentSeats);
+                boolean moderatorMuted = selfSeat != null && selfSeat.isModeratorMuted;
+                boolean preserveUserMute = userChoseMute || moderatorMuted;
+                micOn = !preserveUserMute;
+                RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                micOn = RoomRtcEngine.getInstance().isMicEnabled();
+                if (!moderatorMuted && roomId != null) {
+                    viewModel.setMic(roomId, !micOn);
+                }
+                micStateInitializedForRoom = true;
+                syncMicUi();
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(true);
         } else if ("room:seat_rejected".equals(event)) {
             String rejectedId = memberStr(payload, "userId");
             if (myUserId != null && sameUser(myUserId, rejectedId)) {
                 Toast.makeText(this, R.string.mic_request_rejected, Toast.LENGTH_SHORT).show();
             }
-            if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
+            if ((canInviteMic || canManageSeats || isHost || isOwner) && roomId != null) viewModel.loadSeatRequests(roomId);
         } else if ("room:seat_left".equals(event)) {
             String leftId = payload.has("userId") ? payload.get("userId").getAsString() : null;
             boolean forced = payload.has("forced")
                     && !payload.get("forced").isJsonNull()
                     && payload.get("forced").getAsBoolean();
             if (myUserId != null && sameUser(myUserId, leftId)) {
+                // This is an explicit server seat-left event, unlike an empty refresh snapshot.
+                restoreSeatSnapshot = null;
+                restoreSeatSnapshotUntilMs = 0L;
+                lastSelfSeatConfirmedAtMs = 0L;
+                pendingSelfSeatIndex = -1;
+                pendingSelfSeatUntilMs = 0L;
                 micOn = false;
-                userChoseMute = false;
+                micStateInitializedForRoom = false;
+                // Seat removal is not a request to erase the user's saved mute preference.
                 RoomRtcEngine.getInstance().setMicEnabled(false);
                 RoomRtcEngine.getInstance().stopPublishing();
                 if (forced) {
@@ -11686,9 +17703,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else if (leftId != null) {
                 RoomRtcEngine.getInstance().stopPlaying(RoomRtcEngine.audioStreamId(leftId));
             }
-            appendChatLine("النظام",
-                    forced ? "تم إنزال مستخدم من المايك" : "مستخدم نزل من المايك",
-                    0, 1);
+            String leftName = memberStr(payload, "displayName");
+            if (leftName == null || leftName.trim().isEmpty()) leftName = "مستخدم";
+            boolean anonymousLeft = memberBool(payload, "mysteriousMan", false)
+                    || "الرجل الغامض".equals(leftName);
+            if (anonymousLeft) {
+                appendChatLine("الرجل الغامض",
+                        forced ? "تم إنزاله من المايك" : "نزل من المايك",
+                        0, 1, null, leftId, configuredMysteriousAvatarUrl());
+            } else {
+                appendChatLine("النظام",
+                        forced ? leftName + " تم إنزاله من المايك" : leftName + " نزل من المايك",
+                        0, 1);
+            }
             requestRoomRefresh(true);
         } else if ("room:staff_updated".equals(event)
                 || "room:seat_locked".equals(event)
@@ -11716,6 +17743,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (exiting || hoppingRoom) return;
         clearSeatRequestsUi();
         clearTopSupportersUi();
+        // A forced/final exit must discard this device's room-feed snapshot too.
+        // This is strictly local: never emit a room-wide chat clear or touch gift/wallet records.
+        clearRoomChatSession();
         exiting = true;
         minimizing = false;
         handler.removeCallbacks(refreshRunnable);
@@ -12195,7 +18225,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (shouldPublish) {
             // Music-only publish: keep mic soft-muted unless seated with micOn.
-            RoomRtcEngine.getInstance().setMicEnabled(onSeat && micOn);
+            // Avoid repeating mic/focus transitions on every seat-state refresh.
+            boolean desiredMicEnabled = onSeat && micOn;
+            if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+            }
+            boolean actualMicEnabled = RoomRtcEngine.getInstance().isMicEnabled();
+            if (micOn != actualMicEnabled) {
+                micOn = actualMicEnabled;
+                syncMicUi();
+            }
             if (moderatorMuted && onSeat) {
                 rtcCanPublish = false;
                 handler.removeCallbacks(rtcTokenRefreshRunnable);
@@ -12204,7 +18243,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (rtcCanPublish
                     && System.currentTimeMillis() < rtcPublishTokenExpiresAtMs - 20_000L) {
-                RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                if (!RoomRtcEngine.getInstance().isPublishing()) {
+                    RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                }
             } else {
                 refreshRtcPublishToken(streamId);
             }
@@ -12245,9 +18286,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 && LiveKitEngineManager.getInstance().isSessionCanPublish();
                 if (livekitAlreadyPublishable) {
                     if (isOnSeat(currentSeats) || isLocalMusicMixNeeded()) {
-                        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
-                        RoomRtcEngine.getInstance().setMicEnabled(
-                                isOnSeat(currentSeats) && micOn);
+                        if (!RoomRtcEngine.getInstance().isPublishing()) {
+                            RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                        }
+                        boolean desiredMicEnabled = isOnSeat(currentSeats) && micOn;
+                        if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                            RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+                        }
                         handler.removeCallbacks(rtcTokenRefreshRunnable);
                         long refreshDelay = Math.max(
                                 60_000L,
@@ -12261,9 +18306,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 RoomRtcEngine.getInstance().renewRoomToken(zegoRoom, result.data.token);
                 if ((isOnSeat(currentSeats) || isLocalMusicMixNeeded()) && rtcCanPublish) {
-                    RoomRtcEngine.getInstance().startPublishingAudio(streamId);
-                    RoomRtcEngine.getInstance().setMicEnabled(
-                            isOnSeat(currentSeats) && micOn);
+                    if (!RoomRtcEngine.getInstance().isPublishing()) {
+                        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                    }
+                    boolean desiredMicEnabled = isOnSeat(currentSeats) && micOn;
+                    if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
+                        RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+                    }
                     handler.removeCallbacks(rtcTokenRefreshRunnable);
                     long refreshDelay = Math.max(
                             15_000L,
@@ -12325,7 +18374,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuthDtos.UserDto me = ContainerProvider.from(this).getSessionManager().getUser();
             if (me != null) {
                 hostBadge = me.hostBadgeUrl;
-                vipBadge = me.vipBadgeUrl;
+                vipBadge = com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me);
                 meta = me.hostBadgeMeta;
                 displayName = me.displayName != null && !me.displayName.isEmpty()
                         ? me.displayName : me.username;
@@ -12337,6 +18386,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception ignored) {
         }
         seatAdapter.setSelfHostWear(myUserId, hostBadge, vipBadge, meta, displayName, avatarUrl);
+    }
+
+    /** Refresh already-rendered self chat bubbles after equipping/unequipping in the store. */
+    private void refreshSelfRoomChatFrames() {
+        if (binding == null || binding.chatLog == null || myUserId == null) return;
+        AuthDtos.UserDto me = null;
+        try {
+            me = ContainerProvider.from(this).getSessionManager().getUser();
+        } catch (Exception ignored) { }
+        if (me == null) return;
+        for (int i = 0; i < binding.chatLog.getChildCount(); i++) {
+            View row = binding.chatLog.getChildAt(i);
+            if (row == null) continue;
+            ImageView frame = row.findViewById(R.id.imgChatFrame);
+            ImageView avatar = row.findViewById(R.id.imgChatAvatar);
+            HostSignalView signal = row.findViewById(R.id.webChatHostSignal);
+            Object rowUserId = frame != null ? frame.getTag() : null;
+            if (!(rowUserId instanceof String) || !sameUser(myUserId, (String) rowUserId)
+                    || avatar == null || frame == null) continue;
+            String avatarUrl = avatar.getTag() instanceof String
+                    ? (String) avatar.getTag() : me.avatarUrl;
+            AvatarCosmetics.bindStacked(avatar, frame, signal, avatarUrl,
+                    com.Dramizo.Series.util.AvatarCosmetics.avatarFrameUrl(me), null);
+        }
     }
 
     private RoomDtos.SeatDto findHostSeat(@Nullable List<RoomDtos.SeatDto> seats) {
@@ -12393,50 +18466,53 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private static final int MIKOO_SEAT_COLUMNS = 5;
 
-    /** UI guest mic presets (10/15/20) → backend total including host seat 0. */
+    /** UI guest mic presets (10/15/20/30) → backend total including host seat 0. */
     private static int totalSeatCountForGuestMics(int guestMics) {
         return Math.min(31, Math.max(2, guestMics + 1));
     }
 
     private void wireSeatCountButtons(View sheet, @Nullable Runnable onPicked) {
-        View.OnClickListener seats = v -> {
-            int guestMics = 10;
-            int id = v.getId();
-            if (id == R.id.btnSeats15) guestMics = 15;
-            else if (id == R.id.btnSeats20) guestMics = 20;
-            viewModel.resizeSeats(roomId, totalSeatCountForGuestMics(guestMics));
-            Toast.makeText(this, "تم ضبط المقاعد: " + guestMics, Toast.LENGTH_SHORT).show();
+        View row = sheet.findViewById(R.id.rowSeatCounts);
+        TextView choose = sheet.findViewById(R.id.btnChooseSeatCount);
+        if (row == null || choose == null) return;
+        row.setVisibility(View.VISIBLE);
+        choose.setText("تعديل عدد المقاعد · الحالي " + currentGuestSeatCount());
+        choose.setOnClickListener(v -> {
             if (onPicked != null) onPicked.run();
-        };
-        int[] ids = {R.id.btnSeats10, R.id.btnSeats15, R.id.btnSeats20};
-        for (int btnId : ids) {
-            View button = sheet.findViewById(btnId);
-            if (button != null) {
-                button.setVisibility(View.VISIBLE);
-                button.setOnClickListener(seats);
-            }
-        }
+            choose.postDelayed(this::showRoomSeatCountPicker, 180);
+        });
     }
 
     /** Mikoo grid: 5 columns, no scroll, compact scale for 15/20 mics. */
     private void applyMikooSeatGrid(int guestCount) {
         if (binding == null || binding.recyclerSeats == null || seatAdapter == null) return;
-        int scale = guestCount <= 10
+        int columns = roomPkSeatSplitApplied ? 2 : (guestCount > 20 ? 6 : MIKOO_SEAT_COLUMNS);
+        int scale = roomPkSeatSplitApplied ? SeatAdapter.SCALE_COMPACT
+                : guestCount <= 10
                 ? SeatAdapter.SCALE_NORMAL
                 : guestCount <= 15
                 ? SeatAdapter.SCALE_MEDIUM
+                : guestCount > 20
+                ? SeatAdapter.SCALE_MICRO
                 : SeatAdapter.SCALE_COMPACT;
         seatAdapter.setScaleMode(scale);
 
         RecyclerView.LayoutManager lm = binding.recyclerSeats.getLayoutManager();
-        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != MIKOO_SEAT_COLUMNS) {
-            grid.setSpanCount(MIKOO_SEAT_COLUMNS);
+        if (lm instanceof GridLayoutManager grid && grid.getSpanCount() != columns) {
+            grid.setSpanCount(columns);
         }
 
-        int rows = guestCount <= 0 ? 1 : (guestCount + MIKOO_SEAT_COLUMNS - 1) / MIKOO_SEAT_COLUMNS;
-        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 70
-                : scale == SeatAdapter.SCALE_MEDIUM ? 76 : 86;
-        int totalHeightPx = dp(rows * rowHeightDp + 8);
+        int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
+        // Reserve the full measured seat footprint, including the name and the
+        // always-reserved coin-counter line. This prevents the final grid row from
+        // being clipped when all seats are configured and occupied.
+        int rowHeightDp = scale == SeatAdapter.SCALE_MICRO ? 92
+                : scale == SeatAdapter.SCALE_COMPACT ? 104
+                : scale == SeatAdapter.SCALE_MEDIUM ? 110 : 122;
+        int totalHeightPx = dp(rows * rowHeightDp + 4);
+        // 30-mic rooms stay fully visible as a six-column/five-row grid.
+        boolean largeSeatGrid = guestCount > 20;
+        binding.recyclerSeats.setNestedScrollingEnabled(false);
         // Skip requestLayout on mute-only room refreshes — that was blinking seats.
         int layoutKey = (guestCount << 16) ^ (scale << 8) ^ totalHeightPx;
         if (layoutKey == lastSeatGridLayoutKey) return;
@@ -12446,10 +18522,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             clp.height = totalHeightPx;
             clp.matchConstraintMaxHeight = 0;
             clp.matchConstraintMinHeight = 0;
-            clp.topMargin = dp(4);
+            clp.topMargin = dp(0);
             binding.recyclerSeats.setLayoutParams(clp);
         }
         binding.recyclerSeats.setNestedScrollingEnabled(false);
+        if (binding.rowTopHosts != null) {
+            ViewGroup.LayoutParams topRaw = binding.rowTopHosts.getLayoutParams();
+            if (topRaw instanceof ViewGroup.MarginLayoutParams topLp) {
+                // On 30-seat rooms, give the supporter stack a little more clearance
+                // below the final seat row without moving the room bottom controls.
+                topLp.topMargin = dp(largeSeatGrid ? 14 : 16);
+                binding.rowTopHosts.setLayoutParams(topLp);
+            }
+        }
+        binding.recyclerSeats.setPadding(dp(2), binding.recyclerSeats.getPaddingTop(),
+                dp(2), dp(2));
         binding.recyclerSeats.requestLayout();
     }
 
@@ -12506,9 +18593,94 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * Mikoo boss card = fixed room-host identity (not a leaveable mic).
      * Guest mics only in the grid — host may sit/leave those; card always shows host.
      */
+    private boolean headerFollowBusy = false;
+    private boolean headerFollowing = false;
+    private String headerFollowTargetKey = "";
+
+    private void bindRoomFollowHeart(@Nullable RoomDtos.RoomDto room) {
+        if (binding == null || binding.btnFollowRoomHeart == null || room == null) return;
+        final boolean agency = com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room)
+                && room.agencyId != null && !room.agencyId.trim().isEmpty();
+        final String targetId = agency ? room.agencyId : room.id;
+        if (targetId == null || targetId.trim().isEmpty()) {
+            binding.btnFollowRoomHeart.setVisibility(View.GONE);
+            return;
+        }
+        String currentUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        if (!agency && currentUserId != null && currentUserId.equals(room.hostId)) {
+            binding.btnFollowRoomHeart.setVisibility(View.GONE);
+            return;
+        }
+        final String key = (agency ? "agency:" : "room:") + targetId;
+        binding.btnFollowRoomHeart.setVisibility(View.VISIBLE);
+        binding.btnFollowRoomHeart.setEnabled(!headerFollowBusy);
+        if (!key.equals(headerFollowTargetKey)) {
+            headerFollowTargetKey = key;
+            headerFollowing = false;
+            binding.btnFollowRoomHeart.setImageResource(R.drawable.ic_heart_outline_red);
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean following = false;
+                if (agency) {
+                    Result<MiscDtos.AgencyDto> result =
+                            ApiCall.execute(c.getAgencyApi().get(targetId));
+                    following = result.success && result.data != null
+                            && Boolean.TRUE.equals(result.data.isFollowing);
+                } else {
+                    Result<java.util.Map<String, Object>> result =
+                            ApiCall.execute(c.getRoomApi().roomFollowStatus(targetId));
+                    following = result.success && result.data != null
+                            && Boolean.TRUE.equals(result.data.get("following"));
+                }
+                final boolean state = following;
+                runOnUiThread(() -> {
+                    if (binding == null || !key.equals(headerFollowTargetKey)) return;
+                    headerFollowing = state;
+                    binding.btnFollowRoomHeart.setImageResource(state
+                            ? R.drawable.ic_heart_filled_red : R.drawable.ic_heart_outline_red);
+                });
+            });
+        }
+        binding.btnFollowRoomHeart.setOnClickListener(v -> {
+            if (headerFollowBusy) return;
+            headerFollowBusy = true;
+            binding.btnFollowRoomHeart.setEnabled(false);
+            final boolean wasFollowing = headerFollowing;
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                Result<?> result;
+                if (agency) {
+                    result = wasFollowing
+                            ? ApiCall.execute(c.getAgencyApi().unfollowAgency(targetId))
+                            : ApiCall.execute(c.getAgencyApi().followAgency(targetId));
+                } else {
+                    result = wasFollowing
+                            ? ApiCall.execute(c.getRoomApi().unfollowRoom(targetId))
+                            : ApiCall.execute(c.getRoomApi().followRoom(targetId));
+                }
+                final boolean ok = result.success;
+                runOnUiThread(() -> {
+                    if (binding == null || !key.equals(headerFollowTargetKey)) return;
+                    headerFollowBusy = false;
+                    binding.btnFollowRoomHeart.setEnabled(true);
+                    if (ok) {
+                        headerFollowing = !wasFollowing;
+                        binding.btnFollowRoomHeart.setImageResource(headerFollowing
+                                ? R.drawable.ic_heart_filled_red : R.drawable.ic_heart_outline_red);
+                        Toast.makeText(this, headerFollowing ? "تمت المتابعة" : "تم إلغاء المتابعة",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+    }
+
     private void bindHeaderHostVisual(@Nullable RoomDtos.RoomDto room,
                                       @Nullable List<RoomDtos.SeatDto> seats) {
         if (binding == null || room == null) return;
+        bindRoomFollowHeart(room);
         if (binding.hostStage != null) {
             binding.hostStage.setVisibility(View.GONE);
         }
@@ -12639,6 +18811,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     isAgencyRoom,
                     1);
         }
+        // In the room header card only, show the owner's profile photo naturally
+        // without their decorative profile frame. Other app surfaces keep the frame.
+        if (binding.imgRoomHostFrame != null) {
+            binding.imgRoomHostFrame.setVisibility(View.GONE);
+            binding.imgRoomHostFrame.setImageDrawable(null);
+        }
         if (binding.headerHostSignal != null
                 && binding.headerHostSignal.getVisibility() == View.VISIBLE) {
             binding.headerHostSignal.resumeMotion();
@@ -12654,8 +18832,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         Runnable bind = () -> {
             if (binding == null || isFinishing()) return;
             try {
-                applyMikooSeatGrid(gridSeats.size());
-                if (seatAdapter != null) seatAdapter.submit(gridSeats);
+                roomPkLatestGridSeats = new java.util.ArrayList<>(gridSeats);
+                java.util.List<RoomDtos.SeatDto> visibleSeats = gridSeats;
+                if (roomPkSeatSplitApplied) {
+                    visibleSeats = new java.util.ArrayList<>();
+                    for (RoomDtos.SeatDto seat : gridSeats) {
+                        String occupant = seatUserId(seat);
+                        if (occupant != null && !occupant.trim().isEmpty()) visibleSeats.add(seat);
+                    }
+                }
+                // Keep the adapter scale selected by applyMikooSeatGrid. Overriding it
+                // to NORMAL here made 15/20-seat cells taller than the measured grid,
+                // clipping the final row and placing relationship effects over seats.
+                applyMikooSeatGrid(visibleSeats.size());
+                if (seatAdapter != null) {
+                    seatAdapter.submit(visibleSeats);
+                }
+                refreshRoomRelationshipEffects(gridSeats);
                 RoomDtos.RoomDto latest = viewModel != null ? viewModel.getRoom().getValue() : null;
                 bindHostStage(findHostSeat(allSeats), latest != null ? latest : room);
             } catch (Exception e) {
@@ -12669,15 +18862,132 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /**
+     * Fetch relationship metadata for occupied seats only. This is decorative UI and is
+     * deliberately isolated from all RTC, microphone, ZEGO and Redis flows.
+     */
+    private void refreshRoomRelationshipEffects(@Nullable List<RoomDtos.SeatDto> seats) {
+        lastRelationshipEffectsSeats = seats == null ? null : new ArrayList<>(seats);
+        if (seats == null || seats.isEmpty() || relationshipSeatEffectsOverlay == null
+                || isFinishing() || exiting) {
+            if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
+            lastRelationshipEffectsSeatSignature = null;
+            pendingRelationshipEffectsSeats = null;
+            return;
+        }
+        java.util.TreeSet<String> ids = new java.util.TreeSet<>();
+        java.util.TreeMap<Integer, String> seatedByPosition = new java.util.TreeMap<>();
+        for (RoomDtos.SeatDto seat : seats) {
+            if (seat == null || seat.locked()) continue;
+            String id = seatUserId(seat);
+            if (id == null || id.trim().isEmpty()) continue;
+            id = id.trim();
+            ids.add(id);
+            seatedByPosition.put(seat.seatIndex, id);
+        }
+        String signature = seatedByPosition.toString();
+        if (ids.size() < 2) {
+            lastRelationshipEffectsSeatSignature = signature;
+            pendingRelationshipEffectsSeatSignature = null;
+            if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
+            return;
+        }
+        String userIds = android.text.TextUtils.join(",", ids);
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (signature.equals(lastRelationshipEffectsSeatSignature)
+                && now - lastRelationshipEffectsFetchMs < 15000L) return;
+        if (relationshipEffectsFetchInFlight) {
+            // If seat occupants move while a request is in flight, remember the newest grid.
+            // The old response must never prevent the new pair from getting its own effect.
+            pendingRelationshipEffectsSeats = new ArrayList<>(seats);
+            pendingRelationshipEffectsSeatSignature = signature;
+            lastRelationshipEffectsSeatSignature = signature;
+            return;
+        }
+        relationshipEffectsFetchInFlight = true;
+        lastRelationshipEffectsFetchMs = now;
+        lastRelationshipEffectsSeatSignature = signature;
+        pendingRelationshipEffectsSeatSignature = null;
+        final List<RoomDtos.SeatDto> seatSnapshot = new ArrayList<>(seats);
+        AppContainer cpContainer;
+        try {
+            cpContainer = ContainerProvider.from(this);
+        } catch (Exception e) {
+            relationshipEffectsFetchInFlight = false;
+            return;
+        }
+        cpContainer.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    cpContainer.getUserApi().cpRoomSeatEffects(userIds));
+            relationshipEffectsFetchInFlight = false;
+            List<RoomDtos.SeatDto> pending = pendingRelationshipEffectsSeats;
+            pendingRelationshipEffectsSeats = null;
+            if (pending != null) {
+                // A pending grid can represent either changed seat occupants or a forced
+                // refresh after a dashboard CP configuration event. Do not let the normal
+                // 15-second same-grid throttle suppress that newer authoritative read.
+                lastRelationshipEffectsFetchMs = 0L;
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) refreshRoomRelationshipEffects(pending);
+                });
+            }
+            if (!result.success || result.data == null || isFinishing() || isDestroyed()) {
+                runOnUiThread(() -> {
+                    if (signature.equals(lastRelationshipEffectsSeatSignature)) {
+                        // Allow a later room refresh to retry a failed request.
+                        lastRelationshipEffectsSeatSignature = null;
+                    }
+                });
+                return;
+            }
+            Object relationsValue = result.data.get("relationships");
+            Object effectsValue = result.data.get("effects");
+            List<Map<String, Object>> relations = new ArrayList<>();
+            if (relationsValue instanceof List) {
+                for (Object item : (List<?>) relationsValue) {
+                    if (item instanceof Map) relations.add((Map<String, Object>) item);
+                }
+            }
+            Map<String, Map<String, Object>> effects = new HashMap<>();
+            if (effectsValue instanceof Map) {
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) effectsValue).entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        effects.put(String.valueOf(entry.getKey()), (Map<String, Object>) entry.getValue());
+                    }
+                }
+            }
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || relationshipSeatEffectsOverlay == null) return;
+                if (!signature.equals(lastRelationshipEffectsSeatSignature)) return;
+                binding.recyclerSeats.post(() -> {
+                    if (relationshipSeatEffectsOverlay != null
+                            && signature.equals(lastRelationshipEffectsSeatSignature)) {
+                        relationshipSeatEffectsOverlay.render(seatSnapshot, relations, effects);
+                    }
+                });
+            });
+        });
+    }
+
     /** Instant local sit so wear shows before takeSeat API returns. */
     private void optimisticTakeSeat(int seatIndex) {
+        pendingSelfSeatIndex = seatIndex;
+        pendingSelfSeatUntilMs = System.currentTimeMillis() + 6000L;
         refreshSelfHostWearOnSeats();
         AuthDtos.UserDto me = null;
         try {
             me = ContainerProvider.from(this).getSessionManager().getUser();
         } catch (Exception ignored) {
         }
-        if (me == null || myUserId == null || myUserId.isEmpty()) return;
+        if (myUserId == null || myUserId.isEmpty()) return;
+        // Do not suppress the optimistic seat UI just because the cached profile DTO
+        // is temporarily unavailable; the authenticated user ID is enough to paint it.
+        if (me == null) {
+            me = new AuthDtos.UserDto();
+            me.id = myUserId;
+            me.displayName = "أنت";
+            me.username = "أنت";
+        }
         // Ensure wear fields present on optimistic user.
         if ((me.vipBadgeUrl == null || me.vipBadgeUrl.isEmpty())
                 || (me.hostBadgeUrl == null || me.hostBadgeUrl.isEmpty())) {
@@ -12687,6 +18997,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // and would otherwise skip the open-mic path after optimistic sit.
         boolean wasSeatedBefore = isOnSeat(currentSeats);
         List<RoomDtos.SeatDto> src = currentSeats != null ? currentSeats : new ArrayList<>();
+        RoomDtos.SeatDto previousSelfSeat = findMySeat(src);
+        // The previous seat's isMuted may be a stale server echo. Only the user's
+        // persisted local choice or an explicit moderator lock may govern the hop.
+        boolean previousModeratorMuted = previousSelfSeat != null && previousSelfSeat.isModeratorMuted;
+        boolean shouldRemainMuted = userChoseMute || previousModeratorMuted;
         List<RoomDtos.SeatDto> next = new ArrayList<>(src.size());
         boolean placed = false;
         for (RoomDtos.SeatDto s : src) {
@@ -12702,9 +19017,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 copy.user = me;
                 copy.status = "occupied";
                 copy.isLocked = false;
-                // Don't inherit previous occupant's mute badge.
-                copy.isMuted = false;
-                copy.isModeratorMuted = false;
+                // Don't inherit the previous occupant's mute badge; retain our
+                // own explicit mute choice when hopping between seats.
+                copy.isMuted = shouldRemainMuted;
+                copy.isModeratorMuted = previousModeratorMuted;
                 placed = true;
             }
             next.add(copy);
@@ -12715,26 +19031,80 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             neu.userId = myUserId;
             neu.user = me;
             neu.status = "occupied";
-            neu.isMuted = false;
-            neu.isModeratorMuted = false;
+            neu.isMuted = shouldRemainMuted;
+            neu.isModeratorMuted = previousModeratorMuted;
             next.add(neu);
         }
         currentSeats = next;
-        // Open mic immediately on first sit (room LiveData arrives later with wasOnSeat=true).
-        if (!wasSeatedBefore && !userChoseMute) {
-            micOn = true;
-            try {
-                RoomRtcEngine.getInstance().setMicEnabled(true);
-            } catch (Exception ignored) {
-            }
-            if (roomId != null) viewModel.setMic(roomId, false);
-            syncMicUi();
+        // A seat hop must re-apply the user's desired mic state, not inherit a stale
+        // isMuted flag from the previous seat. The ViewModel serializes this write
+        // before takeSeat; the backend uses the same per-user transaction lock.
+        micOn = !shouldRemainMuted;
+        try {
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+        } catch (Exception micError) {
+            micOn = false;
+            android.util.Log.w("VoiceRoom", "optimistic mic state apply failed", micError);
         }
+        RoomDtos.SeatDto optimisticSelf = findMySeat(currentSeats);
+        if (optimisticSelf != null) {
+            optimisticSelf.isMuted = !micOn;
+            optimisticSelf.isModeratorMuted = previousModeratorMuted;
+        }
+        if (!previousModeratorMuted && roomId != null) {
+            // Persist the confirmed engine state, not the pre-RTC optimistic request.
+            viewModel.setMic(roomId, !micOn);
+        }
+        micStateInitializedForRoom = true;
+        syncMicUi();
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         if (binding != null && room != null) {
             applySeatGridUi(prepareGuestSeatsForGrid(next), next, room);
             bindHeaderHostVisual(room, next);
         }
+    }
+
+    /** Keep the just-selected local seat while older poll responses are still in flight. */
+    private List<RoomDtos.SeatDto> reconcilePendingSelfSeat(List<RoomDtos.SeatDto> incoming) {
+        if (pendingSelfSeatIndex < 0 || myUserId == null || myUserId.isEmpty()) return incoming;
+        if (System.currentTimeMillis() > pendingSelfSeatUntilMs) {
+            pendingSelfSeatIndex = -1;
+            pendingSelfSeatUntilMs = 0L;
+            return incoming;
+        }
+        RoomDtos.SeatDto serverSelf = findMySeat(incoming);
+        if (serverSelf != null && serverSelf.seatIndex == pendingSelfSeatIndex) {
+            pendingSelfSeatIndex = -1;
+            pendingSelfSeatUntilMs = 0L;
+            return incoming;
+        }
+        RoomDtos.SeatDto localSelf = findMySeat(currentSeats);
+        if (localSelf == null || localSelf.seatIndex != pendingSelfSeatIndex) return incoming;
+        List<RoomDtos.SeatDto> reconciled = new ArrayList<>();
+        RoomDtos.SeatDto target = null;
+        for (RoomDtos.SeatDto seat : incoming) {
+            if (seat == null) continue;
+            if (sameUser(myUserId, seatUserId(seat))) continue;
+            if (seat.seatIndex == pendingSelfSeatIndex) target = shallowCopySeat(seat);
+            else reconciled.add(seat);
+        }
+        if (target == null) {
+            target = shallowCopySeat(localSelf);
+        } else {
+            String occupant = seatUserId(target);
+            if (occupant != null && !occupant.isEmpty() && !sameUser(myUserId, occupant)) {
+                // Server says another user owns this seat; do not overwrite their occupancy.
+                return incoming;
+            }
+            target.userId = myUserId;
+            target.user = localSelf.user;
+            target.status = "occupied";
+            target.isMuted = userChoseMute || localSelf.isMuted;
+            target.isModeratorMuted = localSelf.isModeratorMuted;
+        }
+        reconciled.add(target);
+        return reconciled;
     }
 
     private static RoomDtos.SeatDto shallowCopySeat(RoomDtos.SeatDto s) {
@@ -12881,6 +19251,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 .show();
     }
 
+    private void uploadRoomBackground(@NonNull android.net.Uri uri) {
+        if (roomId == null || roomId.isEmpty() || viewModel == null) return;
+        if (!canManageRoom) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "جاري رفع خلفية الغرفة…", Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                okhttp3.MultipartBody.Part part = AvatarImageLoader.multipartFromUri(
+                        getContentResolver(), uri, "file");
+                retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> resp =
+                        c.getUploadApi().upload(part).execute();
+                if (!resp.isSuccessful() || resp.body() == null || !resp.body().success
+                        || resp.body().data == null || resp.body().data.url == null
+                        || resp.body().data.url.isEmpty()) {
+                    throw new IllegalStateException("تعذر رفع خلفية الغرفة");
+                }
+                String url = resp.body().data.url;
+                runOnUiThread(() -> {
+                    if (isFinishing() || viewModel == null) return;
+                    viewModel.setBackground(roomId, url);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(this,
+                            e.getMessage() != null ? e.getMessage() : "تعذر رفع خلفية الغرفة",
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
     private void uploadRoomCover(@NonNull android.net.Uri uri) {
         if (roomId == null || roomId.isEmpty() || viewModel == null) return;
         if (!canManageRoom) {
@@ -13001,7 +19406,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showSeatRequestsDialog() {
         if (roomId == null) return;
-        if (!canInviteMic) {
+        if (!canReviewMicRequests()) {
             Toast.makeText(this, R.string.host_mod_only_mic_requests, Toast.LENGTH_SHORT).show();
             return;
         }
@@ -13040,9 +19445,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 TextView tvMeta = holder.itemView.findViewById(R.id.tvRequestMeta);
                 TextView btnApprove = holder.itemView.findViewById(R.id.btnRequestApprove);
                 TextView btnReject = holder.itemView.findViewById(R.id.btnRequestReject);
+                ImageView avatar = holder.itemView.findViewById(R.id.imgRequestAvatar);
                 String name = req.displayName != null && !req.displayName.isEmpty()
                         ? req.displayName : "ضيف";
                 tvName.setText(name);
+                if (avatar != null) {
+                    com.Dramizo.Series.util.AvatarCosmetics.bindAvatar(avatar, req.avatarUrl);
+                }
+                android.graphics.drawable.GradientDrawable approveBg =
+                        new android.graphics.drawable.GradientDrawable();
+                approveBg.setColor(Color.rgb(22, 163, 112));
+                approveBg.setCornerRadius(dp(11));
+                btnApprove.setBackground(approveBg);
+                btnApprove.setTextColor(Color.WHITE);
+                android.graphics.drawable.GradientDrawable rejectBg =
+                        new android.graphics.drawable.GradientDrawable();
+                rejectBg.setColor(Color.rgb(190, 55, 70));
+                rejectBg.setCornerRadius(dp(11));
+                btnReject.setBackground(rejectBg);
+                btnReject.setTextColor(Color.WHITE);
                 tvMeta.setText(req.seatIndex != null
                         ? ("يريد مقعد " + Math.max(1, req.seatIndex))
                         : "طلب انضمام للمايك");
@@ -13104,13 +19525,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         progress.setVisibility(View.VISIBLE);
         empty.setVisibility(View.GONE);
         recycler.setVisibility(View.GONE);
-        viewModel.loadSeatRequests(roomId);
+        // Bind the authoritative response when it arrives; a fixed 650ms delay
+        // could show an empty list while the request is still in flight.
+        androidx.lifecycle.Observer<List<RoomDtos.SeatRequestDto>> requestsObserver =
+                list -> {
+                    if (Boolean.FALSE.equals(viewModel.getSeatRequestsLoading().getValue())) {
+                        bindList.run();
+                    }
+                };
+        androidx.lifecycle.Observer<Boolean> loadingObserver = loading -> {
+            if (Boolean.FALSE.equals(loading)) bindList.run();
+        };
+        viewModel.getSeatRequests().observe(this, requestsObserver);
+        viewModel.getSeatRequestsLoading().observe(this, loadingObserver);
         List<RoomDtos.SeatRequestDto> cached = viewModel.getSeatRequests().getValue();
-        if (cached != null && !cached.isEmpty()) {
-            bindList.run();
-        } else {
-            handler.postDelayed(bindList, 650);
-        }
+        if (cached != null && !cached.isEmpty()) bindList.run();
+        dialog.setOnDismissListener(ignored -> {
+            viewModel.getSeatRequests().removeObserver(requestsObserver);
+            viewModel.getSeatRequestsLoading().removeObserver(loadingObserver);
+        });
+        viewModel.loadSeatRequests(roomId);
 
         btnClose.setOnClickListener(v -> dialog.dismiss());
         boolean canOpenSettings = canModerateRoom();
@@ -13318,20 +19752,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String rewardLabel = reward != null
                             ? ("ربحت: " + reward.amount + " " + reward.type)
                             : "تم فتح الصندوق";
-                    String me = ContainerProvider.from(this).getSessionManager().getDisplayName();
+                    boolean mysteriousEnabled = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                            .getBoolean("enabled", false);
+                    String me = mysteriousEnabled
+                            ? "الرجل الغامض"
+                            : ContainerProvider.from(this).getSessionManager().getDisplayName();
                     if (me == null || me.isEmpty()) me = "أنا";
-                    showLuckyWinOverlay(me, rewardLabel);
                     hideLuckyFloat();
                     JsonObject payload = new JsonObject();
                     payload.addProperty("userId", myUserId != null ? myUserId : "");
                     payload.addProperty("displayName", me);
+                    payload.addProperty("mysteriousMan", mysteriousEnabled);
                     payload.addProperty("rewardLabel", rewardLabel);
+                    if (openResult.data.openId != null) payload.addProperty("openId", openResult.data.openId);
+                    String supportVideoUrl = openResult.data.videoUrl != null
+                            && !openResult.data.videoUrl.trim().isEmpty()
+                            ? openResult.data.videoUrl : target.videoUrl;
+                    if (supportVideoUrl != null && !supportVideoUrl.trim().isEmpty()) {
+                        payload.addProperty("videoUrl", supportVideoUrl.trim());
+                    }
                     if (reward != null) {
                         payload.addProperty("coins", reward.amount);
                         payload.addProperty("rewardType", reward.type != null ? reward.type : "");
                     }
                     if (roomId != null) {
-                        RealtimeClient.getInstance().emitRoomEvent(roomId, "lucky:opened", payload);
+                        boolean emitted = RealtimeClient.getInstance()
+                                .emitRoomEvent(roomId, "lucky:opened", payload);
+                        if (!emitted) {
+                            // Realtime is temporarily unavailable: keep the opener's local
+                            // result visible, but do not pretend it was synchronized to peers.
+                            showLuckyWinOverlay(me, rewardLabel, supportVideoUrl, 0L);
+                        }
+                    } else {
+                        showLuckyWinOverlay(me, rewardLabel, supportVideoUrl, 0L);
                     }
                 } else {
                     String err = openResult.error != null ? openResult.error : "حاول لاحقاً";

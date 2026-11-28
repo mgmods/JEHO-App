@@ -13,7 +13,19 @@ public final class VanityDtos {
 
     public static class MineResult {
         @SerializedName("item") public VanityItem item;
+        @SerializedName("canApplyToAgency") public boolean canApplyToAgency;
         @SerializedName("leaseDays") public int leaseDays;
+    }
+
+    public static class Style {
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("styleMode") public String styleMode;
+        @SerializedName("styleColor1") public String styleColor1;
+        @SerializedName("styleColor2") public String styleColor2;
+        @SerializedName("styleColor3") public String styleColor3;
+        @SerializedName("styleGlow") public boolean styleGlow;
+        @SerializedName("styleVipLevel") public int styleVipLevel;
+        @SerializedName("styleIconUrl") public String styleIconUrl;
     }
 
     public static class VanityItem {
@@ -30,6 +42,13 @@ public final class VanityDtos {
         @SerializedName("active") public boolean active;
     }
 
+    public static class ApplyResult {
+        @SerializedName("success") public boolean success;
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("targetType") public String targetType;
+        @SerializedName("targetId") public String targetId;
+    }
+
     public static class PurchaseResult {
         @SerializedName("publicId") public String publicId;
         @SerializedName("priceCoins") public long priceCoins;
@@ -38,5 +57,6 @@ public final class VanityDtos {
         @SerializedName("leaseDays") public int leaseDays;
         @SerializedName("expiresAt") public String expiresAt;
         @SerializedName("userId") public String userId;
+        @SerializedName("canApplyToAgency") public boolean canApplyToAgency;
     }
 }

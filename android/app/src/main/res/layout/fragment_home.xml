@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@drawable/bg_home_full_gradient">
 
     <ImageView
         android:id="@+id/imgHomeBg"
@@ -11,7 +11,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/home_page_bg" />
+        android:src="@drawable/home_page_bg"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -23,11 +24,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:layoutDirection="locale"
+            android:layoutDirection="rtl"
             android:orientation="horizontal"
             android:paddingHorizontal="14dp"
-            android:paddingTop="12dp"
-            android:paddingBottom="8dp">
+            android:paddingTop="4dp"
+            android:paddingBottom="6dp">
 
             <HorizontalScrollView
                 android:layout_width="0dp"
@@ -42,37 +43,11 @@
                     android:orientation="horizontal"
                     android:paddingEnd="8dp">
 
-                    <LinearLayout
-                        android:id="@+id/tabMeWrap"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvTabMe"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:alpha="0.45"
-                            android:text="@string/tab_me_home"
-                            android:textColor="@color/text_primary"
-                            android:textSize="17sp"
-                            android:textStyle="bold" />
-
-                        <View
-                            android:id="@+id/dotMe"
-                            android:layout_width="6dp"
-                            android:layout_height="6dp"
-                            android:layout_marginTop="4dp"
-                            android:background="@drawable/bg_tab_dot_active"
-                            android:visibility="invisible" />
-                    </LinearLayout>
-
-                    <LinearLayout
+<LinearLayout
                         android:id="@+id/tabHotWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -82,22 +57,23 @@
                             android:layout_height="wrap_content"
                             android:text="@string/tab_hot"
                             android:textColor="@color/text_primary"
-                            android:textSize="17sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <View
                             android:id="@+id/dotHot"
-                            android:layout_width="6dp"
-                            android:layout_height="6dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_width="24dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
                             android:background="@drawable/bg_tab_dot_active" />
                     </LinearLayout>
 
-                    <LinearLayout
+<LinearLayout
                         android:id="@+id/tabLocationWrap"
+                        android:visibility="gone"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -113,9 +89,9 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:alpha="0.45"
-                                android:text="@string/tab_location"
+                                android:text="أخرى"
                                 android:textColor="@color/text_primary"
-                                android:textSize="17sp"
+                                android:textSize="13sp"
                                 android:textStyle="bold" />
 
                             <ImageView
@@ -131,18 +107,45 @@
 
                         <View
                             android:id="@+id/dotLocation"
-                            android:layout_width="6dp"
-                            android:layout_height="6dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_width="30dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
                             android:background="@drawable/bg_tab_dot_active"
                             android:visibility="invisible" />
                     </LinearLayout>
 
-                    <LinearLayout
+<LinearLayout
+                        android:id="@+id/tabMeWrap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvTabMe"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:alpha="0.45"
+                            android:text="@string/tab_me_home"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:id="@+id/dotMe"
+                            android:layout_width="24dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
+                            android:background="@drawable/bg_tab_dot_active"
+                            android:visibility="invisible" />
+                    </LinearLayout>
+
+<LinearLayout
                         android:id="@+id/tabActivitiesWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -153,54 +156,87 @@
                             android:alpha="0.45"
                             android:text="@string/tab_activities"
                             android:textColor="@color/text_primary"
-                            android:textSize="17sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <View
                             android:id="@+id/dotActivities"
-                            android:layout_width="6dp"
-                            android:layout_height="6dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_width="24dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
                             android:background="@drawable/bg_tab_dot_active"
                             android:visibility="invisible" />
                     </LinearLayout>
-                </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/tabMomentsWrap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="22dp"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/tvTabMoments"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:alpha="0.45"
+                            android:text="اللحظات"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                        <View
+                            android:id="@+id/dotMoments"
+                            android:layout_width="24dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
+                            android:background="@drawable/bg_tab_dot_active"
+                            android:visibility="invisible" />
+                    </LinearLayout>
+
+                    </LinearLayout>
             </HorizontalScrollView>
 
             <FrameLayout
-                android:id="@+id/btnFilter"
                 android:layout_width="36dp"
                 android:layout_height="36dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:id="@+id/imgFilterIcon"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/country"
-                    android:scaleType="fitCenter" />
-            </FrameLayout>
-
-            <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@android:color/transparent"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
                     android:id="@+id/btnSearch"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
+                    android:layout_width="21dp"
+                    android:layout_height="21dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/search"
                     android:scaleType="fitCenter" />
             </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btnMyRoomShortcut"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="2dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/my_room">
+
+                <ImageView
+                    android:id="@+id/imgMyRoomShortcutIcon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/my_room"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+
+
+
+
+
         </LinearLayout>
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -232,14 +268,14 @@
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="15dp"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="8dp">
+                    android:layout_marginHorizontal="10dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="0dp">
 
                     <androidx.viewpager2.widget.ViewPager2
                         android:id="@+id/pagerBanners"
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
+                        android:layout_height="112dp"
                         android:clipChildren="false"
                         android:clipToPadding="false"
                         android:overScrollMode="never" />
@@ -267,7 +303,66 @@
                     layout="@layout/include_home_act_banners"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" />
+                    android:layout_marginTop="10dp" />
+
+                <!-- Worldwide popular rooms + quick country filters -->
+                <HorizontalScrollView
+                    android:id="@+id/hotCountryBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layoutDirection="rtl"
+                    android:fillViewport="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="4dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/hotAllButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/bg_home_filter_pill"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:minWidth="82dp"
+                            android:paddingHorizontal="10dp"
+                            android:text="@string/home_hot_all"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:id="@+id/hotCountryChips"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal" />
+
+                        <TextView
+                            android:id="@+id/hotCountryDropdown"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="5dp"
+                            android:background="@drawable/bg_home_filter_pill"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:text="⌄"
+                            android:textColor="@color/text_primary"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </HorizontalScrollView>
 
                 <!-- Mikoo Hot = one RV only (no separate top-4 explore grid). -->
                 <include
@@ -424,7 +519,7 @@
                     android:id="@+id/feedHost"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
                     <com.Dramizo.Series.presentation.common.NestedScrollableHost

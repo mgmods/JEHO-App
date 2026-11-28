@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -38,6 +39,23 @@
         android:usesCleartextTraffic="true">
 
         <activity
+            android:name=".presentation.home.MomentsActivity"
+            android:exported="false"
+            android:label="اللحظات" />
+
+        <activity
+            android:name=".presentation.stories.StoryPreviewActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AuraLive" />
+
+        <activity
+            android:name=".presentation.splash.UpdateActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AuraLive" />
+
+        <activity
             android:name=".presentation.splash.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.AuraLive.Splash"
@@ -58,24 +76,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hamslive" android:host="invite" />
                 <data android:scheme="jehochat" android:host="invite" />
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="api.adnova.bbs.tr"
-                    android:pathPrefix="/open/room" />
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="api.adnova.bbs.tr"
-                    android:pathPrefix="/open/invite" />
             </intent-filter>
         </activity>
 
@@ -120,21 +120,37 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AuraLive.Fullscreen" />
-        <activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
+        <activity android:name=".presentation.admin.AdminConsoleActivity" android:exported="false" />
+        <activity android:name=".presentation.admin.preview.AdminPreviewActivity" android:exported="false" />
+        <activity android:name=".presentation.notifications.AdminMessagesActivity" android:exported="false" />
+        <activity android:name=".presentation.profile.ProfileInsightsActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.MedalActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.BadgeActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.SecureProfileImageActivity" android:exported="false" android:screenOrientation="portrait" />
+                <activity android:name=".presentation.profile.ProfileDetailsActivity" android:exported="false" android:screenOrientation="portrait" />
+<activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
+        <!-- Required by uCrop: without this explicit activity registration Android throws
+             "Unable to find explicit activity class" when changing avatar or cover. -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
         <activity android:name=".presentation.profile.EditProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.ranking.WealthRankingHtmlActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.ranking.RankingActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.invite.InvitationActivity" android:exported="false" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.cp.CpDiscoveryActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.cp.CpCenterActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestsActivity" android:exported="false" 
-            android:screenOrientation="portrait" />
-        <activity android:name=".presentation.profile.MedalActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestDetailActivity" android:exported="false" 
             android:screenOrientation="portrait" />
@@ -227,6 +243,7 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.SocialListActivity" android:exported="false" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.SupportersActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.GiftHistoryActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.MyEventsActivity" android:exported="false"
@@ -234,6 +251,8 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.search.SearchActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
+            android:screenOrientation="portrait" />
+        <activity android:name=".presentation.settings.RoomTrackingPrivacyActivity" android:exported="false"
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.settings.PrivacyActivity" android:exported="false" 
             android:screenOrientation="portrait" />
@@ -285,6 +304,10 @@
 
         <receiver
             android:name=".util.NotificationDismissReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".util.NotificationQuickReplyReceiver"
             android:exported="false" />
 
         <meta-data

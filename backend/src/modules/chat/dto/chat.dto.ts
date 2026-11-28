@@ -32,11 +32,17 @@ export class SendMessageDto {
   @IsObject()
   media?: {
     url: string;
+    thumbnailUrl?: string;
     mimeType: string;
     size: number;
     width?: number;
     height?: number;
     duration?: number;
+    storyId?: string;
+    storyMediaType?: string;
+    storyMediaUrl?: string;
+    storyCaption?: string;
+    storyOwnerName?: string;
   };
 
   @ApiPropertyOptional()

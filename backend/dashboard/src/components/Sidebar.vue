@@ -83,10 +83,20 @@ const sections = computed(() => [
     ],
   },
   {
+    id: 'staff-identity',
+    label: 'إدارة الرتب الإدارية',
+    items: [
+      { name: 'staff-identity', icon: 'bi-person-badge-fill', label: 'هوية الرتب الإدارية', module: 'settings' },
+    ],
+  },
+  {
     id: 'community',
     label: t('nav.community'),
     items: [
       { name: 'users', icon: 'bi-people', label: t('nav.users'), also: ['user-detail'] },
+      { name: 'medals', icon: 'bi-award-fill', label: 'المداليات' },
+      { name: 'conversations', icon: 'bi-chat-left-text', label: t('nav.conversations') },
+      { name: 'paid-messages', icon: 'bi-chat-square-text', label: 'الرسائل المدفوعة' },
       { name: 'agencies', icon: 'bi-building', label: t('nav.agencies') },
       ...(femaleVerifyEnabled.value
         ? [{ name: 'gender-verifications', icon: 'bi-person-check', label: t('nav.genderVerifications') }]
@@ -98,6 +108,8 @@ const sections = computed(() => [
     label: t('nav.liveRooms'),
     items: [
       { name: 'rooms', icon: 'bi-mic', label: t('nav.rooms') },
+      { name: 'support-chest', icon: 'bi-box2-heart', label: 'صندوق الدعم' },
+      { name: 'advertisements', icon: 'bi-megaphone-fill', label: 'إعلانات الغرفة', module: 'rooms' },
       {
         name: 'settings',
         query: { tab: 'zego' },
@@ -112,6 +124,8 @@ const sections = computed(() => [
     label: t('nav.money'),
     items: [
       { name: 'gifts', icon: 'bi-gift', label: t('nav.gifts') },
+      { name: 'lucky-gift-odds', icon: 'bi-percent', label: 'احتمالات هدايا الحظ' },
+      { name: 'toast-manager', icon: 'bi-stars', label: 'إدارة توستات الهدايا', module: 'settings' },
       { name: 'coins', icon: 'bi-coin', label: t('nav.coins') },
       { name: 'wallet', icon: 'bi-wallet2', label: t('nav.wallet') },
       { name: 'withdrawals', icon: 'bi-cash-stack', label: t('nav.withdrawals') },
@@ -126,12 +140,19 @@ const sections = computed(() => [
     ],
   },
   {
+    id: 'store',
+    label: 'إدارة المتجر',
+    items: [
+      { name: 'cosmetics', icon: 'bi-shop-window', label: 'إعدادات المتجر: الإطارات والدخوليات' },
+    ],
+  },
+  {
     id: 'memberships',
     label: t('nav.memberships'),
     items: [
-      { name: 'vip', icon: 'bi-diamond', label: t('nav.vip') },
-      { name: 'vanity-ids', icon: 'bi-hash', label: t('nav.vanityIds') },
-      { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
+      { name: 'vip', query: {}, icon: 'bi-diamond', label: 'VIP ومظاهره' },
+      { name: 'mysterious-man', icon: 'bi-incognito', label: 'الرجل الغامض', module: 'settings' },
+      { name: 'vanity-ids', icon: 'bi-hash', label: 'الأيدي المميزة والمتحركة' },
       { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
       { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
     ],
@@ -141,9 +162,11 @@ const sections = computed(() => [
     label: t('nav.engagement'),
     items: [
       { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
+      { name: 'daily-login-rewards', icon: 'bi-calendar2-check', label: 'مكافآت تسجيل الدخول اليومية', module: 'tasks' },
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
-      { name: 'contests', icon: 'bi-trophy', label: t('nav.contests') },
+      { name: 'contests', icon: 'bi-lightning-charge-fill', label: 'تحديات PK بين الرومات' },
+      { name: 'moments', icon: 'bi-images', label: 'إدارة اللحظات' },
       { name: 'ranking', icon: 'bi-bar-chart', label: t('nav.ranking') },
       { name: 'room-cup', icon: 'bi-trophy-fill', label: t('nav.roomCup') },
     ],
@@ -152,11 +175,13 @@ const sections = computed(() => [
     id: 'media',
     label: t('nav.mediaGames'),
     items: [
-      { name: 'games', icon: 'bi-controller', label: t('nav.games') },
+      { name: 'games', icon: 'bi-controller', label: t('nav.games'), module: 'games' },
       { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
-      { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
+      { name: 'stories', icon: 'bi-camera-reels', label: t('nav.stories'), module: 'drama' },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
+      { name: 'splash', icon: 'bi-megaphone', label: 'السبلاش — تغيير الصورة', module: 'banners' },
       { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
+      { name: 'profile-action-icons', icon: 'bi-person-square', label: 'أيقونات قسم أنا' },
       { name: 'seat-stickers', icon: 'bi-emoji-smile', label: t('nav.seatStickers') },
     ],
   },
@@ -166,6 +191,7 @@ const sections = computed(() => [
     items: [
       { name: 'reports', icon: 'bi-flag', label: t('nav.reports') },
       { name: 'notifications', icon: 'bi-bell', label: t('nav.notifications') },
+{ name: 'cp-settings', icon: 'bi-heart', label: t('nav.cpSettings') },
       { name: 'settings', icon: 'bi-gear', label: t('nav.settings'), settingsRoot: true },
       ...(auth.isSuperAdmin
         ? [{
@@ -182,9 +208,11 @@ const sections = computed(() => [
 ])
 
 function itemAllowed(item) {
+  if (item.superOnly) return auth.isSuperAdmin
   if (auth.isSuperAdmin) return true
   const mod = item.module || ROUTE_MODULE[item.name]
-  if (!mod) return true
+  // Fail closed: an unmapped route must never become visible by default.
+  if (!mod) return false
   return auth.can(mod, 'read')
 }
 

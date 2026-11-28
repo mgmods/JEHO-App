@@ -2,6 +2,7 @@ package com.Dramizo.Series.data.remote.dto;
 
 import com.google.gson.annotations.SerializedName;
 import java.util.List;
+import java.util.Map;
 
 public final class ContestDtos {
     private ContestDtos() {}
@@ -22,10 +23,48 @@ public final class ContestDtos {
         @SerializedName("scope") public String scope;
         @SerializedName("roomId") public String roomId;
         @SerializedName("agencyId") public String agencyId;
+        @SerializedName("kind") public String kind;
+        @SerializedName("bannerUrl") public String bannerUrl;
+        @SerializedName("goalDiamonds") public long goalDiamonds;
+        @SerializedName("scoringMode") public String scoringMode;
+        @SerializedName("challengeType") public String challengeType;
+        @SerializedName("isInteractive") public boolean isInteractive;
+        @SerializedName("durationSeconds") public long durationSeconds;
+        @SerializedName("remainingSeconds") public long remainingSeconds;
+        @SerializedName("startedAt") public String startedAt;
+        @SerializedName("sideA") public SideDto sideA;
+        @SerializedName("sideB") public SideDto sideB;
+        @SerializedName("rules") public Map<String, Object> rules;
+        @SerializedName("milestones") public List<MilestoneDto> milestones;
+        @SerializedName("prizes") public List<PrizeDto> prizes;
+    }
+
+    public static class SideDto {
+        @SerializedName("name") public String name;
+        @SerializedName("logoUrl") public String logoUrl;
+        @SerializedName("score") public long score;
+        @SerializedName("roomIds") public List<String> roomIds;
+        @SerializedName("agencyIds") public List<String> agencyIds;
+        @SerializedName("participantIds") public List<String> participantIds;
+    }
+
+    public static class MilestoneDto {
+        @SerializedName("goal") public long goal;
+        @SerializedName("title") public String title;
+        @SerializedName("prize") public String prize;
+    }
+
+    public static class PrizeDto {
+        @SerializedName("rank") public int rank;
+        @SerializedName("coins") public long coins;
+        @SerializedName("diamonds") public long diamonds;
+        @SerializedName("label") public String label;
+        @SerializedName("minimumScore") public long minimumScore;
     }
 
     public static class ContestList {
         @SerializedName("items") public List<ContestDto> items;
+        @SerializedName("roomPkEnabled") public Boolean roomPkEnabled;
     }
 
     public static class LeaderRow {
@@ -35,6 +74,7 @@ public final class ContestDtos {
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
+        @SerializedName("side") public String side;
     }
 
     public static class ContestDetail {

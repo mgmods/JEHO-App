@@ -60,13 +60,14 @@
     "ops": "التشغيل",
     "dashboard": "لوحة التحكم",
     "users": "المستخدمون",
+    "conversations": "جميع المحادثات",
     "rooms": "الغرف",
     "streams": "البث المباشر",
     "agencies": "الوكالات",
     "gifts": "الهدايا",
     "banners": "البنرات",
     "navIcons": "أيقونات التبويبات",
-    "seatStickers": "ملصقات المقاعد",
+    "seatStickers": "ملصقات",
     "coins": "باقات العملات",
     "offers": "عروض المتجر",
     "promos": "العروض والترقيات",
@@ -81,7 +82,6 @@
     "contests": "المسابقات",
     "games": "الألعاب",
     "gameAds": "إعلانات الألعاب",
-    "drama": "الدراما",
     "luckyBoxes": "صناديق الحظ",
     "tasks": "المهام",
     "ranking": "الترتيب",
@@ -92,12 +92,15 @@
     "notifications": "الإشعارات",
     "settings": "الإعدادات العامة",
     "logs": "السجلات",
-    "policyBrochure": "سياسة المنصة PDF"
+    "policyBrochure": "سياسة المنصة PDF",
+    "cpSettings": "إعدادات علاقات CP",
+    "stories": "الستوريات"
   },
   "routes": {
     "login": "تسجيل الدخول",
     "dashboard": "لوحة التحكم",
     "users": "المستخدمون",
+    "conversations": "جميع المحادثات",
     "userDetail": "تفاصيل المستخدم",
     "rooms": "الغرف",
     "streams": "البث المباشر",
@@ -118,7 +121,6 @@
     "contests": "المسابقات",
     "games": "الألعاب",
     "gameAds": "إعلانات الألعاب",
-    "drama": "الدراما",
     "luckyBoxes": "صناديق الحظ",
     "tasks": "المهام",
     "ranking": "الترتيب",
@@ -129,9 +131,11 @@
     "reports": "البلاغات",
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
+    "cpSettings": "إعدادات علاقات CP",
     "settings": "الإعدادات",
     "logs": "السجلات",
-    "policyBrochure": "سياسة المنصة PDF"
+    "policyBrochure": "سياسة المنصة PDF",
+    "stories": "إدارة الستوريات"
   },
   "login": {
     "title": "JEHO CHAT Admin",
@@ -651,8 +655,8 @@
   },
   "voiceRtc": {
     "title": "محرّك الصوت (تبديل ZEGO ↔ LiveKit)",
-    "hint": "LiveKit مفتوح المصدر ومجاني كخدمة على سيرفرك. زيجو يبقى الخيار المدفوع. التبديل هنا يطبّق على كل الغرف فوراً بعد تحديث التطبيق. استخدم «إظهار المفاتيح» لنسخ URL / API Key / Secret لتطبيقات أخرى.",
-    "free": "مجاني",
+    "hint": "LiveKit برنامج صوت مفتوح المصدر ويمكن تشغيله على خادمك؛ تكلفة الخادم والاستضافة تعتمد على اختيارك واستخدامك. ZEGO خدمة سحابية مدفوعة. التبديل هنا يطبّق على الغرف بعد تحديث التطبيق. استخدم «إظهار المفاتيح» لعرض بيانات الاتصال.",
+    "free": "مفتوح المصدر",
     "saveKeys": "حفظ مفاتيح LiveKit",
     "showKeys": "إظهار المفاتيح",
     "hideKeys": "إخفاء المفاتيح",
@@ -660,7 +664,7 @@
     "active": "النشط الآن",
     "ready": "جاهز",
     "notReady": "غير مكتمل الإعداد",
-    "switchedLiveKit": "تم التبديل إلى LiveKit (مجاني)",
+    "switchedLiveKit": "تم التبديل إلى LiveKit",
     "switchedZego": "تم التبديل إلى ZEGO"
   },
   "commonStatus": {
@@ -765,7 +769,6 @@
     "imageUrl": "رابط الصورة",
     "link": "الرابط",
     "noData": "لا توجد بيانات بعد",
-    "saved": "تم الحفظ بنجاح",
     "deleted": "تم الحذف بنجاح",
     "failedLoad": "فشل التحميل",
     "untitled": "بدون عنوان",
@@ -1186,10 +1189,10 @@
     "badFormat": "الصيغة المسموحة: PNG أو JPG أو SVG",
     "tabs": {
       "party": "حفلة / رئيسية",
-      "drama": "دراما",
       "games": "ألعاب",
       "chat": "دردشة",
-      "me": "أنا"
+      "me": "أنا",
+      "stories": "الستوريات"
     }
   },
   "seatStickers": {

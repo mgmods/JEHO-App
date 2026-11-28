@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User } from '../../database/entities/user.entity';
 import {
@@ -18,6 +20,7 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { VipService } from '../vip/vip.service';
+import { BadgesService } from '../badges/badges.service';
 import {
   HOST_NEW_USER_CHAT,
   HOST_ROOM_INVITE_REWARD,
@@ -46,6 +49,8 @@ export type DailyTask = {
   /** Optional temporary VIP level. */
   rewardVipLevel?: number;
   rewardVipDays?: number;
+  /** Explicit completion count; falls back to the numeric suffix for legacy tasks. */
+  target?: number;
   type: string;
   /** Who sees/claims this task. host = female users only. */
   audience?: TaskAudience;
@@ -371,6 +376,7 @@ export class TasksService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(AgencyMember) private readonly members: Repository<AgencyMember>,
     private readonly dataSource: DataSource,
+    private readonly badges: BadgesService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly cosmetics?: CosmeticsService,
     @Optional() private readonly vip?: VipService,
@@ -410,6 +416,295 @@ export class TasksService {
     await this.settings.save(row);
     this.enabledCache = { value: enabled, at: Date.now() };
     return enabled;
+  }
+
+  private static readonly DAILY_LOGIN_KEY = 'daily_login_rewards.v1';
+  private dailyLoginStateKey(userId: string) { return `daily_login_state:${userId}`; }
+  private defaultDailyLoginConfig() {
+    return {
+      enabled: true,
+      theme: {
+        backgroundColor: '#f5f0e8',
+        backgroundImageUrl: '',
+        overlayColor: '#ffffff',
+        overlayOpacity: 0.12,
+        logoUrl: '',
+        title: 'مكافآت تسجيل الدخول لمدة 7 أيام',
+        subtitle: 'سجّل دخولك يومياً واحصل على مكافأتك',
+        titleColor: '#3d3158',
+        subtitleColor: '#766b80',
+        cardsPerRow: 4,
+        buttonText: 'استلام المكافأة',
+        buttonColor: '#7652a5',
+        buttonTextColor: '#ffffff',
+        titleSize: 28,
+        titleTop: 24,
+        headerGap: 14,
+        cardColor: '#fffef4',
+        cardBorderColor: '#e8efcf',
+        cardRadius: 20,
+        cardGap: 12,
+        cardImageSize: 76,
+        cardLabelSize: 16,
+        buttonRadius: 64,
+        buttonHeight: 64,
+        buttonBottom: 20,
+        contentTop: 18,
+        contentGap: 16,
+        fontFamily: 'default',
+        cardBackgroundColor: '#fffef4',
+      },
+      days: [
+        { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
+        { day: 2, type: 'coins', amount: 150, label: 'مكافأة يومية' },
+        { day: 3, type: 'coins', amount: 200, label: 'مكافأة يومية' },
+        { day: 4, type: 'coins', amount: 200, label: 'عملات ذهبية' },
+        { day: 5, type: 'coins', amount: 250, label: 'مكافأة يومية' },
+        { day: 6, type: 'coins', amount: 300, label: 'عملات ذهبية' },
+        { day: 7, type: 'coins', amount: 500, label: 'الجائزة الكبرى' },
+      ],
+    };
+  }
+
+  async getDailyLoginConfig() {
+    const row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
+    const fallback = this.defaultDailyLoginConfig();
+    if (!row?.value) return fallback;
+    try {
+      const parsed = JSON.parse(row.value);
+      const days = Array.isArray(parsed?.days) ? parsed.days : fallback.days;
+      return {
+        enabled: parsed?.enabled !== false,
+        theme: { ...fallback.theme, ...(parsed?.theme && typeof parsed.theme === 'object' ? parsed.theme : {}) },
+        days: Array.from({ length: 7 }, (_, i) => {
+          const candidate = days.find((d: any) => Number(d?.day) === i + 1) || fallback.days[i];
+          return { ...fallback.days[i], ...candidate, day: i + 1 };
+        }),
+      };
+    } catch { return fallback; }
+  }
+
+  async saveDailyLoginConfig(input: any) {
+    if (!input || !Array.isArray(input.days) || input.days.length !== 7) {
+      throw new BadRequestException('يجب إعداد مكافآت الأيام السبعة كاملة');
+    }
+    const allowed = new Set(['coins', 'cosmetic']);
+    const days = input.days.map((raw: any, i: number) => {
+      const type = String(raw?.type || 'coins');
+      if (!allowed.has(type)) throw new BadRequestException(`نوع مكافأة اليوم ${i + 1} غير صالح`);
+      const amount = Math.max(0, Math.min(1_000_000_000, Math.floor(Number(raw?.amount) || 0)));
+      const durationDays = Math.max(1, Math.min(365, Math.floor(Number(raw?.durationDays) || 7)));
+      const cosmeticCode = String(raw?.cosmeticCode || '').trim().slice(0, 64);
+      if (type === 'coins' && amount < 1) throw new BadRequestException(`حدد كمية العملات لليوم ${i + 1}`);
+      if (type === 'cosmetic' && !cosmeticCode) throw new BadRequestException(`اختر عنصرًا من كتالوج المتجر لليوم ${i + 1}`);
+      return { day: i + 1, type, amount, cosmeticCode, durationDays, label: String(raw?.label || '').trim().slice(0, 100) };
+    });
+    for (const day of days.filter((d: any) => d.type === 'cosmetic')) {
+      const cosmetic = await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode, isActive: true } });
+      if (!cosmetic) throw new BadRequestException(`العنصر المحدد لليوم ${day.day} غير موجود أو غير نشط`);
+    }
+    const defaults = this.defaultDailyLoginConfig().theme;
+    const rawTheme = input.theme && typeof input.theme === 'object' ? input.theme : {};
+    const safeColor = (value: unknown, fallback: string) => /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
+    const safeOpacity = Number(rawTheme.overlayOpacity);
+    const numeric = (value: unknown, fallback: number, min: number, max: number) => {
+      const parsed = Number(value);
+      const selected = value === null || value === undefined || value === '' || !Number.isFinite(parsed)
+        ? fallback
+        : parsed;
+      return Math.max(min, Math.min(max, selected));
+    };
+    const theme = {
+      backgroundColor: safeColor(rawTheme.backgroundColor, defaults.backgroundColor),
+      backgroundImageUrl: String(rawTheme.backgroundImageUrl ?? '').slice(0, 2048),
+      overlayColor: safeColor(rawTheme.overlayColor, defaults.overlayColor),
+      overlayOpacity: numeric(rawTheme.overlayOpacity, defaults.overlayOpacity, 0, 1),
+      logoUrl: String(rawTheme.logoUrl ?? '').slice(0, 2048),
+      title: String(rawTheme.title ?? defaults.title).slice(0, 80),
+      subtitle: String(rawTheme.subtitle ?? defaults.subtitle).slice(0, 120),
+      titleColor: safeColor(rawTheme.titleColor, defaults.titleColor),
+      subtitleColor: safeColor(rawTheme.subtitleColor, defaults.subtitleColor),
+      cardsPerRow: 4,
+      buttonText: String(rawTheme.buttonText ?? defaults.buttonText).slice(0, 40),
+      buttonColor: safeColor(rawTheme.buttonColor, defaults.buttonColor),
+      buttonTextColor: safeColor(rawTheme.buttonTextColor, defaults.buttonTextColor),
+      // Persist every supported visual-editor field so dashboard edits survive reloads.
+      titleSize: numeric(rawTheme.titleSize, defaults.titleSize, 12, 64),
+      titleTop: numeric(rawTheme.titleTop, defaults.titleTop, 0, 300),
+      headerGap: numeric(rawTheme.headerGap, defaults.headerGap, 0, 100),
+      cardColor: safeColor(rawTheme.cardColor, defaults.cardColor),
+      cardBorderColor: safeColor(rawTheme.cardBorderColor, defaults.cardBorderColor),
+      cardRadius: numeric(rawTheme.cardRadius, defaults.cardRadius, 0, 48),
+      cardGap: numeric(rawTheme.cardGap, defaults.cardGap, 0, 60),
+      cardImageSize: numeric(rawTheme.cardImageSize, defaults.cardImageSize, 24, 180),
+      cardLabelSize: numeric(rawTheme.cardLabelSize, defaults.cardLabelSize, 10, 32),
+      buttonRadius: numeric(rawTheme.buttonRadius, defaults.buttonRadius, 0, 100),
+      buttonHeight: numeric(rawTheme.buttonHeight, defaults.buttonHeight, 32, 120),
+      buttonBottom: numeric(rawTheme.buttonBottom, defaults.buttonBottom, 0, 300),
+      contentTop: numeric(rawTheme.contentTop, defaults.contentTop, 0, 300),
+      contentGap: numeric(rawTheme.contentGap, defaults.contentGap, 0, 100),
+      fontFamily: String(rawTheme.fontFamily ?? defaults.fontFamily).slice(0, 40),
+      cardBackgroundColor: safeColor(rawTheme.cardBackgroundColor, defaults.cardBackgroundColor),
+    };
+    const value = JSON.stringify({ enabled: input.enabled !== false, theme, days });
+    let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
+    if (!row) row = this.settings.create({ key: TasksService.DAILY_LOGIN_KEY, value, description: 'Seven-day daily login rewards configuration' });
+    else row.value = value;
+    await this.settings.save(row);
+    return JSON.parse(value);
+  }
+
+  private async readDailyLoginState(userId: string) {
+    const row = await this.settings.findOne({ where: { key: this.dailyLoginStateKey(userId) } });
+    if (!row?.value) return { lastClaimDate: '', streak: 0 };
+    try {
+      const state = JSON.parse(row.value);
+      return { lastClaimDate: String(state.lastClaimDate || ''), streak: Math.max(0, Number(state.streak) || 0) };
+    } catch { return { lastClaimDate: '', streak: 0 }; }
+  }
+
+  async dailyLoginStatus(userId: string) {
+    const config = await this.getDailyLoginConfig();
+    const state = await this.readDailyLoginState(userId);
+    const today = this.dayKey();
+    const yesterdayDate = new Date(Date.now() - 86400000);
+    const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
+    const alreadyClaimed = state.lastClaimDate === today;
+    const streakIsCurrent = alreadyClaimed || state.lastClaimDate === yesterday;
+    // Once day 7 was claimed, the next calendar day starts a fresh seven-day cycle.
+    // Do not leave all seven cards marked as claimed while presenting day 1 again.
+    const completedCycleYesterday = !alreadyClaimed && state.lastClaimDate === yesterday && state.streak >= 7;
+    const activeStreak = streakIsCurrent && !completedCycleYesterday ? state.streak : 0;
+    const nextDay = alreadyClaimed
+      ? Math.min(7, Math.max(1, activeStreak))
+      : state.lastClaimDate === yesterday
+        ? (state.streak >= 7 ? 1 : activeStreak + 1)
+        : 1;
+    const day = config.days.find((d: any) => d.day === nextDay) || config.days[0];
+    const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
+      ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
+      : null;
+    const cosmeticArtwork = (item: Cosmetic | null) => {
+      const meta = item?.meta && typeof item.meta === 'object'
+        ? item.meta as Record<string, unknown>
+        : {};
+      const pick = (...values: unknown[]) => {
+        for (const value of values) {
+          const candidate = String(value ?? '').trim();
+          if (candidate) return candidate;
+        }
+        return null;
+      };
+      return {
+        previewUrl: pick(meta.previewUrl, meta.iconUrl, meta.imageUrl, item?.previewUrl),
+        animationUrl: pick(meta.animationUrl, meta.svgaUrl, meta.gifUrl, item?.animationUrl),
+        imageUrl: pick(meta.imageUrl, meta.iconUrl, meta.previewUrl, item?.previewUrl),
+        iconUrl: pick(meta.iconUrl, meta.previewUrl, item?.previewUrl),
+      };
+    };
+    const dayCards = await Promise.all(config.days.map(async (d: any) => {
+      const item = d.type === 'cosmetic' && d.cosmeticCode
+        ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: d.cosmeticCode } })
+        : null;
+      const artwork = cosmeticArtwork(item);
+      return {
+        ...d,
+        name: item?.name || d.label,
+        previewUrl: artwork.previewUrl,
+        animationUrl: artwork.animationUrl,
+        imageUrl: artwork.imageUrl,
+        iconUrl: artwork.iconUrl,
+        cosmeticType: item?.type || null,
+        claimed: activeStreak > 0 && d.day <= activeStreak,
+      };
+    }));
+    return {
+      enabled: config.enabled,
+      theme: config.theme,
+      shouldShow: config.enabled && !alreadyClaimed,
+      alreadyClaimed,
+      streak: activeStreak,
+      currentDay: nextDay,
+      today,
+      reward: day ? {
+        ...day,
+        ...cosmeticArtwork(cosmetic),
+        cosmeticType: cosmetic?.type || null,
+        name: cosmetic?.name || day.label,
+      } : null,
+      days: dayCards,
+    };
+  }
+
+  async claimDailyLogin(userId: string) {
+    const config = await this.getDailyLoginConfig();
+    if (!config.enabled) throw new BadRequestException('مكافآت تسجيل الدخول متوقفة حاليًا');
+    const today = this.dayKey();
+    const stateKey = this.dailyLoginStateKey(userId);
+    const yesterdayDate = new Date(Date.now() - 86400000);
+    const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
+    const result = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`daily-login:${userId}:${today}`]);
+      let stateRow = await manager.findOne(AppSetting, { where: { key: stateKey }, lock: { mode: 'pessimistic_write' } });
+      let state = { lastClaimDate: '', streak: 0 };
+      try { if (stateRow?.value) state = { ...state, ...JSON.parse(stateRow.value) }; } catch {}
+      if (state.lastClaimDate === today) throw new BadRequestException('تم استلام مكافأة اليوم مسبقًا');
+      const dayNo = state.lastClaimDate === yesterday ? (Number(state.streak) >= 7 ? 1 : Number(state.streak) + 1) : 1;
+      const reward: any = config.days.find((d: any) => d.day === dayNo);
+      if (!reward) throw new BadRequestException('مكافأة اليوم غير متاحة');
+      let rewardResult: any = { type: reward.type, amount: 0 };
+      if (reward.type === 'coins') {
+        const amount = Math.max(0, Math.floor(Number(reward.amount) || 0));
+        if (amount < 1) throw new BadRequestException('كمية المكافأة غير صالحة');
+        let wallet = await manager.findOne(Wallet, { where: { userId }, lock: { mode: 'pessimistic_write' } });
+        if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId, coins: 0, diamonds: 0, gamePoints: 0 }));
+        wallet.coins = Number(wallet.coins || 0) + amount;
+        await manager.save(wallet);
+        await manager.save(manager.create(WalletTransaction, {
+          userId, type: TransactionType.LUCKY_REWARD, currency: CurrencyType.COINS, amount,
+          balanceAfter: Number(wallet.coins), referenceType: 'daily_login_reward', referenceId: `${today}:${dayNo}`,
+          description: `مكافأة تسجيل الدخول اليومي - اليوم ${dayNo}`, metadata: { day: dayNo, date: today },
+        }));
+        rewardResult = { type: 'coins', amount, balance: Number(wallet.coins) };
+      } else {
+        const cosmetic = await manager.findOne(Cosmetic, { where: { code: reward.cosmeticCode, isActive: true } });
+        if (!cosmetic) throw new BadRequestException('العنصر المحدد للمكافأة لم يعد متاحًا');
+        const now = new Date();
+        let owned = await manager.findOne(UserCosmetic, { where: { userId, cosmeticId: cosmetic.id }, lock: { mode: 'pessimistic_write' } });
+        const expiry = new Date(now.getTime() + Math.max(1, Number(reward.durationDays) || 7) * 86400000);
+        if (!owned) owned = manager.create(UserCosmetic, { userId, cosmeticId: cosmetic.id, equipped: false, expiresAt: expiry });
+        else if (owned.expiresAt !== null) owned.expiresAt = new Date(Math.max(now.getTime(), new Date(owned.expiresAt || 0).getTime()) + Math.max(1, Number(reward.durationDays) || 7) * 86400000);
+        await manager.save(owned);
+        const cosmeticMeta = cosmetic.meta && typeof cosmetic.meta === 'object'
+          ? cosmetic.meta as Record<string, unknown>
+          : {};
+        const artwork = (...values: unknown[]) => {
+          for (const value of values) {
+            const candidate = String(value ?? '').trim();
+            if (candidate) return candidate;
+          }
+          return null;
+        };
+        rewardResult = {
+          type: 'cosmetic',
+          code: cosmetic.code,
+          name: cosmetic.name,
+          cosmeticType: cosmetic.type,
+          previewUrl: artwork(cosmeticMeta.previewUrl, cosmeticMeta.iconUrl, cosmeticMeta.imageUrl, cosmetic.previewUrl),
+          animationUrl: artwork(cosmeticMeta.animationUrl, cosmeticMeta.svgaUrl, cosmeticMeta.gifUrl, cosmetic.animationUrl),
+          imageUrl: artwork(cosmeticMeta.imageUrl, cosmeticMeta.iconUrl, cosmeticMeta.previewUrl, cosmetic.previewUrl),
+          iconUrl: artwork(cosmeticMeta.iconUrl, cosmeticMeta.previewUrl, cosmetic.previewUrl),
+          expiresAt: owned.expiresAt,
+        };
+      }
+      const nextState = { lastClaimDate: today, streak: dayNo };
+      if (!stateRow) stateRow = manager.create(AppSetting, { key: stateKey, value: JSON.stringify(nextState), description: `Daily login streak for ${userId}` });
+      else stateRow.value = JSON.stringify(nextState);
+      await manager.save(stateRow);
+      return { ok: true, message: 'تم الاستلام بنجاح', day: dayNo, reward: rewardResult, streak: dayNo };
+    });
+    if (result.reward?.type === 'coins') this.realtime?.emitToUser(userId, 'wallet:updated', { coins: result.reward.balance, amount: result.reward.amount, reason: 'daily_login_reward' });
+    return result;
   }
 
   private async assertEnabled() {
@@ -479,6 +774,7 @@ export class TasksService {
       throw new BadRequestException('قائمة المهام فارغة');
     }
     const normalized = tasks.map((t, i) => {
+      const type = String(t.type || 'custom').trim() || 'custom';
       const scope = (['global', 'room', 'agency'].includes(String(t.scope))
         ? t.scope
         : 'global') as TaskScope;
@@ -497,7 +793,8 @@ export class TasksService {
         ) || undefined,
         rewardVipLevel: Math.max(0, Math.floor(Number(t.rewardVipLevel) || 0)) || undefined,
         rewardVipDays: Math.max(0, Math.floor(Number(t.rewardVipDays) || 0)) || undefined,
-        type: String(t.type || 'custom').trim() || 'custom',
+        target: Math.min(1_000_000_000, Math.max(1, Math.floor(Number(t.target) || this.targetFor(type)))),
+        type,
         audience,
         scope,
         roomId: scope === 'room' ? t.roomId || null : null,
@@ -521,7 +818,9 @@ export class TasksService {
   }
 
   /** Parse target count from type suffix: rooms_1 → 1, gift_2 → 2, checkin → 1 */
-  targetFor(type: string): number {
+  targetFor(type: string, task?: DailyTask): number {
+    const configured = Math.floor(Number(task?.target) || 0);
+    if (Number.isFinite(configured) && configured > 0) return Math.min(1_000_000_000, configured);
     const m = String(type || '').match(/_(\d+)$/);
     if (m) return Math.max(1, parseInt(m[1], 10));
     return 1;
@@ -623,6 +922,8 @@ export class TasksService {
     context: TaskProgressContext = {},
   ) {
     if (!userId || !event || amount <= 0) return;
+    // Secret medal conditions run independently of the visible daily-tasks feature.
+    await this.badges.recordHiddenTaskProgress(userId, event, amount);
     if (!(await this.isEnabled())) return;
     const family = this.familyOf(event);
     const tasks = await this.loadTasks();
@@ -659,7 +960,7 @@ export class TasksService {
       const changes: Array<{ taskId: string; current: number; target: number }> = [];
       for (const task of matching) {
         if (claimed.includes(task.id)) continue;
-        const target = this.targetFor(task.type);
+        const target = this.targetFor(task.type, task);
         const current = Number(progress[task.id] || 0);
         const next = Math.min(target, current + amount);
         if (next !== current) {
@@ -712,8 +1013,8 @@ export class TasksService {
     });
     const claimed = await this.readClaims(userId);
     const progress = await this.readProgress(userId);
-    return tasks.map((t) => {
-      const target = this.targetFor(t.type);
+    const dailyTasks = tasks.map((t) => {
+      const target = this.targetFor(t.type, t);
       const current = Math.min(target, Number(progress[t.id] || 0));
       const done = claimed.includes(t.id);
       const claimable = !done && current >= target;
@@ -728,6 +1029,8 @@ export class TasksService {
         requiresAgency: (t.audience || 'all') === 'host',
       };
     });
+    const medalTasks = await this.badges.visibleManualTasks(userId);
+    return [...dailyTasks, ...medalTasks];
   }
 
   private matchesScope(task: DailyTask, context: TaskProgressContext) {
@@ -772,7 +1075,7 @@ export class TasksService {
       }
     }
     const progress = await this.readProgress(userId);
-    const target = this.targetFor(task.type);
+    const target = this.targetFor(task.type, task);
     const current = Number(progress[task.id] || 0);
     if (current < target) {
       throw new BadRequestException(

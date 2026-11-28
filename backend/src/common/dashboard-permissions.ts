@@ -5,10 +5,15 @@
 
 export const DASHBOARD_MODULES = [
   'dashboard',
+  'conversations',
+  'paidMessages',
+  'profileActionIcons',
   'users',
   'agencies',
   'rooms',
+  'supportChest',
   'gifts',
+  'customGifts',
   'coins',
   'wallet',
   'withdrawals',
@@ -32,6 +37,7 @@ export const DASHBOARD_MODULES = [
   'seatStickers',
   'reports',
   'notifications',
+  'cpSettings',
   'settings',
   'logs',
   'policyBrochure',
@@ -50,11 +56,18 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   auth: 'self',
   operators: 'super-only',
   dashboard: 'dashboard',
+  conversations: 'conversations',
+  'paid-messages': 'paidMessages',
+  'profile-action-icons': 'profileActionIcons',
   'policy-brochure': 'policyBrochure',
   users: 'users',
+  badges: 'users',
   agencies: 'agencies',
   rooms: 'rooms',
+  'support-chest': 'supportChest',
   gifts: 'gifts',
+  'custom-gifts': 'customGifts',
+  'toast-manager': 'settings',
   coins: 'coins',
   'coin-packages': 'coins',
   wallet: 'wallet',
@@ -64,11 +77,13 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'recharge-agent-pricing': 'rechargeAgents',
   'recharge-agent-contacts': 'rechargeAgents',
   vip: 'vip',
+  'mysterious-man': 'settings',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
   promos: 'promos',
   'lucky-boxes': 'luckyBoxes',
+  'daily-login-rewards': 'tasks',
   tasks: 'tasks',
   'host-target': 'hostTarget',
   'host-targets': 'hostTarget',
@@ -77,12 +92,14 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'room-cup': 'roomCup',
   games: 'games',
   'game-ads': 'gameAds',
-  drama: 'drama',
+  stories: 'drama',
   banners: 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',
   reports: 'reports',
+  moments: 'reports',
   notifications: 'notifications',
+  'cp-settings': 'cpSettings',
   settings: 'settings',
   'payment-settings': 'settings',
   payments: 'settings',
@@ -101,21 +118,29 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
 /** Route name (vue-router) → module */
 export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   dashboard: 'dashboard',
+  conversations: 'conversations',
+  'paid-messages': 'paidMessages',
+  'profile-action-icons': 'profileActionIcons',
   users: 'users',
   'user-detail': 'users',
   agencies: 'agencies',
   rooms: 'rooms',
+  streams: 'rooms',
+  'support-chest': 'supportChest',
   gifts: 'gifts',
+  'toast-manager': 'settings',
   coins: 'coins',
   wallet: 'wallet',
   withdrawals: 'withdrawals',
   'recharge-agents': 'rechargeAgents',
   vip: 'vip',
+  'mysterious-man': 'settings',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
   promos: 'promos',
   'lucky-boxes': 'luckyBoxes',
+  'daily-login-rewards': 'tasks',
   tasks: 'tasks',
   'host-target': 'hostTarget',
   contests: 'contests',
@@ -125,10 +150,14 @@ export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   'game-ads': 'gameAds',
   drama: 'drama',
   banners: 'banners',
+  splash: 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',
   reports: 'reports',
+  moments: 'reports',
   notifications: 'notifications',
+  'cp-settings': 'cpSettings',
+  'staff-identity': 'settings',
   settings: 'settings',
   logs: 'logs',
   'policy-brochure': 'policyBrochure',
@@ -183,8 +212,22 @@ export function canAccessModule(
   need: 'read' | 'write' = 'read',
 ): boolean {
   if (!user) return false;
-  const role = String(user.staffRole || '').toLowerCase();
-  if (user.isSuperAdmin || role === 'super') return true;
+  const role = String(user.staffRole || '').trim().toLowerCase();
+  // Explicit limited staff roles must override stale cached super-admin flags.
+  const limitedRoles = new Set([
+    'admin', 'manager', 'moderator', 'operator', 'dashboard_operator',
+    'admin_op', 'staff', 'user', 'none',
+  ]);
+  if (limitedRoles.has(role)) {
+    // Continue to the assigned module permissions below.
+  } else if (
+    user.isSuperAdmin
+    || role === 'super'
+    || role === 'super_admin'
+    || role === 'superadmin'
+  ) {
+    return true;
+  }
 
   const perms = user.permissions || {};
   const level = (perms as PermissionsMap)[module as DashboardModule] || 'none';
@@ -215,6 +258,11 @@ export function resolveAdminRequest(
   const path = stripPath(url);
   // path: admin/users/xxx
   const parts = path.split('/').filter(Boolean);
+  // Vanity-ID admin routes live in the dedicated controller at
+  // /vanity-ids/admin/* rather than /admin/*; apply the same ACL module.
+  if (parts[0] === 'vanity-ids' && parts[1] === 'admin') {
+    parts.splice(0, 2, 'admin', 'vanity-ids');
+  }
   if (parts[0] !== 'admin') {
     return { kind: 'deny', message: 'Invalid admin route' };
   }

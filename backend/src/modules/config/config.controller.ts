@@ -4,10 +4,62 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+
 import { Public } from '../../common/decorators';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { ContentModerationService } from '../moderation/content-moderation.service';
+
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
+
+function publicApiBase(): string {
+  const configured = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/api\/v\d+$/i, '');
+
+  // Uploaded dashboard assets belong to the dedicated Ghaymah/Cumin service.
+  // Never rewrite its valid origin to the retired Blitz/legacy backend.
+  if (
+    !configured
+    || /jeho-own-backend\.mgs\.(?:blitz|prod)\.page/i.test(configured)
+    || /jeho-own-backend\.mgs\.blitz\.cloud/i.test(configured)
+  ) {
+    return CURRENT_JEHO_API_ORIGIN;
+  }
+  return configured;
+}
+
+function normalizePublicAssetUrl(value: unknown): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  const apiBase = publicApiBase();
+
+  if (raw.startsWith('/uploads/') && !raw.startsWith('//')) return apiBase + raw;
+  if (/^uploads\//i.test(raw)) return apiBase + '/' + raw;
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      if (/^\/uploads\//i.test(parsed.pathname)) {
+        return apiBase + parsed.pathname + parsed.search + parsed.hash;
+      }
+      return raw;
+    } catch {
+      return '';
+    }
+  }
+  return raw;
+}
+
+function versionPublicUploadUrl(value: unknown, updatedAt: unknown, parameter: string): string {
+  const url = normalizePublicAssetUrl(value);
+  if (!url || !url.includes('/uploads/')) return url;
+  const parsedTime = updatedAt ? new Date(updatedAt as any).getTime() : 0;
+  const version = Number.isFinite(parsedTime) && parsedTime > 0 ? parsedTime : 1;
+  return url + (url.includes('?') ? '&' : '?') + parameter + '=' + version;
+}
+
 
 @ApiTags('Config')
 @Controller('config')
@@ -90,16 +142,147 @@ export class ConfigController {
     }
 
     const q = ((req.query?.lang as string) || '').trim().toLowerCase();
+    const normalized = list.map((banner: any) => ({
+      ...banner,
+      // Older dashboard saves may contain an absolute upload URL from the
+      // retired backend. Re-resolve only /uploads assets to this Ghaymah API.
+      imageUrl: versionPublicUploadUrl(banner?.imageUrl, row?.updatedAt, 'banner_v'),
+    }));
     if (!q) {
       // Return all locale variants; the app filters by device language.
-      return list.slice(0, 12);
+      return normalized.slice(0, 12);
     }
     const lang = q.startsWith('ar') ? 'ar' : 'en';
-    const filtered = list.filter((b: { lang?: string }) => {
+    const filtered = normalized.filter((b: { lang?: string }) => {
       const bl = (b.lang || 'all').toLowerCase();
       return bl === 'all' || bl === lang || !b.lang;
     });
-    return (filtered.length ? filtered : list).slice(0, 8);
+    return (filtered.length ? filtered : normalized).slice(0, 8);
+  }
+
+  @Public()
+  @Get('profile-banner')
+  @ApiOperation({ summary: 'Independent profile page banner managed from dashboard' })
+  async profileBanner() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'profile_banner' } });
+    if (!row?.value) return [];
+    try {
+      const parsed = JSON.parse(row.value);
+      const imageUrl = versionPublicUploadUrl(parsed?.imageUrl, row?.updatedAt, 'profile_banner_v');
+      if (!imageUrl) return [];
+      return [{
+        title: typeof parsed.title === 'string' ? parsed.title : '',
+        imageUrl,
+        link: typeof parsed.link === 'string' ? parsed.link : '',
+        lang: 'all',
+      }];
+    } catch {
+      return [];
+    }
+  }
+
+  @Public()
+  @Get('mysterious-man')
+  @ApiOperation({ summary: 'Public shared media assets for Mysterious Man mode' })
+  async mysteriousMan() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    const defaults = { avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
+        entryText: typeof parsed.entryText === 'string' ? parsed.entryText : 'دخل الرجل الغامض',
+        entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
+        messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  @Public()
+  @Get('toast-style')
+  @ApiOperation({ summary: 'Public dashboard-managed gift and lucky-win toast appearance' })
+  async toastStyle() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    const defaults = {
+      backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
+      highWinMinMultiplier: 10, highWinMinCoins: 1000,
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyReturn: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinHighRoom: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, placementX: 50, placementY: 50 },
+      luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+    };
+    let parsed: any = {};
+    try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
+    const normalize = (value: unknown): string => {
+      const url = normalizePublicAssetUrl(value);
+      if (!url || !/^https?:\/\//i.test(url)) return '';
+      const separator = url.includes('?') ? '&' : '?';
+      return url + separator + 'toast_v=' + Math.max(1, Number(parsed.version) || 1);
+    };
+    const oldGift = parsed.giftSend || parsed;
+    const giftSend = {
+      backgroundUrl: normalize(oldGift.backgroundUrl),
+      shineEnabled: oldGift.shineEnabled !== false,
+      frameGlowEnabled: oldGift.frameGlowEnabled !== false,
+      durationSeconds: Math.max(1, Math.min(12, Math.round(Number(oldGift.durationSeconds) || 3))),
+      avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarX)) ? Number(oldGift.avatarX) : 8))),
+      avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarY)) ? Number(oldGift.avatarY) : 50))),
+      textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
+      textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textY)) ? Number(oldGift.textY) : 50))),
+      bodyX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.bodyX)) ? Number(oldGift.bodyX) : 25))),
+      bodyY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.bodyY)) ? Number(oldGift.bodyY) : 67))),
+      countX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.countX)) ? Number(oldGift.countX) : 88))),
+      countY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.countY)) ? Number(oldGift.countY) : 50))),
+      widthDp: Math.max(220, Math.min(360, Math.round(Number(oldGift.widthDp) || 340))),
+      heightDp: Math.max(60, Math.min(180, Math.round(Number(oldGift.heightDp) || 100))),
+      avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(oldGift.avatarSizeDp) || 44))),
+      titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.titleSizeSp) || 13))),
+      bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.bodySizeSp) || 12))),
+      countSizeSp: Math.max(8, Math.min(30, Math.round(Number(oldGift.countSizeSp) || 12))),
+    };
+    const win = (key: 'luckyWinNormal' | 'luckyReturn' | 'luckyWinHigh' | 'luckyWinHighRoom') => {
+      const value = parsed[key] || {};
+      const fallback = defaults[key];
+      return {
+        backgroundUrl: normalize(value.backgroundUrl),
+        shineEnabled: value.shineEnabled !== false,
+        frameGlowEnabled: value.frameGlowEnabled !== false,
+        durationSeconds: Math.max(1, Math.min(12, Math.round(Number(value.durationSeconds) || fallback.durationSeconds))),
+        avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarX)) ? Number(value.avatarX) : fallback.avatarX))),
+        avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarY)) ? Number(value.avatarY) : fallback.avatarY))),
+        textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.textX))),
+        textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textY)) ? Number(value.textY) : fallback.textY))),
+        bodyX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.bodyX)) ? Number(value.bodyX) : fallback.bodyX))),
+        bodyY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.bodyY)) ? Number(value.bodyY) : fallback.bodyY))),
+        countX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.countX)) ? Number(value.countX) : fallback.countX))),
+        countY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.countY)) ? Number(value.countY) : fallback.countY))),
+        widthDp: Math.max(220, Math.min(360, Math.round(Number(value.widthDp) || fallback.widthDp))),
+        heightDp: Math.max(60, Math.min(180, Math.round(Number(value.heightDp) || fallback.heightDp))),
+        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(value.avatarSizeDp) || fallback.avatarSizeDp))),
+        titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.titleSizeSp) || 13))),
+        bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(value.bodySizeSp) || 12))),
+        countSizeSp: Math.max(8, Math.min(30, Math.round(Number(value.countSizeSp) || 12))),
+        placementX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementX)) ? Number(value.placementX) : Number((fallback as any).placementX ?? 50)))),
+        placementY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.placementY)) ? Number(value.placementY) : Number((fallback as any).placementY ?? 50)))),
+      };
+    };
+    const button = parsed.luckyButton || {};
+    const luckyButton = {
+      iconUrl: normalize(button.iconUrl),
+      durationSeconds: Math.max(1, Math.min(12, Math.round(Number(button.durationSeconds) || 5))),
+      pulseEnabled: button.pulseEnabled !== false,
+    };
+    const highWinMinMultiplier = Math.max(0, Math.min(1000000, Math.floor(Number.isFinite(Number(parsed.highWinMinMultiplier)) ? Number(parsed.highWinMinMultiplier) : 10)));
+    const highWinMinCoins = Math.max(0, Math.min(1000000000, Math.floor(Number.isFinite(Number(parsed.highWinMinCoins)) ? Number(parsed.highWinMinCoins) : 1000)));
+    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyReturn: win('luckyReturn'), luckyWinHigh: win('luckyWinHigh'), luckyWinHighRoom: win('luckyWinHighRoom'), luckyButton,
+      highWinMinMultiplier, highWinMinCoins,
+      version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
   }
 
   @Public()
@@ -158,6 +341,7 @@ export class ConfigController {
   @ApiOperation({ summary: 'Store update prompt config for Android clients' })
   async appUpdate() {
     const keys = [
+      'app.update_enabled',
       'app.latest_version_code',
       'app.latest_version_name',
       'app.min_version_code',
@@ -166,6 +350,7 @@ export class ConfigController {
       'app.update_title_en',
       'app.update_message_en',
       'app.update_store_url',
+      'app.update_link_type',
       'app.update_force',
     ];
     const rows = await this.settingsRepo
@@ -180,6 +365,7 @@ export class ConfigController {
     const latestCode = num('app.latest_version_code', 0);
     const minCode = num('app.min_version_code', 0);
     return {
+      enabled: map.get('app.update_enabled') === 'true',
       latestVersionCode: latestCode,
       latestVersionName: map.get('app.latest_version_name') || '',
       minVersionCode: minCode,
@@ -192,9 +378,10 @@ export class ConfigController {
       messageEn:
         map.get('app.update_message_en') ||
         'A newer version of JEHO CHAT is available on the store. Update now for improvements and fixes.',
-      storeUrl:
-        map.get('app.update_store_url') ||
-        'https://play.google.com/store/apps/details?id=com.Dramizo.Series',
+      storeUrl: map.get('app.update_store_url') || '',
+      linkType: ['apk', 'external', 'auto'].includes((map.get('app.update_link_type') || 'auto').toLowerCase())
+        ? (map.get('app.update_link_type') || 'auto').toLowerCase()
+        : 'auto',
     };
   }
 
@@ -266,7 +453,47 @@ export class ConfigController {
         cfg = sanitizeNavIconsConfig(row.value);
       }
     }
-    return navIconsClientPayload(cfg);
+    // Resolve stored /uploads paths against the active Cumin API host, never a retired deployment.
+    return navIconsClientPayload(cfg, publicApiBase());
+  }
+
+  @Public()
+  @Get('agency-role-badges')
+  @ApiOperation({ summary: 'Public agency leader and host badge images managed from dashboard' })
+  async agencyRoleBadges() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'agency_role_badges' } });
+    let config: any = {};
+    if (row?.value) {
+      try {
+        config = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+      } catch {
+        config = {};
+      }
+    }
+    const safeUrl = (value: unknown) => {
+      const raw = String(value || '').trim();
+      if (!raw || raw.length > 2048) return '';
+      let url = raw;
+      if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
+        url = publicApiBase() + raw;
+      } else if (/^uploads\//i.test(raw)) {
+        url = publicApiBase() + '/' + raw;
+      } else if (/^https?:\/\//i.test(raw)) {
+        try {
+          const parsed = new URL(raw);
+          if (/^\/uploads\//i.test(parsed.pathname)) {
+            url = publicApiBase() + parsed.pathname + parsed.search;
+          }
+        } catch {
+          return '';
+        }
+      }
+      return url;
+    };
+    return {
+      leaderBadgeUrl: safeUrl(config?.leaderBadgeUrl),
+      hostBadgeUrl: safeUrl(config?.hostBadgeUrl),
+    };
   }
 
   @Public()
@@ -347,6 +574,125 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('theme')
+  @ApiOperation({ summary: 'Public remote app theme/assets for pre-login splash and app screens' })
+  async theme() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'app_theme' } });
+    const defaults = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      brand: {
+        appName: 'JEHO CHAT',
+        logoUrl: '',
+        splashUrl: '',
+        faviconUrl: '',
+      },
+      colors: {
+        primary: '#FE2C55',
+        secondary: '#22D3EE',
+        background: '#FFFFFF',
+        surface: '#FFFFFF',
+        onPrimary: '#FFFFFF',
+        danger: '#F0435B',
+        gold: '#F5C542',
+      },
+      backgrounds: {},
+      assets: {},
+      splash: { enabled: true, skipEnabled: true, items: [] },
+    };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      if (!parsed || typeof parsed !== 'object') return defaults;
+      const version = Number(parsed.version) || defaults.version;
+      const updatedAt = parsed.updatedAt || new Date().toISOString();
+      const cacheBust = encodeURIComponent(String(version) + '-' + String(updatedAt));
+      const bust = (value: unknown) => {
+        const raw = String(value || '').trim();
+        if (!raw) return value;
+
+        // Dashboard uploads are served by this API. Convert relative upload
+        // paths into absolute URLs so mobile clients and Glide can load them.
+        // Uploads are served at the root path (/uploads/:filename), not under
+        // the Nest API prefix. Normalize env values that may include /api/v1.
+        const apiBase = publicApiBase();
+        let url = raw;
+        if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
+          url = apiBase + raw;
+        } else if (/^uploads\//i.test(raw)) {
+          // Older uploads may be stored without the leading slash.
+          url = apiBase + '/' + raw;
+        } else if (/^https?:\/\//i.test(raw)) {
+          // Older dashboard settings may contain an absolute /uploads URL
+          // from the legacy host. Uploaded files are owned by this deployment,
+          // so normalize those paths to the current JEHO-OWN API host.
+          try {
+            const parsed = new URL(raw);
+            if (/^\/uploads\//i.test(parsed.pathname)) {
+              url = apiBase + parsed.pathname + parsed.search;
+            }
+          } catch {
+            // Keep an unparseable URL unchanged; the client will use its fallback.
+          }
+        }
+
+        const isHttp = url.startsWith('http://') || url.startsWith('https://');
+        if (!isHttp) return value;
+
+        const separator = url.includes('?') ? '&' : '?';
+        return url + separator + 'v=' + cacheBust;
+      };
+      const next = {
+        ...defaults,
+        ...parsed,
+        version,
+        updatedAt,
+      };
+      // Normalize every dashboard-managed brand/media URL so uploads from an
+      // older deployment are served by the current JEHO API origin.
+      if (next.brand && typeof next.brand === 'object') {
+        next.brand = { ...next.brand };
+        for (const key of ['logoUrl', 'splashUrl', 'faviconUrl']) {
+          if (next.brand[key]) next.brand[key] = bust(next.brand[key]);
+        }
+      }
+      if (next.assets && typeof next.assets === 'object') {
+        next.assets = Object.fromEntries(
+          Object.entries(next.assets).map(([key, value]) => [key, bust(value)]),
+        );
+      }
+      // Normalize only the four top-level section wallpapers. Detail screens
+      // (liveRoom, voiceRoom, createRoom) are deliberately left untouched.
+      if (next.backgrounds && typeof next.backgrounds === 'object') {
+        next.backgrounds = { ...next.backgrounds };
+        for (const key of ['allSections', 'home', 'profile', 'chat', 'games']) {
+          if (next.backgrounds[key]) next.backgrounds[key] = bust(next.backgrounds[key]);
+        }
+      }
+      if (next.brand?.splashUrl) {
+        next.brand = { ...next.brand, splashUrl: bust(next.brand.splashUrl) };
+      }
+      // Normalize the legacy splash background field too; some dashboard versions
+      // store a single splash asset here instead of splash.items.
+      if (next.backgrounds?.splash) {
+        next.backgrounds = { ...next.backgrounds, splash: bust(next.backgrounds.splash) };
+      }
+      if (next.splash?.items && Array.isArray(next.splash.items)) {
+        next.splash = {
+          ...next.splash,
+          items: next.splash.items.map((item: any) => ({
+            ...item,
+            url: bust(item?.url),
+          })),
+        };
+      }
+      return next;
+    } catch {
+      return defaults;
+    }
+  }
+
+  @Public()
   @Get('support')
   @ApiOperation({ summary: 'Customer support channels for the app (managed from dashboard)' })
   async support() {
@@ -359,6 +705,7 @@ export class ConfigController {
       whatsapp: await pick('support_whatsapp'),
       telegram: await pick('support_telegram'),
       instagram: await pick('support_instagram'),
+      website: await pick('support_website'),
       email: await pick('supportEmail', await pick('support_email', 'support@adnova.bbs.tr')),
       phone: await pick('support_phone'),
     };

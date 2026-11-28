@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Optional, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -13,6 +14,7 @@ import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import {
   VIP_ALLOWED_DAYS,
   VIP_DURATION_PACKS,
@@ -22,10 +24,10 @@ import {
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 export class PurchaseVipDto {
-  @ApiProperty({ minimum: 1, maximum: 100 })
+  @ApiProperty({ minimum: 1, maximum: 7 })
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(7)
   level: number;
 
   /** Rental days — VIP is never permanent. Allowed: 7 / 30 / 40. */
@@ -37,11 +39,140 @@ export class PurchaseVipDto {
 }
 
 @Injectable()
-export class VipService {
+export class VipService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VipService.name);
-  private static readonly MAX_VIP_LEVEL = 100;
+  private static readonly MAX_VIP_LEVEL = 7;
+  private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
+  private mysteriousModeSchemaTimer?: ReturnType<typeof setInterval>;
+  private mysteriousModeColumnReady = false;
 
-  /** Hard progression curve so VIP100 stays elite. */
+  /** Optional VIP maintenance is scheduled after Nest initialization; it never blocks HTTP startup. */
+  onModuleInit() {
+    this.mysteriousModeSchemaTimer = setInterval(() => {
+      void this.ensureMysteriousModeColumn();
+    }, 30_000);
+    this.mysteriousModeSchemaTimer.unref?.();
+    this.mysteriousModeCleanupTimer = setInterval(() => {
+      void this.reconcileMysteriousModes().catch((error) => {
+        this.logger.warn(`Mysterious Man reconciliation failed: ${error?.message || error}`);
+      });
+    }, 60_000);
+    this.mysteriousModeCleanupTimer.unref?.();
+
+    const initialMaintenance = setTimeout(() => {
+      void (async () => {
+        await this.ensureMysteriousModeColumn();
+        await this.reconcileMysteriousModes();
+      })().catch((error) => {
+        this.logger.warn(`Initial Mysterious Man maintenance deferred: ${error?.message || error}`);
+      });
+    }, 0);
+    initialMaintenance.unref?.();
+  }
+
+  private async ensureMysteriousModeColumn(): Promise<void> {
+    if (this.mysteriousModeColumnReady) return;
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      locked = await tryAcquireJehoSchemaLock(runner);
+      if (!locked) return;
+      await runner.query(
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
+      );
+      this.mysteriousModeColumnReady = true;
+      if (this.mysteriousModeSchemaTimer) clearInterval(this.mysteriousModeSchemaTimer);
+      this.mysteriousModeSchemaTimer = undefined;
+    } catch (error) {
+      this.logger.warn(`Mysterious Mode column check deferred: ${error?.message || error}`);
+    } finally {
+      if (locked) {
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  onModuleDestroy() {
+    if (this.mysteriousModeCleanupTimer) clearInterval(this.mysteriousModeCleanupTimer);
+    if (this.mysteriousModeSchemaTimer) clearInterval(this.mysteriousModeSchemaTimer);
+  }
+
+  private async reconcileMysteriousModes() {
+    if (!this.mysteriousModeColumnReady) return;
+    // This scheduled reconciliation runs on every API replica. Serialize it
+    // across the cluster to avoid concurrent bulk updates to the users table.
+    const runner = this.dataSource.createQueryRunner();
+    let locked = false;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '8s'");
+      locked = await tryAcquireJehoSchemaLock(runner);
+      if (!locked) return;
+      await this.reconcileMysteriousModesOnce(runner);
+    } finally {
+      if (locked) {
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+    }
+  }
+
+  private async reconcileMysteriousModesOnce(runner: import('typeorm').QueryRunner) {
+    // Settings are stored by AppSetting in app_settings (inside the
+    // configured jeho_own schema). Never query a legacy/nonexistent settings table.
+    let rows: Array<{ value?: string | Record<string, unknown> }> = [];
+    try {
+      rows = await runner.query(
+        'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+        ['mysterious_man_config'],
+      );
+    } catch (error) {
+      // Missing settings storage must not crash application startup or cause
+      // existing users to be switched out of mysterious mode unintentionally.
+      this.logger.warn(
+        `Mysterious Man reconciliation skipped: app_settings is unavailable (${error?.message || error})`,
+      );
+      return;
+    }
+    if (!rows?.length) {
+      // No saved policy yet: preserve user state until the dashboard creates one.
+      return;
+    }
+    let policy: any = {};
+    try {
+      policy = typeof rows?.[0]?.value === 'string'
+        ? JSON.parse(rows[0].value)
+        : (rows?.[0]?.value || {});
+    } catch {
+      policy = {};
+    }
+    const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+      ? [...new Set(policy.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))]
+      : [];
+    if (policy.enabled !== true || allowedLevels.length === 0) {
+      await runner.query(
+        'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
+      );
+      return;
+    }
+    await runner.query(
+      'UPDATE users u SET "mysteriousMode" = false WHERE u."mysteriousMode" = true AND NOT EXISTS (' +
+      'SELECT 1 FROM user_vips uv WHERE uv."userId" = u.id AND uv."isActive" = true AND uv."expiresAt" > NOW() AND uv.level = ANY($1::int[])' +
+      ')',
+      [allowedLevels],
+    );
+  }
+
+  /** Fallback prices are used only when the catalog is empty; existing database prices stay authoritative. */
   private static vipPriceForLevel(level: number): number {
     const l = Math.max(1, Math.min(VipService.MAX_VIP_LEVEL, Math.floor(Number(level) || 1)));
     if (l <= 10) return [0, 99, 199, 399, 699, 999, 1499, 2499, 3999, 5999, 9999][l];
@@ -55,6 +186,7 @@ export class VipService {
   constructor(
     @InjectRepository(VipPlan) private readonly plansRepo: Repository<VipPlan>,
     @InjectRepository(UserVip) private readonly userVipsRepo: Repository<UserVip>,
+    @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     private readonly dataSource: DataSource,
     @Optional() private readonly cosmetics?: CosmeticsService,
@@ -66,7 +198,9 @@ export class VipService {
         where: { isActive: true },
         order: { level: 'ASC' },
       });
-      return plans.map((p) => ({
+      // Older database rows may include levels beyond the actual VIP1–VIP7 product.
+      // Hide them from the catalog without deleting or resetting persistent data.
+      return plans.filter((p) => Number(p.level) >= 1 && Number(p.level) <= VipService.MAX_VIP_LEVEL).map((p) => ({
         ...p,
         durationPacks: VIP_DURATION_PACKS.map((pack) => ({
           ...pack,
@@ -74,6 +208,8 @@ export class VipService {
         })),
         // Default display = monthly (never permanent).
         durationDays: 30,
+        vipMainIconUrl: ((p.benefits as any)?.visuals || {}).vipMainIconUrl || null,
+        vipHorizontalBadgeUrl: ((p.benefits as any)?.visuals || {}).vipHorizontalBadgeUrl || null,
       }));
     });
   }
@@ -133,7 +269,80 @@ export class VipService {
     });
   }
 
+  private async activeMysteriousVip(userId: string) {
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    if (!vip) return null;
+
+    // Dashboard policy takes precedence when configured. It is additive-only and
+    // reads the existing settings row; no schema migration or user data reset.
+    const rows = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+      ['mysterious_man_config'],
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      let policy: any = {};
+      try {
+        policy = typeof rows[0]?.value === 'string'
+          ? JSON.parse(rows[0].value)
+          : (rows[0]?.value || {});
+      } catch {
+        policy = {};
+      }
+      const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7)
+        : [];
+      return policy.enabled === true && allowedLevels.includes(Number(vip.level)) ? vip : null;
+    }
+
+    // Backward compatibility until the dashboard saves its first policy.
+    const benefits = vip.vipPlan?.benefits as any;
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man') ? vip : null;
+  }
+
+  async mysteriousModeStatus(userId: string) {
+    const [user, vip] = await Promise.all([
+      this.usersRepo.findOne({ where: { id: userId } }),
+      this.activeMysteriousVip(userId),
+    ]);
+
+    // Expiry or a dashboard-level feature disable takes effect immediately on status
+    // checks, not only when the periodic reconciliation timer next runs.
+    if (user?.mysteriousMode && !vip) {
+      user.mysteriousMode = false;
+      await this.usersRepo.save(user);
+    }
+
+    const benefits = vip?.vipPlan?.benefits as any;
+    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    return {
+      eligible: !!vip,
+      enabled: !!user?.mysteriousMode && !!vip,
+      frameMode: visuals.mysteriousManFrameMode === 'user' ? 'user' : 'custom',
+      frameUrl: visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null),
+      vipLevel: vip?.level || null,
+    };
+  }
+
+  async setMysteriousMode(userId: string, enabled: boolean) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (enabled && !(await this.activeMysteriousVip(userId))) {
+      throw new BadRequestException('This VIP subscription does not include Mysterious Man');
+    }
+    user.mysteriousMode = enabled;
+    await this.usersRepo.save(user);
+    return this.mysteriousModeStatus(userId);
+  }
+
   async purchase(userId: string, dto: PurchaseVipDto) {
+    if (!Number.isInteger(Number(dto.level)) || Number(dto.level) < 1 || Number(dto.level) > VipService.MAX_VIP_LEVEL) {
+      throw new BadRequestException('VIP level must be between 1 and 7');
+    }
     await this.ensurePlans();
     const plan = await this.plansRepo.findOne({ where: { level: dto.level, isActive: true } });
     if (!plan) throw new NotFoundException('VIP plan not found');

@@ -52,10 +52,16 @@ public final class RoomCardBinder {
         String title = displayTitle(room);
         b.tvTitle.setText(title);
         b.tvTitle.setSelected(true);
-        b.tvHost.setText(resolveHostName(room));
+        if (RoomUiHelper.isSupportRoom(room)) {
+            b.tvHost.setText("customer_service".equalsIgnoreCase(room.topic) ? "خدمة العملاء" :
+                    ("management".equalsIgnoreCase(room.topic) ? "إدارة المنصة" : "روم رسمي تابع للمنصة"));
+        } else {
+            b.tvHost.setText(resolveHostName(room));
+        }
 
         RoomUiHelper.bindLockOverlay(b.flLock, room);
         bindRoomLevelBadge(b, room);
+        bindRoomPkBadge(b, room);
         bindOfficialBadge(b, room);
         bindHotTop(b, room);
         bindCountryFlag(b, room);
@@ -65,9 +71,14 @@ public final class RoomCardBinder {
         bindViewerCount(b, room);
         bindLiveEqualizer(b);
         bindCardFrame(b, room, compactStrip);
+        bindTopFrame(b, room);
     }
 
     private static String displayTitle(RoomDtos.RoomDto room) {
+        if (RoomUiHelper.isSupportRoom(room)) {
+            String officialTitle = room.title != null ? room.title.trim() : "";
+            return officialTitle.isEmpty() ? "روم رسمي" : officialTitle;
+        }
         boolean agency = RoomUiHelper.isAgencyRoom(room);
         if (!agency) {
             String hostName = resolveHostName(room);
@@ -84,6 +95,47 @@ public final class RoomCardBinder {
             return hostName;
         }
         return "غرفة";
+    }
+
+    /** A compact, high-contrast badge shown only while this room has an active PK. */
+    private static void bindRoomPkBadge(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
+        if (b.itemCard == null) return;
+        Object cached = b.itemCard.getTag(R.id.tag_room_cover_url);
+        android.widget.TextView badge = cached instanceof android.widget.TextView
+                ? (android.widget.TextView) cached : null;
+        if (badge == null) {
+            badge = new android.widget.TextView(b.itemCard.getContext());
+            badge.setText("⚔ PK LIVE");
+            badge.setTextColor(android.graphics.Color.WHITE);
+            badge.setTextSize(10f);
+            badge.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            badge.setGravity(android.view.Gravity.CENTER);
+            badge.setPadding(dp(b.itemCard, 8), dp(b.itemCard, 5), dp(b.itemCard, 8), dp(b.itemCard, 5));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFFE53955, 0xFF7C3AED, 0xFFDAA520});
+            bg.setCornerRadius(dp(b.itemCard, 12));
+            bg.setStroke(dp(b.itemCard, 1), 0xFFFFE6A6);
+            badge.setBackground(bg);
+            badge.setElevation(dp(b.itemCard, 12));
+            badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            badge.setContentDescription("هذا الروم يشارك في تحدي PK مباشر");
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.setMargins(dp(b.itemCard, 7), dp(b.itemCard, 7), 0, 0);
+            b.itemCard.addView(badge, lp);
+            b.itemCard.setTag(R.id.tag_room_cover_url, badge);
+        }
+        boolean active = RoomPkState.isRoomChallenging(room.id);
+        badge.setVisibility(active ? View.VISIBLE : View.GONE);
+        if (active) badge.bringToFront();
+    }
+
+    private static int dp(View view, int value) {
+        return Math.round(value * view.getResources().getDisplayMetrics().density);
     }
 
     /** Numeric Lv.N above viewer count — never an image (room frames would cover images). */
@@ -187,6 +239,7 @@ public final class RoomCardBinder {
     public static void bindViewerOnly(ItemPartyRoomBinding b, @Nullable RoomDtos.RoomDto room) {
         if (b == null || room == null) return;
         bindViewerCount(b, room);
+        bindRoomPkBadge(b, room);
     }
 
     private static void bindViewerCount(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
@@ -214,10 +267,15 @@ public final class RoomCardBinder {
             b.itemCard.setBackgroundResource(android.R.color.transparent);
         }
         if (b.imgCardFrame == null) return;
-        // Prefer room frame; fall back to host-equipped mall card (same as in-room header).
-        String url = room != null ? room.roomCardUrl : null;
-        if ((url == null || url.isEmpty()) && room != null && room.host != null) {
-            url = room.host.roomCardUrl;
+        // TOP 1/2/3 is a temporary replacement for the room's own card,
+        // not an extra overlay. When a room loses its TOP rank, its original
+        // room/host card is restored automatically from the same payload.
+        String url = room != null ? room.roomTopFrameUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            url = room != null ? room.roomCardUrl : null;
+            if ((url == null || url.isEmpty()) && room != null && room.host != null) {
+                url = room.host.roomCardUrl;
+            }
         }
         String key = room != null ? room.id : null;
         String lower = url != null ? url.toLowerCase(Locale.ROOT) : "";
@@ -226,6 +284,12 @@ public final class RoomCardBinder {
                 || RoomKenarHelper.isRoomFrameUrl(url);
         // fillItem=false: keep ConstraintLayout constraints on list cards (see RoomKenarHelper).
         RoomKenarHelper.bind(b.imgCardFrame, b.itemCard, url, key, animated, false);
+    }
+
+    /** TOP artwork is now bound as the card frame itself, so never stack a second frame. */
+    private static void bindTopFrame(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
+        if (b.imgTopFrame == null) return;
+        RoomKenarHelper.bind(b.imgTopFrame, b.itemCard, null, null, false, false);
     }
 
     private static void bindAvatars(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {

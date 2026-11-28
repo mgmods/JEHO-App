@@ -19,11 +19,13 @@ public final class RoomDtos {
         @SerializedName("cohostId") public String cohostId;
         @SerializedName("agencyId") public String agencyId;
         @SerializedName("roomKind") public String roomKind;
+        @SerializedName("topic") public String topic;
         @SerializedName("isSupport") public boolean isSupport;
         @SerializedName("isPersistent") public boolean isPersistent;
         @SerializedName("activeHostId") public String activeHostId;
         @SerializedName("moderatorIds") public List<String> moderatorIds;
         @SerializedName("moderatorPermissions") public List<ModeratorPermissionDto> moderatorPermissions;
+        @SerializedName("viewerPermissions") public ViewerPermissionsDto viewerPermissions;
         @SerializedName("musicUrl") public String musicUrl;
         @SerializedName("musicTitle") public String musicTitle;
         @SerializedName("musicArtist") public String musicArtist;
@@ -40,6 +42,10 @@ public final class RoomDtos {
         @SerializedName("challengeBadge") public String challengeBadge;
         @SerializedName("viewerAvatars") public List<String> viewerAvatars;
         /** Room progression level from gift activity (Mikoo-style Lv badge). */
+        /** Current daily/weekly support rank for visual card frame (1..3). */
+        @SerializedName("roomTopRank") public Integer roomTopRank;
+        @SerializedName("roomTopFrameUrl") public String roomTopFrameUrl;
+        @SerializedName("roomTopPeriod") public String roomTopPeriod;
         @SerializedName("roomLevel") public int roomLevel = 1;
         /** 1-based rank in explore feed sorted by viewers. */
         @SerializedName("exploreRank") public int exploreRank;
@@ -50,6 +56,7 @@ public final class RoomDtos {
         @SerializedName("charmEnabled") public boolean charmEnabled = true;
         @SerializedName("bannerEnabled") public boolean bannerEnabled = true;
         @SerializedName("micInteractEnabled") public boolean micInteractEnabled = true;
+        @SerializedName("micRequestEnabled") public boolean micRequestEnabled = false;
         @SerializedName("entryEffectsEnabled") public boolean entryEffectsEnabled = true;
         @SerializedName("lowGiftEffectsEnabled") public boolean lowGiftEffectsEnabled = true;
         /** Server stamp of last full public-chat wipe (ISO-8601). */
@@ -65,6 +72,18 @@ public final class RoomDtos {
         @SerializedName("agencyTotalDiamonds") public long agencyTotalDiamonds;
         /** Official dashboard verification for the agency (show badge next to وكالة). */
         @SerializedName("agencyIsVerified") public boolean agencyIsVerified;
+    }
+
+    public static class ViewerPermissionsDto {
+        @SerializedName("canManageMusic") public boolean canManageMusic;
+        @SerializedName("canChangeFrames") public boolean canChangeFrames;
+        @SerializedName("canControlGames") public boolean canControlGames;
+        @SerializedName("canMute") public boolean canMute;
+        @SerializedName("canKick") public boolean canKick;
+        @SerializedName("canBan") public boolean canBan;
+        @SerializedName("canManageSeats") public boolean canManageSeats;
+        @SerializedName("canInvite") public boolean canInvite;
+        @SerializedName("canManageRoom") public boolean canManageRoom;
     }
 
     public static class ModeratorPermissionDto {
@@ -123,6 +142,7 @@ public final class RoomDtos {
         @SerializedName("userId") public String userId;
         @SerializedName("seatIndex") public Integer seatIndex;
         @SerializedName("displayName") public String displayName;
+        @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("at") public String at;
     }
 

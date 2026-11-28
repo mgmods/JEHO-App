@@ -18,7 +18,10 @@ export type MikooGameDef = {
   sortOrder: number;
 };
 
-const ORIGIN = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+// Match Android ApiOrigin and the single JEHO-OWN Cumin deployment exactly.
+// Do not allow stale PUBLIC_API_ORIGIN values, IPs, or provider DOMAIN settings to
+// silently send the game catalogue to another backend.
+const ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
 
 export const MIKOO_GAMES: MikooGameDef[] = [
   { id: '7updown', title: '٧ فوق تحت', titleEn: '7 Up Down', entry: 'index.html', bridge: 'hash', gameType: 1, sortOrder: 10 },
@@ -185,7 +188,9 @@ export function classifyCatalogItem(item: Record<string, unknown>) {
     title,
     titleEn,
     coverUrl,
-    playUrl: item.playUrl || (game ? mikooPlayUrl(id) : item.playUrl),
+    // Known packaged games must always use this backend's current public origin.
+    // Saved app_games rows can contain retired hosts; preserving those URLs makes every game load a blank WebView.
+    playUrl: game ? mikooPlayUrl(id) : item.playUrl,
     mode,
     enabled,
     bridge: item.bridge ?? game?.bridge ?? null,

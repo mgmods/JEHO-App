@@ -1,6 +1,7 @@
 package com.Dramizo.Series.data.repository;
 
 import com.Dramizo.Series.data.remote.api.RoomApi;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.domain.model.Result;
@@ -11,19 +12,68 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.lang.reflect.Type;
+import com.google.gson.reflect.TypeToken;
 
 public class RoomRepositoryImpl implements RoomRepository {
     private final RoomApi api;
     private final ExecutorService io;
+    private final EncryptedFeatureCache cache;
+    private final ConcurrentHashMap<String, AtomicBoolean> refreshes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> refreshStartedAt = new ConcurrentHashMap<>();
 
     public RoomRepositoryImpl(RoomApi api, ExecutorService io) {
+        this(api, io, null);
+    }
+
+    public RoomRepositoryImpl(RoomApi api, ExecutorService io, EncryptedFeatureCache cache) {
         this.api = api;
         this.io = io;
+        this.cache = cache;
+    }
+
+    private boolean beginRefresh(String key) {
+        long now = System.currentTimeMillis();
+        Long last = refreshStartedAt.get(key);
+        if (last != null && now - last < 180_000L) return false;
+        AtomicBoolean gate = refreshes.computeIfAbsent(key, ignored -> new AtomicBoolean(false));
+        if (!gate.compareAndSet(false, true)) return false;
+        refreshStartedAt.put(key, now);
+        return true;
+    }
+
+    private void endRefresh(String key) {
+        AtomicBoolean gate = refreshes.get(key);
+        if (gate != null) gate.set(false);
     }
 
     @Override
     public Result<RoomDtos.MusicLibraryDto> musicLibrary() {
-        return ApiCall.execute(api.musicLibrary());
+        final String key = "room_music_library";
+        if (cache != null) {
+            RoomDtos.MusicLibraryDto local = cache.getJson(EncryptedFeatureCache.UID_APP, key, RoomDtos.MusicLibraryDto.class, 0L);
+            if (local != null) {
+                refreshMusicLibraryInBackground(key);
+                return Result.ok(local);
+            }
+        }
+        Result<RoomDtos.MusicLibraryDto> result = ApiCall.execute(api.musicLibrary());
+        if (result.success && result.data != null && cache != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+        return result;
+    }
+
+    private void refreshMusicLibraryInBackground(String key) {
+        if (cache == null || !beginRefresh(key)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    Result<RoomDtos.MusicLibraryDto> result = ApiCall.execute(api.musicLibrary());
+                    if (result.success && result.data != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+                } finally { endRefresh(key); }
+            });
+        } catch (RuntimeException rejected) { endRefresh(key); }
     }
 
     @Override
@@ -43,8 +93,32 @@ public class RoomRepositoryImpl implements RoomRepository {
 
     @Override
     public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit) {
+        int safePage = Math.max(1, page);
         int safe = Math.max(1, Math.min(100, limit));
-        return ApiCall.execute(api.list(page, safe));
+        final String key = "rooms_list_" + safePage + "_" + safe;
+        final Type type = new TypeToken<MiscDtos.ListResult<RoomDtos.RoomDto>>() {}.getType();
+        if (cache != null) {
+            MiscDtos.ListResult<RoomDtos.RoomDto> local = cache.getJson(EncryptedFeatureCache.UID_APP, key, type, 0L);
+            if (local != null) {
+                refreshRoomListInBackground(key, safePage, safe);
+                return Result.ok(local);
+            }
+        }
+        Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result = ApiCall.execute(api.list(safePage, safe));
+        if (result.success && result.data != null && cache != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+        return result;
+    }
+
+    private void refreshRoomListInBackground(String key, int page, int limit) {
+        if (cache == null || !beginRefresh(key)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result = ApiCall.execute(api.list(page, limit));
+                    if (result.success && result.data != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+                } finally { endRefresh(key); }
+            });
+        } catch (RuntimeException rejected) { endRefresh(key); }
     }
 
     @Override
@@ -54,7 +128,30 @@ public class RoomRepositoryImpl implements RoomRepository {
 
     @Override
     public Result<RoomDtos.RoomDto> get(String id) {
-        return ApiCall.execute(api.get(id));
+        if (id == null || id.trim().isEmpty()) return Result.err("معرّف الغرفة غير صالح");
+        final String key = "room_detail_" + id.trim();
+        if (cache != null) {
+            RoomDtos.RoomDto local = cache.getJson(EncryptedFeatureCache.UID_APP, key, RoomDtos.RoomDto.class, 0L);
+            if (local != null) {
+                refreshRoomDetailInBackground(key, id);
+                return Result.ok(local);
+            }
+        }
+        Result<RoomDtos.RoomDto> result = ApiCall.execute(api.get(id));
+        if (result.success && result.data != null && cache != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+        return result;
+    }
+
+    private void refreshRoomDetailInBackground(String key, String id) {
+        if (cache == null || !beginRefresh(key)) return;
+        try {
+            io.execute(() -> {
+                try {
+                    Result<RoomDtos.RoomDto> result = ApiCall.execute(api.get(id));
+                    if (result.success && result.data != null) cache.putJson(EncryptedFeatureCache.UID_APP, key, result.data);
+                } finally { endRefresh(key); }
+            });
+        } catch (RuntimeException rejected) { endRefresh(key); }
     }
 
     @Override
@@ -90,7 +187,11 @@ public class RoomRepositoryImpl implements RoomRepository {
     public Result<RoomDtos.JoinRoomResult> join(String id, String password) {
         Map<String, String> body = new HashMap<>();
         if (password != null) body.put("password", password);
-        return ApiCall.execute(api.join(id, body));
+        Result<RoomDtos.JoinRoomResult> result = ApiCall.execute(api.join(id, body));
+        if (result.success && result.data != null && result.data.room != null && cache != null) {
+            cache.putJson(EncryptedFeatureCache.UID_APP, "room_detail_" + id, result.data.room);
+        }
+        return result;
     }
 
     @Override
@@ -106,6 +207,14 @@ public class RoomRepositoryImpl implements RoomRepository {
     @Override
     public Result<RoomDtos.SeatRequestsResult> seatRequests(String id) {
         return ApiCall.execute(api.seatRequests(id));
+    }
+
+    @Override
+    public Result<RoomDtos.RoomDto> assignSeat(String id, String userId, Integer seatIndex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("userId", userId);
+        if (seatIndex != null) body.put("seatIndex", seatIndex);
+        return ApiCall.execute(api.assignSeat(id, body));
     }
 
     @Override
@@ -205,6 +314,14 @@ public class RoomRepositoryImpl implements RoomRepository {
         body.put("userId", userId);
         if (reason != null) body.put("reason", reason);
         return ApiCall.execute(api.forceLeaveSeat(id, body));
+    }
+
+    @Override
+    public Result<Object> removeMemberFromMic(String id, String userId, String reason) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("userId", userId);
+        body.put("reason", reason != null ? reason : "moderator_remove_mic");
+        return ApiCall.execute(api.removeMemberFromMic(id, body));
     }
 
     @Override

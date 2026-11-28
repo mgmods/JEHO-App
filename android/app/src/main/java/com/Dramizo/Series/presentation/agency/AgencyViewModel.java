@@ -107,9 +107,9 @@ public class AgencyViewModel extends ViewModel {
         });
     }
 
-    public void joinByCode(String code) {
+    public void joinByCode(String publicId, String code) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getAgencyRepository().joinByCode(code);
+            Result<Object> r = c.getAgencyRepository().joinByCode(publicId, code);
             if (r.success) {
                 message.postValue("تم إرسال طلب الانضمام — بانتظار موافقة إدارة الوكالة");
                 load();
@@ -195,6 +195,12 @@ public class AgencyViewModel extends ViewModel {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getAgencyRepository().delete(id);
             if (r.success) {
+                String uid = c.getSessionManager().getUserId();
+                if (uid != null) {
+                    c.getFeatureCache().remove(uid, EncryptedFeatureCache.NS_AGENCY_MINE);
+                }
+                mine.postValue(null);
+                earnings.postValue(null);
                 message.postValue("agency_deleted");
                 load();
             } else {

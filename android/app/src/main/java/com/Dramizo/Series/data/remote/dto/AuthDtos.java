@@ -9,6 +9,7 @@ public final class AuthDtos {
         @SerializedName("email") public String email;
         @SerializedName("password") public String password;
         @SerializedName("username") public String username;
+        @SerializedName("countryCode") public String countryCode;
         @SerializedName("displayName") public String displayName;
 
         public RegisterRequest(String email, String password, String username, String displayName) {
@@ -97,29 +98,68 @@ public final class AuthDtos {
         @SerializedName("debugCode") public String debugCode;
     }
 
+    public static class AgencyClubDto {
+        @SerializedName("agencyId") public String agencyId;
+        @SerializedName("agencyName") public String agencyName;
+        @SerializedName("agencyLogoUrl") public String agencyLogoUrl;
+        @SerializedName("role") public String role;
+        @SerializedName("label") public String label;
+    }
+
     public static class UserDto {
         @SerializedName("id") public String id;
+        @SerializedName("agencyClub") public AgencyClubDto agencyClub;
         @SerializedName("email") public String email;
         @SerializedName("phone") public String phone;
         @SerializedName("username") public String username;
         /** Stable numeric app ID — not Google / store account name. */
         @SerializedName("publicId") public String publicId;
+        /** Public cosmetic rank only; deliberately unrelated to authorization. */
+        @SerializedName("customDisplayRankName") public String customDisplayRankName;
+        @SerializedName("customDisplayRankImageUrl") public String customDisplayRankImageUrl;
+        @SerializedName("customDisplayRankAnimated") public boolean customDisplayRankAnimated;
+        @SerializedName("publicIdStyleMode") public String publicIdStyleMode;
+        @SerializedName("publicIdStyleVipLevel") public int publicIdStyleVipLevel;
+        @SerializedName("publicIdStyleColor1") public String publicIdStyleColor1;
+        @SerializedName("publicIdStyleColor2") public String publicIdStyleColor2;
+        @SerializedName("publicIdStyleColor3") public String publicIdStyleColor3;
+        @SerializedName("publicIdStyleGlow") public boolean publicIdStyleGlow;
+        @SerializedName("publicIdStyleIconUrl") public String publicIdStyleIconUrl;
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
+        /** True when the room profile is intentionally anonymized by an eligible VIP. */
+        @SerializedName("mysteriousMan") public boolean mysteriousMan;
+        @SerializedName("mysteriousMode") public Boolean mysteriousMode;
+        @SerializedName("mysteriousManEligible") public Boolean mysteriousManEligible;
         @SerializedName("coverUrl") public String coverUrl;
+        @SerializedName("profileCoverUrls") public java.util.List<String> profileCoverUrls;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
         /** Fixed VIP nobility frame (ud_vip_tou_{n}) for profile/card — not mall wear. */
         @SerializedName("vipTouUrl") public String vipTouUrl;
+        /** Dashboard-configured VIP avatar frame for the active membership level. */
+        @SerializedName("vipFrameUrl") public String vipFrameUrl;
         /** VIP card head ornament (ic_head_vip_{n}) — only when vipLevel &gt; 0. */
         @SerializedName("vipHeadUrl") public String vipHeadUrl;
+        @SerializedName("vipMainIconUrl") public String vipMainIconUrl;
+        @SerializedName("vipHorizontalBadgeUrl") public String vipHorizontalBadgeUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
         /** Cosmetic meta JSON for worn host badge: offsetX/offsetY/scale/avatarScale */
         @SerializedName("hostBadgeMeta") public java.util.Map<String, Object> hostBadgeMeta;
         @SerializedName("entryEffectUrl") public String entryEffectUrl;
         @SerializedName("entryAnimationUrl") public String entryAnimationUrl;
         @SerializedName("roomCardUrl") public String roomCardUrl;
+        @SerializedName("vipCardUrl") public String vipCardUrl;
+        @SerializedName("profileCardUrl") public String profileCardUrl;
+        @SerializedName("chatBubbleUrl") public String chatBubbleUrl;
+        @SerializedName("nameplateUrl") public String nameplateUrl;
+        @SerializedName("voiceWaveUrl") public String voiceWaveUrl;
+        /** Public VIP account-name style configured by the dashboard. */
+        @SerializedName("nameStyle") public java.util.Map<String, Object> nameStyle;
         @SerializedName("bio") public String bio;
+        @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
+        /** Highest active room-support medal earned in the current room-support system. */
+        @SerializedName("roomSupportMedal") public RoomSupportMedalDto roomSupportMedal;
         @SerializedName("gender") public String gender;
         @SerializedName("level") public int level;
         @SerializedName("experience") public long experience;
@@ -127,6 +167,10 @@ public final class AuthDtos {
         @SerializedName("isAdmin") public boolean isAdmin;
         /** Platform staff: "manager" | "super" | null/none */
         @SerializedName("staffRole") public String staffRole;
+        /** Per-module dashboard permissions returned by the authenticated server. */
+        @SerializedName("dashboardPermissions") public java.util.Map<String, String> dashboardPermissions;
+        /** True only while the user has an active recharge-agent assignment. */
+        @SerializedName("isRechargeAgent") public boolean isRechargeAgent;
         @SerializedName("followersCount") public int followersCount;
         @SerializedName("followingCount") public int followingCount;
         @SerializedName("friendsCount") public int friendsCount;
@@ -147,9 +191,13 @@ public final class AuthDtos {
         @SerializedName("countryChangeAvailableAt") public String countryChangeAvailableAt;
         @SerializedName("birthday") public String birthday;
         @SerializedName("city") public String city;
+        @SerializedName("language") public String language;
+        @SerializedName("interests") public java.util.List<String> interests;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
         @SerializedName("showOnlineStatus") public Boolean showOnlineStatus;
         @SerializedName("allowDmFromStrangers") public Boolean allowDmFromStrangers;
+        @SerializedName("dmEnabled") public Boolean dmEnabled;
+        @SerializedName("dmAudience") public String dmAudience;
         @SerializedName("dmGiftGateEnabled") public Boolean dmGiftGateEnabled;
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("lastSeenAt") public String lastSeenAt;
@@ -187,5 +235,12 @@ public final class AuthDtos {
             if (publicId != null && !publicId.trim().isEmpty()) return publicId.trim();
             return "";
         }
+
+    public static class RoomSupportMedalDto {
+        @SerializedName("id") public String id;
+        @SerializedName("name") public String name;
+        @SerializedName("imageUrl") public String imageUrl;
+        @SerializedName("expiresAt") public String expiresAt;
+    }
     }
 }

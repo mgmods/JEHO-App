@@ -22,6 +22,7 @@ import com.Dramizo.Series.util.AgencyUi;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.text.NumberFormat;
@@ -35,7 +36,7 @@ public final class AgencyFamilyInfoSheet {
     private AgencyFamilyInfoSheet() {}
 
     public static void show(@NonNull FragmentActivity activity, @Nullable String agencyId) {
-        show(activity, agencyId, null, null);
+        show(activity, agencyId, null, null, false);
     }
 
     public static void show(
@@ -43,6 +44,17 @@ public final class AgencyFamilyInfoSheet {
             @Nullable String agencyId,
             @Nullable String logoHint,
             @Nullable String coverHint) {
+        show(activity, agencyId, logoHint, coverHint, false);
+    }
+
+
+
+    private static void show(
+            @NonNull FragmentActivity activity,
+            @Nullable String agencyId,
+            @Nullable String logoHint,
+            @Nullable String coverHint,
+            boolean openRequestsOnLoad) {
         if (agencyId == null || agencyId.trim().isEmpty()) {
             Toast.makeText(activity, R.string.error_generic, Toast.LENGTH_SHORT).show();
             return;
@@ -75,12 +87,16 @@ public final class AgencyFamilyInfoSheet {
         TextView tvOwner = sheet.findViewById(R.id.tvOwnerName);
         TextView tvMedals = sheet.findViewById(R.id.tvMedals);
         TextView btnFollow = sheet.findViewById(R.id.btnFollowAgency);
+
         TextView btnOpen = sheet.findViewById(R.id.btnOpenAgencyManage);
 
         final String[] gidHold = {""};
         final boolean[] following = {false};
+        final MiscDtos.AgencyDto[] aHolder = {null};
 
         if (btnOpen != null) {
+            // Fail closed while membership/role is being verified.
+            btnOpen.setVisibility(View.GONE);
             btnOpen.setOnClickListener(v -> {
                 dialog.dismiss();
                 try {
@@ -143,6 +159,7 @@ public final class AgencyFamilyInfoSheet {
         container.getIoExecutor().execute(() -> {
             Result<MiscDtos.AgencyDto> r =
                     ApiCall.execute(container.getAgencyApi().get(id));
+            Result<MiscDtos.AgencyMineDto> mine = container.getAgencyRepository().mine();
             activity.runOnUiThread(() -> {
                 if (!dialog.isShowing()) return;
                 if (!r.success || r.data == null) {
@@ -155,6 +172,23 @@ public final class AgencyFamilyInfoSheet {
                     return;
                 }
                 MiscDtos.AgencyDto a = r.data;
+                aHolder[0] = a;
+                boolean isSuper = false;
+                try {
+                    isSuper = StaffRoleHelper.isSuper(container.getSessionManager().getUser());
+                } catch (Exception ignored) { }
+                String role = mine != null && mine.success && mine.data != null
+                        && mine.data.role != null
+                        ? mine.data.role.trim().toLowerCase(java.util.Locale.US) : "";
+                boolean belongsToThisAgency = mine != null && mine.success && mine.data != null
+                        && mine.data.agency != null && mine.data.agency.id != null
+                        && id.equals(mine.data.agency.id)
+                        && !"pending".equalsIgnoreCase(mine.data.membershipStatus);
+                boolean canManageThisAgency = isSuper || (belongsToThisAgency
+                        && ("owner".equals(role) || "manager".equals(role)));
+                if (btnOpen != null) {
+                    btnOpen.setVisibility(canManageThisAgency ? View.VISIBLE : View.GONE);
+                }
                 if (tvName != null) {
                     tvName.setText(a.name != null ? a.name : activity.getString(R.string.agency));
                 }
@@ -167,10 +201,9 @@ public final class AgencyFamilyInfoSheet {
                         btnCopy.setVisibility(gid.isEmpty() ? View.GONE : View.VISIBLE);
                     }
                 }
-                if (tvFollowers != null) {
-                    long fc = a.followerCount > 0 ? a.followerCount : Math.max(0, a.memberCount);
-                    tvFollowers.setText(formatCount(fc));
-                }
+                if (tvFollowers != null) tvFollowers.setText(formatCount(Math.max(0, a.followerCount)));
+                following[0] = Boolean.TRUE.equals(a.isFollowing);
+                applyFollowUi(btnFollow, following[0]);
                 if (tvRooms != null) tvRooms.setText(formatCount(Math.max(0, a.roomCount)));
                 if (tvMaxOnline != null) {
                     long max = Math.max(a.maxOnline, Math.max(a.liveOnline, a.liveViewerCount));
@@ -214,7 +247,150 @@ public final class AgencyFamilyInfoSheet {
             });
         });
 
+
+        TextView membersTab = sheet.findViewById(R.id.btnAgencyMembersTab);
+        TextView followersTab = sheet.findViewById(R.id.btnAgencyFollowersTab);
+        TextView rosterSummary = sheet.findViewById(R.id.tvAgencyRosterSummary);
+        android.widget.LinearLayout peopleList = sheet.findViewById(R.id.agencyPeopleList);
+        if (membersTab != null) membersTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, 0);
+            loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
+        });
+        if (followersTab != null) followersTab.setOnClickListener(v -> {
+            applyAgencyTabUi(membersTab, followersTab, 1);
+            loadAgencyPeople(activity, container, id, peopleList, rosterSummary, true);
+        });
+        loadAgencyPeople(activity, container, id, peopleList, rosterSummary, false);
         dialog.show();
+    }
+
+
+    private static int agencyRoleOrder(@Nullable String role) {
+        if ("owner".equalsIgnoreCase(role)) return 0;
+        if ("manager".equalsIgnoreCase(role)) return 1;
+        if ("host".equalsIgnoreCase(role)) return 2;
+        return 3;
+    }
+
+    private static void applyAgencyTabUi(@Nullable TextView members, @Nullable TextView followers, int selected) {
+        TextView[] tabs = {members, followers};
+        for (int i = 0; i < tabs.length; i++) {
+            if (tabs[i] != null) {
+                tabs[i].setTextColor(i == selected ? 0xFFFFFFFF : 0xBFFFFFFF);
+                tabs[i].setTypeface(null, i == selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+            }
+        }
+    }
+
+    private static void loadAgencyPeople(@NonNull FragmentActivity activity, @NonNull AppContainer container,
+            @NonNull String agencyId, @Nullable android.widget.LinearLayout list,
+            @Nullable TextView summary, boolean followers) {
+        if (list == null) return;
+        list.removeAllViews();
+        TextView loading = new TextView(activity);
+        loading.setText("جارٍ تحميل القائمة...");
+        loading.setTextColor(0xBFFFFFFF);
+        loading.setGravity(android.view.Gravity.CENTER);
+        list.addView(loading);
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(followers
+                    ? container.getAgencyApi().publicFollowers(agencyId, 1, 40)
+                    : container.getAgencyApi().publicMembers(agencyId, 1, 40));
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing()) return;
+                list.removeAllViews();
+                if (!result.success || result.data == null) {
+                    TextView error = new TextView(activity);
+                    error.setText("تعذر تحميل القائمة");
+                    error.setTextColor(0xFFFF8A8A);
+                    error.setGravity(android.view.Gravity.CENTER);
+                    list.addView(error);
+                    return;
+                }
+                Object raw = result.data.get("items");
+                java.util.List<?> rows = raw instanceof java.util.List ? new java.util.ArrayList<>((java.util.List<?>) raw) : new java.util.ArrayList<>();
+                if (!followers) {
+                    ((java.util.List<Object>) rows).sort((left, right) -> {
+                        String lr = left instanceof Map ? String.valueOf(((Map<?, ?>) left).get("role")) : "";
+                        String rr = right instanceof Map ? String.valueOf(((Map<?, ?>) right).get("role")) : "";
+                        return Integer.compare(agencyRoleOrder(lr), agencyRoleOrder(rr));
+                    });
+                }
+                Object count = result.data.get("total");
+                long total = count instanceof Number ? ((Number) count).longValue() : rows.size();
+                if (summary != null) summary.setText((followers ? "المتابعون • " : "الأعضاء • ") + formatCount(total));
+                if (rows.isEmpty()) {
+                    TextView empty = new TextView(activity);
+                    empty.setText(followers ? "لا يوجد متابعون حتى الآن" : "لا يوجد أعضاء حتى الآن");
+                    empty.setTextColor(0xBFFFFFFF);
+                    empty.setGravity(android.view.Gravity.CENTER);
+                    empty.setPadding(0, dp(activity, 18), 0, dp(activity, 18));
+                    list.addView(empty);
+                    return;
+                }
+                for (Object value : rows) {
+                    if (!(value instanceof Map)) continue;
+                    Map<?, ?> row = (Map<?, ?>) value;
+                    Map<?, ?> user = row.get("user") instanceof Map ? (Map<?, ?>) row.get("user") : row;
+                    String name = String.valueOf(user.get("displayName") != null ? user.get("displayName") :
+                            (user.get("username") != null ? user.get("username") : "مستخدم"));
+                    String publicId = String.valueOf(user.get("publicId") == null ? "—" : user.get("publicId"));
+                    String avatar = user.get("avatarUrl") == null ? null : String.valueOf(user.get("avatarUrl"));
+                    String role = String.valueOf(row.get("role") == null ? "" : row.get("role"));
+                    String roleLabel = followers ? "متابع للوكالة" :
+                            "owner".equalsIgnoreCase(role) ? "قائد الوكالة" :
+                            "manager".equalsIgnoreCase(role) ? "مشرف الوكالة" :
+                            "host".equalsIgnoreCase(role) ? "مضيف الوكالة" : "عضو الوكالة";
+                    android.widget.LinearLayout card = new android.widget.LinearLayout(activity);
+                    card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                    card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    card.setPadding(dp(activity, 10), dp(activity, 8), dp(activity, 10), dp(activity, 8));
+                    android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+                    bg.setColor(0xFF151F28);
+                    bg.setCornerRadius(dp(activity, 14));
+                    bg.setStroke(dp(activity, 1), 0xFF34414D);
+                    card.setBackground(bg);
+                    android.widget.ImageView avatarView = new android.widget.ImageView(activity);
+                    android.widget.LinearLayout.LayoutParams avatarLp = new android.widget.LinearLayout.LayoutParams(dp(activity, 46), dp(activity, 46));
+                    avatarLp.setMarginEnd(dp(activity, 10));
+                    card.addView(avatarView, avatarLp);
+                    AvatarCosmetics.bindAvatar(avatarView, avatar);
+                    android.widget.LinearLayout details = new android.widget.LinearLayout(activity);
+                    details.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    card.addView(details, new android.widget.LinearLayout.LayoutParams(0, -2, 1f));
+                    TextView title = new TextView(activity);
+                    title.setText(roleLabel + "  •  " + name);
+                    title.setTextColor(0xFFFFFFFF);
+                    title.setTextSize(14);
+                    title.setTypeface(null, android.graphics.Typeface.BOLD);
+                    details.addView(title);
+                    TextView idLine = new TextView(activity);
+                    String country = String.valueOf(user.get("country") == null ? "" : user.get("country"));
+                    idLine.setText("ID: " + publicId + (country.trim().isEmpty() || "null".equals(country) ? "" : "   •   " + country));
+                    idLine.setTextColor(0xFFB6C1CC);
+                    idLine.setTextSize(11);
+                    details.addView(idLine);
+                    String city = String.valueOf(user.get("city") == null ? "" : user.get("city"));
+                    Object levelRaw = user.get("level");
+                    String extra = !city.trim().isEmpty() && !"null".equals(city) ? city : "";
+                    if (levelRaw instanceof Number) extra += (extra.isEmpty() ? "" : "   •   ") + "المستوى " + ((Number) levelRaw).intValue();
+                    if (!extra.isEmpty()) {
+                        TextView metaLine = new TextView(activity);
+                        metaLine.setText(extra);
+                        metaLine.setTextColor(0xFF8997A6);
+                        metaLine.setTextSize(10);
+                        details.addView(metaLine);
+                    }
+                    android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(-1, -2);
+                    cardLp.bottomMargin = dp(activity, 7);
+                    list.addView(card, cardLp);
+                }
+            });
+        });
+    }
+
+    private static int dp(Context context, int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     private static void applyFollowUi(@Nullable TextView btn, boolean following) {
@@ -223,7 +399,10 @@ public final class AgencyFamilyInfoSheet {
         btn.setText(following
                 ? R.string.agency_family_following
                 : R.string.agency_family_follow);
-        btn.setTextColor(following ? 0xFFFFFFFF : 0xFF0B1A16);
+        btn.setVisibility(View.VISIBLE);
+        btn.setTextColor(0xFFFFFFFF);
+        btn.setEnabled(true);
+        btn.bringToFront();
     }
 
     private static String formatCount(long n) {

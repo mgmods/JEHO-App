@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Mikoo dialog_user_info inspired room user card (ids mapped to JEHO handlers). -->
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:clipToPadding="false"
+    android:paddingBottom="32dp"
+    android:overScrollMode="never">
+
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -37,43 +46,42 @@
         tools:visibility="visible" />
 
     <!-- Avatar + VIP frame (iv_vip_tou) -->
-    <FrameLayout
-        android:id="@+id/avatar_layout"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="8dp"
-        android:clipChildren="false"
-        android:clipToPadding="false"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <ImageView
-            android:id="@+id/imgUserAvatar"
-            android:layout_width="86dp"
-            android:layout_height="86dp"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_tab_me" />
-
-        <ImageView
-            android:id="@+id/imgUserFrame"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
-
-        <ImageView
-            android:id="@+id/imgUserHostBadge"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
+    <FrameLayout android:id="@+id/avatar_layout" android:layout_width="160dp" android:layout_height="100dp"
+        android:layout_marginTop="8dp" android:clipChildren="false" android:clipToPadding="false"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5" app:layout_constraintTop_toTopOf="parent">
+        <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgUserAvatar"
+            android:layout_width="76dp" android:layout_height="76dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:elevation="4dp"
+            android:scaleType="centerCrop" android:src="@drawable/ic_tab_me"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+            app:strokeColor="#F7F3FF" app:strokeWidth="3dp" />
+        <ImageView android:id="@+id/imgUserFrame" android:layout_width="92dp" android:layout_height="92dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
+        <com.Dramizo.Series.util.HostSignalView android:id="@+id/userCardHostSignal" android:layout_width="92dp"
+            android:layout_height="92dp" android:layout_gravity="center_vertical|start" android:visibility="gone" />
+        <ImageView android:id="@+id/imgUserHostBadge" android:layout_width="92dp" android:layout_height="92dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
+        <ImageView android:id="@+id/imgVipMainIcon" android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_gravity="end|center_vertical" android:contentDescription="@null"
+            android:scaleType="fitCenter" android:visibility="gone" />
+        <View android:id="@+id/superAdminAvatarFrame" android:layout_width="98dp" android:layout_height="98dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:visibility="gone" />
+        <FrameLayout android:id="@+id/cpTopPartnerWrap" android:layout_width="72dp" android:layout_height="72dp"
+            android:layout_gravity="center_vertical|end" android:background="@drawable/bg_cp_cv_avatar_gold"
+            android:elevation="8dp" android:padding="3dp" android:visibility="gone">
+            <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgCpPartnerTop"
+                android:layout_width="match_parent" android:layout_height="match_parent" android:elevation="3dp"
+                android:scaleType="centerCrop" app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+                app:strokeColor="#F7F3FF" app:strokeWidth="2dp" />
+            <ImageView android:id="@+id/imgCpPartnerTopFrame" android:layout_width="match_parent" android:layout_height="match_parent"
+                android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
+        </FrameLayout>
+        <TextView android:id="@+id/tvCpTopHeart" android:layout_width="34dp" android:layout_height="34dp"
+            android:layout_gravity="center_vertical|end" android:layout_marginEnd="58dp" android:background="@drawable/bg_room_cp_heart"
+            android:elevation="10dp" android:gravity="center" android:includeFontPadding="false" android:shadowColor="#FFFF8DB9"
+            android:shadowDx="0" android:shadowDy="0" android:shadowRadius="8" android:text="♥" android:textColor="#FFFF6FA9"
+            android:textSize="23sp" android:textStyle="bold" android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
@@ -95,7 +103,7 @@
             android:ellipsize="end"
             android:maxWidth="180dp"
             android:maxLines="1"
-            android:textColor="#FFFFFF"
+            android:textColor="#FFF7F3FF"
             android:textSize="18sp"
             android:textStyle="bold"
             tools:text="عمار" />
@@ -115,10 +123,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_user_card_stat_cell"
+            android:background="@drawable/bg_user_card_id_chip"
             android:paddingHorizontal="8dp"
             android:paddingVertical="2dp"
-            android:textColor="#FF7CFFB2"
+            android:textColor="#FF72E3B1"
             android:textSize="11sp"
             android:visibility="gone"
             tools:text="متصل"
@@ -137,13 +145,13 @@
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ll_level_name">
+        app:layout_constraintTop_toBottomOf="@id/rowRoleBadges">
 
         <TextView
             android:id="@+id/tvUserId"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#99FFFFFF"
+            android:textColor="#FFBDB5D2"
             android:textSize="14sp"
             android:visibility="gone"
             tools:text="ID:5764421"
@@ -177,11 +185,32 @@
             android:background="@drawable/bg_user_card_id_chip"
             android:paddingHorizontal="10dp"
             android:paddingVertical="3dp"
-            android:textColor="#E0F7FA"
+            android:textColor="#FFD5B0FF"
             android:textSize="11sp"
             android:textStyle="bold"
             tools:text="30" />
     </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/rowRoleBadges"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginTop="8dp"
+        android:scrollbars="none"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_level_name">
+
+        <LinearLayout
+            android:id="@+id/roleBadgesContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="2dp" />
+    </HorizontalScrollView>
 
     <!-- Mikoo: three counters under ID (followers / fans / visitors) -->
     <LinearLayout
@@ -190,12 +219,12 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="14dp"
         android:layout_marginTop="10dp"
-        android:background="@drawable/bg_user_card_stat_cell"
+        android:background="@android:color/transparent"
         android:orientation="horizontal"
         android:paddingVertical="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/id_layout">
+        app:layout_constraintTop_toBottomOf="@id/userCardEarnedMedalsScroll">
 
         <LinearLayout
             android:id="@+id/cellStatFollowers"
@@ -213,7 +242,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -222,7 +251,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_following"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -242,7 +271,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -251,7 +280,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_fans"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -271,7 +300,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -280,12 +309,21 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_stat_visitors"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- VIP medal + stats -->
+    <LinearLayout android:id="@+id/rowVipHorizontalBadge" android:layout_width="0dp"
+        android:layout_height="20dp" android:layout_marginStart="14dp" android:layout_marginTop="3dp"
+        android:gravity="center_vertical" android:orientation="horizontal"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/id_layout">
+        <ImageView android:id="@+id/imgVipHorizontalBadge" android:layout_width="wrap_content"
+            android:layout_height="18dp" android:adjustViewBounds="true" android:contentDescription="@null"
+            android:scaleType="fitCenter" android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Stats only: legacy VIP badge and medal are intentionally hidden -->
     <LinearLayout
         android:id="@+id/ll_model"
         android:layout_width="0dp"
@@ -297,7 +335,7 @@
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowSocialStats">
+        app:layout_constraintTop_toBottomOf="@id/rowVipHorizontalBadge">
 
         <ImageView
             android:id="@+id/imgEntryRide"
@@ -309,31 +347,9 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
-        <ImageView
-            android:id="@+id/imgVipMedal"
-            android:layout_width="43dp"
-            android:layout_height="25dp"
-            android:layout_marginStart="6dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone"
-            tools:visibility="visible" />
+        <ImageView android:id="@+id/imgVipMedal" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/chipVip"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_chip_vip"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="4dp"
-            android:textColor="@color/white"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            tools:text="VIP3"
-            tools:visibility="visible" />
+        <TextView android:id="@+id/chipVip" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
 
         <TextView
             android:id="@+id/chipCharm"
@@ -389,6 +405,26 @@
             android:textStyle="bold|italic"
             android:visibility="gone" />
     </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/userCardEarnedMedalsScroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="5dp"
+        android:layout_marginEnd="12dp"
+        android:scrollbars="none"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_model">
+        <LinearLayout
+            android:id="@+id/userCardEarnedMedals"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
 
     <!-- Agency / guild strip (Mikoo clGuildInfo + icon_info_guild_bg_base_lvN) -->
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -475,7 +511,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="الوكالة" />
@@ -486,7 +522,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="12sp"
                 tools:text="GID:1895" />
         </LinearLayout>
@@ -506,7 +542,7 @@
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="12dp"
         android:text="@string/user_card_property_title"
-        android:textColor="#B3FFFFFF"
+        android:textColor="#FFBDB5D2"
         android:textSize="12sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -549,7 +585,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/user_card_prop_family"
-                android:textColor="#E6FFFFFF"
+                android:textColor="#FFD5B0FF"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -568,7 +604,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -577,7 +613,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_prop_supporters"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -595,7 +631,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FFFFFF"
+                android:textColor="#FFF7F3FF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -604,7 +640,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="@string/user_card_prop_friends"
-                android:textColor="#99FFFFFF"
+                android:textColor="#FFBDB5D2"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
@@ -735,13 +771,44 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/bottom_layout">
 
+        <LinearLayout
+            android:id="@+id/rowCpRelationship"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/imgCpPartnerAvatar"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_tab_me" />
+
+            <TextView
+                android:id="@+id/tvCpRelationship"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:textColor="#FFF7F3FF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="♥ علاقة حب مع سارة" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tvUserActionsTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="المزيد"
-            android:textColor="#99FFFFFF"
+            android:textColor="#FFBDB5D2"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -765,6 +832,14 @@
                 android:layout_weight="1"
                 android:text="صداقة" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/actCpRequest"
+            style="@style/Widget.AuraLive.UserCardAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="طلب علاقة CP" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -908,3 +983,4 @@
             android:visibility="gone" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.core.widget.NestedScrollView>

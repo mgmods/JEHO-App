@@ -24,15 +24,31 @@ public final class SeatReactionEmojis {
         public final String key;
         public final String url;
         public final String name;
+        public final String accessType;
+        public final long priceCoins;
+        public final String audience;
+        public final int requiredVipLevel;
+        public final boolean requiresCp;
+        public final String categoryId;
 
-        public Item(String key, String url, String name) {
+        public Item(String key, String url, String name, String accessType, long priceCoins,
+                    String audience, int requiredVipLevel, boolean requiresCp, String categoryId) {
             this.key = key;
             this.url = url;
             this.name = name;
+            this.accessType = accessType != null ? accessType : "free";
+            this.priceCoins = Math.max(0L, priceCoins);
+            this.audience = audience != null ? audience : "all";
+            this.requiredVipLevel = Math.max(1, requiredVipLevel);
+            this.requiresCp = requiresCp;
+            this.categoryId = categoryId != null ? categoryId : "male";
         }
     }
 
     private static final CopyOnWriteArrayList<Item> ITEMS = new CopyOnWriteArrayList<>();
+    private static volatile List<MiscDtos.SeatStickerCategoryDto> CATEGORIES = Collections.emptyList();
+
+    public static List<MiscDtos.SeatStickerCategoryDto> categories() { return CATEGORIES; }
 
     /** Apply catalog from network/cache. Empty list disables stickers until loaded. */
     public static void setCatalog(@Nullable List<Item> items) {
@@ -42,17 +58,20 @@ public final class SeatReactionEmojis {
     }
 
     public static void setFromDto(@Nullable MiscDtos.SeatStickersDto dto) {
-        if (dto == null || dto.items == null || dto.items.isEmpty()) {
+        if (dto == null || !dto.enabled || dto.items == null || dto.items.isEmpty()) {
+            CATEGORIES = Collections.emptyList();
             setCatalog(Collections.emptyList());
             return;
         }
+        CATEGORIES = dto.categories != null ? new ArrayList<>(dto.categories) : Collections.emptyList();
         List<Item> next = new ArrayList<>(dto.items.size());
         for (MiscDtos.SeatStickerItemDto row : dto.items) {
             if (row == null) continue;
             String key = row.key != null ? row.key.trim().toLowerCase(Locale.US) : "";
             String url = row.url != null ? row.url.trim() : "";
             if (key.isEmpty() || url.isEmpty()) continue;
-            next.add(new Item(key, url, row.name != null ? row.name : key));
+            next.add(new Item(key, url, row.name != null ? row.name : key,
+                    row.accessType, row.priceCoins, row.audience, row.requiredVipLevel, row.requiresCp, row.categoryId));
         }
         setCatalog(next);
     }

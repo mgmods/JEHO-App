@@ -1,0 +1,174 @@
+import { Body, Controller, Get, Post, Delete, Param, Query, BadRequestException, UseGuards } from '@nestjs/common';
+import { CpSchemaReadyGuard } from './cp-schema-ready.guard';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser, Public } from '../../common/decorators';
+import { ParseUUIDPipe } from '@nestjs/common';
+import { CpService } from './cp.service';
+import { CpType } from '../../database/entities/cp-relationship.entity';
+
+@ApiTags('CP')
+@ApiBearerAuth()
+@Controller('cp')
+@UseGuards(CpSchemaReadyGuard)
+export class CpController {
+  constructor(private readonly cp: CpService) {}
+
+  @Public()
+  @Get('room-effects')
+  @ApiOperation({ summary: 'Active relationships and configured visual effects for users seated together in a room' })
+  roomSeatEffects(@Query('userIds') userIds: string) {
+    return this.cp.roomSeatEffects(userIds || '');
+  }
+
+  @Public()
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Public active CP relationships for a profile; no financial data' })
+  profileRelationships(@Param('id', ParseUUIDPipe) userId: string) {
+    return this.cp.profileRelationships(userId);
+  }
+
+  @Get('store')
+  @ApiOperation({ summary: 'CP-only cosmetics catalog; never includes normal mall products' })
+  storeCatalog() {
+    return this.cp.storeCatalog();
+  }
+
+  @Get('store/inventory')
+  @ApiOperation({ summary: 'Inventory of CP-exclusive items only' })
+  storeInventory(@CurrentUser('sub') userId: string) {
+    return this.cp.storeInventory(userId);
+  }
+
+  @Post('store/purchase')
+  @ApiOperation({ summary: "Purchase an item from the CP-only store and add it to the CP bag" })
+  purchaseStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.purchaseStoreItem(userId, body?.cosmeticId);
+  }
+
+  @Post('store/equip')
+  @ApiOperation({ summary: 'Equip an owned item from the CP-only store' })
+  equipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.equipStoreItem(userId, body?.cosmeticId);
+  }
+
+  @Post('store/unequip')
+  @ApiOperation({ summary: 'Unequip an owned CP-only item without deleting ownership' })
+  unequipStoreItem(@CurrentUser('sub') userId: string, @Body() body: { cosmeticId: string }) {
+    return this.cp.unequipStoreItem(userId, body?.cosmeticId);
+  }
+
+  @Get('catalog')
+  @ApiOperation({ summary: 'Enabled CP types and configured gift prices' })
+  catalog() {
+    return this.cp.catalog();
+  }
+
+  @Get('leaderboard')
+  @ApiOperation({ summary: 'Server-calculated weekly or worldwide CP leaderboard' })
+  leaderboard(@Query('period') period?: string) {
+    // Normalize query values from older Android clients and avoid silently
+    // treating whitespace/case variations of "world" as the weekly ranking.
+    const normalizedPeriod = String(period || 'weekly').trim().toLowerCase();
+    const selectedPeriod = ['world', 'global', 'all', 'all-time', 'all_time'].includes(normalizedPeriod)
+      ? 'world'
+      : 'weekly';
+    return this.cp.leaderboard(selectedPeriod);
+  }
+
+  @Get('rewards')
+  @ApiOperation({ summary: 'Configured CP level rewards from server settings' })
+  rewards() {
+    return this.cp.rewards();
+  }
+
+  @Get('discover')
+  @ApiOperation({ summary: 'Real active CP relationships, ranked by points' })
+  discover(@Query('type') type?: CpType) {
+    return this.cp.discover(type);
+  }
+
+
+
+  @Get('tasks')
+  @ApiOperation({ summary: 'Get daily shared tasks and claim status for the current CP relationship' })
+  tasks(@CurrentUser('sub') userId: string) {
+    return this.cp.tasks(userId);
+  }
+
+  @Post('tasks/:taskId/claim')
+  @ApiOperation({ summary: 'Claim a completed CP task reward once per user and day' })
+  claimTask(@CurrentUser('sub') userId: string, @Param('taskId') taskId: string) {
+    return this.cp.claimTask(userId, taskId);
+  }
+
+  @Get('memories')
+  @ApiOperation({ summary: 'List memories shared within the current active CP relationship' })
+  memories(@CurrentUser('sub') userId: string) {
+    return this.cp.memories(userId);
+  }
+
+  @Post('memories')
+  @ApiOperation({ summary: 'Add a text or image memory to the current active CP relationship' })
+  createMemory(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { text?: string; imageUrl?: string },
+  ) {
+    return this.cp.createMemory(userId, body);
+  }
+
+  @Delete('memories/:id')
+  @ApiOperation({ summary: 'Delete a memory created by the current user' })
+  deleteMemory(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cp.deleteMemory(userId, id);
+  }
+
+  @Get('me')
+  me(@CurrentUser('sub') userId: string) {
+    return this.cp.forUser(userId);
+  }
+
+  @Get('requests')
+  requests(@CurrentUser('sub') userId: string) {
+    return this.cp.requests(userId);
+  }
+
+  @Post('requests')
+  @ApiOperation({ summary: 'Send a paid CP initiation gift from a shared voice room' })
+  createRequest(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { recipientId: string; type: CpType; roomId: string; idempotencyKey: string },
+  ) {
+    return this.cp.createRequest(userId, body);
+  }
+
+  @Post('profile-requests')
+  @ApiOperation({ summary: 'Disabled: CP initiation must be a gift sent from a shared voice room' })
+  createProfileRequest() {
+    throw new BadRequestException('إرسال طلب الارتباط الشخصي متوقف. أرسل هدية CP من داخل الروم الصوتي.');
+  }
+
+  @Get('sent-requests')
+  sentRequests(@CurrentUser('sub') userId: string) {
+    return this.cp.sentRequests(userId);
+  }
+
+  @Post('requests/:id/cancel')
+  cancelRequest(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cp.cancelRequest(userId, id);
+  }
+
+  @Post('requests/:id/respond')
+  respond(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('accept') accept: boolean,
+  ) {
+    if (typeof accept !== 'boolean') throw new BadRequestException('يجب تحديد القبول أو الرفض بشكل صريح');
+    return this.cp.respond(userId, id, accept);
+  }
+
+  @Post(':id/end')
+  end(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cp.end(userId, id);
+  }
+}

@@ -12,8 +12,8 @@
             بدون API. ضع <strong>رقم حساب شام كاش</strong> (مثل
             <code dir="ltr">2c5e893402a9cd76d27d28b4b92605aa</code>)
             واسم صاحب الحساب — يظهر للمستخدم QR + الاسم مثل تطبيق شام كاش.
-            بعد التحويل يرسل إثبات على واتساب، ثم توافق الطلب من
-            <strong>المحفظة → طلبات الشحن</strong>.
+            بعد التحويل يرفع المستخدم الإيصال من التطبيق، وتراجعه من
+            <strong>المحفظة → طلبات الشحن</strong> قبل شحن الكوينز.
           </p>
           <div class="small mb-0">
             حالة التطبيق:
@@ -63,24 +63,23 @@
 
       <div class="col-lg-6">
         <div class="settings-card h-100">
-          <h3 class="settings-card-title">واتساب لإرسال الإثبات</h3>
+          <h3 class="settings-card-title">باركود التحويل والتعليمات</h3>
           <div class="mb-3">
-            <label class="form-label">رقم واتساب (مع مفتاح الدولة)</label>
-            <input
-              v-model="form.whatsapp"
-              class="form-control font-monospace"
-              dir="ltr"
-              placeholder="9639XXXXXXXX"
-              autocomplete="off"
-            />
+            <label class="form-label">صورة باركود QR</label>
+            <input class="form-control" type="file" accept="image/png,image/jpeg,image/webp" @change="uploadQr" />
+            <div v-if="form.qrImageUrl" class="mt-3">
+              <img :src="form.qrImageUrl" alt="Sham Cash QR" class="img-fluid rounded border" style="max-height:220px;background:#fff;object-fit:contain" />
+              <button class="btn btn-sm btn-outline-danger mt-2" type="button" @click="form.qrImageUrl = ''">إزالة صورة QR</button>
+            </div>
+            <div class="form-text">تظهر الصورة للمستخدم ويمكنه فتحها وحفظها على جهازه.</div>
           </div>
           <div class="mb-0">
-            <label class="form-label">تعليمات للمستخدم</label>
+            <label class="form-label">تعليمات التحويل للمستخدم</label>
             <textarea
               v-model="form.instructions"
               class="form-control"
-              rows="5"
-              placeholder="حوّل عبر شام كاش ثم أرسل صورة الإثبات على واتساب…"
+              rows="4"
+              placeholder="حوّل قيمة الباقة إلى حساب شام كاش، ثم ارفع إيصال التحويل للمراجعة…"
             />
           </div>
         </div>
@@ -98,7 +97,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { paymentSettingsApi } from '@/api'
+import { paymentSettingsApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -111,6 +110,7 @@ const success = ref('')
 const form = reactive({
   enabled: true,
   whatsapp: '',
+  qrImageUrl: '',
   displayName: 'شام كاش',
   accountName: '',
   accountId: '',
@@ -129,6 +129,7 @@ async function load() {
     const data = unwrap(await paymentSettingsApi.getShamCash())
     form.enabled = data?.enabled !== false
     form.whatsapp = data?.whatsapp || ''
+    form.qrImageUrl = data?.qrImageUrl || ''
     form.displayName = data?.displayName || 'شام كاش'
     form.accountName = data?.accountName || ''
     form.accountId = data?.accountId || ''
@@ -137,6 +138,34 @@ async function load() {
     error.value = e?.message || 'تعذر تحميل إعدادات شام كاش'
   } finally {
     loading.value = false
+  }
+}
+
+async function uploadQr(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    error.value = 'اختر صورة PNG أو JPG أو WEBP'
+    event.target.value = ''
+    return
+  }
+  saving.value = true
+  error.value = ''
+  try {
+    const result = await uploadsApi.upload(file)
+    if (result.error) throw result.error
+    const data = result.data?.data ?? result.data ?? {}
+    const url = data.url || data.path
+    if (!url) throw new Error('لم يرجع الخادم رابط الصورة')
+    form.qrImageUrl = url
+    success.value = 'تم رفع صورة QR'
+    toast().success(success.value)
+  } catch (e) {
+    error.value = e?.message || 'تعذر رفع صورة QR'
+    toast().danger(error.value)
+  } finally {
+    saving.value = false
+    event.target.value = ''
   }
 }
 
@@ -152,12 +181,14 @@ async function save() {
     const data = unwrap(await paymentSettingsApi.updateShamCash({
       enabled: true,
       whatsapp: String(form.whatsapp || '').trim(),
+      qrImageUrl: String(form.qrImageUrl || '').trim(),
       displayName: String(form.displayName || '').trim() || 'شام كاش',
       accountName: String(form.accountName || '').trim() || 'شام كاش',
       accountId,
       instructions: String(form.instructions || '').trim(),
     }))
     form.whatsapp = data?.whatsapp || ''
+    form.qrImageUrl = data?.qrImageUrl || ''
     form.displayName = data?.displayName || 'شام كاش'
     form.accountName = data?.accountName || ''
     form.accountId = data?.accountId || ''

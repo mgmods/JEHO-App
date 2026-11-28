@@ -237,6 +237,7 @@ export class LuckyBoxesService implements OnModuleInit {
         openId: openRecord.id,
         boxCode: box.code,
         boxTitle: box.title,
+        videoUrl: box.videoUrl || null,
         reward: { type: reward.type, amount: reward.amount },
         grantId: grant.id,
         remainingToday: Math.max(0, this.effectiveLimit(box) - opensToday - 1),
@@ -307,6 +308,7 @@ export class LuckyBoxesService implements OnModuleInit {
         costCoins: dto.costCoins ?? existing.costCoins,
         dailyLimitPerUser: dto.dailyLimitPerUser ?? existing.dailyLimitPerUser,
         isActive: dto.isActive ?? existing.isActive,
+        videoUrl: dto.videoUrl !== undefined ? (dto.videoUrl || null) : existing.videoUrl,
         rewardsJson,
       });
     } else {
@@ -317,6 +319,7 @@ export class LuckyBoxesService implements OnModuleInit {
         costCoins: dto.costCoins ?? 0,
         dailyLimitPerUser: dto.dailyLimitPerUser ?? 1,
         isActive: dto.isActive ?? true,
+        videoUrl: dto.videoUrl || null,
         rewardsJson,
       });
     }

@@ -8,7 +8,7 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
-  GoneException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AgenciesService } from './agencies.service';
@@ -20,6 +20,7 @@ import {
   UpdateMemberRoleDto,
   SubmitAgencyApplicationDto,
   JoinByCodeDto,
+  AcceptAgencyInviteDto,
   UpdateAgencySettingsDto,
   UpdateCommissionDto,
   CreateAgencyPayoutRequestDto,
@@ -132,9 +133,22 @@ export class AgenciesController {
     return this.agenciesService.openAgencyRoom(id, userId, dto);
   }
 
+  @Get(':id/audit')
+  @ApiOperation({ summary: 'Recent moderation actions in agency rooms (owner/manager only)' })
+  moderationAudit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.agenciesService.moderationAudit(id, userId, limit ? Number(limit) : 100);
+  }
+
   @Get(':id/stats')
-  stats(@Param('id', ParseUUIDPipe) id: string) {
-    return this.agenciesService.stats(id);
+  stats(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.agenciesService.stats(id, userId);
   }
 
   @Get(':id/earnings')
@@ -216,16 +230,51 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
     @Body() dto: JoinByCodeDto,
   ) {
-    return this.agenciesService.joinByCode(userId, dto.code);
+    return this.agenciesService.joinByCode(userId, dto.code, dto.publicId);
+  }
+
+  @Post(':id/invites/accept')
+  @ApiOperation({ summary: 'Accept a private in-app agency invite by agency UUID and activation code' })
+  acceptInvite(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    if (!dto?.code?.trim()) {
+      throw new BadRequestException('كود الدعوة غير موجود أو انتهت صلاحيته');
+    }
+    return this.agenciesService.acceptInvite(id, userId, dto.code.trim());
+  }
+
+  @Post(':id/invites/reject')
+  @ApiOperation({ summary: 'Reject a private in-app agency invite' })
+  rejectInvite(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    if (!dto?.code?.trim()) {
+      throw new BadRequestException('تعذر رفض الدعوة: بيانات الدعوة غير مكتملة');
+    }
+    return this.agenciesService.rejectInvite(id, userId, dto.code.trim());
   }
 
   @Post(':id/join')
-  @ApiOperation({ summary: 'Deprecated: hosts must use POST /agencies/join-by-code' })
-  join() {
-    throw new GoneException({
-      code: 'AGENCY_ACTIVATION_CODE_REQUIRED',
-      message: 'الانضمام يتم بكود تفعيل الوكالة فقط عبر /agencies/join-by-code',
-    });
+  @ApiOperation({
+    summary: 'Compatibility: accept an in-app agency invite using the agency UUID + activation code',
+  })
+  join(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AcceptAgencyInviteDto,
+  ) {
+    // Compatibility for current/older invite cards. A missing code is NOT a
+    // transport error: it simply becomes a normal pending join request.
+    // When a private activation code is present, validate the invitation first.
+    if (dto?.code?.trim()) {
+      return this.agenciesService.acceptInvite(id, userId, dto.code);
+    }
+    return this.agenciesService.joinSelf(id, userId);
   }
 
   @Patch(':id/settings')
@@ -360,4 +409,17 @@ export class AgenciesController {
   ) {
     return this.agenciesService.removeMember(id, userId, memberUserId);
   }
+
+  @Public()
+  @Get(':id/public-members')
+  publicMembers(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.agenciesService.publicMembers(id, page ? Number(page) : 1, limit ? Number(limit) : 30);
+  }
+
+  @Public()
+  @Get(':id/followers')
+  publicFollowers(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.agenciesService.publicFollowers(id, page ? Number(page) : 1, limit ? Number(limit) : 30);
+  }
+
 }

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@drawable/bg_sham_cash_screen">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -47,80 +47,106 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingBottom="28dp"
-                android:paddingTop="12dp">
+                android:paddingHorizontal="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="36dp">
 
                 <TextView
                     android:id="@+id/tvPackageSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:textColor="#B3000000"
-                    android:textSize="13sp" />
-
-                <!-- White QR card like Sham Cash receipt -->
-                <FrameLayout
-                    android:layout_width="280dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:background="@drawable/bg_sham_cash_qr_card"
-                    android:padding="18dp">
-
-                    <ImageView
-                        android:id="@+id/imgQr"
-                        android:layout_width="244dp"
-                        android:layout_height="244dp"
-                        android:layout_gravity="center_horizontal"
-                        android:contentDescription="@null"
-                        android:scaleType="fitCenter" />
-                </FrameLayout>
+                    android:background="@drawable/bg_sham_cash_hero"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tvAccountNameLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
+                    android:text="بيانات التحويل إلى شام كاش"
+                    android:textColor="#9DE8E1"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_sham_cash_qr_card"
+                    android:padding="14dp">
+
+                    <ImageView
+                        android:id="@+id/imgQr"
+                        android:layout_width="240dp"
+                        android:layout_height="240dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="باركود حساب شام كاش"
+                        android:scaleType="fitCenter" />
+                </FrameLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSaveQr"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="10dp"
+                    android:text="فتح / تحميل صورة الباركود"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#668EA2FF" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
                     android:gravity="center"
                     android:text="@string/pay_sham_cash_name_label"
-                    android:textColor="#99FFFFFF"
+                    android:textColor="#AEB7CC"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvAccountName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_sham_cash_section"
+                    android:padding="12dp"
                     android:gravity="center"
-                    android:textColor="#000000"
-                    android:textSize="20sp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="19sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvAccountIdLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="12dp"
                     android:gravity="center"
                     android:text="@string/pay_sham_cash_account_label"
-                    android:textColor="#99FFFFFF"
+                    android:textColor="#AEB7CC"
                     android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tvAccountId"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="5dp"
                     android:background="@drawable/bg_sham_cash_account_box"
                     android:fontFamily="monospace"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="12dp"
+                    android:padding="12dp"
                     android:textColor="#FFFFFF"
                     android:textIsSelectable="true"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -129,7 +155,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:gravity="center"
-                    android:textColor="#121212"
+                    android:textColor="#E5C979"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
@@ -137,33 +163,209 @@
                     android:id="@+id/tvInstructions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_sham_cash_section"
+                    android:padding="14dp"
                     android:gravity="center"
-                    android:textColor="#99000000"
+                    android:textColor="#B9C1D3"
                     android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCopyAccount"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="18dp"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="10dp"
                     android:text="@string/pay_sham_cash_copy_account"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
-                    app:cornerRadius="14dp"
-                    app:strokeColor="#66FFFFFF" />
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#668EA2FF" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="22dp"
+                    android:layout_marginBottom="18dp"
+                    android:background="#273044" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="رفع إيصال التحويل للمراجعة"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:text="ارفع لقطة واضحة من تطبيق شام كاش أو ملف PDF."
+                    android:textColor="#AEB7CC"
+                    android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWhatsapp"
+                    android:id="@+id/btnSelectReceipt"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/pay_sham_cash_send_proof"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="12dp"
+                    android:text="اختيار صورة الإيصال أو ملف PDF"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
-                    app:backgroundTint="#25D366"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#668EA2FF" />
+
+                <TextView
+                    android:id="@+id/tvReceiptName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_sham_cash_section"
+                    android:padding="10dp"
+                    android:gravity="center"
+                    android:text="لم يتم اختيار إيصال بعد"
+                    android:textColor="#9EA9BE"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="اسم المرسل كما يظهر في الحوالة *"
+                    android:textColor="#E9ECF5"
+                    android:textSize="13sp" />
+
+                <EditText
+                    android:id="@+id/etSenderName"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/bg_sham_cash_account_box"
+                    android:hint="اكتب اسم المرسل"
+                    android:inputType="textPersonName"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#8490A6"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="المبلغ المرسل *"
+                    android:textColor="#E9ECF5"
+                    android:textSize="13sp" />
+
+                <EditText
+                    android:id="@+id/etAmountSent"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/bg_sham_cash_account_box"
+                    android:hint="أدخل المبلغ"
+                    android:inputType="numberDecimal"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#8490A6"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="رقم العملية"
+                    android:textColor="#E9ECF5"
+                    android:textSize="13sp" />
+
+                <EditText
+                    android:id="@+id/etTransferReference"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/bg_sham_cash_account_box"
+                    android:hint="رقم عملية التحويل إن وجد"
+                    android:inputType="text"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#8490A6"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="تاريخ التحويل *"
+                    android:textColor="#E9ECF5"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTransferDate"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="5dp"
+                    android:text="اختر تاريخ التحويل"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#44536D" />
+
+                <TextView
+                    android:id="@+id/tvTransferDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:paddingTop="5dp"
+                    android:textColor="#E5C979"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="ملاحظة"
+                    android:textColor="#E9ECF5"
+                    android:textSize="13sp" />
+
+                <EditText
+                    android:id="@+id/etTransferNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="88dp"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/bg_sham_cash_account_box"
+                    android:gravity="top|start"
+                    android:hint="أضف ملاحظة اختيارية"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:padding="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#8490A6"
+                    android:textSize="14sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSubmitReceipt"
+                    android:layout_width="match_parent"
+                    android:layout_height="54dp"
+                    android:layout_marginTop="20dp"
+                    android:text="إرسال الإيصال للمراجعة"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="#168B75"
                     app:cornerRadius="14dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCancelOrder"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:text="إلغاء الطلب"
+                    android:textAllCaps="false"
+                    android:textColor="#FF9292"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#66FF7777" />
+
             </LinearLayout>
         </ScrollView>
     </LinearLayout>

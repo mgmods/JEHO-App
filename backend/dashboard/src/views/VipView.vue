@@ -1,16 +1,24 @@
 <template>
   <div>
-    <PageHeader :title="t('vip.title')" :subtitle="t('vip.subtitle')">
+    <PageHeader v-if="activeTab === 'plans'" :title="t('vip.title')" :subtitle="t('vip.subtitle')">
       <template #actions>
+        <template v-if="activeTab === 'plans'">
         <button class="btn btn-ghost btn-sm" type="button" @click="openPlan()">
           <i class="bi bi-plus-lg me-1"></i> {{ t('vip.newPlan') }}
         </button>
         <button class="btn btn-aurora btn-sm" type="button" @click="showAssign = true">
           <i class="bi bi-person-plus me-1"></i> {{ t('vip.assignVip') }}
         </button>
+        </template>
       </template>
     </PageHeader>
 
+    <div class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="إدارة VIP">
+      <button type="button" class="btn btn-sm" :class="activeTab === 'plans' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('plans')">مستويات VIP والأعضاء</button>
+      <button type="button" class="btn btn-sm" :class="activeTab === 'visuals' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('visuals')">مظاهر VIP حسب المستوى</button>
+    </div>
+
+    <template v-if="activeTab === 'plans'">
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
@@ -43,14 +51,14 @@
           </div>
           <div class="vip-price mb-1">
             <span class="coin-icon" aria-hidden="true">◈</span>
-            <strong>{{ formatNumber(p.coinPrice ?? p.price ?? 0) }}</strong>
+            <strong>{{ formatNumber(p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 0) }}</strong>
             <span class="vip-price-unit">{{ t('vip.perMonth') }}</span>
           </div>
           <div class="widget-card-meta mb-2">
             {{ p.durationDays || 30 }} {{ t('vip.days') }}
           </div>
-          <ul v-if="(p.benefits || []).length" class="vip-benefits mb-3">
-            <li v-for="(b, i) in (p.benefits || []).slice(0, 4)" :key="i">{{ b }}</li>
+          <ul v-if="planBenefitExtras(p).length" class="vip-benefits mb-3">
+            <li v-for="(b, i) in planBenefitExtras(p).slice(0, 4)" :key="i">{{ b }}</li>
           </ul>
           <div class="action-btns">
             <button class="btn btn-sm btn-ghost" type="button" @click="openPlan(p)">
@@ -151,10 +159,94 @@
                 <label class="form-label">{{ t('vip.benefits') }}</label>
                 <input v-model="planForm.benefitsText" class="form-control" />
               </div>
+              <div class="form-check form-switch my-3 p-3 rounded border">
+                <input id="mysteriousManEnabled" v-model="planForm.mysteriousManEnabled" class="form-check-input ms-0 me-2" type="checkbox" />
+                <label class="form-check-label fw-semibold" for="mysteriousManEnabled">🕵️ ميزة الرجل الغامض لهذا الاشتراك</label>
+                <div class="small text-secondary mt-1">عند التفعيل، يمنح هذا المستوى صلاحية وضع الهوية الغامضة داخل الروم.</div>
+              </div>
+              <hr />
+              <h6 class="mb-2">مظاهر هذا المستوى — ترفع مباشرة إلى VIP {{ planForm.level }}</h6>
+              <div class="mb-3 p-3 rounded border">
+                <label class="form-label fw-semibold">الأيقونة الرئيسية للمستوى — تظهر كبيرة في الملف الشخصي وبطاقة VIP</label>
+                <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'vipMainIconUrl')" />
+                <div v-if="planForm.visuals.vipMainIconUrl" class="vip-upload-preview">
+                  <img :src="assetUrl(planForm.visuals.vipMainIconUrl)" alt="الأيقونة الرئيسية للمستوى" />
+                  <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals.vipMainIconUrl = ''">إزالة الأيقونة الرئيسية</button>
+                </div>
+                <div class="small text-secondary mt-2">لكل مستوى VIP أيقونته المستقلة. تغييرها وحفظ الخطة يحدّثها من الخادم دون تحديث APK.</div>
+              </div>
+              <div class="mb-3 p-3 rounded border">
+                <label class="form-label fw-semibold">الشارة الأفقية الجديدة — تظهر تحت ID بجانب اسم VIP</label>
+                <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'vipHorizontalBadgeUrl')" />
+                <div v-if="planForm.visuals.vipHorizontalBadgeUrl" class="vip-upload-preview">
+                  <img :src="assetUrl(planForm.visuals.vipHorizontalBadgeUrl)" alt="معاينة الشارة الأفقية الجديدة" />
+                  <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals.vipHorizontalBadgeUrl = ''">إزالة الشارة الأفقية</button>
+                </div>
+                <div class="small text-secondary mt-2">ترفع صورة مستقلة لهذا المستوى، وتظهر بارتفاع كتابة VIP الحالية. لا تؤثر على الأيقونة الكبيرة.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">شارة / شعار VIP القديمة (تبقى محفوظة للتوافق)</label>
+                <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'badgeUrl')" />
+                <div v-if="planForm.badgeUrl" class="vip-upload-preview"><img :src="assetUrl(planForm.badgeUrl)" alt="معاينة شارة VIP" /></div>
+              </div>
+              <div class="p-3 rounded border mb-3">
+                <h6 class="mb-2">إطار الرجل الغامض</h6>
+                <label class="form-label">طريقة عرض الإطار</label>
+                <select v-model="planForm.visuals.mysteriousManFrameMode" class="form-select mb-3">
+                  <option value="custom">استخدام إطار خاص ترفعه الإدارة</option>
+                  <option value="user">استخدام إطار المستخدم الحالي</option>
+                </select>
+                <div v-if="planForm.visuals.mysteriousManFrameMode !== 'user'">
+                  <label class="form-label">رفع إطار الرجل الغامض (صورة أو GIF أو SVGA أو فيديو)</label>
+                  <input type="file" class="form-control" accept="image/*,video/mp4,video/webm,.gif,.webp,.mp4,.webm,.svga" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'mysteriousManFrameUrl')" />
+                  <div v-if="planForm.visuals.mysteriousManFrameUrl" class="vip-upload-preview mt-2">
+                    <video v-if="/\.(mp4|webm)(\?|$)/i.test(planForm.visuals.mysteriousManFrameUrl)" :src="assetUrl(planForm.visuals.mysteriousManFrameUrl)" muted autoplay loop playsinline />
+                    <img v-else :src="assetUrl(planForm.visuals.mysteriousManFrameUrl)" alt="معاينة إطار الرجل الغامض" />
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals.mysteriousManFrameUrl = ''">إزالة الإطار الخاص</button>
+                  </div>
+                </div>
+                <div class="small text-secondary mt-2">يمكن اختيار إطار خاص أو الاحتفاظ بإطار المستخدم الحالي. تُحفظ الإعدادات مع اشتراك VIP هذا.</div>
+              </div>
+              <div class="row g-3">
+                <div v-for="asset in [
+                  { key: 'vipFrameUrl', label: 'إطار VIP' },
+                  { key: 'vipCardUrl', label: 'بطاقة VIP' },
+                  { key: 'profileCardUrl', label: 'بطاقة الملف الشخصي' },
+                  { key: 'chatBubbleUrl', label: 'فقاعة الدردشة' },
+                  { key: 'nameplateUrl', label: 'لوحة الاسم' },
+                ]" :key="asset.key" class="col-md-6">
+                  <label class="form-label">{{ asset.label }}</label>
+                  <input type="file" class="form-control" accept="image/*,video/mp4,video/webm,.gif,.webp,.mp4,.webm,.svga" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, asset.key)" />
+                  <div v-if="planForm.visuals[asset.key]" class="vip-upload-preview">
+                    <video v-if="/\.(mp4|webm)(\?|$)/i.test(planForm.visuals[asset.key])" :src="assetUrl(planForm.visuals[asset.key])" muted autoplay loop playsinline />
+                    <img v-else :src="assetUrl(planForm.visuals[asset.key])" :alt="asset.label" />
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals[asset.key] = ''">إزالة من الخطة</button>
+                  </div>
+                </div>
+              </div>
+              <div class="p-3 rounded border mt-3">
+                <h6 class="mb-2">اسم الحساب — لون وحركة وتوهج · VIP {{ planForm.level }}</h6>
+                <div class="form-check form-switch mb-3">
+                  <input id="vipNameStyleEnabled" v-model="planForm.visuals.nameStyle.enabled" class="form-check-input" type="checkbox" />
+                  <label class="form-check-label fw-semibold" for="vipNameStyleEnabled">تفعيل الاسم المميز لهذا المستوى</label>
+                </div>
+                <div v-if="planForm.visuals.nameStyle.enabled">
+                  <div class="row g-2">
+                    <div class="col-md-6"><label class="form-label">نوع اللون</label><select v-model="planForm.visuals.nameStyle.mode" class="form-select"><option value="solid">لون ثابت</option><option value="gradient">تدرج ثابت</option><option value="animated">تدرج متحرك</option></select></div>
+                    <div class="col-md-6" v-if="planForm.visuals.nameStyle.mode === 'animated'"><label class="form-label">حركة الاسم</label><select v-model="planForm.visuals.nameStyle.animation" class="form-select"><option value="rainbow">قوس قزح</option><option value="wave">موجة لونية</option><option value="pulse">نبض لوني</option></select></div>
+                    <div class="col-4"><label class="form-label">اللون الأول</label><input v-model="planForm.visuals.nameStyle.color1" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-4"><label class="form-label">اللون الثاني</label><input v-model="planForm.visuals.nameStyle.color2" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-4"><label class="form-label">اللون الثالث</label><input v-model="planForm.visuals.nameStyle.color3" type="color" class="form-control form-control-color w-100" /></div>
+                    <div class="col-md-6"><label class="form-label">سرعة الحركة</label><select v-model.number="planForm.visuals.nameStyle.speed" class="form-select"><option :value="0.6">سريعة</option><option :value="1">متوسطة</option><option :value="1.8">بطيئة</option></select></div>
+                    <div class="col-md-6"><label class="form-label">التوهج</label><select v-model="planForm.visuals.nameStyle.glow" class="form-select"><option :value="false">بدون توهج</option><option :value="true">مع توهج</option></select></div>
+                  </div>
+                  <div class="mt-3 p-3 rounded text-center bg-dark"><span class="name-style-preview" :class="{ 'name-style-preview-animated': planForm.visuals.nameStyle.mode === 'animated' }" :style="{ '--name-c1': planForm.visuals.nameStyle.color1, '--name-c2': planForm.visuals.nameStyle.color2, '--name-c3': planForm.visuals.nameStyle.color3, textShadow: planForm.visuals.nameStyle.glow ? '0 0 8px ' + planForm.visuals.nameStyle.color2 + ', 0 0 18px ' + planForm.visuals.nameStyle.color1 : 'none' }">{{ 'اسم الحساب · VIP ' + planForm.level }}</span><div class="small text-white-50 mt-2">معاينة شكل الاسم قبل الحفظ</div></div>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-ghost" @click="showPlan = false">{{ t('common.cancel') }}</button>
-              <button type="submit" class="btn btn-aurora" :disabled="saving">{{ t('common.save') }}</button>
+              <button type="submit" class="btn btn-aurora" :disabled="saving || !!uploadingVisual">{{ t('common.save') }}</button>
             </div>
           </form>
         </div>
@@ -179,7 +271,7 @@
                 <select v-model="assignForm.planId" class="form-select" required>
                   <option disabled value="">{{ t('vip.selectPlan') }}</option>
                   <option v-for="p in plans" :key="p.id" :value="p.id">
-                    {{ p.name }} · {{ formatNumber(p.coinPrice ?? p.price ?? 0) }} {{ t('common.coins') }}
+                    {{ p.name }} · {{ formatNumber(p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 0) }} {{ t('common.coins') }}
                   </option>
                 </select>
               </div>
@@ -199,11 +291,40 @@
       :message="confirmMsg"
       @confirm="runConfirm"
     />
+    </template>
+    <template v-else>
+      <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+      <div class="widget-grid mb-3">
+        <article v-for="p in plans" :key="p.id" class="widget-card vip-card" :style="{ '--vip-accent': tierColor(p.level) }">
+          <div class="widget-card-media vip-media vip-visual-preview">
+            <img v-if="p.badgeUrl" :src="assetUrl(p.badgeUrl)" alt="شارة VIP" />
+            <span v-else class="vip-tier-chip">VIP {{ p.level }}</span>
+          </div>
+          <div class="widget-card-body">
+            <h3 class="widget-card-title">{{ p.name || ('VIP ' + p.level) }}</h3>
+            <div class="small text-muted mb-2">إدارة ملفات هذا المستوى مباشرة، بدون فتح المتجر</div>
+            <div class="vip-asset-list">
+              <span :class="{ 'is-set': planVisuals(p).vipFrameUrl }">إطار VIP</span>
+              <span :class="{ 'is-set': planVisuals(p).vipCardUrl }">بطاقة VIP</span>
+              <span :class="{ 'is-set': planVisuals(p).profileCardUrl }">بطاقة الملف الشخصي</span>
+              <span :class="{ 'is-set': planVisuals(p).chatBubbleUrl }">فقاعة الدردشة</span>
+              <span :class="{ 'is-set': planVisuals(p).nameplateUrl }">لوحة الاسم</span>
+              <span :class="{ 'is-set': planBenefitExtras(p).includes('mysterious_man') }">الرجل الغامض</span>
+              <span :class="{ 'is-set': !!planVisuals(p).mysteriousManFrameUrl || planVisuals(p).mysteriousManFrameMode === 'user' }">إطار الرجل الغامض</span>
+            </div>
+            <div class="action-btns mt-3">
+              <button class="btn btn-sm btn-aurora" type="button" @click="openPlan(p)">تعديل مظاهر VIP {{ p.level }}</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { vipApi } from '@/api'
 import { extractList, formatNumber, formatDate } from '@/composables/useUtils'
@@ -217,8 +338,22 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { uploadsApi } from '@/api'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const activeTab = ref(route.query.tab === 'visuals' ? 'visuals' : 'plans')
+
+function setTab(tab) {
+  activeTab.value = tab
+  const query = tab === 'visuals' ? { tab: 'visuals' } : {}
+  router.replace({ name: 'vip', query })
+}
+
+watch(() => route.query.tab, (tab) => {
+  activeTab.value = tab === 'visuals' ? 'visuals' : 'plans'
+})
 
 const plans = ref([])
 const members = ref([])
@@ -228,7 +363,12 @@ const error = ref('')
 const success = ref('')
 const showPlan = ref(false)
 const showAssign = ref(false)
-const planForm = reactive({ id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '' })
+const planForm = reactive({
+  id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '',
+  mysteriousManEnabled: false,
+  badgeUrl: '', visuals: { vipMainIconUrl: '', vipHorizontalBadgeUrl: '', vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
+})
+const uploadingVisual = ref('')
 const assignForm = reactive({ userId: '', planId: '' })
 const bulkBusy = ref(false)
 
@@ -283,11 +423,26 @@ function tierColor(level) {
   return LEVEL_COLORS[tierForLevel(level)] || '#00c9b1'
 }
 
+function assetUrl(path) { return resolveAsset(path) }
+
+function planBenefitExtras(plan) {
+  const benefits = plan?.benefits
+  if (Array.isArray(benefits)) return benefits
+  if (Array.isArray(benefits?.extra)) return benefits.extra
+  if (Array.isArray(plan?.perks)) return plan.perks
+  return []
+}
+
+function planVisuals(plan) {
+  // The API stores tier visuals inside vip_plans.benefits.visuals.
+  if (plan?.visuals && typeof plan.visuals === 'object') return plan.visuals
+  if (plan?.benefits?.visuals && typeof plan.benefits.visuals === 'object') return plan.benefits.visuals
+  return {}
+}
+
 function badgeSrc(p) {
   const lvl = tierForLevel(p.level)
-  const fromPlan = p.badgeUrl && String(p.badgeUrl).includes(`vip_medal_mikoo_${lvl}`)
-    ? p.badgeUrl
-    : `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`
+  const fromPlan = p.badgeUrl || `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`
   return resolveAsset(fromPlan)
 }
 
@@ -314,15 +469,55 @@ function openPlan(p = null) {
     Object.assign(planForm, {
       id: p.id,
       name: p.name || '',
-      price: p.coinPrice ?? p.price ?? 99,
+      price: p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 99,
       durationDays: p.durationDays || p.duration || 30,
       level: Math.max(1, Math.min(100, Number(p.level || 1))),
-      benefitsText: (p.benefits || p.perks || []).join(', '),
+      benefitsText: planBenefitExtras(p).filter((b) => b !== 'mysterious_man').join(', '),
+      mysteriousManEnabled: planBenefitExtras(p).includes('mysterious_man'),
+      badgeUrl: p.badgeUrl || '',
+      visuals: {
+        vipMainIconUrl: planVisuals(p).vipMainIconUrl || p.vipMainIconUrl || '',
+        vipHorizontalBadgeUrl: planVisuals(p).vipHorizontalBadgeUrl || p.vipHorizontalBadgeUrl || '',
+        vipFrameUrl: planVisuals(p).vipFrameUrl || '',
+        vipCardUrl: planVisuals(p).vipCardUrl || '',
+        profileCardUrl: planVisuals(p).profileCardUrl || '',
+        chatBubbleUrl: planVisuals(p).chatBubbleUrl || '',
+        nameplateUrl: planVisuals(p).nameplateUrl || '',
+        mysteriousManFrameUrl: planVisuals(p).mysteriousManFrameUrl || '',
+        mysteriousManFrameMode: planVisuals(p).mysteriousManFrameMode === 'user' ? 'user' : 'custom',
+        nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1, ...(planVisuals(p).nameStyle || {}) },
+      },
     })
   } else {
-    Object.assign(planForm, { id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '' })
+    Object.assign(planForm, {
+      id: null, name: '', price: 99, durationDays: 30, level: plans.value.length + 1, benefitsText: '',
+      mysteriousManEnabled: false,
+      badgeUrl: '', visuals: { vipMainIconUrl: '', vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom', nameStyle: { enabled: false, mode: 'solid', animation: 'rainbow', color1: '#D946EF', color2: '#8B5CF6', color3: '#22D3EE', glow: false, speed: 1 } },
+    })
   }
   showPlan.value = true
+}
+
+async function uploadPlanVisual(event, field) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploadingVisual.value = field
+  error.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw err
+    const url = data?.data?.url || data?.url
+    if (!url) throw new Error('لم يرجع الخادم رابط الملف بعد الرفع')
+    if (field === 'badgeUrl') planForm.badgeUrl = url
+    else planForm.visuals[field] = url
+    toast().success('تم رفع الملف')
+  } catch (e) {
+    error.value = e?.message || t('app.error')
+    toast().danger(error.value)
+  } finally {
+    uploadingVisual.value = ''
+    event.target.value = ''
+  }
 }
 
 async function savePlan() {
@@ -332,7 +527,12 @@ async function savePlan() {
     price: planForm.price,
     durationDays: planForm.durationDays,
     level: Math.max(1, Math.min(100, Number(planForm.level || 1))),
-    benefits: planForm.benefitsText.split(',').map((s) => s.trim()).filter(Boolean),
+    benefits: [
+      ...planForm.benefitsText.split(',').map((s) => s.trim()).filter((s) => s && s !== 'mysterious_man'),
+      ...(planForm.mysteriousManEnabled ? ['mysterious_man'] : []),
+    ],
+    badgeUrl: planForm.badgeUrl || null,
+    visuals: { ...planForm.visuals },
   }
   const result = planForm.id
     ? await vipApi.updatePlan(planForm.id, payload)
@@ -423,6 +623,9 @@ onMounted(load)
 </script>
 
 <style scoped>
+  .name-style-preview { font-size: 1.35rem; font-weight: 800; background: linear-gradient(90deg, var(--name-c1), var(--name-c2), var(--name-c3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .name-style-preview-animated { background-size: 220% 100%; animation: vipNamePreview 2.8s linear infinite; }
+  @keyframes vipNamePreview { from { background-position: 0% 50%; } to { background-position: 220% 50%; } }
 .vip-card {
   --vip-accent: #00c9b1;
   border-color: color-mix(in srgb, var(--vip-accent) 35%, var(--border-color));
@@ -463,6 +666,13 @@ onMounted(load)
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
+.vip-visual-preview { min-height: 140px; }
+.vip-visual-preview img { max-width: 70%; max-height: 120px; object-fit: contain; }
+.vip-asset-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.vip-asset-list span { border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 7px; font-size: .72rem; opacity: .7; }
+.vip-asset-list span.is-set { opacity: 1; border-color: #00c9b1; color: #00c9b1; }
+.vip-upload-preview { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.vip-upload-preview img, .vip-upload-preview video { max-width: 180px; max-height: 100px; object-fit: contain; border-radius: 8px; background: #111; }
 .vip-price {
   color: #ffe08a;
   font-size: 1.12rem;

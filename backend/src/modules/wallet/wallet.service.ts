@@ -4,11 +4,13 @@ import {
   BadRequestException,
   ForbiddenException,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -64,8 +66,9 @@ const MIN_WITHDRAW_USD = 10;
 const DEFAULT_PACKAGES = STANDARD_RECHARGE_PACKAGES.map((p) => ({ ...p }));
 
 @Injectable()
-export class WalletService implements OnModuleInit {
+export class WalletService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WalletService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
@@ -88,39 +91,80 @@ export class WalletService implements OnModuleInit {
     @Optional() private readonly hostTarget?: HostTargetService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndCatalog();
+  }
+
+  private async initializeSchemaAndCatalog(): Promise<void> {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
+        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`);
+        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`);
+      });
     } catch (err) {
-      this.logger.warn(`ensure traderDiamonds: ${(err as Error).message}`);
+      this.logger.warn(`Wallet schema migration deferred: ${(err as Error).message}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
     }
+    // These startup data repairs previously ran independently on every API
+    // replica. In particular, the silverCoins UPDATE could make every replica
+    // contend for the same wallet rows during a rolling deployment. Elect one
+    // cluster-wide maintainer and keep the session pinned for the whole repair.
+    const runner = this.dataSource.createQueryRunner();
+    let maintenanceLockAcquired = false;
     try {
-      await this.dataSource.query(
-        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`,
-      );
-    } catch (err) {
-      this.logger.warn(`ensure agencyDiamonds: ${(err as Error).message}`);
-    }
-    try {
-      // Retire silver: fold any remaining balance into gold coins and zero the column.
-      const result = await this.dataSource.query(`
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '30s'");
+      maintenanceLockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!maintenanceLockAcquired) {
+        // Another replica is performing the shared repair. Retry later in case
+        // that process exits before completing the idempotent conversion.
+        if (!this.schemaRetryTimer) {
+          this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+          this.schemaRetryTimer.unref?.();
+        }
+        return;
+      }
+
+      // Idempotent one-time balance conversion. Only one replica can execute it.
+      const result = await runner.query(`
         UPDATE wallets
         SET coins = COALESCE(coins, 0) + COALESCE("silverCoins", 0),
             "silverCoins" = 0
         WHERE COALESCE("silverCoins", 0) <> 0
       `);
-      this.logger.log(`Silver coins retired into coins (affected rows logged by driver)`);
+      this.logger.log('Silver-coin retirement completed under the cluster maintenance lock.');
       void result;
-    } catch (err) {
-      this.logger.warn(`retire silverCoins: ${(err as Error).message}`);
-    }
-    try {
       await this.ensureCanonicalPackages();
+      if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+      this.schemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`ensureCanonicalPackages: ${(err as Error).message}`);
+      this.logger.warn(`Wallet startup maintenance deferred: ${(err as Error).message}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndCatalog(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+    } finally {
+      if (maintenanceLockAcquired) {
+        if (maintenanceLockAcquired) await releaseJehoSchemaLock(runner).catch((unlockError) => this.logger.error(`Wallet maintenance lock release failed; connection discarded: ${(unlockError as Error).message}`));
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
+  }
+
+  onModuleDestroy(): void {
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /** Force-safe packages if missing, outdated version, or fat density (owner-risk). */
@@ -223,16 +267,17 @@ export class WalletService implements OnModuleInit {
     const economy = await this.economyConfig();
     const target = economy.withdrawTargetDiamonds;
     const fiatRate = economy.diamondUsdRate;
+    const netFiatRate = economy.withdrawalNetUsdRate;
     return {
       ...wallet,
       coins: Number(wallet.coins),
       /** The one and only diamond balance. */
       diamonds,
       personalDiamonds: diamonds,
-      personalUsd: Number((diamonds * fiatRate).toFixed(4)),
+      personalUsd: Number((diamonds * netFiatRate).toFixed(4)),
       agencyDiamonds: 0,
       agencyUsd: 0,
-      diamondsUsd: Number((diamonds * fiatRate).toFixed(4)),
+      diamondsUsd: Number((diamonds * netFiatRate).toFixed(4)),
       traderDiamonds: 0,
       silverCoins: 0,
       gamePoints: 0,
@@ -241,6 +286,8 @@ export class WalletService implements OnModuleInit {
       canWithdraw: diamonds >= target,
       canWithdrawAgency: diamonds >= target,
       diamondUsdRate: fiatRate,
+      withdrawalNetUsdRate: netFiatRate,
+      withdrawalMarginPercent: economy.withdrawalMarginPercent,
     };
   }
 
@@ -254,10 +301,20 @@ export class WalletService implements OnModuleInit {
       1,
     );
     const rate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
+    const withdrawalMarginPercent = await this.numberSetting(
+      'economy.withdrawal_margin_percent',
+      0,
+      0,
+      100,
+    );
+    const withdrawalNetUsdRate =
+      rate * (1 - withdrawalMarginPercent / 100);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / rate));
     const target = Math.max(minFromUsd, Math.floor(ECONOMY.minWithdrawDiamonds || 200000));
     return {
       diamondUsdRate: rate,
+      withdrawalNetUsdRate,
+      withdrawalMarginPercent,
       diamondCoinRate: coinRate,
       /** التارجت = الحد الأدنى للسحب بالألماس القابل للسحب */
       minWithdrawDiamonds: target,
@@ -275,6 +332,7 @@ export class WalletService implements OnModuleInit {
   async listWithdrawPackages() {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
+    const netRate = Number(economy.withdrawalNetUsdRate) || rate;
     const min = Math.max(
       Math.round(MIN_WITHDRAW_USD / rate),
       Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
@@ -297,7 +355,7 @@ export class WalletService implements OnModuleInit {
         : defaultsUsd.map((usd, i) => ({
             id: String(i + 1),
             usd,
-            diamonds: Math.max(min, Math.round(usd / rate)),
+            diamonds: Math.max(min, Math.round(usd / netRate)),
             label: `$${usd % 1 === 0 ? usd.toFixed(0) : usd.toFixed(2)}`,
           }));
     let items = source
@@ -306,13 +364,13 @@ export class WalletService implements OnModuleInit {
           Number(row.usd) > 0
             ? Number(row.usd)
             : Number(row.diamonds) > 0
-              ? Number((Number(row.diamonds) * rate).toFixed(2))
+              ? Number((Number(row.diamonds) * netRate).toFixed(2))
               : 0;
         const diamonds =
           Number(row.diamonds) > 0
             ? Math.floor(Number(row.diamonds))
             : usd > 0
-              ? Math.max(min, Math.round(usd / rate))
+              ? Math.max(min, Math.round(usd / netRate))
               : 0;
         if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
@@ -340,6 +398,8 @@ export class WalletService implements OnModuleInit {
     return {
       items,
       diamondUsdRate: rate,
+      withdrawalNetUsdRate: netRate,
+      withdrawalMarginPercent: Number(economy.withdrawalMarginPercent) || 0,
       minWithdrawDiamonds: min,
       minWithdrawUsd: MIN_WITHDRAW_USD,
       currency: 'USD',
@@ -350,6 +410,7 @@ export class WalletService implements OnModuleInit {
   async saveWithdrawPackages(items: Array<Record<string, unknown>>) {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
+    const netRate = Number(economy.withdrawalNetUsdRate) || rate;
     const min = Math.max(
       Math.round(MIN_WITHDRAW_USD / rate),
       Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
@@ -359,7 +420,7 @@ export class WalletService implements OnModuleInit {
         const usd = Number(row?.usd) || 0;
         let diamonds = Math.floor(Number(row?.diamonds) || 0);
         if (usd > 0 && diamonds <= 0) {
-          diamonds = Math.max(min, Math.round(usd / rate));
+          diamonds = Math.max(min, Math.round(usd / netRate));
         }
         if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
@@ -772,9 +833,30 @@ export class WalletService implements OnModuleInit {
     return { items: normalized };
   }
 
+  /** Read a boolean withdrawal policy from dashboard settings. Existing installs default to enabled. */
+  private async withdrawalSetting(key: string): Promise<boolean> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    if (!row || row.value == null || row.value === '') return true;
+    const value = String(row.value).trim().toLowerCase();
+    return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+  }
+
   async requestWithdraw(userId: string, dto: WithdrawDto) {
     const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
-    const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
+    const withdrawalMarginPercent = await this.numberSetting(
+      'economy.withdrawal_margin_percent',
+      0,
+      0,
+      100,
+    );
+    const netFiatRate = fiatRate * (1 - withdrawalMarginPercent / 100);
+    const configuredMinWithdraw = await this.numberSetting(
+      'economy.min_withdraw_diamonds',
+      Number(ECONOMY.minWithdrawDiamonds || 200000),
+      1,
+      1_000_000_000,
+    );
+    const minWithdraw = Math.floor(configuredMinWithdraw);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
     const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
 
@@ -788,6 +870,23 @@ export class WalletService implements OnModuleInit {
       sourceRaw === 'agency' ||
       sourceRaw === 'agency_room' ||
       sourceRaw === 'agency_earnings';
+    // Dashboard controls the withdrawal channels. The general wallet switch
+    // gates all withdrawals; host/agency switches then gate their stream.
+    if (!(await this.withdrawalSetting('withdrawal.wallet_enabled'))) {
+      throw new ForbiddenException('السحب من المحفظة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.agency_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح الوكالة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      !isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.host_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح المضيف معطّل حاليًا من إعدادات المنصة');
+    }
     const stageIdRaw = String(
       (dto.payoutDetails as any)?.stageId ||
         (dto.payoutDetails as any)?.targetStageId ||
@@ -853,7 +952,7 @@ export class WalletService implements OnModuleInit {
       wallet.diamonds = bal - dto.diamonds;
       await manager.save(wallet);
 
-      const amountFiat = Number((dto.diamonds * fiatRate).toFixed(2));
+      const amountFiat = Number((dto.diamonds * netFiatRate).toFixed(2));
       const stream = isAgencySource ? 'agency' : 'personal';
       const agencyKind =
         sourceRaw === 'agency_host' || sourceRaw === 'host'
@@ -899,7 +998,14 @@ export class WalletService implements OnModuleInit {
               ? `سحب أرباح مضيفة (روم وكالة) ${dto.diamonds} ماسة`
               : `سحب عمولة وكالة ${dto.diamonds} ماسة`
             : `سحب أرباح روم شخصي ${dto.diamonds} ماسة`,
-          metadata: { stream, source: sourceTag, method: dto.method },
+          metadata: {
+            stream,
+            source: sourceTag,
+            method: dto.method,
+            grossDiamondUsdRate: fiatRate,
+            withdrawalMarginPercent,
+            netDiamondUsdRate: netFiatRate,
+          },
         }),
       );
       return { request: created, agencyKind };
@@ -1074,6 +1180,12 @@ export class WalletService implements OnModuleInit {
     return this.dataSource.transaction(async (manager) => {
       const day = new Date().toISOString().slice(0, 10);
       const dayPrefix = `game_ad:${day}:`;
+      // Serialize reward claims for the same user/day. Without this lock,
+      // concurrent requests can calculate the same claimIndex and collide
+      // with uq_wallet_tx_user_reference.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `game-ad:${userId}:${day}`,
+      ]);
       const claimedToday = await manager
         .createQueryBuilder(WalletTransaction, 't')
         .where('t.userId = :userId', { userId })
@@ -1137,6 +1249,11 @@ export class WalletService implements OnModuleInit {
       return { credited: false, coins: 0, alreadyClaimed: false, balance: 0 };
     }
     return this.dataSource.transaction(async (manager) => {
+      // Serialize the same user/episode claim so two simultaneous requests
+      // cannot both pass the existence check before the unique insert.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `drama-watch:${userId}:${String(episodeId)}`,
+      ]);
       const existing = await manager.findOne(WalletTransaction, {
         where: {
           userId,

@@ -93,6 +93,44 @@
             android:scaleType="centerCrop"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Rounded16" />
 
+        <VideoView
+            android:id="@+id/videoMedia"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#000000"
+            android:contentDescription="فيديو المحادثة"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgVideoThumbnail"
+            android:layout_width="238dp"
+            android:layout_height="170dp"
+            android:background="#151923"
+            android:contentDescription="معاينة الفيديو"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/btnVideoPlay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_chat_header_icon_circle"
+            android:clickable="true"
+            android:contentDescription="تشغيل الفيديو"
+            android:elevation="4dp"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_audio_play"
+                app:tint="#FFFFFFFF" />
+        </FrameLayout>
+
         <LinearLayout
             android:id="@+id/rowImageReaction"
             android:layout_width="wrap_content"
@@ -522,6 +560,17 @@
         android:textDirection="locale"
         android:textSize="15sp"
         tools:text="Heyy! How are you?" />
+
+    <TextView
+        android:id="@+id/tvPaidMessageInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:maxWidth="250dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone"
+        tools:text="💰 10 عملة · بانتظار الرد" />
 
     <TextView
         android:id="@+id/tvTranslateAction"

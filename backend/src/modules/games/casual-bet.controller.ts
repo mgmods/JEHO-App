@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min, MinLength, MaxLength } from 'class-validator';
 import { CurrentUser } from '../../common/decorators';
 import { CasualBetService } from './casual-bet.service';
 
@@ -25,8 +25,10 @@ class CasualPlayDto {
 
   @Type(() => Number)
   @IsNumber()
-  @Min(50)
-  @Max(20_000)
+  // The authoritative per-game min/max is validated in CasualBetService.
+  // Keep only the platform-wide DTO safety ceiling here.
+  @Min(1)
+  @Max(50_000)
   amount!: number;
 
   @IsOptional()
@@ -35,6 +37,13 @@ class CasualPlayDto {
 
   @IsOptional()
   choice?: string | number;
+
+  /** Stable per-action key; clients must reuse it when retrying the same play. */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  idempotencyKey?: string;
 }
 
 @ApiTags('Games')

@@ -27,7 +27,10 @@ public class GiftViewModel extends ViewModel {
     private String lastReceiverId;
     private int combo = 1;
     private long lastSendAt;
-    private boolean loadInFlight;
+    private volatile boolean loadInFlight;
+    private volatile long lastLoadCompletedAt;
+    private long lastWalletLoadAt;
+    private volatile boolean walletLoadInFlight;
 
     public GiftViewModel(AppContainer c) {
         this.c = c;
@@ -86,9 +89,19 @@ public class GiftViewModel extends ViewModel {
         if (local != null && !local.isEmpty()) {
             gifts.postValue(new ArrayList<>(local));
         }
-        if (loadInFlight) return;
-        loadInFlight = true;
-        c.getIoExecutor().execute(() -> {
+        final boolean hadUsableCatalog = hasGiftsNow() || (local != null && !local.isEmpty());
+        synchronized (this) {
+            if (loadInFlight) return;
+            // Reopening the room gift sheet should paint from memory, not refetch the
+            // same catalog on every open. Realtime CP config updates remain independent.
+            long now = System.currentTimeMillis();
+            if (hadUsableCatalog && lastLoadCompletedAt > 0L
+                    && now - lastLoadCompletedAt < 15_000L) return;
+            loadInFlight = true;
+        }
+        try {
+            c.getIoExecutor().execute(() -> {
+            boolean catalogRefreshSucceeded = false;
             try {
                 Result<List<GiftDtos.GiftCategoryDto>> cats =
                         c.getGiftRepository().refreshCategories();
@@ -98,47 +111,131 @@ public class GiftViewModel extends ViewModel {
 
                 Result<GiftDtos.GiftList> r = c.getGiftRepository().refreshGifts();
                 if (r.success && r.data != null && !r.data.isEmpty()) {
+                    catalogRefreshSucceeded = true;
                     gifts.postValue(new ArrayList<>(r.data));
-                    ArrayList<String> urls = new ArrayList<>();
-                    for (GiftDtos.GiftDto g : r.data) {
-                        if (g == null) continue;
-                        if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
-                            urls.add(g.animationUrl);
-                        }
-                        if (g.iconUrl != null && !g.iconUrl.isEmpty()) {
-                            urls.add(g.iconUrl);
-                        }
-                    }
-                    try {
-                        com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
-                                c.getAppContext(), urls);
-                    } catch (Exception ignored) {
-                    }
+                    // GiftBottomSheet warms only a small visible priority window.
+                    // Preloading the entire catalog here duplicated its Glide/video cache work
+                    // and could exhaust memory on room devices while a gift was being sent.
                 } else if (r.success && r.data != null) {
+                    catalogRefreshSucceeded = true;
                     gifts.postValue(r.data);
                     if (r.data.isEmpty()) {
                         error.postValue("لا توجد هدايا حالياً");
                     }
                 } else {
                     List<GiftDtos.GiftDto> current = gifts.getValue();
-                    if (current == null || current.isEmpty()) {
+                    if ((current == null || current.isEmpty()) && !hadUsableCatalog) {
                         gifts.postValue(Collections.emptyList());
-                        error.postValue(r.error != null ? r.error : "لا توجد هدايا");
+                        error.postValue("تعذر تحميل الهدايا من الخادم، حاول مجددًا بعد لحظات");
+                    } else {
+                        // A transient catalog request failure must not cover a valid
+                        // cached gift sheet with a false server-error toast.
+                        android.util.Log.w("GiftViewModel",
+                                "Gift catalog refresh failed; keeping cached catalog: " +
+                                        (r.error != null ? r.error : "unknown error"));
                     }
                 }
+                // Merge only this account's active custom gifts into this account's gift sheet.
+                // Preserve a usable public catalog when its refresh temporarily fails, and
+                // always rebuild the private tab from the current server-owned grants so an
+                // expired/revoked gift cannot leave a stale tab visible in this ViewModel.
+                Result<GiftDtos.GiftList> custom =
+                        com.Dramizo.Series.util.ApiCall.execute(c.getGiftApi().customMine());
+                List<GiftDtos.GiftDto> publicGifts;
+                if (r.success && r.data != null) {
+                    publicGifts = new ArrayList<>(r.data);
+                } else {
+                    List<GiftDtos.GiftDto> current = gifts.getValue();
+                    publicGifts = current == null
+                            ? new ArrayList<>()
+                            : new ArrayList<>(current);
+                    for (int i = publicGifts.size() - 1; i >= 0; i--) {
+                        GiftDtos.GiftDto item = publicGifts.get(i);
+                        if (item != null && "custom".equalsIgnoreCase(item.category)) {
+                            publicGifts.remove(i);
+                        }
+                    }
+                }
+
+                List<GiftDtos.GiftDto> merged = new ArrayList<>(publicGifts);
+                boolean hasActiveCustom = custom.success && custom.data != null
+                        && !custom.data.isEmpty();
+                if (hasActiveCustom) {
+                    for (GiftDtos.GiftDto customGift : custom.data) {
+                        if (customGift != null && customGift.id != null) merged.add(customGift);
+                    }
+                }
+                gifts.postValue(merged);
+
+                List<GiftDtos.GiftCategoryDto> visibleCats = new ArrayList<>();
+                List<GiftDtos.GiftCategoryDto> categorySource =
+                        cats.success && cats.data != null
+                                ? cats.data
+                                : categories.getValue();
+                if (categorySource != null) {
+                    for (GiftDtos.GiftCategoryDto category : categorySource) {
+                        if (category != null && !"custom".equalsIgnoreCase(category.key)) {
+                            visibleCats.add(category);
+                        }
+                    }
+                }
+                if (hasActiveCustom) {
+                    GiftDtos.GiftCategoryDto customCategory = new GiftDtos.GiftCategoryDto();
+                    customCategory.id = "custom";
+                    customCategory.key = "custom";
+                    customCategory.labelAr = "الهدايا المخصصة";
+                    customCategory.labelEn = "Custom Gifts";
+                    customCategory.sortOrder = 999;
+                    customCategory.isActive = true;
+                    visibleCats.add(customCategory);
+                }
+                categories.postValue(visibleCats);
+            } catch (Exception failure) {
+                List<GiftDtos.GiftDto> current = gifts.getValue();
+                if ((current == null || current.isEmpty()) && !hadUsableCatalog) {
+                    gifts.postValue(Collections.emptyList());
+                    error.postValue("تعذر تحميل الهدايا من الخادم، حاول مجددًا بعد لحظات");
+                }
+                android.util.Log.w("GiftViewModel", "Gift catalog refresh exception", failure);
             } finally {
-                loadInFlight = false;
+                synchronized (GiftViewModel.this) {
+                    loadInFlight = false;
+                    lastLoadCompletedAt = catalogRefreshSucceeded
+                            ? System.currentTimeMillis() : 0L;
+                }
             }
-        });
+            });
+        } catch (RuntimeException rejected) {
+            synchronized (this) { loadInFlight = false; lastLoadCompletedAt = 0L; }
+            android.util.Log.w("GiftViewModel", "Gift catalog executor rejected refresh", rejected);
+            if (!hadUsableCatalog) {
+                error.postValue("تعذر تحميل الهدايا حالياً، حاول مجددًا");
+            }
+        }
     }
 
     public void loadWallet() {
-        c.getIoExecutor().execute(() -> {
-            Result<WalletDtos.WalletDto> r = c.getWalletUseCase.execute();
-            if (r.success && r.data != null) {
-                coinsBalance.postValue(r.data.coins);
-            }
-        });
+        long now = System.currentTimeMillis();
+        if (walletLoadInFlight || (lastWalletLoadAt > 0L
+                && now - lastWalletLoadAt < 5_000L)) return;
+        walletLoadInFlight = true;
+        lastWalletLoadAt = now;
+        try {
+            c.getIoExecutor().execute(() -> {
+                try {
+                    Result<WalletDtos.WalletDto> r = c.getWalletUseCase.execute();
+                    if (r.success && r.data != null) {
+                        coinsBalance.postValue(r.data.coins);
+                    }
+                } finally {
+                    walletLoadInFlight = false;
+                }
+            });
+        } catch (RuntimeException rejected) {
+            walletLoadInFlight = false;
+            lastWalletLoadAt = 0L;
+            android.util.Log.w("GiftViewModel", "Wallet refresh executor rejected request", rejected);
+        }
     }
 
     public void send(String giftId, String receiverId, String roomId) {
@@ -147,6 +244,11 @@ public class GiftViewModel extends ViewModel {
     }
 
     public void sendMany(String giftId, List<String> receiverIds, int quantity, String roomId) {
+        sendMany(giftId, receiverIds, quantity, roomId, false, java.util.UUID.randomUUID().toString());
+    }
+
+    public void sendMany(String giftId, List<String> receiverIds, int quantity, String roomId,
+                         boolean includeHost, String requestId) {
         if (giftId == null || receiverIds == null || receiverIds.isEmpty()) {
             error.postValue("اختر مستلماً");
             return;
@@ -175,18 +277,39 @@ public class GiftViewModel extends ViewModel {
         lastReceiverId = first;
         lastSendAt = now;
         final int comboCount = combo;
-        c.getIoExecutor().execute(() -> {
+        try {
+            c.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> r;
-            if (targets.size() > 1 && roomId != null && !roomId.isEmpty()) {
-                r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId, comboCount);
-            } else {
-                r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount);
+            try {
+                if ((targets.size() > 1 || includeHost) && roomId != null && !roomId.isEmpty()) {
+                    r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId,
+                            comboCount, includeHost, requestId);
+                } else {
+                    r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount, requestId);
+                }
+            } catch (RuntimeException failure) {
+                android.util.Log.e("GiftViewModel", "Gift send request failed safely", failure);
+                error.postValue("تعذر إرسال الهدية، حاول مرة أخرى");
+                return;
+            }
+            // Retrofit/network wrappers can report a transport-level failure after the
+            // server has already committed the gift (for example a timeout while the response
+            // body was still in flight). Never show a false failure when the authoritative
+            // response payload confirms success.
+            if (!r.success && r.data != null && r.data.success) {
+                sent.postValue(r.data);
+                return;
             }
             if (!r.success) {
-                error.postValue(r.error);
+                error.postValue(r.error != null && !r.error.isEmpty()
+                        ? r.error : "تعذر إرسال الهدية، حاول مرة أخرى");
                 return;
             }
             GiftDtos.SendGiftResult data = r.data;
+            if (data != null && !data.success) {
+                error.postValue("تعذر تأكيد نتيجة إرسال الهدية، حاول مرة أخرى");
+                return;
+            }
             // Server may echo combo — never let lucky inflate local streak.
             if (data != null && data.comboCount > 0 && !isLuckyGift(giftId)) {
                 combo = data.comboCount;
@@ -205,7 +328,11 @@ public class GiftViewModel extends ViewModel {
                 if (w.success && w.data != null) coinsBalance.postValue(w.data.coins);
             }
             sent.postValue(data);
-        });
+            });
+        } catch (RuntimeException rejected) {
+            android.util.Log.w("GiftViewModel", "Gift send executor rejected request", rejected);
+            error.postValue("تعذر إرسال الهدية حالياً، حاول مرة أخرى");
+        }
     }
 
     private boolean isLuckyGift(String giftId) {

@@ -1,6 +1,8 @@
 package com.Dramizo.Series.presentation.notifications;
 
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.AssetCatalog;
+import com.bumptech.glide.Glide;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -40,11 +42,24 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         MiscDtos.NotificationDto n = items.get(position);
-        String typeLabel = labelForType(holder.itemView.getContext(), n.type);
+        String typeLabel = isBadgeAward(n)
+                ? "شارة جديدة"
+                : labelForType(holder.itemView.getContext(), n.type);
         holder.b.tvTitle.setText(n.title != null ? n.title : typeLabel);
         holder.b.tvBody.setText(n.body != null ? n.body : "");
         holder.b.tvTypeChip.setText(typeLabel);
-        holder.b.imgNotificationType.setImageResource(iconForType(n.type));
+        String badgeImage = badgeImageUrl(n);
+        String agencyImage = agencyImageUrl(n);
+        String image = badgeImage != null ? badgeImage : agencyImage;
+        if (image != null) {
+            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(image))
+                    .placeholder(R.drawable.jeho_logo)
+                    .error(R.drawable.jeho_logo)
+                    .into(holder.b.imgNotificationType);
+        } else {
+            Glide.with(holder.itemView).clear(holder.b.imgNotificationType);
+            holder.b.imgNotificationType.setImageResource(iconForType(n.type));
+        }
         holder.b.imgNotificationType.setImageTintList(null);
         holder.b.imgNotificationType.clearColorFilter();
         String time = n.createdAt != null ? n.createdAt.replace('T', ' ') : "";
@@ -75,8 +90,33 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             case "relation": return context.getString(R.string.notification_friendship);
             case "withdraw": return context.getString(R.string.notification_withdrawal);
             case "system": return context.getString(R.string.notification_system);
+            case "agency": return "نادي الوكالة";
             default: return type;
         }
+    }
+
+    private static boolean isBadgeAward(MiscDtos.NotificationDto n) {
+        return n != null && n.data != null
+                && "badge_earned".equalsIgnoreCase(String.valueOf(n.data.get("kind")));
+    }
+
+    private static String badgeImageUrl(MiscDtos.NotificationDto n) {
+        if (!isBadgeAward(n)) return null;
+        Object value = n.data.get("imageUrl");
+        String url = value == null ? "" : String.valueOf(value).trim();
+        return url.isEmpty() ? null : url;
+    }
+
+    private static String agencyImageUrl(MiscDtos.NotificationDto n) {
+        if (n == null || n.data == null || !"agency".equalsIgnoreCase(n.type)) return null;
+        Object action = n.data.get("action");
+        if (action == null) return null;
+        String kind = String.valueOf(action);
+        if (!"join_request".equalsIgnoreCase(kind)
+                && !"agency_club_request".equalsIgnoreCase(kind)) return null;
+        Object value = n.data.get("agencyLogoUrl");
+        String url = value == null ? "" : String.valueOf(value).trim();
+        return url.isEmpty() ? null : url;
     }
 
     private static int iconForType(String type) {

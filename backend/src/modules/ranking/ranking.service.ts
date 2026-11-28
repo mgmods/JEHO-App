@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -11,6 +11,7 @@ import { Room } from '../../database/entities/room.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 
 type RankingBoardItem = {
   targetId: string;
@@ -28,8 +29,9 @@ type RankingBoardItem = {
     vipBadgeUrl: string | null;
     frameUrl: string | null;
     followersCount: number;
+    countryCode: string | null;
     totalReceivedDiamonds: number;
-    totalSentCoins: number;
+    nameStyle: Record<string, unknown> | null;
   } | null;
 };
 
@@ -48,7 +50,80 @@ export class RankingService {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Follow)
     private readonly followsRepo: Repository<Follow>,
+    @InjectRepository(AppSetting)
+    private readonly settingsRepo: Repository<AppSetting>,
   ) {}
+
+  // Rewards are stored in the existing app_settings table; no schema migration is required.
+  async getRewardConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'ranking_reward_config' } });
+    const defaults = { enabled: true, weekly: [], monthly: [] };
+    if (!row) return defaults;
+    try {
+      const parsed = JSON.parse(row.value || '{}');
+      const normalize = (items: unknown) => Array.isArray(items) ? items.slice(0, 3).map((item: any, index: number) => ({
+        rank: index + 1,
+        name: String(item?.name || '').slice(0, 80),
+        imageUrl: String(item?.imageUrl || '').slice(0, 2048),
+        description: String(item?.description || '').slice(0, 180),
+        cosmeticId: String(item?.cosmeticId || '').slice(0, 128),
+      })) : [];
+      return { enabled: parsed.enabled !== false, weekly: normalize(parsed.weekly), monthly: normalize(parsed.monthly) };
+    } catch { return defaults; }
+  }
+
+  async patchRewardConfig(input: Record<string, unknown>) {
+    const normalize = (items: unknown) => {
+      if (!Array.isArray(items)) return [];
+      return items.slice(0, 3).map((item: any, index: number) => {
+        const name = String(item?.name || '').trim().slice(0, 80);
+        const imageUrl = String(item?.imageUrl || '').trim().slice(0, 2048);
+        const description = String(item?.description || '').trim().slice(0, 180);
+        const isHttpsUrl = (() => {
+          try {
+            const parsed = new URL(imageUrl);
+            return parsed.protocol === 'https:' && !!parsed.hostname
+              && !parsed.username && !parsed.password;
+          } catch {
+            return false;
+          }
+        })();
+        const isSafeLocalAsset = (() => {
+          try {
+            if (!imageUrl.startsWith('/') || imageUrl.startsWith('//') || imageUrl.includes('\\')) {
+              return false;
+            }
+            const parsed = new URL(imageUrl, 'https://jeho-local.invalid');
+            if (parsed.origin !== 'https://jeho-local.invalid') return false;
+            const decodedPath = decodeURIComponent(parsed.pathname);
+            const allowedRoot = /^\/(?:uploads|assets|visual-system)\//i.test(decodedPath);
+            const unsafeSegment = decodedPath.split('/').some((part) => part === '.' || part === '..');
+            return allowedRoot && !unsafeSegment && !decodedPath.includes('\\');
+          } catch {
+            return false;
+          }
+        })();
+        if (imageUrl && !isHttpsUrl && !isSafeLocalAsset) {
+          throw new BadRequestException('Reward image must be HTTPS or a safe app asset path');
+        }
+        const cosmeticId = String(item?.cosmeticId || '').trim().slice(0, 128);
+        return { rank: index + 1, name, imageUrl, description, cosmeticId };
+      });
+    };
+    const current = await this.getRewardConfig();
+    const next = {
+      enabled: typeof input.enabled === 'boolean' ? input.enabled : current.enabled,
+      weekly: input.weekly !== undefined ? normalize(input.weekly) : current.weekly,
+      monthly: input.monthly !== undefined ? normalize(input.monthly) : current.monthly,
+    };
+    let row = await this.settingsRepo.findOne({ where: { key: 'ranking_reward_config' } });
+    if (row) { row.value = JSON.stringify(next); await this.settingsRepo.save(row); }
+    else await this.settingsRepo.save(this.settingsRepo.create({
+      key: 'ranking_reward_config', value: JSON.stringify(next),
+      description: 'Dashboard-managed weekly and monthly ranking rewards',
+    }));
+    return next;
+  }
 
   private weekStart(date: Date): Date {
     const start = new Date(Date.UTC(
@@ -81,12 +156,23 @@ export class RankingService {
 
   async getBoard(period: RankingPeriod, category: RankingCategory, limit = 50) {
     const key = this.periodKey(period);
+    // Room ranking is a live occupancy board: never serve a time-window snapshot.
+    if (category === RankingCategory.ROOM) {
+      const liveRooms = await this.compute(period, category, limit);
+      return {
+        period,
+        category,
+        periodKey: key,
+        items: liveRooms.map((item, index) => ({ ...item, rank: index + 1 })),
+      };
+    }
     const cached = await this.snapshotsRepo.find({
       where: { period, category, periodKey: key },
       order: { rank: 'ASC' },
       take: limit,
     });
     const cacheIsFresh =
+      !this.isUserCategory(category) &&
       cached.length > 0 &&
       Date.now() - new Date(cached[0].createdAt).getTime() < 60_000;
     if (cacheIsFresh) {
@@ -158,9 +244,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.senderId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.POPULAR) {
@@ -172,9 +258,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.GIFTS) {
@@ -185,9 +271,9 @@ export class RankingService {
         .where('g.createdAt >= :since', { since })
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.HOST) {
@@ -199,9 +285,9 @@ export class RankingService {
         .andWhere('g.roomId IS NOT NULL')
         .groupBy('g.receiverId')
         .orderBy('score', 'DESC')
-        .limit(limit)
+        .limit(Math.min(limit * 5, 500))
         .getRawMany();
-      return this.withUserNames(rows);
+      return (await this.withUserNames(rows)).slice(0, limit);
     }
 
     if (category === RankingCategory.AGENCY) {
@@ -218,13 +304,20 @@ export class RankingService {
 
     if (category === RankingCategory.ROOM) {
       const rows = await this.roomsRepo.find({
-        order: { viewerCount: 'DESC' },
+        where: { status: 'open' as any, isPublic: true },
+        order: { viewerCount: 'DESC', updatedAt: 'DESC' },
         take: limit,
       });
       return rows.map((r) => ({
         targetId: r.id,
         targetName: r.title,
         score: r.viewerCount,
+        meta: {
+          publicId: r.publicId,
+          coverUrl: r.coverUrl,
+          roomStatus: r.status,
+          hostId: r.hostId,
+        },
       }));
     }
 
@@ -244,37 +337,69 @@ export class RankingService {
     if (!ids.length) return [];
     const users = await this.usersRepo.find({
       where: { id: In(ids) },
-      relations: { profile: true },
+      relations: { profile: true, vips: { vipPlan: true } },
     });
-    const map = new Map(users.map((u) => [u.id, u]));
-    return rows.filter((r) => map.has(r.targetId)).map((r) => ({
-      ...r,
-      targetId: r.targetId,
-      targetName:
-        map.get(r.targetId)?.displayName ||
-        map.get(r.targetId)?.username ||
-        r.targetName ||
-        null,
-      score: Number(r.score),
-      user: {
-        id: map.get(r.targetId)!.id,
-        username: map.get(r.targetId)!.username,
-        displayName: map.get(r.targetId)!.displayName,
-        avatarUrl: map.get(r.targetId)!.avatarUrl,
-        level: map.get(r.targetId)!.level,
-        hostBadgeUrl: map.get(r.targetId)!.profile?.hostBadgeUrl || null,
-        vipBadgeUrl: map.get(r.targetId)!.profile?.vipBadgeUrl || null,
-        frameUrl:
-          map.get(r.targetId)!.profile?.hostBadgeUrl ||
-          map.get(r.targetId)!.profile?.vipBadgeUrl ||
-          null,
-        followersCount: map.get(r.targetId)!.profile?.followersCount || 0,
-        totalReceivedDiamonds:
-          Number(map.get(r.targetId)!.profile?.totalReceivedDiamonds) || 0,
-        totalSentCoins:
-          Number(map.get(r.targetId)!.profile?.totalSentCoins) || 0,
-      },
-    }));
+    // Hide only accounts whose anonymous mode is currently valid under the same
+    // VIP + dashboard policy used by room identity. Expired/disabled modes rank normally.
+    const policyRow = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } }).catch(() => null);
+    let policy: any = null;
+    if (policyRow) {
+      try {
+        policy = typeof policyRow.value === 'string' ? JSON.parse(policyRow.value) : (policyRow.value || {});
+      } catch {
+        policy = { enabled: false };
+      }
+    }
+    const allowedLevels = Array.isArray(policy?.eligibleVipLevels)
+      ? policy.eligibleVipLevels.map(Number).filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 7)
+      : [];
+    const hiddenIds = new Set<string>();
+    for (const user of users) {
+      if (!user.mysteriousMode) continue;
+      const activeVip = (user.vips || [])
+        .filter((vip) => vip.isActive && (!vip.expiresAt || new Date(vip.expiresAt).getTime() > Date.now()))
+        .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))[0];
+      if (!activeVip) continue;
+      const benefits = activeVip.vipPlan?.benefits as any;
+      const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+      const eligible = policyRow
+        ? policy?.enabled === true && allowedLevels.includes(Number(activeVip.level))
+        : Array.isArray(extra) && extra.includes('mysterious_man');
+      if (eligible) hiddenIds.add(user.id);
+    }
+    const map = new Map(users.filter((u) => !hiddenIds.has(u.id)).map((u) => [u.id, u]));
+    return rows.filter((r) => map.has(r.targetId)).map((r, rankIndex) => {
+      const user = map.get(r.targetId)!;
+      const activeVip = (user.vips || [])
+        .filter((vip) => vip.isActive && (!vip.expiresAt || new Date(vip.expiresAt).getTime() > Date.now()))
+        .sort((a, b) => Number(b.level || 0) - Number(a.level || 0))[0];
+      const benefits = activeVip?.vipPlan?.benefits as any;
+      const nameStyle = benefits?.visuals?.nameStyle && typeof benefits.visuals.nameStyle === 'object'
+        ? benefits.visuals.nameStyle as Record<string, unknown>
+        : null;
+      return {
+        ...r,
+        targetId: r.targetId,
+        targetName: user.displayName || user.username || r.targetName || null,
+        rank: rankIndex + 1,
+        score: Number(r.score),
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+          level: user.level,
+          hostBadgeUrl: user.profile?.hostBadgeUrl || null,
+          vipBadgeUrl: user.profile?.vipBadgeUrl || null,
+          frameUrl: user.profile?.hostBadgeUrl || user.profile?.vipBadgeUrl || null,
+          followersCount: user.profile?.followersCount || 0,
+          countryCode: user.profile?.country || null,
+          totalReceivedDiamonds: Number(user.profile?.totalReceivedDiamonds) || 0,
+          totalSentCoins: Number(user.profile?.totalSentCoins) || 0,
+          nameStyle,
+        },
+      };
+    });
   }
 
   private isUserCategory(category: RankingCategory): boolean {

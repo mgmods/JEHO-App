@@ -20,6 +20,19 @@ export class TasksController {
     return this.tasks.listForUser(userId, { roomId, agencyId });
   }
 
+  @Get('daily-login')
+  @ApiOperation({ summary: 'Current seven-day daily login reward and claim state' })
+  dailyLoginStatus(@CurrentUser('sub') userId: string) {
+    return this.tasks.dailyLoginStatus(userId);
+  }
+
+  @Post('daily-login/claim')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Claim today daily login reward once' })
+  claimDailyLogin(@CurrentUser('sub') userId: string) {
+    return this.tasks.claimDailyLogin(userId);
+  }
+
   @Post('checkin')
   @ApiOperation({ summary: 'Daily check-in progress (explicit tap)' })
   checkIn(@CurrentUser('sub') userId: string) {

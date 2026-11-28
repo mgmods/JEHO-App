@@ -21,16 +21,52 @@ const routes = [
         meta: { titleKey: 'routes.dashboard' },
       },
       {
+        path: 'toast-manager',
+        name: 'toast-manager',
+        component: () => import('@/views/ToastManagerView.vue'),
+        meta: { title: 'إدارة توستات الهدايا', module: 'settings' },
+      },
+      {
+        path: 'paid-messages',
+        name: 'paid-messages',
+        component: () => import('@/views/PaidMessagesView.vue'),
+        meta: { title: 'الرسائل المدفوعة' },
+      },
+      {
+        path: 'conversations',
+        name: 'conversations',
+        component: () => import('@/views/UserConversationsView.vue'),
+        meta: { titleKey: 'routes.conversations' },
+      },
+      {
         path: 'users',
         name: 'users',
         component: () => import('@/views/UsersView.vue'),
         meta: { titleKey: 'routes.users' },
       },
       {
+        path: 'medals',
+        name: 'medals',
+        component: () => import('@/views/MedalsView.vue'),
+        meta: { title: 'إدارة المداليات', module: 'users' },
+      },
+      {
+        path: 'staff-identity',
+        name: 'staff-identity',
+        component: () => import('@/views/StaffIdentityView.vue'),
+        meta: { title: 'إدارة الرتب الإدارية', module: 'settings' },
+      },
+      {
         path: 'users/:id',
         name: 'user-detail',
         component: () => import('@/views/UserDetailView.vue'),
         meta: { titleKey: 'routes.userDetail' },
+      },
+      {
+        path: 'support-chest',
+        name: 'support-chest',
+        component: () => import('@/views/SupportChestView.vue'),
+        meta: { title: 'صندوق الدعم' },
       },
       {
         path: 'rooms',
@@ -51,16 +87,34 @@ const routes = [
         meta: { titleKey: 'routes.gifts' },
       },
       {
+        path: 'lucky-gift-odds',
+        name: 'lucky-gift-odds',
+        component: () => import('@/views/LuckyGiftOddsView.vue'),
+        meta: { titleKey: 'routes.gifts' },
+      },
+      {
         path: 'banners',
         name: 'banners',
         component: () => import('@/views/BannersView.vue'),
         meta: { titleKey: 'routes.banners' },
       },
       {
+        path: 'splash',
+        name: 'splash',
+        component: () => import('@/views/BannersView.vue'),
+        meta: { title: 'إدارة السبلاش' },
+      },
+      {
         path: 'nav-icons',
         name: 'nav-icons',
         component: () => import('@/views/NavIconsView.vue'),
         meta: { titleKey: 'nav.navIcons' },
+      },
+      {
+        path: 'profile-action-icons',
+        name: 'profile-action-icons',
+        component: () => import('@/views/ProfileActionIconsView.vue'),
+        meta: { title: 'أيقونات قسم أنا' },
       },
       {
         path: 'seat-stickers',
@@ -128,7 +182,7 @@ const routes = [
         path: 'cosmetics',
         name: 'cosmetics',
         component: () => import('@/views/CosmeticsView.vue'),
-        meta: { titleKey: 'routes.cosmetics' },
+        meta: { titleKey: 'routes.cosmetics', title: 'إدارة المتجر', module: 'cosmetics' },
       },
       {
         path: 'contests',
@@ -140,7 +194,7 @@ const routes = [
         path: 'games',
         name: 'games',
         component: () => import('@/views/GamesView.vue'),
-        meta: { titleKey: 'routes.games' },
+        meta: { titleKey: 'routes.games', module: 'games' },
       },
       {
         path: 'game-ads',
@@ -149,16 +203,23 @@ const routes = [
         meta: { titleKey: 'routes.gameAds' },
       },
       {
-        path: 'drama',
-        name: 'drama',
-        component: () => import('@/views/DramaView.vue'),
-        meta: { titleKey: 'routes.drama' },
+        path: 'stories',
+        name: 'stories',
+        component: () => import('@/views/StoriesView.vue'),
+        meta: { titleKey: 'routes.stories', module: 'drama' },
       },
+      { path: 'drama', redirect: { name: 'stories' } },
       {
         path: 'lucky-boxes',
         name: 'lucky-boxes',
         component: () => import('@/views/LuckyBoxesView.vue'),
         meta: { titleKey: 'routes.luckyBoxes' },
+      },
+      {
+        path: 'daily-login-rewards',
+        name: 'daily-login-rewards',
+        component: () => import('@/views/DailyLoginRewardsView.vue'),
+        meta: { title: 'مكافآت تسجيل الدخول اليومية', module: 'tasks' },
       },
       {
         path: 'tasks',
@@ -197,6 +258,12 @@ const routes = [
         meta: { titleKey: 'routes.reports' },
       },
       {
+        path: 'moments',
+        name: 'moments',
+        component: () => import('@/views/ReportsView.vue'),
+        meta: { title: 'إدارة اللحظات' },
+      },
+      {
         path: 'gender-verifications',
         name: 'gender-verifications',
         component: () => import('@/views/GenderVerificationsView.vue'),
@@ -207,6 +274,24 @@ const routes = [
         name: 'notifications',
         component: () => import('@/views/NotificationsView.vue'),
         meta: { titleKey: 'routes.notifications' },
+      },
+      {
+        path: 'mysterious-man',
+        name: 'mysterious-man',
+        component: () => import('@/views/MysteriousManView.vue'),
+        meta: { title: 'الرجل الغامض' },
+      },
+      {
+        path: 'cp-settings',
+        name: 'cp-settings',
+        component: () => import('@/views/CpSettingsView.vue'),
+        meta: { title: 'إعدادات علاقات CP' },
+      },
+      {
+        path: 'advertisements',
+        name: 'advertisements',
+        component: () => import('@/views/AdvertisementsView.vue'),
+        meta: { title: 'إدارة إعلانات الرومات', module: 'rooms' },
       },
       {
         path: 'settings',

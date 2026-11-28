@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo home_act_banner_layout: ثروة قلاب + CP + نشاط -->
+<!-- Compact home ranking banners: consistent landscape cards within screen bounds -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/actBannerLayout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="15dp"
-    android:layout_marginBottom="12dp"
-    android:orientation="horizontal">
+    android:layout_marginHorizontal="10dp"
+    android:layout_marginBottom="4dp"
+    android:orientation="horizontal"
+    android:layoutDirection="ltr">
 
     <ViewFlipper
         android:id="@+id/rankBannerFlip"
-        android:layout_width="100dp"
+        android:layout_width="0dp"
         android:layout_height="64dp"
+        android:layout_weight="1"
         android:autoStart="true"
         android:flipInterval="3000"
         android:inAnimation="@android:anim/fade_in"
@@ -23,8 +25,9 @@
 
     <FrameLayout
         android:id="@+id/cpBannerCard"
-        android:layout_width="100dp"
+        android:layout_width="0dp"
         android:layout_height="64dp"
+        android:layout_weight="1"
         android:background="@drawable/home_bg_cp"
         android:clickable="true"
         android:focusable="true"
@@ -43,7 +46,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="5dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -82,33 +85,23 @@
     <FrameLayout
         android:id="@+id/activityBannerCard"
         android:layout_width="0dp"
-        android:layout_height="63dp"
+        android:layout_height="64dp"
         android:layout_weight="1"
-        android:background="@drawable/home_top_invite_bg"
+        android:background="@drawable/home_bg_charm"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground">
 
         <TextView
             android:id="@+id/tvActivityBannerTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="8dp"
-            android:text="@string/task_center"
-            android:textColor="@color/white"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tvActivityBannerHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:layout_margin="8dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="مهام يومية · مكافآت"
-            android:textColor="@color/white"
-            android:textSize="10sp" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

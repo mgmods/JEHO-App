@@ -88,6 +88,9 @@ public class CosmeticsCategoryFragment extends Fragment {
                 }
                 return 1;
             }
+            @Override public int leaseDays(com.Dramizo.Series.data.remote.dto.CosmeticDtos.CosmeticDto item) {
+                return vm.leaseDays(item);
+            }
         });
         binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 2));
         binding.recycler.setHasFixedSize(true);

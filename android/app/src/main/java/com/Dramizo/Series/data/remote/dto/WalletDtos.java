@@ -320,5 +320,6 @@ public final class WalletDtos {
         @SerializedName("whatsapp") public String whatsapp;
         @SerializedName("qrPayload") public String qrPayload;
         @SerializedName("instructions") public String instructions;
+        @SerializedName("qrImageUrl") public String qrImageUrl;
     }
 }

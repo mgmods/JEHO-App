@@ -7,6 +7,8 @@ import {
   IsDateString,
   IsArray,
   IsNumber,
+  IsIn,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -84,6 +86,13 @@ export class UpdateProfileDto {
   @IsString()
   coverUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Up to five static profile cover image URLs owned by this user' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  profileCoverUrls?: string[];
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
@@ -93,6 +102,28 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   allowDmFromStrangers?: boolean;
+
+  @ApiPropertyOptional({ description: 'Allow direct messages at all' })
+  @IsOptional()
+  @IsBoolean()
+  dmEnabled?: boolean;
+
+  @ApiPropertyOptional({ enum: ['everyone', 'followers', 'friends', 'nobody'] })
+  @IsOptional()
+  @IsIn(['everyone', 'followers', 'friends', 'nobody'])
+  dmAudience?: 'everyone' | 'followers' | 'friends' | 'nobody';
+
+  @ApiPropertyOptional({ description: 'Up to five owned medal keys shown publicly on profile' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  displayedMedalIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Enable eligible VIP mysterious-man identity in room events' })
+  @IsOptional()
+  @IsBoolean()
+  mysteriousMode?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

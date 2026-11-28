@@ -2,11 +2,14 @@
   'use strict';
 
   var TABS = [
-    { key: 'vip_badge', label: 'قطاع الراس', hint: 'غطاء رأس متحرك مع صورتك — اشترِ ثم ارتدِ' },
-    { key: 'entry_effect', label: 'الدخولية', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
+    { key: 'vip_badge', label: 'الإطارات', hint: 'إطارات وحركات تظهر على صورتك — عاين قبل الشراء' },
+    { key: 'entry_effect', label: 'الدخوليات', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
     { key: 'level_badge', label: 'شارات المستوى', hint: 'شارات المستوى بجانب الاسم' },
-    { key: 'room_card', label: 'كروت الروم', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
-    { key: 'room_background', label: 'خلفيات الروم', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
+    { key: 'room_card', label: 'بطاقات الغرف', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
+    { key: 'profile_card', label: 'بطاقة الملف الشخصي', hint: 'تصميم بطاقة المستخدم عند فتح ملفه الشخصي' },
+    { key: 'chat_bubble', label: 'فقاعة الدردشة', hint: 'تصميم فقاعات الرسائل في المحادثة' },
+    { key: 'nameplate', label: 'لوحة الاسم', hint: 'لوحة مخصصة خلف اسم المستخدم' },
+    { key: 'room_background', label: 'خلفيات الغرف', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
   ];
 
   var state = {
@@ -43,8 +46,13 @@
     heroRoomFrame: document.getElementById('heroRoomFrame'),
     heroBg: document.getElementById('heroBg'),
     heroVideo: document.getElementById('heroVideo'),
+    wearStage: document.getElementById('wearStage'),
     btnPrimary: document.getElementById('btnPrimary'),
     btnSecondary: document.getElementById('btnSecondary'),
+    btnBag: document.getElementById('btnBag'),
+    btnRecharge: document.getElementById('btnRecharge'),
+    catalogCount: document.getElementById('catalogCount'),
+    catalogCaption: document.getElementById('catalogCaption'),
   };
 
   function qs(name) {
@@ -215,6 +223,7 @@
   var heroSvgaToken = 0;
   var cardSvga = {}; // id -> { player, parser, token }
   var cardObserver = null;
+  var cardVideoObserver = null;
 
   function stopHeroSvga() {
     heroSvgaToken += 1;
@@ -482,6 +491,8 @@
     el.heroRoomCard.hidden = true;
     el.heroBg.hidden = true;
     el.heroVideo.hidden = true;
+    el.heroVideo.controls = false;
+    if (el.wearStage) el.wearStage.classList.remove('entry-effect-preview');
     el.heroAvatar.hidden = false;
     try { el.heroVideo.pause(); el.heroVideo.removeAttribute('src'); el.heroVideo.load(); } catch (e) {}
   }
@@ -529,8 +540,10 @@
         });
       } else if (kind === 'video' && wear) {
         el.heroVideo.hidden = false;
+        el.heroVideo.controls = true;
+        el.heroVideo.muted = false;
         el.heroVideo.src = wear;
-        el.heroVideo.play().catch(function () {});
+        el.heroVideo.play().catch(function () { /* user can start playback with controls */ });
       } else if (kind === 'gif' && wear) {
         showStaticFrame(wear, false);
       } else {
@@ -547,12 +560,27 @@
       el.heroAvatar.hidden = true;
       el.heroBg.hidden = false;
       el.heroBg.src = thumb || wear;
+    } else if (state.type === 'profile_card' || state.type === 'chat_bubble' || state.type === 'nameplate') {
+      el.heroAvatar.hidden = false;
+      showStaticFrame(thumb || wear, kind === 'gif');
     } else if (state.type === 'entry_effect') {
-      el.heroAvatar.hidden = true;
+      // Keep the account avatar visible: entrance media is layered over it,
+      // so users can judge the effect against their actual profile photo.
+      el.heroAvatar.hidden = false;
+      if (el.wearStage) el.wearStage.classList.add('entry-effect-preview');
       if (kind === 'video' && wear) {
         el.heroVideo.hidden = false;
+        el.heroVideo.controls = false;
+        el.heroVideo.muted = true;
+        el.heroVideo.defaultMuted = true;
+        el.heroVideo.loop = true;
+        el.heroVideo.playsInline = true;
+        el.heroVideo.setAttribute('aria-label', 'معاينة الدخولية المتحركة');
         el.heroVideo.src = wear;
-        el.heroVideo.play().catch(function () {});
+        var videoPlay = el.heroVideo.play();
+        if (videoPlay && videoPlay.catch) videoPlay.catch(function () {
+          // Muted playback is attempted automatically; the status stays usable if blocked.
+        });
       } else if (kind === 'svga' && wear) {
         playHeroSvga(wear).then(function (ok) {
           if (!ok && selectedItem() && selectedItem().id === item.id) {
@@ -589,6 +617,12 @@
     return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
   }
 
+  function coinMarkup(amount) {
+    var n = Math.max(0, Number(amount) || 0);
+    return '<span class="coin-price"><span class="coin-price-icon" aria-label="كوينز">🪙</span>' +
+      n.toLocaleString('en-US') + '</span>';
+  }
+
   function syncActionButtons(item) {
     el.btnSecondary.hidden = true;
     if (!item) {
@@ -603,47 +637,36 @@
 
     if (state.type === 'room_background') {
       if (!owned) {
-        el.btnPrimary.textContent = item.coinPrice > 0
-          ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+        el.btnPrimary.innerHTML = item.coinPrice > 0
+          ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
           : 'احصل مجاناً · 30 يوم';
         el.btnPrimary.className = 'btn btn-buy';
       } else if (state.roomId) {
         el.btnPrimary.textContent = 'طبّق على الروم';
         el.btnPrimary.className = 'btn btn-primary';
-        el.btnSecondary.hidden = false;
-        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
-        el.btnSecondary.disabled = state.busy;
       } else {
         el.btnPrimary.textContent = left != null
           ? ('مشتراة · متبقي ' + left + ' يوم')
           : 'مشتراة — من إعدادات الروم';
         el.btnPrimary.className = 'btn btn-owned';
         el.btnPrimary.disabled = true;
-        el.btnSecondary.hidden = false;
-        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
-        el.btnSecondary.disabled = state.busy;
       }
       return;
     }
 
     if (!owned) {
-      el.btnPrimary.textContent = item.coinPrice > 0
-        ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+      el.btnPrimary.innerHTML = item.coinPrice > 0
+        ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
         : 'احصل مجاناً · 30 يوم';
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
-      el.btnPrimary.textContent = left != null ? ('مُرتدى · ' + left + ' يوم') : 'مُرتدى';
-      el.btnPrimary.className = 'btn btn-owned';
-      el.btnPrimary.disabled = true;
-      el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
-      el.btnSecondary.disabled = state.busy;
+      el.btnPrimary.textContent = left != null ? ('خلع · ' + left + ' يوم') : 'خلع';
+      el.btnPrimary.className = 'btn btn-primary';
+      el.btnSecondary.hidden = true;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
       el.btnPrimary.className = 'btn btn-primary';
-      el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
-      el.btnSecondary.disabled = state.busy;
+      el.btnSecondary.hidden = true;
     }
   }
 
@@ -675,7 +698,37 @@
     });
   }
 
+  function stopAllCardVideo() {
+    if (cardVideoObserver) {
+      try { cardVideoObserver.disconnect(); } catch (e) { /* ignore */ }
+      cardVideoObserver = null;
+    }
+    try {
+      el.grid.querySelectorAll('video.mall-video-preview').forEach(function (video) {
+        try { video.pause(); } catch (e) { /* ignore */ }
+        try { video.removeAttribute('src'); video.load(); } catch (e2) { /* ignore */ }
+      });
+    } catch (e3) { /* ignore */ }
+  }
+
+  function ensureCardVideoObserver() {
+    if (cardVideoObserver || typeof IntersectionObserver === 'undefined') return;
+    cardVideoObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var video = entry.target;
+        if (!video || !video.isConnected) return;
+        if (entry.isIntersecting && entry.intersectionRatio > 0.08) {
+          var play = video.play();
+          if (play && typeof play.catch === 'function') play.catch(function () { /* native controls remain available */ });
+        } else {
+          try { video.pause(); } catch (e) { /* ignore */ }
+        }
+      });
+    }, { root: null, rootMargin: '100px 0px', threshold: [0, 0.08, 0.25] });
+  }
+
   function renderGrid() {
+    stopAllCardVideo();
     stopAllCardSvga();
     Object.keys(cardPlayTimers).forEach(function (id) {
       clearTimeout(cardPlayTimers[id]);
@@ -689,8 +742,12 @@
     }
     el.empty.hidden = list.length > 0;
     el.empty.textContent = state.bagMode ? 'حقيبتك فارغة في هذا القسم' : 'لا توجد عناصر في هذا القسم';
+    if (el.catalogCount) el.catalogCount.textContent = list.length ? (list.length + ' عنصر') : '';
+    if (el.catalogCaption) el.catalogCaption.textContent = state.bagMode ? 'العناصر الموجودة في حقيبتك' : 'مختارات هذا القسم';
+    syncBagButton();
 
     var pendingSvga = [];
+    var pendingVideos = [];
     list.forEach(function (item) {
       var card = document.createElement('article');
       card.className = 'card' + (item.id === state.selectedId ? ' selected' : '');
@@ -734,7 +791,42 @@
           canvas.setAttribute('data-svga', wear);
           thumb.appendChild(canvas);
           pendingSvga.push(canvas);
+        } else if (kind === 'video' && wear) {
+          var frameVideo = document.createElement('video');
+          frameVideo.className = 'overlay mall-video-preview';
+          frameVideo.src = wear;
+          frameVideo.muted = true;
+          frameVideo.defaultMuted = true;
+          frameVideo.loop = true;
+          frameVideo.playsInline = true;
+          frameVideo.preload = 'none';
+          frameVideo.setAttribute('aria-label', (item.name || 'معاينة الإطار'));
+          frameVideo.addEventListener('error', function () { frameVideo.classList.add('media-error'); });
+          thumb.appendChild(frameVideo);
+          pendingVideos.push(frameVideo);
         }
+      } else if (kind === 'video' && wear) {
+        if (still && still !== wear) {
+          var videoFallback = document.createElement('img');
+          videoFallback.className = 'overlay still-fallback';
+          videoFallback.loading = 'lazy';
+          videoFallback.decoding = 'async';
+          videoFallback.src = still;
+          videoFallback.alt = '';
+          thumb.appendChild(videoFallback);
+        }
+        var mediaVideo = document.createElement('video');
+        mediaVideo.className = 'overlay mall-video-preview';
+        mediaVideo.src = wear;
+        mediaVideo.muted = true;
+        mediaVideo.defaultMuted = true;
+        mediaVideo.loop = true;
+        mediaVideo.playsInline = true;
+        mediaVideo.preload = 'none';
+        mediaVideo.setAttribute('aria-label', (item.name || 'معاينة الحركة'));
+        mediaVideo.addEventListener('error', function () { mediaVideo.classList.add('media-error'); });
+        thumb.appendChild(mediaVideo);
+        pendingVideos.push(mediaVideo);
       } else if (still) {
         var img = document.createElement('img');
         img.loading = 'lazy';
@@ -758,8 +850,8 @@
           ? (left != null ? ('مُرتدى · ' + left + 'ي') : 'مُرتدى')
           : (left != null ? ('مشتراة · ' + left + 'ي') : 'مشتراة');
       } else {
-        price.textContent = item.coinPrice > 0
-          ? (item.coinPrice + ' · 30 يوم')
+        price.innerHTML = item.coinPrice > 0
+          ? (coinMarkup(item.coinPrice) + ' · 30 يوم')
           : 'مجاني · 30 يوم';
       }
       card.appendChild(price);
@@ -770,14 +862,14 @@
       var equipped = !!state.equipped[item.id];
       if (!owned) {
         action.className = 'btn btn-buy';
-        action.textContent = item.coinPrice > 0 ? ('شراء ' + item.coinPrice) : 'احصل';
+        action.innerHTML = item.coinPrice > 0 ? ('شراء ' + coinMarkup(item.coinPrice)) : 'احصل';
       } else if (state.type === 'room_background') {
         action.className = 'btn btn-owned';
         action.textContent = state.roomId ? 'طبّق' : 'مشتراة';
         if (!state.roomId) action.disabled = true;
       } else if (equipped) {
         action.className = 'btn btn-buy';
-        action.textContent = 'تجديد ' + renewPrice(item.coinPrice);
+        action.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice));
       } else {
         action.className = 'btn btn-primary';
         action.textContent = 'ارتدِ';
@@ -806,6 +898,17 @@
             canvas,
             canvas.getAttribute('data-svga')
           );
+        });
+      }
+    }
+    if (pendingVideos.length) {
+      ensureCardVideoObserver();
+      if (cardVideoObserver) {
+        pendingVideos.forEach(function (video) { cardVideoObserver.observe(video); });
+      } else {
+        pendingVideos.slice(0, 2).forEach(function (video) {
+          var play = video.play();
+          if (play && typeof play.catch === 'function') play.catch(function () {});
         });
       }
     }
@@ -865,6 +968,10 @@
   async function onPrimary() {
     var item = selectedItem();
     if (!item || state.busy) return;
+    if (isActiveOwned(item.id) && state.equipped[item.id] && state.type !== 'room_background') {
+      onUnequip();
+      return;
+    }
     if (!state.token) {
       setStatus('سجّل الدخول أولاً', 'err');
       toastNative('سجّل الدخول أولاً');
@@ -941,24 +1048,9 @@
   }
 
   async function onSecondary() {
+    // Renewals are intentionally unavailable while a lease is active.
     var item = selectedItem();
-    if (!item || state.busy) return;
-    if (!isActiveOwned(item.id)) return;
-    state.busy = true;
-    syncActionButtons(item);
-    try {
-      await renewItem(item);
-      updateHero();
-      renderGrid();
-    } catch (err) {
-      var em = (err && err.message) ? err.message : 'فشل التجديد';
-      setStatus(em, 'err');
-      if (looksInsufficient(em)) openRechargeNative(em);
-      else toastNative(em);
-    } finally {
-      state.busy = false;
-      syncActionButtons(selectedItem());
-    }
+    if (!item || state.busy || isActiveOwned(item.id)) return;
   }
 
   async function onUnequip() {
@@ -1005,7 +1097,35 @@
   };
 
   el.btnPrimary.addEventListener('click', onPrimary);
-  el.btnSecondary.addEventListener('click', onSecondary);
+  el.btnSecondary.addEventListener('click', function () {
+    var item = selectedItem();
+    if (item && state.equipped[item.id] && state.type !== 'room_background') {
+      onUnequip();
+    } else {
+      onSecondary();
+    }
+  });
+
+  function syncBagButton() {
+    if (!el.btnBag) return;
+    el.btnBag.setAttribute('aria-pressed', state.bagMode ? 'true' : 'false');
+    el.btnBag.classList.toggle('is-active', !!state.bagMode);
+    var label = el.btnBag.querySelector('.action-label');
+    if (label) label.textContent = state.bagMode ? 'المتجر' : 'حقيبتي';
+    el.btnBag.setAttribute('aria-label', state.bagMode ? 'العودة إلى المتجر' : 'حقيبتي');
+  }
+
+  if (el.btnBag) el.btnBag.addEventListener('click', function () {
+    state.bagMode = !state.bagMode;
+    state.selectedId = null;
+    syncBagButton();
+    loadCatalog();
+  });
+
+  if (el.btnRecharge) el.btnRecharge.addEventListener('click', function () {
+    openRechargeNative('افتح صفحة الشحن لإضافة رصيد إلى محفظتك');
+    if (!bridge()) setStatus('ميزة الشحن متاحة من داخل التطبيق بعد تسجيل الدخول.', 'err');
+  });
 
   // Bootstrap from query + bridge
   state.type = qs('type') || 'vip_badge';

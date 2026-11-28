@@ -6,7 +6,6 @@ export default registerAs('app', () => {
       ['JWT_SECRET', process.env.JWT_SECRET],
       ['JWT_REFRESH_SECRET', process.env.JWT_REFRESH_SECRET],
       ['ADMIN_PASSWORD', process.env.ADMIN_PASSWORD],
-      ['DB_PASSWORD', process.env.DB_PASSWORD],
     ] as const;
     const missing = required
       .filter(([, value]) => !value || value.length < 16)
@@ -16,6 +15,14 @@ export default registerAs('app', () => {
         `Production secrets are missing or too short: ${missing.join(', ')}`,
       );
     }
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    const databasePassword = process.env.DB_PASSWORD;
+    if (!databaseUrl && (!databasePassword || databasePassword.length < 16)) {
+      throw new Error('Set DATABASE_URL or a DB_PASSWORD of at least 16 characters in production');
+    }
+    if (databaseUrl && !['postgres://', 'postgresql://'].some((prefix) => databaseUrl.toLowerCase().startsWith(prefix))) {
+      throw new Error('DATABASE_URL must be a PostgreSQL connection URL');
+    }
     if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
       throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be different');
     }
@@ -24,15 +31,22 @@ export default registerAs('app', () => {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
   apiPrefix: process.env.API_PREFIX || 'api/v1',
-  corsOrigins: (process.env.CORS_ORIGINS || '*').split(',').map((s) => s.trim()),
+  corsOrigins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+    : process.env.NODE_ENV === 'production'
+      ? []
+      : ['*'],
   throttleTtl: parseInt(process.env.THROTTLE_TTL || '60', 10),
   throttleLimit: parseInt(process.env.THROTTLE_LIMIT || '400', 10),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
-  uploadMaxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '20', 10),
+  uploadMaxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB || '50', 10),
   internetMusic: {
     pipedInstances: process.env.PIPED_API_INSTANCES || '',
   },
   database: {
+    // Render provides a private DATABASE_URL. Individual DB_* values remain for local development.
+    url: process.env.DATABASE_URL || '',
+    ssl: process.env.DB_SSL === 'true',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     username: process.env.DB_USERNAME || 'auralive',
@@ -109,7 +123,7 @@ export default registerAs('app', () => {
   },
   googlePlay: {
     // Must match android `applicationId` / Play Console package exactly.
-    packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.Dramizo.Series',
+    packageName: 'com.mgwa.chat',
     /**
      * Optional dedicated service-account JSON for Android Publisher API
      * (Play Console → Users and permissions → API access). NOT Firebase.
@@ -126,17 +140,23 @@ export default registerAs('app', () => {
     requirePublisherApi: process.env.GOOGLE_PLAY_REQUIRE_PUBLISHER === 'true',
   },
   fcm: {
+    projectId: process.env.FIREBASE_PROJECT_ID || 'jeho-fe429',
+    // FCM_SERVER_KEY is legacy and is not used by Firebase Admin SDK.
     serverKey: process.env.FCM_SERVER_KEY || '',
     credentialsPath: process.env.FIREBASE_CREDENTIALS_PATH || '',
   },
   google: {
-    // Web client ID from Firebase google-services.json (client_type 3).
-    // Must match Android requestIdToken(default_web_client_id).
+    // The Android app requests an ID token using default_web_client_id from
+    // android/app/google-services.json. Keep that exact Firebase Web OAuth ID
+    // as the primary verifier audience; older Blitz env values remain accepted
+    // as additional audiences to avoid breaking existing deployments.
     clientId:
-      process.env.GOOGLE_CLIENT_ID ||
-      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
-    // Optional comma-separated extra audiences (Android OAuth clients).
-    clientIds: process.env.GOOGLE_CLIENT_IDS || '',
+      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
+    clientIds: Array.from(new Set([
+      process.env.GOOGLE_CLIENT_ID || '',
+      ...(process.env.GOOGLE_CLIENT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+      '807697628126-sc7hj3pccrkt4p0b8ilji91mqb9ojs53.apps.googleusercontent.com',
+    ].filter(Boolean))).join(','),
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@auralive.com',

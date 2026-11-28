@@ -57,6 +57,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Transparent, touch-pass-through native renderer for room entries and gifts.
@@ -79,6 +81,11 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     return Math.max(1, value.getByteCount() / 1024);
                 }
             };
+    /** Prevent duplicate downloads when the sheet and ViewModel warm the same catalog. */
+    private static final Set<String> PRELOAD_VIDEO_IN_FLIGHT =
+            ConcurrentHashMap.newKeySet();
+    private static final int MAX_PRELOAD_VIDEOS = 12;
+    private static final int MAX_PRELOAD_IMAGES = 24;
 
     private final Runnable scheduledFinish = this::finishActive;
     private final List<Animator> looseAnimators = new ArrayList<>();
@@ -742,9 +749,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         // Same as Mikoo entry: center-crop full stage; vapc inside MP4 controls RGB size.
         anim.setScaleType(ScaleType.CENTER_CROP);
         anim.setLoop(1);
-        // Entry gifts: play gift/MP4 audio. Room-join entry rides stay muted
-        // so a wave of joins does not drown mic chat.
-        anim.setMute(!forGift);
+        // Entrance videos play with their original audio for everyone in the room.
+        // Do not request audio focus: the existing ZEGO room voice stays connected.
+        anim.setMute(false);
         if (forGift) {
             giftAnimView = anim;
         } else {
@@ -767,17 +774,28 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 });
                 return;
             }
-            // Gift path: plain MP4 (no vapc) → Exo fullscreen. Entry rides stay on AnimView.
-            if (giftMode && !localFileHasVapc(file)) {
+            // VAP entry packs need AnimView; ordinary uploaded MP4s do not contain
+            // the embedded vapc metadata and must use ExoPlayer instead. Previously
+            // only gifts had this fallback, so a normal purchased entry MP4 produced
+            // no video and no visual fallback on every room client.
+            if (!localFileHasVapc(file)) {
                 android.util.Log.i("NativeRoomEffects",
-                        "gift mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
+                        (giftMode ? "gift" : "entry")
+                                + " mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
                 post(() -> {
-                    if (giftAnimView != anim) return;
+                    if (giftMode) {
+                        if (giftAnimView != anim) return;
+                        giftAnimView = null;
+                    } else {
+                        if (entryAnimView != anim) return;
+                        entryAnimView = null;
+                    }
                     try {
-                        removeView(anim);
+                        if (anim.getParent() instanceof ViewGroup) {
+                            ((ViewGroup) anim.getParent()).removeView(anim);
+                        }
                     } catch (Exception ignored) {
                     }
-                    giftAnimView = null;
                     View streamed = createGiftVideoStream(mediaUrl, null, null);
                     if (streamed != null) {
                         addView(streamed, new LayoutParams(
@@ -1270,7 +1288,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
         return null;
     }
 
-    /** Warm gift media so send/play is instant for everyone in the room. */
+    /** Warm a small priority window; selected gifts outside it load on demand. */
     public static void preloadGiftUrls(Context context, @Nullable Iterable<String> urls) {
         if (context == null || urls == null) return;
         Context app = context.getApplicationContext();
@@ -1282,14 +1300,20 @@ public final class NativeRoomEffectsView extends FrameLayout {
             if (abs == null || abs.isEmpty()) continue;
             CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
             if (kind == CosmeticMedia.Kind.VIDEO) {
-                if (!videos.contains(abs)) videos.add(abs);
-            } else if (kind == CosmeticMedia.Kind.GIF
+                if (videos.size() < MAX_PRELOAD_VIDEOS
+                        && !videos.contains(abs)
+                        && peekGiftMp4Cache(app, abs) == null
+                        && PRELOAD_VIDEO_IN_FLIGHT.add(abs)) {
+                    videos.add(abs);
+                }
+            } else if ((kind == CosmeticMedia.Kind.GIF
                     || kind == CosmeticMedia.Kind.IMAGE
-                    || kind == CosmeticMedia.Kind.SVGA) {
-                if (!images.contains(abs)) images.add(abs);
+                    || kind == CosmeticMedia.Kind.SVGA)
+                    && images.size() < MAX_PRELOAD_IMAGES && !images.contains(abs)) {
+                images.add(abs);
             }
         }
-        // Videos first — limited concurrency so weak networks still finish the important ones.
+        // Keep each catalog warm-up to two concurrent video downloads; duplicate URLs coalesce.
         final java.util.concurrent.atomic.AtomicInteger inFlight =
                 new java.util.concurrent.atomic.AtomicInteger(0);
         final java.util.concurrent.ConcurrentLinkedQueue<String> q =
@@ -1299,13 +1323,13 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 while (inFlight.get() < 2) {
                     String next = q.poll();
                     if (next == null) return;
-                    if (peekGiftMp4Cache(app, next) != null) continue;
                     inFlight.incrementAndGet();
                     final String url = next;
                     new Thread(() -> {
                         try {
                             cacheGiftMp4(app, url);
                         } finally {
+                            PRELOAD_VIDEO_IN_FLIGHT.remove(url);
                             inFlight.decrementAndGet();
                             run();
                         }

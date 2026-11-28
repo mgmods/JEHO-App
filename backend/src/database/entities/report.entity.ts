@@ -15,6 +15,7 @@ export enum ReportTargetType {
   ROOM = 'room',
   MESSAGE = 'message',
   GIFT = 'gift',
+  MOMENT = 'moment',
 }
 
 export enum ReportStatus {

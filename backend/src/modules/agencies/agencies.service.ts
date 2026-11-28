@@ -8,10 +8,12 @@ import {
   Inject,
   forwardRef,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { v4 as uuidv4 } from 'uuid';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
 import {
@@ -78,7 +80,10 @@ const DEFAULT_AGENCY_SEAT_COUNT = 11;
 const DEFAULT_DIAMOND_USD_RATE = 0.00005;
 
 @Injectable()
-export class AgenciesService implements OnModuleInit {
+export class AgenciesService implements OnModuleInit, OnModuleDestroy {
+  private agencySchemaBootstrapTimer: ReturnType<typeof setInterval> | null = null;
+  private agencySchemaBootstrapRunning = false;
+  private agencySchemaBootstrapReady = false;
   private readonly logger = new Logger(AgenciesService.name);
   constructor(
     @InjectRepository(Agency) private readonly agenciesRepo: Repository<Agency>,
@@ -124,19 +129,49 @@ export class AgenciesService implements OnModuleInit {
     };
   }
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    // Schema maintenance must never hold Nest's HTTP startup behind a PostgreSQL
+    // relation lock. Run it in the background with a pinned connection, a
+    // non-blocking advisory lock, and strict per-statement timeouts.
+    void this.initializeAgencySchema();
+    this.agencySchemaBootstrapTimer = setInterval(() => {
+      void this.initializeAgencySchema();
+    }, 30_000);
+    this.agencySchemaBootstrapTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.agencySchemaBootstrapTimer) clearInterval(this.agencySchemaBootstrapTimer);
+    this.agencySchemaBootstrapTimer = null;
+  }
+
+  private async initializeAgencySchema(): Promise<void> {
+    if (this.agencySchemaBootstrapRunning || this.agencySchemaBootstrapReady) return;
+    this.agencySchemaBootstrapRunning = true;
+
+    const runner = this.dataSource.createQueryRunner();
+    let advisoryLockAcquired = false;
     try {
-      await this.dataSource.query(`
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '20s'");
+
+      advisoryLockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!advisoryLockAcquired) {
+        this.logger.warn('Agency schema bootstrap deferred: another instance owns the migration lock.');
+        return;
+      }
+
+      // Each additive DDL statement commits independently. If a later statement
+      // encounters a lock, earlier changes remain safe and the next retry resumes
+      // through IF NOT EXISTS without rewriting or deleting user/agency data.
+      await runner.query(`
         ALTER TABLE agency_applications
           ADD COLUMN IF NOT EXISTS "paidCoins" BIGINT NOT NULL DEFAULT 0,
           ADD COLUMN IF NOT EXISTS "paymentReferenceId" VARCHAR(128),
           ADD COLUMN IF NOT EXISTS "paymentRefunded" BOOLEAN NOT NULL DEFAULT false
       `);
-    } catch (err) {
-      this.logger.warn(`ensure agency application payment columns: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(`
+      await runner.query(`
         ALTER TABLE agencies
           ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16),
           ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN NOT NULL DEFAULT false,
@@ -145,28 +180,44 @@ export class AgenciesService implements OnModuleInit {
           ADD COLUMN IF NOT EXISTS "exclusiveRoomCardCode" VARCHAR(64),
           ADD COLUMN IF NOT EXISTS "exclusiveFrameUrl" VARCHAR(512)
       `);
-      await this.dataSource.query(`
+      await runner.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agencies_publicId"
         ON agencies ("publicId") WHERE "publicId" IS NOT NULL
       `);
-    } catch (err) {
-      this.logger.warn(`ensure agency exclusive columns: ${(err as Error).message}`);
-    }
-    try {
-      await this.dataSource.query(`
+      await runner.query(`
         ALTER TABLE gifts
           ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid
       `);
-      await this.dataSource.query(`
+      await runner.query(`
         CREATE INDEX IF NOT EXISTS "IDX_gifts_brandAgencyId"
         ON gifts ("brandAgencyId") WHERE "brandAgencyId" IS NOT NULL
       `);
-    } catch (err) {
-      this.logger.warn(`ensure gift brandAgencyId: ${(err as Error).message}`);
-    }
-    try {
-      // Family-card follows (Mikoo guild attention) — independent of membership.
-      await this.dataSource.query(`
+      await runner.query(`
+        CREATE TABLE IF NOT EXISTS agency_membership_periods (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
+          "userId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          "joinedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "leftAt" TIMESTAMPTZ,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await runner.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_agency_membership_periods_lookup"
+        ON agency_membership_periods ("agencyId", "userId", "joinedAt")
+      `);
+      await runner.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agency_membership_periods_active"
+        ON agency_membership_periods ("agencyId", "userId") WHERE "leftAt" IS NULL
+      `);
+      await runner.query(`
+        INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
+        SELECT m."agencyId", m."userId", COALESCE(m."joinedAt", NOW())
+        FROM agency_members m
+        WHERE m."status" = 'active' AND m."isActive" = true
+        ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING
+      `);
+      await runner.query(`
         CREATE TABLE IF NOT EXISTS agency_follows (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           "agencyId" uuid NOT NULL REFERENCES agencies(id) ON DELETE CASCADE,
@@ -175,70 +226,96 @@ export class AgenciesService implements OnModuleInit {
           UNIQUE ("agencyId", "userId")
         )
       `);
-      await this.dataSource.query(`
+      await runner.query(`
         CREATE INDEX IF NOT EXISTS "IDX_agency_follows_agencyId"
         ON agency_follows ("agencyId")
       `);
-      await this.dataSource.query(`
+      await runner.query(`
         CREATE INDEX IF NOT EXISTS "IDX_agency_follows_userId"
         ON agency_follows ("userId")
       `);
-    } catch (err) {
-      this.logger.warn(`ensure agency_follows: ${(err as Error).message}`);
-    }
-    try {
-      // Mark catalog agency frames as admin-only exclusive when meta missing.
-      await this.dataSource.query(`
-        UPDATE cosmetics
-        SET meta = COALESCE(meta, '{}'::jsonb) || '{"agencyExclusive":true}'::jsonb
-        WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
-          AND (meta IS NULL OR meta->>'agencyExclusive' IS NULL OR meta->>'agencyExclusive' = 'false')
-      `);
-    } catch {
-      // meta may be json not jsonb on some DBs — best effort
+
+      // Normalize existing agency display IDs without changing valid IDs.
+      const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
+      for (const agency of agencies) {
+        if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
+        let candidate = '';
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const next = String(100000 + Math.floor(Math.random() * 900000));
+          if (!(await this.agenciesRepo.exist({ where: { publicId: next } }))) {
+            candidate = next;
+            break;
+          }
+        }
+        if (candidate) await this.agenciesRepo.update({ id: agency.id }, { publicId: candidate });
+      }
+
+      // Mark catalog agency frames as admin-only exclusive when metadata permits.
       try {
-        await this.dataSource.query(`
+        await runner.query(`
           UPDATE cosmetics
-          SET meta = json_build_object('agencyExclusive', true)
+          SET meta = COALESCE(meta, '{}'::jsonb) || '{"agencyExclusive":true}'::jsonb
           WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
-            AND meta IS NULL
+            AND (meta IS NULL OR meta->>'agencyExclusive' IS NULL OR meta->>'agencyExclusive' = 'false')
         `);
       } catch {
-        /* ignore */
+        try {
+          await runner.query(`
+            UPDATE cosmetics
+            SET meta = json_build_object('agencyExclusive', true)
+            WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
+              AND meta IS NULL
+          `);
+        } catch {
+          // Older installations may use a metadata type unsupported by either update.
+        }
       }
-    }
-    try {
-      const existing = await this.settingsRepo.findOne({
-        where: { key: AGENCY_CREATE.settingKey },
-      });
-      if (!existing) {
-        await this.settingsRepo.save(
-          this.settingsRepo.create({
-            key: AGENCY_CREATE.settingKey,
-            value: String(AGENCY_CREATE.defaultCoins),
-            description: 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)',
-          }),
+
+      try {
+        const existing = await this.settingsRepo.findOne({
+          where: { key: AGENCY_CREATE.settingKey },
+        });
+        if (!existing) {
+          await this.settingsRepo.save(
+            this.settingsRepo.create({
+              key: AGENCY_CREATE.settingKey,
+              value: String(AGENCY_CREATE.defaultCoins),
+              description: 'سعر فتح الوكالة بالعملات (مدفوع — يحدده الأدمن)',
+            }),
+          );
+        }
+        await this.ensureSetting(
+          AGENCY_CREATE.freeSettingKey,
+          'false',
+          'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
         );
+        await this.ensureSetting(
+          'agency_auto_approve_after_payment',
+          'false',
+          'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
+        );
+      } catch (err) {
+        this.logger.warn(`ensure agency settings deferred: ${(err as Error).message}`);
       }
-      await this.ensureSetting(
-        AGENCY_CREATE.freeSettingKey,
-        'false',
-        'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
-      );
+
+      this.agencySchemaBootstrapReady = true;
+      if (this.agencySchemaBootstrapTimer) clearInterval(this.agencySchemaBootstrapTimer);
+      this.agencySchemaBootstrapTimer = null;
+      this.logger.log('Agency schema bootstrap completed with bounded, serialized DDL.');
     } catch (err) {
-      this.logger.warn(`ensure agency create price setting: ${(err as Error).message}`);
-    }
-    try {
-      // The gift split (owner commission vs host share) is owned entirely by the
-      // live ECONOMY config (dashboard → Economy panel). No per-share app_settings
-      // rows are seeded here anymore — that old system was fully removed.
-      await this.ensureSetting(
-        'agency_auto_approve_after_payment',
-        'false',
-        'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
+      this.logger.warn(
+        `Agency schema bootstrap deferred; API remains available and the migration will retry: ${(err as Error).message}`,
       );
-    } catch (err) {
-      this.logger.warn(`ensure agency settings: ${(err as Error).message}`);
+    } finally {
+      if (advisoryLockAcquired) {
+        await releaseJehoSchemaLock(runner).catch(() => undefined);
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch((err) => {
+        this.logger.warn(`Agency bootstrap connection release failed: ${(err as Error).message}`);
+      });
+      this.agencySchemaBootstrapRunning = false;
     }
   }
 
@@ -266,7 +343,7 @@ export class AgenciesService implements OnModuleInit {
     }
     for (let attempt = 0; attempt < 40; attempt++) {
       // Easy 5-digit display ID (never starts with 0).
-      const id = String(10000 + Math.floor(Math.random() * 90000));
+      const id = String(100000 + Math.floor(Math.random() * 900000));
       const exists = await this.agenciesRepo.findOne({
         where: { publicId: id },
         select: ['id'],
@@ -368,13 +445,18 @@ export class AgenciesService implements OnModuleInit {
         userId,
         status: AgencyMemberStatus.ACTIVE,
         isActive: true,
+        agency: { status: AgencyStatus.ACTIVE },
       },
       relations: ['agency'],
       order: { joinedAt: 'DESC' },
     });
     if (!membership) {
       membership = await this.membersRepo.findOne({
-        where: { userId, status: AgencyMemberStatus.PENDING },
+        where: {
+          userId,
+          status: AgencyMemberStatus.PENDING,
+          agency: { status: AgencyStatus.ACTIVE },
+        },
         relations: ['agency'],
         order: { joinedAt: 'DESC' },
       });
@@ -384,6 +466,12 @@ export class AgenciesService implements OnModuleInit {
       order: { createdAt: 'DESC' },
     });
     let agency = membership?.agency || null;
+    // A suspended/inactive agency must disappear from the member's app and profile.
+    // This also covers stale pending memberships left behind by older deployments.
+    if (agency && agency.status !== AgencyStatus.ACTIVE) {
+      agency = null;
+      membership = null;
+    }
     const visibleApplication =
       application?.status === AgencyApplicationStatus.APPROVED &&
       (!agency || !application.agencyId || application.agencyId !== agency.id)
@@ -652,14 +740,14 @@ export class AgenciesService implements OnModuleInit {
         if (!clash) break;
         activationCode = generateActivationCode();
       }
-      let publicId = String(10000 + Math.floor(Math.random() * 90000));
+      let publicId = String(100000 + Math.floor(Math.random() * 900000));
       for (let attempt = 0; attempt < 40; attempt++) {
         const clash = await manager.findOne(Agency, {
           where: { publicId },
           select: ['id'],
         });
         if (!clash) break;
-        publicId = String(10000 + Math.floor(Math.random() * 90000));
+        publicId = String(100000 + Math.floor(Math.random() * 900000));
       }
       const agency = await manager.save(
         manager.create(Agency, {
@@ -839,7 +927,9 @@ export class AgenciesService implements OnModuleInit {
       .take(Math.min(query.limit || 10, 10));
     const [items, total] = await qb.getManyAndCount();
     const liveByAgency = await this.loadLiveAgencyRooms(items.map((a) => a.id));
-    const safe = items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id)));
+    const safe = await Promise.all(
+      items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id))),
+    );
     return paginate(safe, total, query.page || 1, query.limit || 10);
   }
 
@@ -922,7 +1012,7 @@ export class AgenciesService implements OnModuleInit {
     return map;
   }
 
-  private publicAgencyCard(
+  private async publicAgencyCard(
     agency: Agency,
     live?: {
       id: string;
@@ -974,16 +1064,19 @@ export class AgenciesService implements OnModuleInit {
     // Do not load full members list — agencies can be huge. Use listMembers instead.
     let agency = await this.agenciesRepo.findOne({
       where: { id },
-      relations: ['owner'],
+      relations: ['owner', 'owner.profile'],
     });
     if (!agency) {
       // Also resolve by numeric public agency ID (not owner user ID).
       agency = await this.agenciesRepo.findOne({
         where: { publicId: String(id || '').trim() },
-        relations: ['owner'],
+        relations: ['owner', 'owner.profile'],
       });
     }
-    if (!agency) throw new NotFoundException('Agency not found');
+    // Do not expose suspended/inactive agencies through stale public profile links.
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) {
+      throw new NotFoundException('Agency not found');
+    }
     agency = await this.ensureAgencyPublicId(agency);
     const publicUser = (user: User | null | undefined) =>
       user
@@ -1041,9 +1134,6 @@ export class AgenciesService implements OnModuleInit {
     } catch {
       followerCount = 0;
     }
-    // Also count members as social gravity on the card when follows are empty.
-    if (followerCount <= 0) followerCount = Number(agency.memberCount || 0);
-
     let isFollowing = false;
     if (viewerId) {
       try {
@@ -1147,7 +1237,7 @@ export class AgenciesService implements OnModuleInit {
       return agency;
     }
     for (let attempt = 0; attempt < 48; attempt++) {
-      const candidate = String(10000 + Math.floor(Math.random() * 90000));
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
       const clash = await this.agenciesRepo.findOne({
         where: { publicId: candidate },
         select: ['id'],
@@ -1161,6 +1251,121 @@ export class AgenciesService implements OnModuleInit {
     agency.publicId = fallback;
     await this.agenciesRepo.update({ id: agency.id }, { publicId: fallback });
     return agency;
+  }
+
+  /** Public agency profile roster. Owner is always first, followed by active managers, hosts and members. */
+  async publicMembers(agencyId: string, page = 1, limit = 30) {
+    const key = String(agencyId || '').trim();
+    let agency = await this.agenciesRepo.findOne({
+      where: { publicId: key },
+      relations: ['owner', 'owner.profile'],
+    });
+    if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      agency = await this.agenciesRepo.findOne({
+        where: { id: key },
+        relations: ['owner', 'owner.profile'],
+      });
+    }
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) {
+      throw new NotFoundException('Agency not found');
+    }
+
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
+    const safePage = Math.max(1, Number(page) || 1);
+
+    // Use the same explicit SQL/table mapping as the public followers endpoint.
+    // This avoids ORM relation-metadata failures that previously made the roster
+    // return "تعذر تحميل القائمة" while the follower list continued to work.
+    const rows = await this.dataSource.query(
+      `SELECT m."userId" AS "userId", m.role AS role, m."joinedAt" AS "joinedAt",
+              u.id AS id, u."publicId" AS "publicId", u.username AS username,
+              u."displayName" AS "displayName", u."avatarUrl" AS "avatarUrl",
+              u.level AS level, up.country AS country, up.city AS city
+       FROM agency_members m
+       JOIN users u ON u.id = m."userId"
+       LEFT JOIN user_profiles up ON up."userId" = u.id
+       WHERE m."agencyId" = $1
+         AND m.status = $2
+         AND m."isActive" = TRUE
+       ORDER BY CASE m.role
+         WHEN 'owner' THEN 0
+         WHEN 'manager' THEN 1
+         WHEN 'host' THEN 2
+         ELSE 3
+       END ASC, m."joinedAt" ASC
+       LIMIT $3 OFFSET $4`,
+      [agency.id, AgencyMemberStatus.ACTIVE, safeLimit, (safePage - 1) * safeLimit],
+    );
+
+    const items = rows.map((row: any) => ({
+      userId: row.userId,
+      role: row.role,
+      joinedAt: row.joinedAt,
+      user: {
+        id: row.id,
+        publicId: row.publicId,
+        username: row.username,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
+        level: row.level,
+        country: row.country || null,
+        city: row.city || null,
+      },
+    }));
+
+    // The agency owner must appear exactly once and always lead the roster,
+    // even on older installations where an owner membership row is missing.
+    const ownerAlreadyListed = items.some((item: any) => item.userId === agency!.ownerId);
+    if (safePage === 1 && !ownerAlreadyListed && agency.owner) {
+      items.unshift({
+        userId: agency.owner.id,
+        role: AgencyRole.OWNER,
+        joinedAt: agency.createdAt,
+        user: {
+          id: agency.owner.id,
+          publicId: agency.owner.publicId,
+          username: agency.owner.username,
+          displayName: agency.owner.displayName,
+          avatarUrl: agency.owner.avatarUrl,
+          level: agency.owner.level,
+          country: agency.owner.profile?.country || null,
+          city: agency.owner.profile?.city || null,
+        },
+      });
+    }
+
+    const countRows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS total FROM agency_members
+       WHERE "agencyId" = $1 AND status = $2 AND "isActive" = TRUE`,
+      [agency.id, AgencyMemberStatus.ACTIVE],
+    );
+    const total = Number(countRows?.[0]?.total || 0) + (ownerAlreadyListed ? 0 : 1);
+    return { items, total: Math.max(total, items.length), page: safePage, limit: safeLimit };
+  }
+
+  /** Public, paginated follower list; following is separate from agency employment. */
+  async publicFollowers(agencyId: string, page = 1, limit = 30) {
+    const key = String(agencyId || '').trim();
+    let agency = await this.agenciesRepo.findOne({ where: { publicId: key } });
+    if (!agency && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) {
+      agency = await this.agenciesRepo.findOne({ where: { id: key } });
+    }
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) throw new NotFoundException('Agency not found');
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 30));
+    const safePage = Math.max(1, Number(page) || 1);
+    const [items, count] = await Promise.all([
+      this.dataSource.query(`
+        SELECT u.id AS "userId", u."publicId", u.username, u."displayName", u."avatarUrl", u.level,
+               up.country, up.city, f."createdAt" AS "followedAt"
+        FROM agency_follows f JOIN users u ON u.id = f."userId"
+        LEFT JOIN user_profiles up ON up."userId" = u.id
+        WHERE f."agencyId" = $1
+        ORDER BY f."createdAt" DESC
+        LIMIT $2 OFFSET $3
+      `, [agency.id, safeLimit, (safePage - 1) * safeLimit]),
+      this.dataSource.query('SELECT COUNT(*)::int AS total FROM agency_follows WHERE "agencyId" = $1', [agency.id]),
+    ]);
+    return { items, total: Number(count?.[0]?.total || 0), page: safePage, limit: safeLimit };
   }
 
   async followAgency(agencyId: string, userId: string) {
@@ -1347,18 +1552,84 @@ export class AgenciesService implements OnModuleInit {
    * Join using the agency's private activation code (chat invite + manual code field).
    * Code only proves the invite — owner/manager must still approve (PENDING).
    */
-  async joinByCode(userId: string, rawCode: string) {
+  /**
+   * Accept a private invite card without putting the agency UUID into the
+   * user's short publicId DTO field. The agency UUID is validated by the route.
+   */
+  async acceptInvite(agencyId: string, userId: string, rawCode: string) {
+    const code = normalizeActivationCode(rawCode);
+    if (code.length < 4 || code.length > 16) {
+      throw new BadRequestException('كود الدعوة غير صالح');
+    }
+    const agency = await this.agenciesRepo.findOne({
+      where: { id: agencyId, activationCode: code, status: AgencyStatus.ACTIVE },
+    });
+    if (!agency) {
+      throw new NotFoundException('الدعوة غير صالحة أو انتهت صلاحيتها');
+    }
+    // This creates a PENDING membership and notifies the agency owner/managers
+    // with the agency logo and explicit approve/reject actions.
+    return this.joinSelf(agency.id, userId);
+  }
+
+  async rejectInvite(agencyId: string, userId: string, rawCode: string) {
+    const code = normalizeActivationCode(rawCode);
+    if (code.length < 4 || code.length > 16) {
+      throw new BadRequestException('كود الدعوة غير صالح');
+    }
+    const agency = await this.agenciesRepo.findOne({
+      where: { id: agencyId, activationCode: code, status: AgencyStatus.ACTIVE },
+    });
+    if (!agency) {
+      throw new NotFoundException('الدعوة غير صالحة أو انتهت صلاحيتها');
+    }
+    if (agency.ownerId !== userId) {
+      try {
+        const user = await this.usersRepo.findOne({ where: { id: userId } });
+        await this.notificationsService.create({
+          userId: agency.ownerId,
+          type: NotificationType.AGENCY,
+          title: 'تم رفض دعوة الوكالة',
+          body: `${user?.displayName || user?.username || 'المستخدم'} رفض دعوة الانضمام إلى «${agency.name}».`,
+          data: {
+            action: 'invite_rejected',
+            agencyId: agency.id,
+            agencyName: agency.name,
+            agencyLogoUrl: agency.logoUrl || null,
+            rejectedUserId: userId,
+          },
+          sendPush: false,
+        });
+      } catch (err) {
+        this.logger.warn(`agency invite rejection notice failed: ${(err as Error).message}`);
+      }
+    }
+    return { rejected: true };
+  }
+
+  async joinByCode(userId: string, rawCode: string, rawPublicId: string) {
     const code = normalizeActivationCode(rawCode);
     if (code.length < 4) {
       throw new BadRequestException('كود التفعيل غير صالح');
     }
+    const suppliedId = String(rawPublicId || '').trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedId);
+    const publicId = isUuid ? '' : normalizeAgencyPublicId(suppliedId);
+    if (!isUuid && !isValidAgencyPublicId(publicId)) {
+      throw new BadRequestException('أدخل معرف الوكالة الصحيح أولاً');
+    }
+    // In-app invitations may carry the agency UUID; search-form joins use
+    // the short public display ID. Support both without truncating UUIDs.
     const agency = await this.agenciesRepo.findOne({
-      where: { activationCode: code },
+      where: isUuid
+        ? { id: suppliedId, activationCode: code, status: AgencyStatus.ACTIVE }
+        : { activationCode: code, publicId, status: AgencyStatus.ACTIVE },
     });
     if (!agency) {
-      throw new NotFoundException('كود التفعيل غير صحيح');
+      // Avoid disclosing whether a guessed activation code alone is valid.
+      throw new NotFoundException('معرف الوكالة أو كود التفعيل غير صحيح');
     }
-    // Same approval queue as listMembers join-requests (not instant free entry).
+    // Both the public agency ID and private code must match. Approval is still required.
     return this.joinSelf(agency.id, userId);
   }
 
@@ -1571,7 +1842,24 @@ export class AgenciesService implements OnModuleInit {
     return { unsuspended: true };
   }
 
-    async joinSelf(agencyId: string, userId: string) {
+  private async startMembershipPeriod(agencyId: string, userId: string, joinedAt?: Date) {
+    await this.dataSource.query(
+      `INSERT INTO agency_membership_periods ("agencyId", "userId", "joinedAt")
+       VALUES ($1, $2, COALESCE($3::timestamptz, NOW()))
+       ON CONFLICT ("agencyId", "userId") WHERE "leftAt" IS NULL DO NOTHING`,
+      [agencyId, userId, joinedAt || null],
+    );
+  }
+
+  private async endMembershipPeriod(agencyId: string, userId: string) {
+    await this.dataSource.query(
+      `UPDATE agency_membership_periods SET "leftAt" = NOW()
+       WHERE "agencyId" = $1 AND "userId" = $2 AND "leftAt" IS NULL`,
+      [agencyId, userId],
+    );
+  }
+
+  async joinSelf(agencyId: string, userId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
     if (agency.status !== AgencyStatus.ACTIVE) {
@@ -1659,6 +1947,7 @@ export class AgenciesService implements OnModuleInit {
       const data = {
         agencyId: agency.id,
         agencyName: agency.name,
+        agencyLogoUrl: agency.logoUrl || null,
         agencyCode: agency.activationCode || null,
         applicantId,
         action: 'join_request',
@@ -1737,6 +2026,7 @@ export class AgenciesService implements OnModuleInit {
     member.isActive = true;
     await this.membersRepo.save(member);
     if (wasPending) {
+      await this.startMembershipPeriod(agencyId, memberUserId);
       await this.agenciesRepo.increment({ id: agencyId }, 'memberCount', 1);
     }
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
@@ -1825,6 +2115,7 @@ export class AgenciesService implements OnModuleInit {
         isActive: true,
       }),
     );
+    await this.startMembershipPeriod(agencyId, targetUserId, member.joinedAt);
     await this.agenciesRepo.increment({ id: agencyId }, 'memberCount', 1);
     return member;
   }
@@ -1905,6 +2196,7 @@ export class AgenciesService implements OnModuleInit {
     }
     const wasActive =
       member.status === AgencyMemberStatus.ACTIVE && member.isActive;
+    if (wasActive) await this.endMembershipPeriod(agencyId, userId);
     await this.membersRepo.delete(member.id);
     if (!wasActive) {
       // Cancel pending join request — no room/moderator cleanup needed.
@@ -1930,6 +2222,7 @@ export class AgenciesService implements OnModuleInit {
     }
     const wasActive =
       member.status === AgencyMemberStatus.ACTIVE && member.isActive;
+    if (wasActive) await this.endMembershipPeriod(agencyId, targetUserId);
     await this.membersRepo.delete(member.id);
     await this.removeAgencyModerator(agencyId, targetUserId);
     await this.roomsService.closeAgencyHostRoom(agencyId, targetUserId);
@@ -1939,23 +2232,234 @@ export class AgenciesService implements OnModuleInit {
     return { removed: true };
   }
 
-  async stats(agencyId: string) {
+  async stats(agencyId: string, viewerId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
+
+    // Membership names and performance totals are private agency data.
+    // Only the owner and active owner/manager roles may access the roll-up.
+    if (agency.ownerId !== viewerId) {
+      const viewer = await this.membersRepo.findOne({
+        where: {
+          agencyId,
+          userId: viewerId,
+          status: AgencyMemberStatus.ACTIVE,
+          isActive: true,
+        },
+      });
+      if (!viewer || (viewer.role !== AgencyRole.OWNER && viewer.role !== AgencyRole.MANAGER)) {
+        throw new ForbiddenException('Owner/manager only');
+      }
+    }
+
     const members = await this.membersRepo.find({
       where: { agencyId, status: AgencyMemberStatus.ACTIVE, isActive: true },
-      select: ['userId'],
+      select: ['userId', 'role'],
     });
     const memberIds = members.map((m) => m.userId);
-    const received = await this.sumGiftsReceived(memberIds);
+    const roleByUser = new Map(members.map((member) => [member.userId, member.role]));
+    // Aggregate gift totals in one query rather than issuing two queries per member.
+    const activePeriods: Array<{
+      userId: string;
+      joinedAt: Date;
+      displayName: string | null;
+      publicId: string | number | null;
+      giftsReceivedDiamonds: string | number;
+      dailyDiamonds: string | number;
+      weeklyDiamonds: string | number;
+      monthlyDiamonds: string | number;
+      lastGiftAt: Date | string | null;
+    }> = memberIds.length
+      ? await this.dataSource.query(
+          `SELECT p."userId", p."joinedAt",
+                  COALESCE(u."displayName", u.username, 'مضيف') AS "displayName",
+                  u."publicId" AS "publicId",
+                  COALESCE(SUM(g."diamondsAwarded"), 0)::text AS "giftsReceivedDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "dailyDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('week', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "weeklyDiamonds",
+                  COALESCE(SUM(g."diamondsAwarded") FILTER (
+                    WHERE g."createdAt" >= (date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                  ), 0)::text AS "monthlyDiamonds",
+                  MAX(g."createdAt") AS "lastGiftAt"
+           FROM agency_membership_periods p
+           JOIN users u ON u.id = p."userId"
+           LEFT JOIN gift_sends g
+             ON g."receiverId" = p."userId" AND g."createdAt" >= p."joinedAt"
+           WHERE p."agencyId" = $1 AND p."leftAt" IS NULL AND p."userId" = ANY($2::uuid[])
+           GROUP BY p."userId", p."joinedAt", u.id
+           ORDER BY SUM(g."diamondsAwarded") FILTER (
+             WHERE g."createdAt" >= (date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+           ) DESC NULLS LAST, SUM(g."diamondsAwarded") DESC NULLS LAST`,
+          [agencyId, memberIds],
+        )
+      : [];
+
+    // Reuse the existing host-target source of truth; do not calculate a second target.
+    const targetSetting = await this.settingsRepo.findOne({ where: { key: 'host_monthly_target' } });
+    let targetConfig: { enabled?: boolean; period?: string; stages?: Array<{ id?: string; title?: string; threshold?: number }> } = {};
+    try {
+      targetConfig = targetSetting?.value ? JSON.parse(targetSetting.value) : {};
+    } catch {
+      targetConfig = {};
+    }
+    const targetPeriod = String(targetConfig.period || 'monthly').toLowerCase() === 'weekly' ? 'weekly' : 'monthly';
+    const now = new Date();
+    let targetPeriodKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    if (targetPeriod === 'weekly') {
+      const iso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      iso.setUTCDate(iso.getUTCDate() + 4 - (iso.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(iso.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((iso.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      targetPeriodKey = `${iso.getUTCFullYear()}W${String(week).padStart(2, '0')}`;
+    }
+    const targetRows: Array<{ userId: string; progress: string | number; withdrawnStageIds?: string[] | string | null }> =
+      targetConfig.enabled && memberIds.length
+        ? await this.dataSource.query(
+            `SELECT "userId", "progress", "withdrawnStageIds" FROM host_monthly_progress
+             WHERE "yearMonth" = $1 AND "userId" = ANY($2::uuid[])`,
+            [targetPeriodKey, memberIds],
+          )
+        : [];
+    const targetByUser = new Map(targetRows.map((row) => {
+      let withdrawn: string[] = [];
+      if (Array.isArray(row.withdrawnStageIds)) withdrawn = row.withdrawnStageIds;
+      else if (typeof row.withdrawnStageIds === 'string') {
+        try {
+          const parsed = JSON.parse(row.withdrawnStageIds);
+          if (Array.isArray(parsed)) withdrawn = parsed.map(String);
+        } catch {
+          withdrawn = [];
+        }
+      }
+      return [row.userId, { progress: Number(row.progress || 0), withdrawn: new Set(withdrawn) }] as const;
+    }));
+    const sortedStages = (Array.isArray(targetConfig.stages) ? targetConfig.stages : [])
+      .map((stage) => ({ ...stage, threshold: Math.max(0, Number(stage.threshold) || 0) }))
+      .sort((a, b) => a.threshold - b.threshold);
+
+    const memberStats = activePeriods.map((period) => {
+      const targetState = targetByUser.get(period.userId);
+      const targetProgress = targetState?.progress || 0;
+      // Match the host's existing target ladder: a stage remains current until its
+      // salary is withdrawn; reaching the threshold means zero remaining, not a jump.
+      const nextStage = sortedStages.find((stage) => !targetState?.withdrawn.has(String(stage.id || ''))) || null;
+      const nextThreshold = nextStage?.threshold || 0;
+      return {
+        userId: period.userId,
+        displayName: period.displayName || 'مضيف',
+        publicId: period.publicId == null ? null : String(period.publicId),
+        role: roleByUser.get(period.userId) || AgencyRole.HOST,
+        membershipStartedAt: period.joinedAt,
+        giftsReceivedDiamonds: Number(period.giftsReceivedDiamonds || 0),
+        dailyDiamonds: Number(period.dailyDiamonds || 0),
+        weeklyDiamonds: Number(period.weeklyDiamonds || 0),
+        monthlyDiamonds: Number(period.monthlyDiamonds || 0),
+        lastGiftAt: period.lastGiftAt || null,
+        targetEnabled: !!targetConfig.enabled,
+        targetPeriod,
+        targetPeriodKey,
+        targetProgress,
+        currentTargetName: nextStage?.title || (nextStage ? nextStage.id : (sortedStages.length ? 'اكتمل التارجت' : null)),
+        currentTargetThreshold: nextThreshold,
+        targetRemaining: nextStage ? Math.max(0, nextThreshold - targetProgress) : 0,
+        targetProgressPercent: nextStage && nextThreshold > 0
+          ? Math.max(0, Math.min(100, Math.floor((targetProgress / nextThreshold) * 100)))
+          : (sortedStages.length ? 100 : 0),
+      };
+    });
+    memberStats.sort((a, b) => b.giftsReceivedDiamonds - a.giftsReceivedDiamonds);
+    const received = memberStats.reduce((sum, item) => sum + item.giftsReceivedDiamonds, 0);
+    const dailyReceived = memberStats.reduce((sum, item) => sum + item.dailyDiamonds, 0);
+    const weeklyReceived = memberStats.reduce((sum, item) => sum + item.weeklyDiamonds, 0);
+    const monthlyReceived = memberStats.reduce((sum, item) => sum + item.monthlyDiamonds, 0);
+    const activeHostsToday = memberStats.filter((item) => item.dailyDiamonds > 0).length;
+    const activeHostsThisWeek = memberStats.filter((item) => item.weeklyDiamonds > 0).length;
+    const activeHostsThisMonth = memberStats.filter((item) => item.monthlyDiamonds > 0).length;
+    const utcDayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const utcWeekStart = new Date(utcDayStart);
+    const daysSinceMonday = (utcWeekStart.getUTCDay() + 6) % 7;
+    utcWeekStart.setUTCDate(utcWeekStart.getUTCDate() - daysSinceMonday);
+    const utcMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const memberPeriodCounts = await this.dataSource.query(
+      `SELECT
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $2)::int AS "today",
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $3)::int AS "week",
+          COUNT(DISTINCT p."userId") FILTER (WHERE p."joinedAt" >= $4)::int AS "month"
+       FROM agency_membership_periods p
+       WHERE p."agencyId" = $1`,
+      [agencyId, utcDayStart, utcWeekStart, utcMonthStart],
+    );
+    const periodCounts = memberPeriodCounts?.[0] || {};
+    const lastActivity = memberStats
+      .map((item) => item.lastGiftAt
+        ? (item.lastGiftAt instanceof Date
+          ? item.lastGiftAt.getTime()
+          : new Date(String(item.lastGiftAt)).getTime())
+        : 0)
+      .reduce((latest, value) => Math.max(latest, value), 0);
     return {
       agencyId,
+      dailyDiamonds: dailyReceived,
+      weeklyDiamonds: weeklyReceived,
+      monthlyDiamonds: monthlyReceived,
+      activeHostsToday,
+      activeHostsThisWeek,
+      activeHostsThisMonth,
+      newMembersToday: Number(periodCounts.today || 0),
+      newMembersThisWeek: Number(periodCounts.week || 0),
+      newMembersThisMonth: Number(periodCounts.month || 0),
+      lastGiftActivityAt: lastActivity > 0 ? new Date(lastActivity).toISOString() : null,
+      publicId: agency.publicId,
       name: agency.name,
-      memberCount: agency.memberCount,
-      totalDiamonds: Number(agency.totalDiamonds),
+      memberCount: memberIds.length,
+      targetEnabled: !!targetConfig.enabled,
+      targetPeriod,
+      targetPeriodKey,
+      // Current membership statistics restart when a member rejoins.
+      totalDiamonds: received,
       giftsReceivedDiamonds: received,
+      members: memberStats,
       commissionPercent: Number(agency.commissionPercent),
     };
+  }
+
+  async moderationAudit(agencyId: string, viewerId: string, limit = 100) {
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    if (agency.ownerId !== viewerId) {
+      const viewer = await this.membersRepo.findOne({
+        where: {
+          agencyId,
+          userId: viewerId,
+          status: AgencyMemberStatus.ACTIVE,
+          isActive: true,
+        },
+      });
+      if (!viewer || (viewer.role !== AgencyRole.OWNER && viewer.role !== AgencyRole.MANAGER)) {
+        throw new ForbiddenException('Owner/manager only');
+      }
+    }
+    const safeLimit = Math.max(1, Math.min(200, Math.floor(Number(limit) || 100)));
+    const rows = await this.dataSource.query(
+      `SELECT a.id, a.action, a.reason, a.metadata, a."createdAt",
+              a."roomId", COALESCE(r.title, 'غرفة') AS "roomTitle",
+              a."actorId", COALESCE(actor."displayName", actor.username, 'مشرف سابق') AS "actorName",
+              a."targetUserId", COALESCE(target."displayName", target.username, 'مستخدم سابق') AS "targetName",
+              actor."publicId" AS "actorPublicId", target."publicId" AS "targetPublicId"
+       FROM agency_moderation_audit a
+       LEFT JOIN rooms r ON r.id = a."roomId"
+       LEFT JOIN users actor ON actor.id = a."actorId"
+       LEFT JOIN users target ON target.id = a."targetUserId"
+       WHERE a."agencyId" = $1
+       ORDER BY a."createdAt" DESC
+       LIMIT $2`,
+      [agencyId, safeLimit],
+    );
+    return { agencyId, items: rows };
   }
 
   private periodStarts() {
@@ -2205,6 +2709,16 @@ export class AgenciesService implements OnModuleInit {
   }
 
   /** Detailed earnings for agency owner/manager: commission + period dashboard */
+  private publicAgencyPeriod(slice: Record<string, any>) {
+    if (!slice || typeof slice !== 'object') return slice;
+    const {
+      estimatedPlatformCut: _platform,
+      estimatedAgentShare: _agent,
+      ...visible
+    } = slice;
+    return visible;
+  }
+
   async earnings(agencyId: string, viewerId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
@@ -2221,8 +2735,7 @@ export class AgenciesService implements OnModuleInit {
       Number(agency.commissionPercent) || ownerCommissionDefault(),
       ownerCommissionDefault(),
     );
-    // Clean economy: host keeps the remainder, no split-time platform cut.
-    const platformPct = 0;
+    // Clean economy: the host receives the remainder after the agency commission.
     const hostPct = clampSharePct(100 - commissionPct, 70);
     const { weekStart, monthStart } = this.periodStarts();
 
@@ -2290,7 +2803,6 @@ export class AgenciesService implements OnModuleInit {
       name: agency.name,
       ownerId: agency.ownerId,
       commissionPercent: commissionPct,
-      platformCutPercent: platformPct,
       hostSharePercent: hostPct,
       memberCount: memberIds.length,
       activeHosts,
@@ -2303,13 +2815,12 @@ export class AgenciesService implements OnModuleInit {
         ownerCommissionUsd: this.diamondsToUsd(allTime.ownerCommissionEarned, rate),
         estimatedHostShare: allTime.estimatedHostShare,
         estimatedHostShareUsd: this.diamondsToUsd(allTime.estimatedHostShare, rate),
-        estimatedPlatformCut: allTime.estimatedPlatformCut,
-        estimatedAgentShare: allTime.estimatedAgentShare,
       },
+      // Keep internal platform/agent split fields out of the owner-facing API.
       periods: {
-        week: weekUsd,
-        month: monthUsd,
-        allTime: allUsd,
+        week: this.publicAgencyPeriod(weekUsd),
+        month: this.publicAgencyPeriod(monthUsd),
+        allTime: this.publicAgencyPeriod(allUsd),
       },
       monthCommissionDeltaPct: this.pctChange(
         month.ownerCommissionEarned,
@@ -3011,4 +3522,5 @@ export class AgenciesService implements OnModuleInit {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     return !!agency && agency.ownerId === actorId;
   }
+
 }

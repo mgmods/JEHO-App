@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from './secure-game-rng';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -16,7 +17,8 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiceRollDto } from './dto/dice.dto';
 import { RoomGameAccessService } from './room-game-access.service';
-import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
+import { getGameBetSettings, getGameWinRate, isGameBettingEnabled, isGameEnabled } from './game-odds-runtime';
 
 /** Display multipliers ≈ fair × 0.75 house (true 2-dice outcomes). Peaks soft-clamped by guard. */
 export const DICE_ODDS: Record<number, number> = {
@@ -59,10 +61,15 @@ export class DiceService {
       const n = Number(map.get(k));
       return Number.isFinite(n) ? n : fallback;
     };
+    const adminBet = getGameBetSettings('dice');
     return {
-      enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false',
-      minBet: Math.max(1, num('games.dice.min_bet', 100)),
-      maxBet: Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), GAME_PAYOUT.maxBet),
+      enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('dice'),
+      // The unified dashboard is the source of truth for per-game stake limits.
+      // Keep the legacy enabled flag only as an additional emergency kill switch;
+      // legacy min/max values must not silently override the administrator's values.
+      maxBet: Math.min(adminBet.maxBet, gamePayoutLimits().maxBet),
+      minBet: adminBet.minBet,
+      chips: adminBet.chips.filter((chip) => chip >= adminBet.minBet && chip <= Math.min(adminBet.maxBet, gamePayoutLimits().maxBet)),
       /** Very low hit rate (~8%). */
       winWeight: Math.max(0, num('games.dice.win_weight', 8)),
       loseWeight: Math.max(1, num('games.dice.lose_weight', 92)),
@@ -70,6 +77,7 @@ export class DiceService {
   }
 
   async getState(userId: string) {
+    if (!isGameEnabled('dice')) throw new BadRequestException('لعبة النرد متوقفة حالياً من الإدارة');
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
     let wallet = await this.walletRepo.findOne({ where: { userId } });
@@ -82,19 +90,20 @@ export class DiceService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
+        chips: cfg.chips.filter((c) => c >= cfg.minBet && c <= cfg.maxBet),
         odds: DICE_ODDS,
       },
     };
   }
 
   async roll(userId: string, dto: DiceRollDto, roomId?: string) {
+    if (!isGameEnabled('dice')) throw new BadRequestException('لعبة النرد متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
     const amount = Math.floor(Number(dto.amount));
     const pick = Math.floor(Number(dto.number));
-    if (amount < cfg.minBet || amount > cfg.maxBet) {
+    if (amount < cfg.minBet || amount > cfg.maxBet || !cfg.chips.includes(amount)) {
       throw new BadRequestException(`Bet must be between ${cfg.minBet} and ${cfg.maxBet}`);
     }
     if (pick < 2 || pick > 12) throw new BadRequestException('Number must be 2-12');
@@ -130,14 +139,17 @@ export class DiceService {
         }),
       );
 
-      // True 2-dice roll + house mult table (~75% RTP at fair p × mult).
-      const d1 = 1 + Math.floor(Math.random() * 6);
-      const d2 = 1 + Math.floor(Math.random() * 6);
+      // Optional published admin win rate applies uniformly to all users; otherwise use natural dice.
+      const configuredWinRate = getGameWinRate('dice');
+      const forceWin = configuredWinRate === undefined ? null : secureGameRandom() * 100 < configuredWinRate;
+      const [d1, d2] = forceWin === null
+        ? [1 + Math.floor(secureGameRandom() * 6), 1 + Math.floor(secureGameRandom() * 6)]
+        : forceWin ? this.comboFor(pick) : this.comboNot(pick);
       const total = d1 + d2;
       const multiplier = DICE_ODDS[pick] || 2;
       const won = total === pick;
-      // One extra house soft-void on max peak hits (~5%) for platform safety.
-      const softVoid = won && multiplier >= 14 && Math.random() < 0.08;
+      // Preserve legacy safety adjustment only when no admin percentage is configured.
+      const softVoid = configuredWinRate === undefined && won && multiplier >= 14 && secureGameRandom() < 0.08;
       const rawPayout = won && !softVoid ? amount * multiplier : 0;
       const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
 
@@ -202,7 +214,7 @@ export class DiceService {
 
   private shouldWin(cfg: { winWeight: number; loseWeight: number }) {
     const total = cfg.winWeight + cfg.loseWeight;
-    return Math.random() * total < cfg.winWeight;
+    return secureGameRandom() * total < cfg.winWeight;
   }
 
   private comboFor(sum: number): [number, number] {
@@ -212,7 +224,7 @@ export class DiceService {
         if (i + j === sum) combos.push([i, j]);
       }
     }
-    return combos[Math.floor(Math.random() * combos.length)] || [1, 1];
+    return combos[Math.floor(secureGameRandom() * combos.length)] || [1, 1];
   }
 
   private comboNot(sum: number): [number, number] {
@@ -220,8 +232,8 @@ export class DiceService {
     let d2 = 1;
     let guard = 0;
     do {
-      d1 = 1 + Math.floor(Math.random() * 6);
-      d2 = 1 + Math.floor(Math.random() * 6);
+      d1 = 1 + Math.floor(secureGameRandom() * 6);
+      d2 = 1 + Math.floor(secureGameRandom() * 6);
       guard++;
     } while (d1 + d2 === sum && guard < 40);
     return [d1, d2];

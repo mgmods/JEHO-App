@@ -76,6 +76,206 @@ public final class GiftFlyAnimator {
     }
 
     /**
+     * Shows one large gift at the lower-center of the room, briefly pulsing in
+     * step with each accepted group send, while lightweight copies fly together
+     * from just below it to the occupied seats. The cannon control is not touched.
+     */
+    public static void flyTogether(
+            @Nullable FrameLayout overlay,
+            @Nullable String iconUrl,
+            @Nullable PointF from,
+            @Nullable List<PointF> destinations,
+            long durationMs
+    ) {
+        flyTogether(overlay, iconUrl, from, destinations, durationMs, 1);
+    }
+
+    /**
+     * Fast center-gather → quantity reveal → simultaneous launch to the exact
+     * selected recipients. A capped number of particles keeps the room lightweight;
+     * the X quantity displayed is the actual send quantity.
+     */
+    public static void flyTogether(
+            @Nullable FrameLayout overlay,
+            @Nullable String iconUrl,
+            @Nullable PointF from,
+            @Nullable List<PointF> destinations,
+            long durationMs,
+            int quantity
+    ) {
+        if (overlay == null || from == null || destinations == null || destinations.isEmpty()) return;
+        final List<PointF> targets = new ArrayList<>();
+        for (PointF point : destinations) {
+            if (point != null) targets.add(new PointF(point.x, point.y));
+            if (targets.size() >= 20) break;
+        }
+        if (targets.isEmpty()) return;
+
+        final float density = overlay.getResources().getDisplayMetrics().density;
+        final int heroSize = Math.round(82f * density);
+        final int copySize = Math.round(36f * density);
+        final int gatherCount = Math.max(3, Math.min(8, Math.max(1, quantity)));
+        final long flightDuration = Math.max(420L, Math.min(850L, durationMs + 180L));
+
+        final ImageView hero = newImage(overlay, iconUrl, heroSize);
+        hero.setX(from.x - heroSize / 2f);
+        hero.setY(from.y - heroSize / 2f);
+        hero.setAlpha(0f);
+        hero.setScaleX(0.45f);
+        hero.setScaleY(0.45f);
+
+        final TextView quantityBadge = new TextView(overlay.getContext());
+        quantityBadge.setText("X" + Math.max(1, quantity));
+        quantityBadge.setTextColor(Color.WHITE);
+        quantityBadge.setTextSize(25f);
+        quantityBadge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        quantityBadge.setGravity(Gravity.CENTER);
+        quantityBadge.setPadding(Math.round(13f * density), Math.round(5f * density),
+                Math.round(13f * density), Math.round(5f * density));
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setShape(GradientDrawable.RECTANGLE);
+        badgeBg.setCornerRadius(22f * density);
+        badgeBg.setColor(0xE51A1025);
+        badgeBg.setStroke(Math.max(1, Math.round(1.5f * density)), 0xFFFFD76A);
+        quantityBadge.setBackground(badgeBg);
+        quantityBadge.setElevation(12f * density);
+        quantityBadge.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        quantityBadge.setX(from.x - quantityBadge.getMeasuredWidth() / 2f);
+        quantityBadge.setY(from.y - heroSize * 0.78f);
+        quantityBadge.setAlpha(0f);
+        quantityBadge.setScaleX(0.55f);
+        quantityBadge.setScaleY(0.55f);
+
+        final List<ImageView> gathered = new ArrayList<>(gatherCount);
+        final List<ImageView> copies = new ArrayList<>(targets.size());
+        try {
+            overlay.setVisibility(View.VISIBLE);
+            overlay.setClipChildren(false);
+            overlay.setClipToPadding(false);
+            overlay.addView(hero, new FrameLayout.LayoutParams(heroSize, heroSize));
+            overlay.addView(quantityBadge, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            AnimatorSet gather = new AnimatorSet();
+            List<Animator> gatherParts = new ArrayList<>();
+            float radius = 105f * density;
+            for (int i = 0; i < gatherCount; i++) {
+                double angle = (Math.PI * 2d * i) / gatherCount;
+                float sx = from.x + (float) Math.cos(angle) * radius - copySize / 2f;
+                float sy = from.y + (float) Math.sin(angle) * radius - copySize / 2f;
+                ImageView particle = newImage(overlay, iconUrl, copySize);
+                particle.setX(sx);
+                particle.setY(sy);
+                particle.setAlpha(0f);
+                particle.setScaleX(0.35f);
+                particle.setScaleY(0.35f);
+                overlay.addView(particle, new FrameLayout.LayoutParams(copySize, copySize));
+                gathered.add(particle);
+
+                ObjectAnimator x = ObjectAnimator.ofFloat(particle, View.X, sx,
+                        from.x - copySize / 2f);
+                ObjectAnimator y = ObjectAnimator.ofFloat(particle, View.Y, sy,
+                        from.y - copySize / 2f);
+                ObjectAnimator alpha = ObjectAnimator.ofFloat(particle, View.ALPHA, 0f, 1f, 1f, 0f);
+                ObjectAnimator sxAnim = ObjectAnimator.ofFloat(particle, View.SCALE_X, 0.35f, 1f, 0.15f);
+                ObjectAnimator syAnim = ObjectAnimator.ofFloat(particle, View.SCALE_Y, 0.35f, 1f, 0.15f);
+                AnimatorSet one = new AnimatorSet();
+                one.playTogether(x, y, alpha, sxAnim, syAnim);
+                one.setStartDelay(i * 24L);
+                one.setDuration(440L);
+                one.setInterpolator(new DecelerateInterpolator(1.6f));
+                gatherParts.add(one);
+            }
+            gather.playTogether(gatherParts);
+            gather.setDuration(520L);
+            gather.addListener(new AnimatorListenerAdapter() {
+                private void cleanupGather() {
+                    for (ImageView particle : gathered) remove(particle);
+                }
+
+                @Override public void onAnimationEnd(Animator animation) {
+                    cleanupGather();
+                    revealAndLaunch();
+                }
+
+                @Override public void onAnimationCancel(Animator animation) {
+                    cleanupGather();
+                    remove(hero);
+                    remove(quantityBadge);
+                }
+
+                private void revealAndLaunch() {
+                    ObjectAnimator heroAlpha = ObjectAnimator.ofFloat(hero, View.ALPHA, 0f, 1f);
+                    ObjectAnimator heroX = ObjectAnimator.ofFloat(hero, View.SCALE_X, 0.45f, 1.18f, 1f);
+                    ObjectAnimator heroY = ObjectAnimator.ofFloat(hero, View.SCALE_Y, 0.45f, 1.18f, 1f);
+                    ObjectAnimator badgeAlpha = ObjectAnimator.ofFloat(quantityBadge, View.ALPHA, 0f, 1f);
+                    ObjectAnimator badgeX = ObjectAnimator.ofFloat(quantityBadge, View.SCALE_X, 0.55f, 1.12f, 1f);
+                    ObjectAnimator badgeY = ObjectAnimator.ofFloat(quantityBadge, View.SCALE_Y, 0.55f, 1.12f, 1f);
+                    AnimatorSet reveal = new AnimatorSet();
+                    reveal.playTogether(heroAlpha, heroX, heroY, badgeAlpha, badgeX, badgeY);
+                    reveal.setDuration(260L);
+                    reveal.setInterpolator(new OvershootInterpolator(1.15f));
+                    reveal.addListener(new AnimatorListenerAdapter() {
+                        @Override public void onAnimationEnd(Animator animation) {
+                            overlay.postDelayed(() -> {
+                                if (hero.getParent() == null) return;
+                                List<Animator> flights = new ArrayList<>(targets.size() * 4);
+                                for (PointF target : targets) {
+                                    ImageView copy = newImage(overlay, iconUrl, copySize);
+                                    copy.setX(from.x - copySize / 2f);
+                                    copy.setY(from.y - copySize / 2f);
+                                    copy.setAlpha(1f);
+                                    copy.setScaleX(0.72f);
+                                    copy.setScaleY(0.72f);
+                                    overlay.addView(copy, new FrameLayout.LayoutParams(copySize, copySize));
+                                    copies.add(copy);
+                                    flights.add(ObjectAnimator.ofFloat(copy, View.X,
+                                            from.x - copySize / 2f, target.x - copySize / 2f));
+                                    flights.add(ObjectAnimator.ofFloat(copy, View.Y,
+                                            from.y - copySize / 2f, target.y - copySize / 2f));
+                                    flights.add(ObjectAnimator.ofFloat(copy, View.SCALE_X, 0.72f, 1.18f, 0.82f));
+                                    flights.add(ObjectAnimator.ofFloat(copy, View.SCALE_Y, 0.72f, 1.18f, 0.82f));
+                                }
+                                AnimatorSet launch = new AnimatorSet();
+                                launch.playTogether(flights);
+                                launch.setDuration(flightDuration);
+                                launch.setInterpolator(new AccelerateDecelerateInterpolator());
+                                launch.addListener(new AnimatorListenerAdapter() {
+                                    private void cleanup() {
+                                        for (ImageView copy : copies) remove(copy);
+                                        remove(hero);
+                                        remove(quantityBadge);
+                                    }
+                                    @Override public void onAnimationEnd(Animator animation) { cleanup(); }
+                                    @Override public void onAnimationCancel(Animator animation) { cleanup(); }
+                                });
+                                if (flights.isEmpty()) {
+                                    remove(hero);
+                                    remove(quantityBadge);
+                                } else {
+                                    launch.start();
+                                }
+                            }, 180L);
+                        }
+                    });
+                    reveal.start();
+                }
+            });
+            overlay.bringToFront();
+            quantityBadge.bringToFront();
+            gather.start();
+        } catch (OutOfMemoryError | RuntimeException error) {
+            for (ImageView particle : gathered) remove(particle);
+            for (ImageView copy : copies) remove(copy);
+            remove(hero);
+            remove(quantityBadge);
+            android.util.Log.w("GiftFlyAnimator", "Gift combo animation skipped safely", error);
+        }
+    }
+
+    /**
      * @deprecated Prefer {@link #allMicClone} for full banner + simultaneous scatter.
      */
     @Deprecated
@@ -120,7 +320,13 @@ public final class GiftFlyAnimator {
                 overlay.getResources().getDisplayMetrics().widthPixels);
         int h = Math.max(overlay.getHeight(),
                 overlay.getResources().getDisplayMetrics().heightPixels);
-        PointF mid = center != null ? center : new PointF(w / 2f, h * 0.40f);
+        // The cannon/all-mic hero must be anchored to the actual overlay bounds.
+        // A caller-provided point may be in screen, seat, or parent coordinates and
+        // was shifting the rose + X badge toward the right-hand seats.
+        // Use overlay-local center for the hero, glow, multiplier, banner and scatter origin.
+        PointF mid = new PointF(
+                overlay.getWidth() > 0 ? overlay.getWidth() * 0.5f : w * 0.5f,
+                overlay.getHeight() > 0 ? overlay.getHeight() * 0.5f : h * 0.5f);
         List<PointF> targets = seats != null ? new ArrayList<>(seats) : new ArrayList<>();
 
         overlay.setVisibility(View.VISIBLE);

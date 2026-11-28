@@ -29,6 +29,9 @@ public final class ChatDtos {
         @SerializedName("replyTo") public MessageDto replyTo;
         @SerializedName("isEdited") public boolean isEdited;
         @SerializedName("createdAt") public String createdAt;
+        @SerializedName("paidCoins") public long paidCoins;
+        @SerializedName("paidStatus") public String paidStatus;
+        @SerializedName("replyDeadlineAt") public String replyDeadlineAt;
         @SerializedName("sender") public AuthDtos.UserDto sender;
         /** Client-only: pending until server ack. */
         public transient boolean localPending;
@@ -36,11 +39,18 @@ public final class ChatDtos {
 
     public static class MediaDto {
         @SerializedName("url") public String url;
+        @SerializedName("thumbnailUrl") public String thumbnailUrl;
         @SerializedName("mimeType") public String mimeType;
         @SerializedName("size") public long size;
         @SerializedName("width") public int width;
         @SerializedName("height") public int height;
         @SerializedName("duration") public int duration;
+        // JEHO story-reply preview metadata; kept inside the existing media JSON.
+        @SerializedName("storyId") public String storyId;
+        @SerializedName("storyMediaType") public String storyMediaType;
+        @SerializedName("storyMediaUrl") public String storyMediaUrl;
+        @SerializedName("storyCaption") public String storyCaption;
+        @SerializedName("storyOwnerName") public String storyOwnerName;
     }
 
     public static class SendMessageRequest {

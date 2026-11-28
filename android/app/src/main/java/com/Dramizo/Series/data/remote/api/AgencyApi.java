@@ -21,6 +21,13 @@ public interface AgencyApi {
     @GET("agencies/{id}")
     Call<ApiResponse<MiscDtos.AgencyDto>> get(@Path("id") String id);
 
+    @GET("agencies/{id}/public-members")
+    Call<ApiResponse<Map<String, Object>>> publicMembers(
+            @Path("id") String id, @Query("page") int page, @Query("limit") int limit);
+
+    @GET("agencies/{id}/followers")
+    Call<ApiResponse<Map<String, Object>>> publicFollowers(
+            @Path("id") String id, @Query("page") int page, @Query("limit") int limit);
     @POST("agencies/{id}/follow")
     Call<ApiResponse<Map<String, Object>>> followAgency(@Path("id") String id);
 
@@ -39,6 +46,13 @@ public interface AgencyApi {
 
     @GET("agencies/{id}/earnings")
     Call<ApiResponse<MiscDtos.AgencyEarningsDto>> earnings(@Path("id") String id);
+
+    @GET("agencies/{id}/stats")
+    Call<ApiResponse<MiscDtos.AgencyStatsDto>> stats(@Path("id") String id);
+
+    @GET("agencies/{id}/audit")
+    Call<ApiResponse<Map<String, Object>>> moderationAudit(
+            @Path("id") String id, @Query("limit") int limit);
 
     @POST("agencies/{id}/distribute")
     Call<ApiResponse<Map<String, Object>>> distribute(
@@ -70,6 +84,23 @@ public interface AgencyApi {
 
     @POST("agencies/join-by-code")
     Call<ApiResponse<Object>> joinByCode(@Body Map<String, String> body);
+
+    /** In-app invite: agency UUID is a route parameter, not the user's publicId. */
+    /** Legacy invite cards without an activation code still enter the normal approval queue. */
+    @POST("agencies/{id}/join")
+    Call<ApiResponse<Object>> joinLegacyInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
+
+    @POST("agencies/{id}/invites/accept")
+    Call<ApiResponse<Object>> acceptInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
+
+    @POST("agencies/{id}/invites/reject")
+    Call<ApiResponse<Object>> rejectInvite(
+            @Path("id") String agencyId,
+            @Body Map<String, String> body);
 
     @retrofit2.http.PATCH("agencies/{id}/settings")
     Call<ApiResponse<Object>> updateSettings(@Path("id") String id, @Body Map<String, String> body);

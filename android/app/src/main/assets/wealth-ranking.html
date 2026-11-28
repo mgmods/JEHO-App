@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>JEHO · الثروة</title>
+<style>
+:root{--gold:#f8d889;--gold2:#b77a2d;--red:#7b1016;--wine:#260407;--ink:#120307;--cream:#ffe8b1;--muted:#d5b9a2}
+*{box-sizing:border-box}html,body{margin:0;width:100%;min-height:100%;overflow-x:hidden;background:#160204;color:#fff;font-family:Arial,"Noto Sans Arabic",sans-serif}
+body{background:radial-gradient(ellipse at 50% 4%,#7d171c 0,#39080d 34%,#160204 78%);padding-bottom:24px}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.34;background:repeating-linear-gradient(112deg,transparent 0 42px,#8e2c22 43px,#250307 49px,transparent 53px 100px);z-index:0}
+main,header{position:relative;z-index:1}
+header{margin:12px 4% 8px;padding:8px 10px;border:2px solid #d5b16b;border-radius:32px;background:linear-gradient(180deg,#291a1a,#100909);box-shadow:0 2px 0 #fff1c1 inset,0 5px 16px #0009;display:flex;gap:4px;justify-content:space-between}
+button{font:inherit;border:0;cursor:pointer}
+.top-tab{flex:1;min-width:0;padding:10px 4px;color:#e5d6c6;background:transparent;font-size:15px;font-weight:800;text-shadow:0 2px 3px #000}
+.top-tab.active{color:#2b1307;border:2px solid #fff0b0;border-radius:28px;background:linear-gradient(180deg,#fff1bc,#c18b3e 48%,#f8dda0);box-shadow:0 0 0 2px #6d3e12,0 3px 8px #000a}
+.periods{display:flex;justify-content:center;gap:42px;padding:8px 10px 14px}
+.period{position:relative;background:transparent;color:#c9a99c;font-size:17px;font-weight:800;padding:6px 4px}
+.period.active{color:#fff;text-shadow:0 2px 4px #000}
+.period.active:after{content:"";position:absolute;bottom:-4px;left:40%;width:20px;height:4px;border-radius:8px;background:#fff}
+.help{position:absolute;left:7%;top:112px;width:34px;height:34px;border-radius:50%;background:#fff;color:#caa05a;font-size:23px;font-weight:900;box-shadow:0 2px 8px #0008}
+main{max-width:760px;margin:auto;padding:0 10px}
+.section{position:relative;margin:18px 0 28px;padding:62px 13px 22px;min-height:380px;border:5px double #d9b36b;border-radius:35px;background:linear-gradient(180deg,#4c1114dd,#260609ed 55%,#180306f5);box-shadow:0 0 0 2px #6b3517,0 0 18px #e6ba6533,inset 0 0 28px #000a}
+.section:before,.section:after{content:"✧";position:absolute;color:#ffdf91;font-size:32px;text-shadow:0 0 6px #fff2b0;top:3px}
+.section:before{left:10px}.section:after{right:10px}
+.ribbon{position:absolute;top:-19px;left:8%;right:8%;min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px 20px;color:#5a210d;font-weight:900;font-size:17px;background:linear-gradient(180deg,#fff1c6,#e8ae62 48%,#fff0bd);border:3px solid #f6d88c;outline:2px solid #713c17;clip-path:polygon(5% 0,95% 0,100% 50%,95% 100%,5% 100%,0 50%);filter:drop-shadow(0 5px 5px #0009)}
+.trophy{font-size:76px;text-align:center;line-height:1.05;margin:-12px 0 8px;color:#ffdf8a;text-shadow:0 4px 6px #000}
+.podium{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:3px;align-items:end;padding:0 1px}
+.podium-card{text-align:center;min-width:0;padding:5px 2px 0;cursor:pointer}
+.podium-card.first{transform:translateY(-13px)}
+.podium-frame{position:relative;width:clamp(78px,25vw,145px);aspect-ratio:1;margin:auto auto 8px;display:grid;place-items:center}
+.podium-frame:before{content:"";position:absolute;inset:0;border-radius:50%;border:5px ridge #f8d78a;box-shadow:0 0 0 3px #7d4117,0 0 15px #ffd978aa,inset 0 0 12px #fff4ad}
+.podium-card.second .podium-frame:before{border-color:#e9e9f2;box-shadow:0 0 0 3px #5e6a84,0 0 15px #dceaffaa}
+.podium-card.third .podium-frame:before{border-color:#f1c4d6;box-shadow:0 0 0 3px #78445d,0 0 15px #ffc8e3aa}
+.podium-avatar{width:78%;height:78%;border-radius:50%;object-fit:cover;background:#321015;border:2px solid #f8d88c}
+.podium-card.second .podium-avatar{border-color:#dbe7ff}.podium-card.third .podium-avatar{border-color:#f3c9df}
+.podium-frame img.overlay{position:absolute;inset:-12%;width:124%;height:124%;object-fit:contain;pointer-events:none}
+.crown{position:absolute;top:-19px;font-size:29px;color:#ffe9a7;text-shadow:0 2px 4px #000}
+.rank{font-size:18px;color:#ffdc85;font-weight:900;text-shadow:0 2px 4px #000}
+.person{font-size:14px;font-weight:800;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score{font-size:13px;color:#ffe7b0;font-weight:900;margin-top:6px;direction:ltr}
+.entries{display:grid;gap:11px;padding:0 0 8px}
+.entry{min-height:86px;display:grid;grid-template-columns:44px minmax(0,1fr) 56px;gap:8px;align-items:center;padding:9px 10px;border-radius:10px;background:linear-gradient(105deg,#18294a,#0d1934 52%,#11132c);border:1px solid #48608b;box-shadow:0 3px 9px #0009,inset 0 1px #ffffff18;cursor:pointer}
+.entry-rank{font-size:19px;text-align:center;color:#fff}
+.entry-main{display:flex;align-items:center;gap:9px;min-width:0}
+.entry-avatar{width:55px;height:55px;flex:0 0 55px;border-radius:50%;object-fit:cover;background:#242a43;border:2px solid #c9b47d}
+.entry-copy{min-width:0;flex:1}
+.entry-name{font-size:15px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry-meta{font-size:11px;color:#c6c8d8;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;align-items:center;gap:5px;margin-top:5px}
+.badge-img{width:25px;height:22px;object-fit:contain}
+.flag{font-size:16px}
+.entry-score{text-align:left;direction:ltr;font-size:17px;font-weight:900;color:#fff;white-space:nowrap}
+.next{font-size:11px;color:#f1cc79;text-align:left;margin-top:5px}
+.reward-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;text-align:center}
+.reward{min-width:0;padding:8px 3px}
+.reward-title{font-size:16px;font-weight:900;margin-bottom:12px;color:#fff}
+.reward-art{width:100%;max-width:150px;aspect-ratio:1;margin:auto;border-radius:25px;border:5px ridge #e5b16a;background:linear-gradient(145deg,#701d21,#23070a);display:grid;place-items:center;overflow:hidden;box-shadow:0 0 12px #ffcf7a44}
+.reward-art img{width:90%;height:90%;object-fit:contain}
+.reward-name{font-size:12px;font-weight:800;margin-top:9px;overflow-wrap:anywhere;color:#ffebc6}
+.reward-empty{grid-column:1/-1;text-align:center;color:#d9bda5;font-size:12px;padding:12px}
+.state{text-align:center;color:#e5cda8;padding:22px 8px;font-size:13px}
+.hidden{display:none!important}
+@media(max-width:370px){.periods{gap:26px}.entry{grid-template-columns:32px minmax(0,1fr) 50px;padding:8px 6px}.entry-avatar{width:46px;height:46px;flex-basis:46px}.entry-name{font-size:13px}.entry-score{font-size:15px}.section{padding-left:9px;padding-right:9px}}
+</style>
+</head>
+<body>
+<header id="mainTabs">
+<button class="top-tab active" data-category="rich">الثروة</button>
+<button class="top-tab" data-category="popular">سحر</button>
+<button class="top-tab" data-category="room">غرفة</button>
+<button class="top-tab" data-category="gifts">الحظ</button>
+</header>
+<nav class="periods" id="periodTabs">
+<button class="period" data-period="monthly">شهرياً</button>
+<button class="period active" data-period="weekly">أسبوعياً</button>
+</nav>
+<button class="help" aria-label="معلومات" onclick="window.JehoRanking&&JehoRanking.showInfo&&JehoRanking.showInfo()">؟</button>
+<main>
+<section class="section">
+<div class="ribbon" id="podiumTitle">الثروة الأسبوعية أفضل 1-3</div>
+<div class="trophy">🏆</div>
+<div id="state" class="state">جارٍ تحميل المتصدرين من JEHO…</div>
+<div id="podium" class="podium"></div>
+</section>
+<section class="section">
+<div class="ribbon" id="rewardTitle">مكافأة الثروة الأسبوعية</div>
+<div id="rewards" class="reward-grid"><div class="reward-empty">المكافآت التي يحددها فريق JEHO ستظهر هنا.</div></div>
+</section>
+<section class="section" style="min-height:0;padding-top:55px">
+<div class="ribbon" id="listRibbon">بقية المتصدرين</div>
+<div id="rows" class="entries"></div>
+</section>
+</main>
+<script>
+'use strict';
+const categories={rich:'الثروة',popular:'سحر',room:'الغرف',gifts:'الحظ',host:'المضيفون',agency:'الوكالات'};
+let period='weekly',category='rich',items=[],rewardData={};
+const $=id=>document.getElementById(id);
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-US'):'—'}
+function image(url,cls){return url?'<img class="'+cls+'" loading="lazy" decoding="async" alt="" src="'+esc(url)+'">':'<span class="'+cls+'"></span>'}
+function displayName(row){return row?.user?.displayName||row?.user?.username||row?.targetName||'—'}
+function flagEmoji(code){const s=String(code||'').trim().toUpperCase();if(!/^[A-Z]{2}$/.test(s))return s;return String.fromCodePoint(...[...s].map(ch=>127397+ch.charCodeAt(0)))} 
+function makePodium(row,rank){const user=row.user||{};const cls=rank===1?'first':rank===2?'second':'third';return '<div class="podium-card '+cls+'" '+(category==='room'?'data-room-id="'+esc(row.targetId)+'" data-room-public-id="'+esc(row.meta?.publicId||'')+'"':'data-user-id="'+esc(row.userId||user.id||row.targetId)+'"')+'><div class="podium-frame">'+(rank===1?'<span class="crown">♛</span>':'')+image(category==='room'?(row.meta?.coverUrl||row.avatarUrl):user.avatarUrl||row.avatarUrl,'podium-avatar')+(user.frameUrl?image(user.frameUrl,'overlay'):'')+'</div><div class="rank">Top '+rank+'</div><div class="person">'+esc(displayName(row))+'</div><div class="score">'+fmt(row.score)+'</div></div>'}
+function makeEntry(row){const user=row.user||{};const rank=Number(row.rank)||0;const badges=[user.hostBadgeUrl,user.vipBadgeUrl].filter(Boolean).slice(0,2).map(u=>image(u,'badge-img')).join('');const meta=category==='room'?(row.meta?.publicId?'غرفة #'+row.meta.publicId:'غرفة صوتية'):(user.username?'@'+user.username:'');const click=category==='room'?'data-room-id="'+esc(row.targetId)+'" data-room-public-id="'+esc(row.meta?.publicId||'')+'"':'data-user-id="'+esc(row.userId||user.id||row.targetId)+'"';return '<article class="entry" '+click+'><div class="entry-rank">'+rank+'</div><div class="entry-main">'+image(category==='room'?(row.meta?.coverUrl||row.avatarUrl):user.avatarUrl,'entry-avatar')+'<div class="entry-copy"><div class="entry-name">'+esc(displayName(row))+'</div><div class="entry-meta">'+esc(meta)+'</div><div class="badges">'+(user.countryCode?'<span class="flag">'+esc(flagEmoji(user.countryCode))+'</span>':'')+badges+'</div></div></div><div><div class="entry-score">'+fmt(row.score)+'</div><div class="next">المرتبة التالية</div></div></article>'}
+function render(){const title=(categories[category]||'الثروة')+(period==='weekly'?' الأسبوعية':' الشهرية');$('podiumTitle').textContent=title+' أفضل 1-3';$('rewardTitle').textContent='مكافأة '+title;$('listRibbon').textContent='ترتيب '+(categories[category]||'الثروة');$('podium').innerHTML=items.slice(0,3).map((r,i)=>makePodium(r,i+1)).join('');$('rows').innerHTML=items.slice(3).map(makeEntry).join('');$('state').classList.toggle('hidden',items.length>0);$('state').textContent=items.length?'':'لا توجد نتائج فعلية لهذه الفترة حالياً.';drawRewards()}
+function load(){ $('state').classList.remove('hidden');$('state').textContent='جارٍ تحميل المتصدرين من JEHO…';$('podium').innerHTML='';$('rows').innerHTML='';if(window.JehoRanking&&typeof JehoRanking.load==='function')JehoRanking.load(period,category);else $('state').textContent='تعذر الاتصال بواجهة الترتيب داخل التطبيق.'}
+document.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{category=b.dataset.category;document.querySelectorAll('[data-category]').forEach(x=>x.classList.toggle('active',x===b));load()}));
+document.querySelectorAll('[data-period]').forEach(b=>b.addEventListener('click',()=>{period=b.dataset.period;document.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===b));load()}));
+function clickCard(e){const room=e.target.closest('[data-room-id]');if(room&&window.JehoRanking?.openRoom){JehoRanking.openRoom(room.dataset.roomId,room.dataset.roomPublicId||'');return}const user=e.target.closest('[data-user-id]');if(user&&window.JehoRanking?.openProfile)JehoRanking.openProfile(user.dataset.userId)}
+$('podium').addEventListener('click',clickCard);$('rows').addEventListener('click',clickCard);
+window.setInitialRanking=(p,c)=>{period=['weekly','monthly'].includes(p)?p:'weekly';category=Object.prototype.hasOwnProperty.call(categories,c)?c:'rich';document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('active',b.dataset.period===period));document.querySelectorAll('[data-category]').forEach(b=>b.classList.toggle('active',b.dataset.category===category))};
+window.renderJehoRankings=json=>{try{const p=JSON.parse(json||'[]');items=Array.isArray(p)?p:[];render()}catch(e){window.showJehoRankingError('تعذر قراءة بيانات الترتيب.')}};
+window.showJehoRankingError=message=>{$('state').classList.remove('hidden');$('state').textContent=message||'تعذر تحميل الترتيب';$('podium').innerHTML='';$('rows').innerHTML=''};
+function drawRewards(){const rewards=Array.isArray(rewardData)?rewardData:(rewardData.enabled===false?[]:(rewardData[period]||[]));$('rewards').innerHTML=Array.isArray(rewards)&&rewards.length?rewards.slice(0,3).map((r,i)=>'<div class="reward"><div class="reward-title">TOP'+(3-i)+'</div><div class="reward-art">'+image(r.imageUrl,'')+'</div><div class="reward-name">'+esc(r.name||r.label||'مكافأة')+'</div></div>').join(''):'<div class="reward-empty">لم يتم تحديد المكافآت بعد من لوحة التحكم.</div>'}
+window.renderJehoRewards=json=>{try{rewardData=JSON.parse(json||'{}');drawRewards()}catch(e){$('rewards').innerHTML='<div class="reward-empty">تعذر تحميل المكافآت.</div>'}};
+window.setInitialRanking('weekly','rich');load();
+</script>
+</body></html>

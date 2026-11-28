@@ -1,0 +1,4 @@
+JEHO MG-JEHO rebuild marker
+Date: 2026-10-23
+Purpose: trigger post-fix Android Universal APK build after replacing Kotlin property access on ApiResponse with explicit Java getters.
+Expected API: https://jeho-own-backend.mgs.blitz.cloud/api/v1

@@ -40,6 +40,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.presentation.web.PromoWebActivity;
+import com.Dramizo.Series.presentation.splash.SplashActivity;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.BalanceRedirect;
 import com.bumptech.glide.Glide;
@@ -173,7 +174,9 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         boolean hasCode = isAgency && !TextUtils.isEmpty(codeFromData);
-        boolean hasLink = !TextUtils.isEmpty(linkFromData);
+        boolean privateEntryGift = n.data != null
+                && Boolean.TRUE.equals(n.data.get("privateEntry"));
+        boolean hasLink = !TextUtils.isEmpty(linkFromData) || privateEntryGift;
         h.rowActions.setVisibility(hasCode || hasLink ? View.VISIBLE : View.GONE);
 
         if (hasCode) {
@@ -186,9 +189,20 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         if (hasLink) {
-            final String link = normalizeUrl(linkFromData);
             h.btnOpenLink.setVisibility(View.VISIBLE);
-            h.btnOpenLink.setOnClickListener(v -> openLink(ctx, link, title));
+            if (privateEntryGift) {
+                h.btnOpenLink.setText("عرض الدخولية");
+                h.btnOpenLink.setOnClickListener(v -> {
+                    Intent bag = new Intent(ctx, com.Dramizo.Series.presentation.cosmetics.CosmeticsActivity.class);
+                    bag.putExtra(com.Dramizo.Series.presentation.cosmetics.CosmeticsViewModel.EXTRA_TYPE, "entry_effect");
+                    bag.putExtra("bag_mode", true);
+                    ctx.startActivity(bag);
+                });
+            } else {
+                h.btnOpenLink.setText("فتح الرابط");
+                final String link = normalizeUrl(linkFromData);
+                h.btnOpenLink.setOnClickListener(v -> openLink(ctx, link, title));
+            }
         } else {
             h.btnOpenLink.setVisibility(View.GONE);
             h.btnOpenLink.setOnClickListener(null);
@@ -675,6 +689,17 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         if (TextUtils.isEmpty(url)) return;
         String u = normalizeUrl(url);
         try {
+            Uri parsed = Uri.parse(u);
+            String host = parsed.getHost() != null ? parsed.getHost() : "";
+            String path = parsed.getPath() != null ? parsed.getPath() : "";
+            if ("jeho-own-backend.mgs.blitz.cloud".equalsIgnoreCase(host)
+                    && path.startsWith("/open/room/")) {
+                Intent deepLink = new Intent(ctx, SplashActivity.class);
+                deepLink.setData(parsed);
+                deepLink.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(deepLink);
+                return;
+            }
             if (u.startsWith("http://") || u.startsWith("https://")) {
                 Intent i = new Intent(ctx, PromoWebActivity.class);
                 i.putExtra(PromoWebActivity.EXTRA_URL, u);

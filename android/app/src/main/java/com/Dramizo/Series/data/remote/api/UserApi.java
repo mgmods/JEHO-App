@@ -13,9 +13,37 @@ import retrofit2.http.PATCH;
 import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
+import retrofit2.http.Url;
 import retrofit2.http.Query;
 
 public interface UserApi {
+    @GET("moments/feed")
+    Call<ApiResponse<List<Map<String, Object>>>> momentsFeed(@Query("page") int page, @Query("limit") int limit);
+
+    @GET("moments/users/{userId}")
+    Call<ApiResponse<List<Map<String, Object>>>> userMoments(@Path("userId") String userId);
+
+    @POST
+    Call<ApiResponse<Map<String, Object>>> createMoment(@Url String endpointUrl, @Body Map<String, Object> body);
+
+    @PATCH("moments/{id}")
+    Call<ApiResponse<Map<String, Object>>> updateMoment(@Path("id") String id, @Body Map<String, Object> body);
+
+    @POST("moments/{id}/like")
+    Call<ApiResponse<Map<String, Object>>> toggleMomentLike(@Path("id") String id);
+
+    @GET("moments/{id}/comments")
+    Call<ApiResponse<List<Map<String, Object>>>> momentComments(@Path("id") String id);
+
+    @POST("moments/{id}/comments")
+    Call<ApiResponse<Map<String, Object>>> commentOnMoment(@Path("id") String id, @Body Map<String, String> body);
+
+    @POST("moments/{id}/report")
+    Call<ApiResponse<Map<String, Object>>> reportMoment(@Path("id") String id, @Body Map<String, String> body);
+
+    @DELETE("moments/{id}")
+    Call<ApiResponse<Map<String, Object>>> deleteMoment(@Path("id") String id);
+
     @GET("users/me")
     Call<ApiResponse<AuthDtos.UserDto>> me();
 
@@ -30,6 +58,21 @@ public interface UserApi {
 
     @GET("users/{id}")
     Call<ApiResponse<AuthDtos.UserDto>> getUser(@Path("id") String id);
+
+    @GET("users/{id}/room-presence")
+    Call<ApiResponse<Map<String, Object>>> roomPresence(@Path("id") String id);
+
+    @GET("users/me/room-tracking-privacy")
+    Call<ApiResponse<Map<String, Object>>> roomTrackingPrivacy();
+
+    @PATCH("users/me/room-tracking-privacy")
+    Call<ApiResponse<Map<String, Object>>> updateRoomTrackingPrivacy(@Body Map<String, String> body);
+
+    @GET("users/{id}/badges")
+    Call<ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> badges(@Path("id") String id);
+
+    @GET("users/{id}/badges/earned")
+    Call<ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> earnedBadges(@Path("id") String id);
 
     @PATCH("users/me")
     Call<ApiResponse<AuthDtos.UserDto>> updateProfile(@Body MiscDtos.UpdateProfileRequest body);
@@ -85,6 +128,10 @@ public interface UserApi {
     @GET("users/me/cp")
     Call<ApiResponse<MiscDtos.CpStatusDto>> myCp();
 
+    /** Public legacy CP fallback for profiles whose pair predates cp_relationships. */
+    @GET("users/{id}/cp")
+    Call<ApiResponse<MiscDtos.CpStatusDto>> publicCp(@Path("id") String id);
+
     @POST("users/me/requests/{id}/accept")
     Call<ApiResponse<Object>> acceptRequest(@Path("id") String id);
 
@@ -102,6 +149,94 @@ public interface UserApi {
 
     @DELETE("users/{id}/bond")
     Call<ApiResponse<Object>> endBond(@Path("id") String id, @Query("type") String type);
+
+    @GET("cosmetics")
+    Call<ApiResponse<List<Map<String, Object>>>> cosmeticsCatalog();
+
+    @GET("cosmetics/inventory")
+    Call<ApiResponse<List<Map<String, Object>>>> cosmeticsInventory();
+
+    @POST("cosmetics/purchase")
+    Call<ApiResponse<Map<String, Object>>> purchaseCosmetic(@Body Map<String, String> body);
+
+    @POST("cosmetics/equip")
+    Call<ApiResponse<Map<String, Object>>> equipCosmetic(@Body Map<String, String> body);
+
+    @POST("cosmetics/unequip")
+    Call<ApiResponse<Map<String, Object>>> unequipCosmetic(@Body Map<String, String> body);
+
+    @GET("cp/catalog")
+    Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
+
+    @GET("cp/store")
+    Call<ApiResponse<List<Map<String, Object>>>> cpStoreCatalog();
+
+    @GET("cp/store/inventory")
+    Call<ApiResponse<List<Map<String, Object>>>> cpStoreInventory();
+
+    @POST("cp/store/purchase")
+    Call<ApiResponse<Map<String, Object>>> purchaseCpStoreItem(@Body Map<String, String> body);
+
+    @POST("cp/store/equip")
+    Call<ApiResponse<Map<String, Object>>> equipCpStoreItem(@Body Map<String, String> body);
+
+    @POST("cp/store/unequip")
+    Call<ApiResponse<Map<String, Object>>> unequipCpStoreItem(@Body Map<String, String> body);
+
+    /** Public active relationships for room seats; returns only relationship ids/types and visual config. */
+    @GET("cp/room-effects")
+    Call<ApiResponse<Map<String, Object>>> cpRoomSeatEffects(@Query("userIds") String userIds);
+
+    @GET("cp/discover")
+    Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
+    @GET("cp/leaderboard")
+    Call<ApiResponse<List<Map<String, Object>>>> cpLeaderboard(@Query("period") String period);
+    @GET("cp/rewards")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRewards();
+
+
+
+    @GET("cp/tasks")
+    Call<ApiResponse<List<Map<String, Object>>>> cpTasks();
+
+    @POST("cp/tasks/{taskId}/claim")
+    Call<ApiResponse<Map<String, Object>>> claimCpTask(@Path("taskId") String taskId);
+
+    @GET("cp/memories")
+    Call<ApiResponse<List<Map<String, Object>>>> cpMemories();
+
+    @POST("cp/memories")
+    Call<ApiResponse<Map<String, Object>>> createCpMemory(@Body Map<String, String> body);
+
+    @DELETE("cp/memories/{id}")
+    Call<ApiResponse<Map<String, Object>>> deleteCpMemory(@Path("id") String id);
+
+    @GET("cp/users/{id}")
+    Call<ApiResponse<List<Map<String, Object>>>> cpProfileRelationships(@Path("id") String id);
+
+    @POST("cp/{id}/end")
+    Call<ApiResponse<Map<String, Object>>> endCpRelationship(@Path("id") String id);
+
+    @GET("cp/me")
+    Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
+
+    @POST("cp/profile-requests")
+    Call<ApiResponse<Map<String, Object>>> createProfileCpRequest(@Body Map<String, String> body);
+
+    @POST("cp/requests")
+    Call<ApiResponse<Map<String, Object>>> createRoomCpRequest(@Body Map<String, String> body);
+
+    @GET("cp/requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
+
+    @GET("cp/sent-requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpSentRequests();
+
+    @POST("cp/requests/{id}/cancel")
+    Call<ApiResponse<Map<String, Object>>> cancelCpRequest(@Path("id") String id);
+
+    @POST("cp/requests/{id}/respond")
+    Call<ApiResponse<Map<String, Object>>> respondCpRequest(@Path("id") String id, @Body Map<String, Boolean> body);
 
     @GET("users/me/gender-verification")
     Call<ApiResponse<MiscDtos.GenderVerificationDto>> getGenderVerification();

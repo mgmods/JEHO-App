@@ -60,13 +60,14 @@
     "ops": "Operations",
     "dashboard": "Dashboard",
     "users": "Users",
+    "conversations": "User Conversations",
     "rooms": "Rooms",
     "streams": "Live Streams",
     "agencies": "Agencies",
     "gifts": "Gifts",
     "banners": "Banners",
     "navIcons": "Tab icons",
-    "seatStickers": "Seat stickers",
+    "seatStickers": "Stickers",
     "coins": "Coin bags",
     "offers": "Store offers",
     "promos": "Offers & promos",
@@ -81,7 +82,6 @@
     "contests": "Contests",
     "games": "Games",
     "gameAds": "Game ads",
-    "drama": "Drama",
     "luckyBoxes": "Lucky boxes",
     "tasks": "Tasks",
     "ranking": "Ranking",
@@ -92,12 +92,15 @@
     "notifications": "Notifications",
     "settings": "General settings",
     "logs": "Logs",
-    "policyBrochure": "Platform policy PDF"
+    "policyBrochure": "Platform policy PDF",
+    "cpSettings": "CP relationship settings",
+    "stories": "Stories"
   },
   "routes": {
     "login": "Login",
     "dashboard": "Dashboard",
     "users": "Users",
+    "conversations": "User Conversations",
     "userDetail": "User Detail",
     "rooms": "Rooms",
     "streams": "Live Streams",
@@ -118,7 +121,6 @@
     "contests": "Contests",
     "games": "Games",
     "gameAds": "Game Ads",
-    "drama": "Drama",
     "luckyBoxes": "Lucky Boxes",
     "tasks": "Tasks",
     "ranking": "Ranking",
@@ -129,9 +131,11 @@
     "reports": "Reports",
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
+    "cpSettings": "CP Relationship Settings",
     "settings": "Settings",
     "logs": "Logs",
-    "policyBrochure": "Platform policy PDF"
+    "policyBrochure": "Platform policy PDF",
+    "stories": "Stories"
   },
   "login": {
     "title": "JEHO CHAT Admin",
@@ -651,8 +655,8 @@
   },
   "voiceRtc": {
     "title": "Voice engine (ZEGO ↔ LiveKit switch)",
-    "hint": "LiveKit is free open-source media on your VPS. ZEGO remains the paid cloud path. Use Show keys to copy URL / API Key / Secret for other apps.",
-    "free": "free",
+    "hint": "LiveKit is open-source software you can self-host; server and hosting costs depend on your setup and usage. ZEGO is the paid cloud option. Switching applies to rooms after the app is updated. Use Show keys to view connection settings.",
+    "free": "open source",
     "saveKeys": "Save LiveKit keys",
     "showKeys": "Show keys",
     "hideKeys": "Hide keys",
@@ -660,7 +664,7 @@
     "active": "Active now",
     "ready": "Ready",
     "notReady": "Not fully configured",
-    "switchedLiveKit": "Switched to LiveKit (free)",
+    "switchedLiveKit": "Switched to LiveKit",
     "switchedZego": "Switched to ZEGO"
   },
   "commonStatus": {
@@ -765,7 +769,6 @@
     "imageUrl": "Image URL",
     "link": "Link",
     "noData": "No data yet",
-    "saved": "Saved successfully",
     "deleted": "Deleted successfully",
     "failedLoad": "Failed to load",
     "untitled": "Untitled",
@@ -1186,10 +1189,10 @@
     "badFormat": "Allowed formats: PNG, JPG, or SVG",
     "tabs": {
       "party": "Party / Home",
-      "drama": "Drama",
       "games": "Games",
       "chat": "Chat",
-      "me": "Me"
+      "me": "Me",
+      "stories": "Stories"
     }
   },
   "seatStickers": {

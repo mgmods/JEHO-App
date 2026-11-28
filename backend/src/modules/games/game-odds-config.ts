@@ -24,6 +24,14 @@ export type GameOddsConfig = {
   maxWinMult: number;
   maxWinAbsolute: number;
   maxCrashRatio: number;
+  /** Server-enforced disabled game IDs, shared by all users. */
+  disabledGames: string[];
+  /** Published per-game win chance, 0–100; applied only by game engines that resolve outcomes on our server. */
+  gameWinRates: Record<string, number>;
+  /** Per-game player return target for shared-outcome betting games. */
+  gameRtpRates: Record<string, number>;
+  /** Per-game wager controls. bettingEnabled=false rejects wagers server-side. */
+  gameBetSettings: Record<string, { minBet: number; maxBet: number; bettingEnabled: boolean; chips: number[] }>;
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -38,6 +46,10 @@ export const DEFAULT_GAME_ODDS: GameOddsConfig = {
   maxWinMult: 12,
   maxWinAbsolute: 80_000,
   maxCrashRatio: 8,
+  disabledGames: [],
+  gameWinRates: {},
+  gameRtpRates: {},
+  gameBetSettings: {},
 };
 
 /** Presets for big-app style one-click tuning (always house-positive). */
@@ -94,6 +106,10 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
   }
   if (!obj || typeof obj !== 'object') return { ...DEFAULT_GAME_ODDS };
   const d = DEFAULT_GAME_ODDS;
+  const maxBet = Math.floor(clamp(obj.maxBet, 100, 50_000, d.maxBet));
+  // A configured winning result must never be capped below the original stake.
+  // Keep the absolute payout ceiling at least as high as the maximum accepted bet.
+  const maxWinAbsolute = Math.max(maxBet + 1, Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)));
   return {
     version: Math.max(1, Math.floor(Number(obj.version) || 1)),
     updatedAt: obj.updatedAt ? String(obj.updatedAt) : undefined,
@@ -104,10 +120,41 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     crashCashoutRake: clamp(obj.crashCashoutRake, 0.9, 0.99, d.crashCashoutRake),
     hiloPayoutMult: clamp(obj.hiloPayoutMult, 1.15, 1.7, d.hiloPayoutMult),
     royalBattlePayGate: clamp(obj.royalBattlePayGate, 0.2, 0.55, d.royalBattlePayGate),
-    maxBet: Math.floor(clamp(obj.maxBet, 100, 50_000, d.maxBet)),
+    maxBet,
     maxWinMult: Math.floor(clamp(obj.maxWinMult, 3, 25, d.maxWinMult)),
-    maxWinAbsolute: Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)),
+    maxWinAbsolute,
     maxCrashRatio: Math.floor(clamp(obj.maxCrashRatio, 3, 20, d.maxCrashRatio)),
+    disabledGames: Array.isArray(obj.disabledGames)
+      ? [...new Set<string>((obj.disabledGames as unknown[]).map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
+      : [...d.disabledGames],
+    gameWinRates: obj.gameWinRates && typeof obj.gameWinRates === 'object' && !Array.isArray(obj.gameWinRates)
+      ? Object.fromEntries(Object.entries(obj.gameWinRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          const n = Number(value);
+          return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(100, Math.max(0, n))]] : [];
+        }))
+      : { ...d.gameWinRates },
+    gameRtpRates: obj.gameRtpRates && typeof obj.gameRtpRates === 'object' && !Array.isArray(obj.gameRtpRates)
+      ? Object.fromEntries(Object.entries(obj.gameRtpRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          const n = Number(value);
+          return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(0.82, Math.max(0.55, n))]] : [];
+        }))
+      : { ...d.gameRtpRates },
+    gameBetSettings: obj.gameBetSettings && typeof obj.gameBetSettings === 'object' && !Array.isArray(obj.gameBetSettings)
+      ? Object.fromEntries(Object.entries(obj.gameBetSettings as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || !value || typeof value !== 'object') return [];
+          const row = value as Record<string, unknown>;
+          const min = Math.floor(clamp(Number(row.minBet), 1, maxBet, Math.min(50, maxBet)));
+          const max = Math.floor(clamp(Number(row.maxBet), min, maxBet, Math.min(20000, maxBet)));
+          const safeMax = Math.max(min, max);
+          const chips = Array.isArray(row.chips)
+            ? [...new Set(row.chips.map((x) => Math.floor(Number(x))).filter((x) => Number.isFinite(x) && x >= min && x <= safeMax))].sort((a, b) => a - b).slice(0, 12)
+            : [50, 100, 500, 1000, 5000].filter((x) => x >= min && x <= safeMax);
+          return [[id, { minBet: min, maxBet: safeMax, bettingEnabled: row.bettingEnabled !== false, chips: chips.length ? chips : [min] }]];
+        }))
+      : { ...d.gameBetSettings },
   };
 }
 
@@ -125,25 +172,38 @@ export const GAME_ODDS_COVERED_GAMES = [
   { id: '7updown', via: 'playerRtp' },
   { id: 'bounty-football', via: 'playerRtp' },
   { id: 'camel-racing', via: 'playerRtp' },
-  { id: 'cleopatra-slot', via: 'spinHitRate' },
-  { id: 'cleopatra-slots', via: 'spinHitRate' },
-  { id: 'crash', via: 'crashCashoutRake+maxCrashRatio' },
-  { id: 'fishing', via: 'fishingHitRate' },
-  { id: 'football-plinko', via: 'spinHitRate' },
-  { id: 'fortune-slot', via: 'spinHitRate' },
+  { id: 'cleopatra-slot', via: 'gameWinRates+spinHitRate' },
+  { id: 'cleopatra-slots', via: 'gameWinRates+spinHitRate' },
+  { id: 'crash', via: 'gameWinRates+crashCashoutRake+maxCrashRatio' },
+  { id: 'fishing', via: 'gameWinRates+fishingHitRate' },
+  { id: 'football-plinko', via: 'gameWinRates+spinHitRate' },
+  { id: 'fortune-slot', via: 'gameWinRates+spinHitRate' },
   { id: 'greedy-box', via: 'playerRtp' },
   { id: 'greedy-lion', via: 'playerRtp' },
-  { id: 'hilo', via: 'hiloPayoutMult' },
-  { id: 'line-slots', via: 'spinHitRate' },
+  { id: 'hilo', via: 'gameWinRates+hiloPayoutMult' },
+  { id: 'line-slots', via: 'gameWinRates+spinHitRate' },
   { id: 'luck-car', via: 'playerRtp' },
   { id: 'lucky77', via: 'playerRtp' },
-  { id: 'megaways-slots', via: 'spinHitRate' },
-  { id: 'olympians', via: 'spinHitRate' },
-  { id: 'pirate-king', via: 'spinHitRate' },
-  { id: 'royal-battle', via: 'royalBattlePayGate' },
-  { id: 'slot777', via: 'spinHitRate' },
-  { id: 'sugar-rush', via: 'spinHitRate' },
-  { id: 'swimsuit-party', via: 'spinHitRate' },
+  { id: 'megaways-slots', via: 'gameWinRates+spinHitRate' },
+  { id: 'olympians', via: 'gameWinRates+spinHitRate' },
+  { id: 'pirate-king', via: 'gameWinRates+spinHitRate' },
+  { id: 'royal-battle', via: 'gameWinRates+royalBattlePayGate' },
+  { id: 'slot777', via: 'gameWinRates+spinHitRate' },
+  { id: 'sugar-rush', via: 'gameWinRates+spinHitRate' },
+  { id: 'swimsuit-party', via: 'gameWinRates+spinHitRate' },
+  // JEHO-owned casual betting games; win rates are resolved server-side.
+  { id: 'slots', via: 'gameWinRates' },
+  { id: 'roulette', via: 'gameWinRates' },
+  { id: 'plinko', via: 'gameWinRates' },
+  { id: 'rps', via: 'gameWinRates' },
+  { id: 'witch', via: 'gameWinRates' },
+  { id: 'blackjack', via: 'gameWinRates' },
+  { id: 'poker', via: 'gameWinRates' },
+  { id: 'tarot', via: 'gameWinRates' },
+  { id: 'penalty', via: 'gameWinRates' },
+  { id: 'reaction', via: 'gameWinRates' },
+  { id: 'dice', via: 'gameWinRates' },
+  { id: 'lucky-wheel', via: 'gameWinRates' },
 ] as const;
 
 export function gameOddsClientPayload(cfg: GameOddsConfig) {
@@ -156,7 +216,16 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     coveredGames: GAME_ODDS_COVERED_GAMES.map((g) => g.id),
     coveredCount: GAME_ODDS_COVERED_GAMES.length,
     presets: Object.keys(GAME_ODDS_PRESETS),
+    gameWinRates: cfg.gameWinRates,
+    // Loss probability is the exact complement of the published win probability.
+    // It is derived server-side so the two percentages can never drift apart.
+    gameLossRates: Object.fromEntries(
+      Object.entries(cfg.gameWinRates).map(([id, winRate]) => [id, Math.round((100 - winRate) * 100) / 100]),
+    ),
+    gameRtpRates: cfg.gameRtpRates,
+    gameBetSettings: cfg.gameBetSettings,
     hints: {
+      gameWinRates: 'نسبة الفوز المعلنة لمحركات JEHO التي تحسم النتائج على الخادم. ألعاب المزوّد الخارجي لا يمكن تغيير احتمالاتها من JEHO دون دعم رسمي من المزوّد.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
       spinHitRate: 'فرصة فوز كل السلوتات / بلينكو / حفلة السباحة',
       fishingHitRate: 'فرصة صيد السمك (أصعب من السلوت)',

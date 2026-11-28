@@ -58,6 +58,43 @@ export class Contest {
   @Column({ type: 'uuid', nullable: true })
   agencyId: string | null;
 
+  /** Dashboard-configurable event/challenge presentation and scoring rules. */
+  @Column({ type: 'varchar', length: 24, default: 'challenge' })
+  kind: string;
+
+  @Column({ type: 'varchar', length: 1024, nullable: true })
+  bannerUrl: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  goalDiamonds: number;
+
+  @Column({ type: 'varchar', length: 24, default: 'coins' })
+  scoringMode: string;
+
+  @Column({ type: 'varchar', length: 24, default: 'individual' })
+  challengeType: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  allowedGiftIds: string[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  milestones: Record<string, unknown>[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  prizes: Record<string, unknown>[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  sideA: Record<string, unknown> | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  sideB: Record<string, unknown> | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  rules: Record<string, unknown> | null;
+
+  @Column({ type: 'boolean', default: false })
+  isInteractive: boolean;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

@@ -1,43 +1,50 @@
 package com.Dramizo.Series.util;
 
+import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
 import android.view.View;
-import android.view.animation.AccelerateDecelerateInterpolator;
 
-import androidx.annotation.Nullable;
+import java.util.WeakHashMap;
 
-import com.Dramizo.Series.R;
-
-/** Gentle motion for staff identity frames, including static uploaded images. */
+/**
+ * Subtle pulse for staff identity frames. Safe for RecyclerView reuse:
+ * callers must stop the animation when a view is rebound or recycled.
+ */
 public final class StaffIdentityFrameMotion {
-    private StaffIdentityFrameMotion() {}
+    private static final WeakHashMap<View, AnimatorSet> RUNNING = new WeakHashMap<>();
 
-    public static void start(@Nullable View frame) {
-        if (frame == null) return;
-        stop(frame);
-        frame.setScaleX(1f);
-        frame.setScaleY(1f);
-        frame.setAlpha(1f);
-        ObjectAnimator animator = ObjectAnimator.ofPropertyValuesHolder(
-                frame,
-                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.035f, 1f),
-                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.035f, 1f),
-                PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.92f, 1f));
-        animator.setDuration(2200L);
-        animator.setRepeatCount(ObjectAnimator.INFINITE);
-        animator.setInterpolator(new AccelerateDecelerateInterpolator());
-        frame.setTag(R.id.imgFrame, animator);
-        animator.start();
+    private StaffIdentityFrameMotion() { }
+
+    public static void start(View view) {
+        if (view == null) return;
+        stop(view);
+
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.82f, 1.0f);
+        alpha.setRepeatMode(ValueAnimator.REVERSE);
+        alpha.setRepeatCount(ValueAnimator.INFINITE);
+
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 0.985f, 1.025f);
+        scaleX.setRepeatMode(ValueAnimator.REVERSE);
+        scaleX.setRepeatCount(ValueAnimator.INFINITE);
+
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 0.985f, 1.025f);
+        scaleY.setRepeatMode(ValueAnimator.REVERSE);
+        scaleY.setRepeatCount(ValueAnimator.INFINITE);
+
+        AnimatorSet set = new AnimatorSet();
+        set.playTogether(alpha, scaleX, scaleY);
+        set.setDuration(2200L);
+        RUNNING.put(view, set);
+        set.start();
     }
 
-    public static void stop(@Nullable View frame) {
-        if (frame == null) return;
-        Object tag = frame.getTag(R.id.imgFrame);
-        if (tag instanceof ObjectAnimator) ((ObjectAnimator) tag).cancel();
-        frame.setTag(R.id.imgFrame, null);
-        frame.setScaleX(1f);
-        frame.setScaleY(1f);
-        frame.setAlpha(1f);
+    public static void stop(View view) {
+        if (view == null) return;
+        AnimatorSet previous = RUNNING.remove(view);
+        if (previous != null) previous.cancel();
+        view.setAlpha(1.0f);
+        view.setScaleX(1.0f);
+        view.setScaleY(1.0f);
     }
 }

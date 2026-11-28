@@ -1,9 +1,12 @@
 package com.Dramizo.Series.util;
 
 import android.content.ContentResolver;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
@@ -68,59 +71,160 @@ public final class AvatarImageLoader {
         if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
             view.setTag(R.id.tag_image_url, null);
             view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            try { Glide.with(view).clear(view); } catch (Exception ignored) {}
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
-        String abs = AssetCatalog.absoluteUrl(avatarUrl);
-        Object prev = view.getTag(R.id.tag_image_url);
-        boolean loadedOk = Boolean.TRUE.equals(view.getTag(R.id.tag_image_loaded));
-        // Only skip when the same URL already decoded — never lock on placeholder/error drawable.
-        if (prev instanceof String && abs != null && abs.equals(prev)
-                && loadedOk && view.getDrawable() != null) {
-            return;
-        }
-        view.setTag(R.id.tag_image_url, abs);
-        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
-        String lower = abs != null ? abs.toLowerCase(Locale.US) : "";
-        boolean animated = lower.contains(".gif") || lower.contains(".webp");
+        String abs = AssetCatalog.absoluteUrl(avatarUrl.trim());
+        if (abs == null || abs.isEmpty()) return;
+        boolean animated = isAnimatedMediaUrl(abs);
         int size = Math.max(96, Math.min(
                 view.getWidth() > 0 ? view.getWidth() : 256, 512));
-        var req = Glide.with(view)
-                .load(abs)
-                .thumbnail(0.2f)
-                .override(size, size)
-                .centerCrop()
-                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                .error(ImagePlaceholder.avatar())
-                .listener(new RequestListener<Drawable>() {
-                    @Override
-                    public boolean onLoadFailed(
-                            @Nullable GlideException e,
-                            Object model,
-                            Target<Drawable> target,
-                            boolean isFirstResource) {
-                        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
-                        return false;
-                    }
-
-                    @Override
-                    public boolean onResourceReady(
-                            Drawable resource,
-                            Object model,
-                            Target<Drawable> target,
-                            DataSource dataSource,
-                            boolean isFirstResource) {
-                        view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
-                        return false;
-                    }
-                });
-        // Placeholder only on cold first paint (no current drawable).
-        if (view.getDrawable() == null) {
-            req = req.placeholder(ImagePlaceholder.avatar());
+        String requestKey = abs + "#avatar:" + size;
+        Object previous = view.getTag(R.id.tag_image_url);
+        Object state = view.getTag(R.id.tag_image_loaded);
+        if (requestKey.equals(previous) && state instanceof Boolean) {
+            // FALSE means the same request is already in flight; TRUE means decoded.
+            // Failed requests clear the key below, so a later bind can retry.
+            return;
         }
-        // Still photos: freeze. GIF/WebP: keep motion (Mikoo shows live head).
-        if (!animated) req = req.dontAnimate();
-        req.into(view);
+        view.setTag(R.id.tag_image_url, requestKey);
+        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+        try {
+            var req = Glide.with(view)
+                    .load(abs)
+                    .override(size, size)
+                    .diskCacheStrategy(animated
+                            ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
+                            : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                    .error(ImagePlaceholder.avatar())
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                @Nullable GlideException e, Object model,
+                                Target<Drawable> target, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_url, null);
+                                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                            }
+                            return false;
+                        }
+
+                        @Override
+                        public boolean onResourceReady(
+                                Drawable resource, Object model, Target<Drawable> target,
+                                DataSource dataSource, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                            }
+                            return false;
+                        }
+                    });
+            if (view.getDrawable() == null) req = req.placeholder(ImagePlaceholder.avatar());
+            // Do not bitmap-transform animated frames; static art gets a tiny preview.
+            if (!animated) req = req.centerCrop().dontAnimate().thumbnail(0.2f);
+            else req = req.dontTransform();
+            req.into(view);
+        } catch (Exception ignored) {
+            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                view.setTag(R.id.tag_image_url, null);
+                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            }
+        }
+    }
+
+    /**
+     * Load profile / room covers at the actual view size while preserving GIF/WebP.
+     * Repeated room/profile refreshes must not restart an already-running animation.
+     */
+    public static void loadMedia(@Nullable ImageView view, @Nullable String mediaUrl, int placeholder) {
+        if (view == null) return;
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (mediaUrl == null || mediaUrl.trim().isEmpty()) {
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            try { Glide.with(view).clear(view); } catch (Exception ignored) {}
+            view.setImageResource(placeholder);
+            return;
+        }
+
+        String abs = AssetCatalog.absoluteUrl(mediaUrl.trim());
+        if (abs == null || abs.isEmpty()) {
+            view.setImageResource(placeholder);
+            return;
+        }
+        int width = view.getWidth() > 0 ? view.getWidth() : 1024;
+        int height = view.getHeight() > 0 ? view.getHeight() : 512;
+        // Avoid decoding a full-resolution upload into a small profile/room surface.
+        width = Math.max(96, Math.min(width, 2048));
+        height = Math.max(96, Math.min(height, 2048));
+        String requestKey = abs + "#media:" + width + "x" + height;
+        Object previous = view.getTag(R.id.tag_image_url);
+        Object state = view.getTag(R.id.tag_image_loaded);
+        if (requestKey.equals(previous) && state instanceof Boolean) {
+            // TRUE = already decoded; FALSE = request still in flight. Failed requests
+            // clear the key in the listener below, so a later bind can retry.
+            return;
+        }
+
+        view.setTag(R.id.tag_image_url, requestKey);
+        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+        boolean animated = isAnimatedMediaUrl(abs);
+        try {
+            var request = Glide.with(view).load(abs)
+                    .override(width, height)
+                    .diskCacheStrategy(animated
+                            ? com.bumptech.glide.load.engine.DiskCacheStrategy.DATA
+                            : com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                    .error(placeholder)
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(
+                                @Nullable GlideException e, Object model,
+                                Target<Drawable> target, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_url, null);
+                                view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                            }
+                            return false;
+                        }
+
+                        @Override
+                        public boolean onResourceReady(
+                                Drawable resource, Object model, Target<Drawable> target,
+                                DataSource dataSource, boolean isFirstResource) {
+                            if (requestKey.equals(view.getTag(R.id.tag_image_url))) {
+                                view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                            }
+                            return false;
+                        }
+                    });
+            if (view.getDrawable() == null) request = request.placeholder(placeholder);
+            // Do not bitmap-transform animated frames; static art gets a tiny preview
+            // while the correctly sized final resource is decoded.
+            if (animated) {
+                request = request.dontTransform();
+            } else {
+                request = request.centerCrop().dontAnimate().thumbnail(0.15f);
+            }
+            request.into(view);
+        } catch (Exception ignored) {
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+            if (view.getDrawable() == null) view.setImageResource(placeholder);
+        }
+    }
+
+    /** Local cover preview (gallery Uri) — keep the original animated drawable. */
+    public static void loadMedia(@Nullable ImageView view, @Nullable Uri uri, int placeholder) {
+        if (view == null) return;
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (uri == null) {
+            view.setImageResource(placeholder);
+            return;
+        }
+        Glide.with(view).load(uri).dontTransform()
+                .placeholder(placeholder).error(placeholder).into(view);
     }
 
     /** Local preview (gallery Uri) — preserves GIF animation. */
@@ -131,28 +235,123 @@ public final class AvatarImageLoader {
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
-        Glide.with(view).load(uri).into(view);
+        view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Glide.with(view).load(uri).dontTransform().into(view);
+    }
+
+    private static boolean isAnimatedMediaUrl(@Nullable String value) {
+        if (value == null) return false;
+        String path = value.toLowerCase(Locale.US);
+        int query = path.indexOf('?');
+        if (query >= 0) path = path.substring(0, query);
+        int hash = path.indexOf('#');
+        if (hash >= 0) path = path.substring(0, hash);
+        return path.endsWith(".gif") || path.endsWith(".webp");
     }
 
     /**
      * Build multipart upload preserving GIF/PNG/WebP mime + extension
      * (do not force JPEG — that breaks animated avatars).
      */
+    private static final int MAX_DIMENSION = 2048;
+    private static final int MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
+
     public static MultipartBody.Part multipartFromUri(
             ContentResolver resolver, Uri uri, String baseName) throws Exception {
-        byte[] bytes;
+        if (uri == null) throw new IllegalArgumentException("اختر صورة أولاً");
+
+        String sourceMime = resolver.getType(uri);
+        if (sourceMime != null) sourceMime = sourceMime.toLowerCase(Locale.US);
+        String displayName = "";
+        try (android.database.Cursor cursor = resolver.query(
+                uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) displayName = cursor.getString(column);
+            }
+        } catch (Exception ignored) {}
+        String lowerName = displayName == null ? "" : displayName.toLowerCase(Locale.US);
+        boolean gif = (sourceMime != null && sourceMime.contains("gif")) || lowerName.endsWith(".gif");
+        boolean webp = (sourceMime != null && sourceMime.contains("webp")) || lowerName.endsWith(".webp");
+        // Some gallery/providers return a generic MIME type. Inspect the file signature
+        // before deciding to recompress it, otherwise a GIF can silently become a JPEG.
+        if (!gif && !webp) {
+            try (InputStream in = resolver.openInputStream(uri)) {
+                if (in != null) {
+                    byte[] header = new byte[12];
+                    int n = in.read(header);
+                    gif = n >= 3 && header[0] == 'G' && header[1] == 'I' && header[2] == 'F';
+                    webp = n >= 12 && header[0] == 'R' && header[1] == 'I'
+                            && header[2] == 'F' && header[3] == 'F'
+                            && header[8] == 'W' && header[9] == 'E'
+                            && header[10] == 'B' && header[11] == 'P';
+                }
+            } catch (Exception ignored) {}
+        }
+        if (gif || webp) {
+            byte[] bytes;
+            try (InputStream in = resolver.openInputStream(uri)) {
+                if (in == null) throw new IllegalStateException("تعذر قراءة الصورة");
+                bytes = readAll(in);
+            }
+            if (bytes.length > MAX_UPLOAD_BYTES) {
+                throw new IllegalArgumentException("الصورة المتحركة كبيرة جداً (الحد 6MB)");
+            }
+            String mime = gif ? "image/gif" : "image/webp";
+            String ext = extensionForMime(mime);
+            String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ext;
+            return MultipartBody.Part.createFormData(
+                    "file", name, RequestBody.create(bytes, MediaType.parse(mime)));
+        }
+
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
         try (InputStream in = resolver.openInputStream(uri)) {
-            if (in == null) throw new IllegalStateException("cannot open image");
-            bytes = readAll(in);
+            if (in == null) throw new IllegalArgumentException("تعذر قراءة الصورة");
+            BitmapFactory.decodeStream(in, null, bounds);
         }
-        String mime = resolver.getType(uri);
-        if (mime == null || !mime.toLowerCase(Locale.US).startsWith("image/")) {
-            mime = sniffImageMime(bytes);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw new IllegalArgumentException(
+                    "صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP أو GIF");
         }
-        String ext = extensionForMime(mime);
-        String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ext;
-        RequestBody body = RequestBody.create(bytes, MediaType.parse(mime));
-        return MultipartBody.Part.createFormData("file", name, body);
+
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, MAX_DIMENSION);
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        Bitmap bitmap;
+        try (InputStream in = resolver.openInputStream(uri)) {
+            if (in == null) throw new IllegalStateException("تعذر قراءة الصورة");
+            bitmap = BitmapFactory.decodeStream(in, null, opts);
+        }
+        if (bitmap == null) {
+            throw new IllegalArgumentException(
+                    "تعذر تجهيز الصورة. استخدم JPG أو PNG أو WebP أو GIF");
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int quality = 88;
+        boolean wrote = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
+        while (wrote && out.size() > MAX_UPLOAD_BYTES && quality > 65) {
+            out.reset();
+            quality -= 8;
+            wrote = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
+        }
+        bitmap.recycle();
+        if (!wrote || out.size() == 0) throw new IllegalStateException("تعذر ضغط الصورة");
+        if (out.size() > MAX_UPLOAD_BYTES) {
+            throw new IllegalArgumentException("الصورة كبيرة جداً بعد الضغط (الحد 6MB)");
+        }
+
+        byte[] bytes = out.toByteArray();
+        String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ".jpg";
+        return MultipartBody.Part.createFormData(
+                "file", name, RequestBody.create(bytes, MediaType.parse("image/jpeg")));
+    }
+
+    private static int sampleSize(int width, int height, int maxDimension) {
+        int sample = 1;
+        while (width / sample > maxDimension || height / sample > maxDimension) sample *= 2;
+        return Math.max(1, sample);
     }
 
     public static String sniffImageMime(byte[] bytes) {

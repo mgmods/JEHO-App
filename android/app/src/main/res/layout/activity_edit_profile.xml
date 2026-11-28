@@ -5,7 +5,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="#FFF5F6FA"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false"
@@ -63,8 +63,7 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="@color/white"
-
+        android:background="#FFF5F6FA"
         android:layout_weight="1">
 
         <ScrollView
@@ -83,15 +82,72 @@
                 android:orientation="vertical"
                 android:paddingBottom="16dp">
 
+                <!-- Cover -->
+                <LinearLayout
+                    android:id="@+id/rowCover"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_wallet_section"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:orientation="vertical"
+                    android:layout_marginHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/change_cover_photo"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/imgCoverPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="86dp"
+                        android:layout_marginTop="8dp"
+                        android:contentDescription="@string/change_cover_photo"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/lodim"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Jeho.BannerImage" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPickCoverGallery"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="8dp"
+                        android:textSize="12sp"
+                        android:text="إضافة صور للغلاف (حتى 5 صور)" />
+
+                    <TextView
+                        android:id="@+id/tvCoverGalleryCount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="0 من 5 صور"
+                        android:textColor="@color/text_hint"
+                        android:textSize="12sp" />
+                    <HorizontalScrollView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp" android:fillViewport="false" android:scrollbars="none">
+                        <LinearLayout android:id="@+id/coverGalleryItems" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:orientation="horizontal" />
+                    </HorizontalScrollView>
+                </LinearLayout>
+
                 <!-- Avatar hero -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingTop="22dp"
-                    android:paddingBottom="18dp">
+                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_wallet_section"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="16dp">
 
                     <FrameLayout
                         android:id="@+id/rowAvatar"
@@ -133,51 +189,16 @@
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="center"
-                        android:paddingHorizontal="28dp"
-                        android:text="@string/edit_profile_hint"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
+                    
+
+                    
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="10dp" />
 
-                <!-- Cover -->
-                <LinearLayout
-                    android:id="@+id/rowCover"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@color/white"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingTop="14dp"
-                    android:paddingBottom="14dp">
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/change_cover_photo"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/imgCoverPreview"
-                        android:layout_width="match_parent"
-                        android:layout_height="110dp"
-                        android:layout_marginTop="10dp"
-                        android:contentDescription="@string/change_cover_photo"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/lodim"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Jeho.BannerImage" />
-                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPickAvatar"
@@ -211,7 +232,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
+                    android:background="@drawable/bg_wallet_section"
+                    android:layout_marginHorizontal="12dp"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="6dp"
@@ -238,30 +260,9 @@
                         android:textColorHint="@color/text_hint"
                         android:textSize="15sp" />
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:paddingBottom="4dp"
-                        android:text="@string/bio"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
+                    
 
-                    <EditText
-                        android:id="@+id/etBio"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_edit_profile_field"
-                        android:gravity="top|start"
-                        android:hint="@string/bio"
-                        android:inputType="textMultiLine"
-                        android:minHeight="88dp"
-                        android:minLines="3"
-                        android:paddingHorizontal="14dp"
-                        android:paddingVertical="12dp"
-                        android:textColor="@color/text_primary"
-                        android:textColorHint="@color/text_hint"
-                        android:textSize="15sp" />
+                    
                 </LinearLayout>
 
                 <View
@@ -272,7 +273,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/white"
+                    android:background="@drawable/bg_wallet_section"
+                    android:layout_marginHorizontal="12dp"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
                     android:paddingTop="6dp"

@@ -82,10 +82,10 @@
               <input
                 id="admin-email"
                 v-model="form.email"
-                type="email"
+                type="text"
                 class="login-input"
                 required
-                :placeholder="PRIMARY_ADMIN_EMAIL"
+                placeholder="البريد الإلكتروني أو اسم المستخدم"
                 autocomplete="username"
                 dir="ltr"
               />
@@ -129,11 +129,7 @@
         <footer class="login-meta">
           <div>
             <span class="login-meta-k">{{ t('login.api') }}</span>
-            <code dir="ltr">api.adnova.bbs.tr</code>
-          </div>
-          <div>
-            <span class="login-meta-k">{{ t('login.defaultAccount') }}</span>
-            <code dir="ltr">{{ PRIMARY_ADMIN_EMAIL }}</code>
+            <code dir="ltr">JEHO-OWN · same server</code>
           </div>
         </footer>
       </section>
@@ -152,9 +148,6 @@ import brandLogo from '@/assets/brand/logo.png'
 
 const { t } = useI18n()
 
-/** Primary platform admin (seed account). */
-const PRIMARY_ADMIN_EMAIL = 'admin@auralive.com'
-
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -162,7 +155,7 @@ const logoUrl = brandLogo
 const showPassword = ref(false)
 
 const form = reactive({
-  email: PRIMARY_ADMIN_EMAIL,
+  email: '',
   password: '',
 })
 

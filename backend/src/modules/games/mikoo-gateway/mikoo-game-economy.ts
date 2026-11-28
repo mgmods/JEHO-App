@@ -1,6 +1,9 @@
+import { secureGameRandom } from '../secure-game-rng';
+
 /**
  * Shared Mikoo economy presets — chips, area ratios, spin multipliers.
- * High display mults are OK because settlement lands via inverse-weight RTP (≈75%).
+ * Multi-area land probabilities are calibrated against the dashboard RTP target
+ * using a normalized multiplier-power distribution (equal-stake area benchmark).
  */
 
 /** Expanded stake tray (UI chips). */
@@ -16,7 +19,7 @@ export const MIKOO_CRASH_CHIPS = [50, 200, 1000, 5000] as const;
 export const MIKOO_WIN_MULTS = [2, 3, 4, 10, 15, 20, 25] as const;
 
 /**
- * Greedy box / 8-area — peaks capped; land is inverse-weighted to RTP~75%.
+ * Greedy box / 8-area — peaks capped; land distribution is calibrated to dashboard RTP.
  * (Was [2,3,4,10,20,25,50,5] → 625% RTP on x50 under uniform.)
  */
 export const GREEDY_BOX_RATIOS = [2, 3, 4, 6, 10, 12, 15, 5] as const;
@@ -37,7 +40,7 @@ export const BOUNTY_BET_CHIPS = [50, 100, 500, 1000, 2000, 5000, 10_000] as cons
 
 /**
  * Lucky77 three bet icons — peak was x50 (556% RTP under uniform).
- * Now ×10 display; land weights use inverse mult × target RTP.
+ * Now ×10 display; land weights use dashboard RTP calibration.
  */
 export const LUCKY77_AREA_RATIOS = [2, 3, 10] as const;
 
@@ -57,5 +60,5 @@ export function lucky77ChipsList(): number[] {
 
 /** Pick a random win mult from the table (for decorating symbols). */
 export function randomWinMult(): number {
-  return MIKOO_WIN_MULTS[Math.floor(Math.random() * MIKOO_WIN_MULTS.length)]!;
+  return MIKOO_WIN_MULTS[Math.floor(secureGameRandom() * MIKOO_WIN_MULTS.length)]!;
 }

@@ -11,6 +11,7 @@ import { extname } from 'path';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { RoomChatPenalty } from '../../database/entities/room-chat-penalty.entity';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
 
 export type ModerationHit = {
   ok: false;
@@ -35,6 +36,7 @@ export type ChatStrikeResolution = {
 @Injectable()
 export class ContentModerationService implements OnModuleInit {
   private readonly log = new Logger(ContentModerationService.name);
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Built-in promo / link / adult text patterns (Arabic + Latin). */
   private readonly defaultBlocked = [
@@ -64,7 +66,11 @@ export class ContentModerationService implements OnModuleInit {
     private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeModerationDefaults();
+  }
+
+  private async initializeModerationDefaults(): Promise<void> {
     const defaults: Array<[string, string, string]> = [
       ['auto_moderation', 'true', 'Enable automated chat/image moderation'],
       ['autoModeration', 'true', 'Enable automated chat/image moderation (dashboard key)'],
@@ -101,27 +107,44 @@ export class ContentModerationService implements OnModuleInit {
 
   private async ensurePenaltyTable() {
     try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS room_chat_penalties (
-          id uuid PRIMARY KEY,
-          "roomId" uuid NOT NULL,
-          "userId" uuid NOT NULL,
-          "strikeCount" integer NOT NULL DEFAULT 0,
-          "chatMutedUntil" TIMESTAMPTZ NULL,
-          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
-          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
-      `);
-      await this.dataSource.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
-        ON room_chat_penalties ("roomId", "userId")
-      `);
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query("SET LOCAL lock_timeout = '250ms'");
+        await manager.query("SET LOCAL statement_timeout = '8s'");
+        const lockRows = await manager.query(
+          'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+          [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+        );
+        if (lockRows?.[0]?.locked !== true) {
+          throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+        }
+        await manager.query(`
+          CREATE TABLE IF NOT EXISTS room_chat_penalties (
+            id uuid PRIMARY KEY,
+            "roomId" uuid NOT NULL,
+            "userId" uuid NOT NULL,
+            "strikeCount" integer NOT NULL DEFAULT 0,
+            "chatMutedUntil" TIMESTAMPTZ NULL,
+            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+            "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+          )
+        `);
+        await manager.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
+          ON room_chat_penalties ("roomId", "userId")
+        `);
+      });
+      if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+      this.schemaRetryTimer = null;
     } catch (err) {
       this.log.warn(
-        `room_chat_penalties ensure skipped: ${
+        `room_chat_penalties ensure deferred; retrying safely: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.ensurePenaltyTable(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
     }
   }
 
@@ -347,15 +370,13 @@ export class ContentModerationService implements OnModuleInit {
     const threshold = await this.numSetting('live_nsfw_confidence', 0.72);
     const score = await this.estimateNsfwScore(storedPath, ext);
     if (score == null) {
-      try {
-        unlinkSync(storedPath);
-      } catch {
-        /* ignore */
-      }
-      throw new BadRequestException({
-        code: 'NSFW_SCAN_UNAVAILABLE',
-        message: 'تعذر فحص الصورة — ارفع JPG أو PNG',
-      });
+      // Upload availability must not depend on an optional NSFW scanner.
+      // JPEG/PNG use the built-in scanner; GIF/WebP need an external scanner.
+      // If a scanner is unavailable, keep the image and let the upload succeed.
+      this.log.warn(
+        `NSFW scan unavailable for ${ext || 'unknown image type'}; allowing upload`,
+      );
+      return;
     }
     if (score < threshold) return;
 

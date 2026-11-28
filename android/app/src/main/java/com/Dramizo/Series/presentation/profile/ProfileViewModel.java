@@ -26,6 +26,34 @@ public class ProfileViewModel extends ViewModel {
         loadMe(false);
     }
 
+    /**
+     * Profile setup must decide from the server's current profile, not an incomplete
+     * cached login DTO. If the request fails, fall back to the saved snapshot so a
+     * previously completed account can still enter the app while offline.
+     */
+    public void loadMeForSetup() {
+        c.getIoExecutor().execute(() -> {
+            try {
+                Result<AuthDtos.UserDto> r = c.getProfileUseCase.me();
+                if (r != null && r.success && r.data != null) {
+                    c.getSessionManager().updateCachedUser(r.data);
+                    lastLoadMeAtMs = System.currentTimeMillis();
+                    user.postValue(r.data);
+                    return;
+                }
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue(r != null && r.error != null
+                        ? r.error : "تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
+            } catch (Throwable failure) {
+                // Never leave onboarding transparent with its progress indicator stuck.
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue("تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
+            }
+        });
+    }
+
     /** @param force true after edits / pull when fresh data is required */
     public void loadMe(boolean force) {
         // Paint cached profile only once so tab re-entry does not rebuild the whole header.
@@ -57,9 +85,21 @@ public class ProfileViewModel extends ViewModel {
         if (!eq(a.id, b.id)) return false;
         if (!eq(a.displayName, b.displayName)) return false;
         if (!eq(a.avatarUrl, b.avatarUrl)) return false;
+        if (!eq(a.coverUrl, b.coverUrl)) return false;
         if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
+        // Refresh the visible profile when the dashboard changes the purchased animated name style.
+        if (!java.util.Objects.equals(a.nameStyle, b.nameStyle)) return false;
         if (!eq(a.hostBadgeUrl, b.hostBadgeUrl)) return false;
+        if (!eq(a.voiceWaveUrl, b.voiceWaveUrl)) return false;
+        if (!eq(a.vipBadgeUrl, b.vipBadgeUrl)) return false;
         if (!eq(a.staffRole, b.staffRole)) return false;
+        if (!java.util.Objects.equals(a.displayedMedalIds, b.displayedMedalIds)) return false;
+        if (!eq(a.agency == null ? null : a.agency.id, b.agency == null ? null : b.agency.id)) return false;
+        if (!eq(a.agency == null ? null : a.agency.role, b.agency == null ? null : b.agency.role)) return false;
+        if (!eq(a.agencyClub == null ? null : a.agencyClub.agencyId,
+                b.agencyClub == null ? null : b.agencyClub.agencyId)) return false;
+        if (!eq(a.agencyClub == null ? null : a.agencyClub.role,
+                b.agencyClub == null ? null : b.agencyClub.role)) return false;
         if (a.isAdmin != b.isAdmin) return false;
         if (a.level != b.level) return false;
         if (a.vipLevel != b.vipLevel) return false;

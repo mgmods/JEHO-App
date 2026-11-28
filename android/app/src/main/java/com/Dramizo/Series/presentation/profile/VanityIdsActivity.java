@@ -12,7 +12,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
@@ -28,6 +28,7 @@ import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.ErrorToasts;
+import com.Dramizo.Series.util.VanityIdStyle;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +46,9 @@ public class VanityIdsActivity extends ThemedActivity {
     private TextView tvCurrentId;
     private TextView tvBalance;
     private TextView tvEmpty;
+    private View searchPreviewWrap;
+    private TextView tvSearchPreviewNumber;
+    private TextView tvSearchPreviewLabel;
     private EditText etSearch;
     private RecyclerView recycler;
     private CatalogAdapter adapter;
@@ -53,6 +57,7 @@ public class VanityIdsActivity extends ThemedActivity {
     @Nullable private VanityDtos.VanityItem myLease;
     private long coinsBal;
     @Nullable private String userPublicId;
+    private boolean canApplyToAgency;
 
     @Override
     protected boolean wantsRemoteThemeChrome() {
@@ -72,11 +77,15 @@ public class VanityIdsActivity extends ThemedActivity {
         tvCurrentId = findViewById(R.id.tvCurrentId);
         tvBalance = findViewById(R.id.tvBalance);
         tvEmpty = findViewById(R.id.tvEmpty);
+        searchPreviewWrap = findViewById(R.id.searchPreviewWrap);
+        tvSearchPreviewNumber = findViewById(R.id.tvSearchPreviewNumber);
+        tvSearchPreviewLabel = findViewById(R.id.tvSearchPreviewLabel);
         recycler = findViewById(R.id.recycler);
         etSearch = findViewById(R.id.etVanitySearch);
 
         adapter = new CatalogAdapter();
-        recycler.setLayoutManager(new LinearLayoutManager(this));
+        recycler.setLayoutManager(new GridLayoutManager(this, 2));
+        recycler.setItemAnimator(null);
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
 
@@ -101,18 +110,27 @@ public class VanityIdsActivity extends ThemedActivity {
 
     private void bindHero() {
         if (myLease != null && myLease.active && myLease.publicId != null) {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText(myLease.publicId);
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText(myLease.publicId);
+                VanityIdStyle.bind(tvCurrentIdNumber, c == null ? null : c.getVanityApi(), myLease.publicId, 0);
+            }
             if (tvCurrentId != null) {
                 String exp = formatExpires(myLease.expiresAt);
                 tvCurrentId.setText(getString(R.string.vanity_hero_active_until, exp));
             }
         } else if (userPublicId != null && !userPublicId.isEmpty()) {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText(userPublicId);
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText(userPublicId);
+                VanityIdStyle.bind(tvCurrentIdNumber, c == null ? null : c.getVanityApi(), userPublicId, 0);
+            }
             if (tvCurrentId != null) {
                 tvCurrentId.setText(R.string.vanity_hero_current_hint);
             }
         } else {
-            if (tvCurrentIdNumber != null) tvCurrentIdNumber.setText("—");
+            if (tvCurrentIdNumber != null) {
+                tvCurrentIdNumber.setText("—");
+                VanityIdStyle.bind(tvCurrentIdNumber, null, null, 0);
+            }
             if (tvCurrentId != null) {
                 tvCurrentId.setText(R.string.vanity_hero_pick_hint);
             }
@@ -132,6 +150,34 @@ public class VanityIdsActivity extends ThemedActivity {
             shown.add(it);
         }
         adapter.submit(shown);
+
+        // Show a larger live preview only for a complete catalog ID match. This
+        // reuses the exact dashboard-configured colors/glow/animation via the
+        // shared renderer and avoids sending a style request on every typed digit.
+        VanityDtos.VanityItem exactMatch = null;
+        if (!q.isEmpty()) {
+            for (VanityDtos.VanityItem it : shown) {
+                if (it.publicId != null && it.publicId.equals(q)) {
+                    exactMatch = it;
+                    break;
+                }
+            }
+        }
+        if (searchPreviewWrap != null) {
+            boolean showPreview = exactMatch != null && tvSearchPreviewNumber != null;
+            searchPreviewWrap.setVisibility(showPreview ? View.VISIBLE : View.GONE);
+            if (showPreview) {
+                tvSearchPreviewNumber.setText(exactMatch.publicId);
+                if (tvSearchPreviewLabel != null) {
+                    tvSearchPreviewLabel.setText("معاينة حية للآيدي " + exactMatch.publicId);
+                }
+                VanityIdStyle.bind(tvSearchPreviewNumber, c == null ? null : c.getVanityApi(),
+                        exactMatch.publicId, 0);
+            } else if (tvSearchPreviewNumber != null) {
+                VanityIdStyle.bind(tvSearchPreviewNumber, null, null, 0);
+            }
+        }
+
         if (tvEmpty != null) {
             boolean empty = shown.isEmpty();
             tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -159,6 +205,7 @@ public class VanityIdsActivity extends ThemedActivity {
                 AppLoadingOverlay.hide(this);
                 coinsBal = (w.success && w.data != null) ? w.data.coins : 0;
                 myLease = mine.success && mine.data != null ? mine.data.item : null;
+                canApplyToAgency = mine.success && mine.data != null && mine.data.canApplyToAgency;
 
                 allItems.clear();
                 if (cat.success && cat.data != null && cat.data.items != null) {
@@ -227,6 +274,9 @@ public class VanityIdsActivity extends ThemedActivity {
                                             ? getString(R.string.vanity_renewed_toast, days)
                                             : getString(R.string.vanity_purchased_toast, days),
                                     Toast.LENGTH_SHORT).show();
+                            if (r.data != null && r.data.publicId != null) {
+                                showApplyTargetDialog(r.data.publicId, r.data.canApplyToAgency);
+                            }
                             load();
                         } else {
                             com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
@@ -235,6 +285,50 @@ public class VanityIdsActivity extends ThemedActivity {
                 }),
                 getString(android.R.string.cancel),
                 null);
+    }
+
+
+    private void showApplyTargetDialog(String publicId, boolean canApplyToAgency) {
+        List<String> labels = new ArrayList<>();
+        List<String> targets = new ArrayList<>();
+        labels.add("الروم الشخصي");
+        targets.add("room");
+        if (canApplyToAgency) {
+            labels.add("الوكالة");
+            targets.add("agency");
+        }
+        labels.add("الحساب الشخصي");
+        targets.add("account");
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("أين تريد استخدام الآيدي " + publicId + "؟")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    String target = targets.get(which);
+                    AppLoadingOverlay.showUntilReady(this);
+                    c.getIoExecutor().execute(() -> {
+                        java.util.Map<String, String> body = new java.util.HashMap<>();
+                        body.put("targetType", target);
+                        Result<VanityDtos.ApplyResult> result =
+                                ApiCall.execute(c.getVanityApi().apply(publicId, body));
+                        runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            AppLoadingOverlay.hide(this);
+                            if (result.success && result.data != null && result.data.success) {
+                                String label = "account".equals(target) ? "الحساب الشخصي"
+                                        : "room".equals(target) ? "الروم الشخصي" : "الوكالة";
+                                Toast.makeText(this, "تم تطبيق الآيدي على " + label,
+                                        Toast.LENGTH_LONG).show();
+                                load();
+                            } else {
+                                Toast.makeText(this,
+                                        result.error != null ? result.error
+                                                : "تعذر تطبيق الآيدي، تأكد من امتلاك الروم أو الوكالة",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    });
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private static String formatExpires(String iso) {
@@ -284,6 +378,7 @@ public class VanityIdsActivity extends ThemedActivity {
             int days = item.leaseDays > 0 ? item.leaseDays : 30;
 
             h.tvPublicId.setText(pid);
+            com.Dramizo.Series.util.VanityIdStyle.bind(h.tvPublicId, c.getVanityApi(), pid, 0);
             h.tvTier.setText(tierLabel(pid));
             if (h.tvMineBadge != null) {
                 h.tvMineBadge.setVisibility(renew ? View.VISIBLE : View.GONE);
@@ -298,7 +393,24 @@ public class VanityIdsActivity extends ThemedActivity {
             }
             h.tvMeta.setText(meta);
             h.btnBuy.setText(renew ? R.string.vanity_renew : R.string.vanity_buy);
-            h.btnBuy.setOnClickListener(v -> purchase(item));
+            h.btnBuy.setOnClickListener(v -> {
+                if (renew) {
+                    new androidx.appcompat.app.AlertDialog.Builder(VanityIdsActivity.this)
+                            .setTitle("الآيدي " + pid)
+                            .setItems(new String[]{"تطبيق الآيدي", "تجديد الآيدي 30 يوم"}, (dialog, which) -> {
+                                if (which == 0) showApplyTargetDialog(pid, canApplyToAgency);
+                                else purchase(item);
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                } else {
+                    purchase(item);
+                }
+            });
+            h.tvPublicId.setOnClickListener(v -> {
+                if (renew) showApplyTargetDialog(pid, canApplyToAgency);
+                else purchase(item);
+            });
         }
 
         @Override

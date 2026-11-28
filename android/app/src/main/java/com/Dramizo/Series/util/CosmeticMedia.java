@@ -32,7 +32,12 @@ public final class CosmeticMedia {
         }
         if (lower.endsWith(".json")) return Kind.NONE;
         if (lower.endsWith(".svga")) return Kind.SVGA;
-        if (lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov")) {
+        // Imported Mikoo headwear SVGA URLs are extensionless CDN endpoints.
+        // The equipped profile only carries the selected URL, so recognize this
+        // known animation endpoint directly instead of treating it as a still image.
+        if (lower.contains("res.echoliveapp.com/headwear/")) return Kind.SVGA;
+        if (lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov")
+                || lower.endsWith(".3gp") || lower.endsWith(".3g2")) {
             return Kind.VIDEO;
         }
         if (lower.endsWith(".gif")) return Kind.GIF;

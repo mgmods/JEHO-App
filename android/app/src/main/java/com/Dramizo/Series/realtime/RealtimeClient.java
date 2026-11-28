@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.socket.client.IO;
 import io.socket.client.Socket;
@@ -98,13 +100,15 @@ public class RealtimeClient {
         default void onDisconnected() {}
     }
 
-    private Socket socket;
+    private volatile Socket socket;
     private String token;
     private final CopyOnWriteArrayList<RoomListener> roomListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<ChatListener> chatListeners = new CopyOnWriteArrayList<>();
     private final CopyOnWriteArrayList<UserListener> userListeners = new CopyOnWriteArrayList<>();
-    private final Set<String> joinedRooms = new HashSet<>();
-    private final Set<String> joinedConversations = new HashSet<>();
+    // Socket callbacks and Android UI callers mutate these collections on different threads.
+    // Concurrent sets prevent reconnect/leave races and ConcurrentModificationException.
+    private final Set<String> joinedRooms = ConcurrentHashMap.newKeySet();
+    private final Set<String> joinedConversations = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> recentJoinEvents = new HashMap<>();
 
     public static synchronized RealtimeClient getInstance() {
@@ -168,8 +172,14 @@ public class RealtimeClient {
             socket.on("room:slot_ended", onSlotEnded);
             socket.on("room:gift_sounds", onRoomGiftSounds);
             socket.on("room:display_settings", onRoomDisplaySettings);
+            socket.on("room:advertisement", args -> dispatchUserEvent("room:advertisement", args));
+            socket.on("room:advertisement:config", args -> dispatchUserEvent("room:advertisement:config", args));
             socket.on("task:progress", onTaskProgress);
             socket.on("contest:score", onContestScore);
+            socket.on("contest:pk-status", args -> dispatchUserEvent("contest:pk-status", args));
+            socket.on("cp:request", args -> dispatchUserEvent("cp:request", args));
+            socket.on("cp:config-updated", args -> dispatchUserEvent("cp:config-updated", args));
+            socket.on("config:updated", args -> dispatchUserEvent("config:updated", args));
             socket.on("social:request", onSocialRequest);
             socket.on("social:request_responded", onSocialResponded);
             socket.on("notification:new", onNotificationNew);
@@ -236,12 +246,11 @@ public class RealtimeClient {
         }
         // Always emit room:join — skipping when joinedRooms is stale prevents entry effects
         // and leaves the socket outside the room after process death / incomplete leave.
-        final boolean[] done = {false};
+        final AtomicBoolean done = new AtomicBoolean(false);
         final android.os.Handler ackTimeout =
                 new android.os.Handler(android.os.Looper.getMainLooper());
         final Runnable timeout = () -> {
-            if (done[0]) return;
-            done[0] = true;
+            if (!done.compareAndSet(false, true)) return;
             Log.w(TAG, "room:join ack timeout " + roomId);
             if (callback != null) callback.onResult(false, "Join timeout", null);
         };
@@ -254,8 +263,7 @@ public class RealtimeClient {
             body.put("userLevel", Math.max(1, userLevel));
             ackTimeout.postDelayed(timeout, 12_000L);
             socket.emit("room:join", body, (Ack) args -> {
-                if (done[0]) return;
-                done[0] = true;
+                if (!done.compareAndSet(false, true)) return;
                 ackTimeout.removeCallbacks(timeout);
                 JSONObject response =
                         args != null && args.length > 0 && args[0] instanceof JSONObject
@@ -278,7 +286,7 @@ public class RealtimeClient {
             });
             Log.d(TAG, "room:join " + roomId);
         } catch (JSONException e) {
-            done[0] = true;
+            done.set(true);
             ackTimeout.removeCallbacks(timeout);
             Log.w(TAG, "joinRoom failed", e);
             if (callback != null) callback.onResult(false, e.getMessage(), null);
@@ -446,9 +454,29 @@ public class RealtimeClient {
 
     private final Emitter.Listener onConnect = args -> {
         Log.i(TAG, "Connected");
-        for (RoomListener l : roomListeners) l.onConnected();
-        for (ChatListener l : chatListeners) l.onConnected();
-        for (UserListener l : userListeners) l.onConnected();
+        // A stale Activity listener must never crash Socket.IO's callback thread and
+        // take down realtime delivery for every other screen/listener.
+        for (RoomListener l : roomListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Room onConnected listener failed", error);
+            }
+        }
+        for (ChatListener l : chatListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Chat onConnected listener failed", error);
+            }
+        }
+        for (UserListener l : userListeners) {
+            try {
+                l.onConnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "User onConnected listener failed", error);
+            }
+        }
         // Room re-join is owned by VoiceRoomActivity.connectRealtimeRoom (full profile).
         // Skipping bare room:join here avoids double presence traffic on every reconnect.
         for (String cid : new HashSet<>(joinedConversations)) {
@@ -463,9 +491,32 @@ public class RealtimeClient {
 
     private final Emitter.Listener onDisconnect = args -> {
         Log.i(TAG, "Disconnected");
-        for (RoomListener l : roomListeners) l.onDisconnected();
-        for (ChatListener l : chatListeners) l.onDisconnected();
-        for (UserListener l : userListeners) l.onDisconnected();
+        // Server-side Socket.IO room membership is lost on disconnect. Clear the
+        // local cache so VoiceRoomActivity can re-join before sending room events.
+        joinedRooms.clear();
+        // Isolate callbacks: an Activity being destroyed during a network transition
+        // must not throw out of Socket.IO's thread and terminate the app process.
+        for (RoomListener l : roomListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Room onDisconnected listener failed", error);
+            }
+        }
+        for (ChatListener l : chatListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "Chat onDisconnected listener failed", error);
+            }
+        }
+        for (UserListener l : userListeners) {
+            try {
+                l.onDisconnected();
+            } catch (RuntimeException error) {
+                Log.e(TAG, "User onDisconnected listener failed", error);
+            }
+        }
     };
 
     private final Emitter.Listener onRoomEvent = args -> {

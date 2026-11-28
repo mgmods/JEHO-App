@@ -8,7 +8,10 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
 import { User } from '../../database/entities/user.entity';
+import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -21,8 +24,11 @@ import { AuthModule } from '../auth/auth.module';
       Wallet,
       WalletTransaction,
       User,
+      AdminUser,
       VipPlan,
       UserVip,
+      Cosmetic,
+      UserCosmetic,
     ]),
   ],
   controllers: [RoomCupController],

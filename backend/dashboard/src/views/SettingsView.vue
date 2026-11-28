@@ -45,6 +45,195 @@
           <ShamCashPaymentPanel />
         </template>
 
+
+
+        <template v-else-if="settingsTab === 'section-background'">
+          <SectionBackgroundPanel />
+        </template>
+        <template v-else-if="settingsTab === 'splash'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">صورة شاشة السبلاش</h3>
+            <p class="form-text mb-3">ارفع صورة شاشة البداية التي تظهر عند فتح JEHO. بعد الحفظ تُحمّل من السيرفر عند التشغيل التالي دون تحديث APK.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="splashPreviewUrl" :src="splashPreviewUrl" alt="معاينة صورة السبلاش" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين صورة للسبلاش</span>
+            </div>
+            <div class="row g-3 align-items-end">
+              <div class="col-md-8">
+                <label class="form-label">صورة السبلاش (PNG / JPG / WebP)</label>
+                <input ref="splashFileInput" class="form-control" type="file" accept="image/png,image/jpeg,image/webp" @change="selectSplashImage" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">مدة العرض بالثواني</label>
+                <input v-model.number="splashDuration" class="form-control" type="number" min="1" max="5" />
+              </div>
+            </div>
+            <label class="form-label mt-3">أو رابط مباشر لصورة السبلاش</label>
+            <input v-model.trim="splashUrlInput" class="form-control" type="url" dir="ltr" placeholder="https://example.com/splash.webp" />
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <button type="button" class="btn btn-aurora" :disabled="!splashSelectedFile || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="uploadAndSaveSplash">
+                <span v-if="splashUploading || splashSaving" class="spinner-border spinner-border-sm me-1"></span>
+                {{ splashUploading ? 'جارٍ رفع الصورة…' : splashSaving ? 'جارٍ حفظ الصورة…' : 'رفع وحفظ صورة السبلاش' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!splashSavedUrl || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="removeSplashImage">إزالة الصورة</button>
+              <button type="button" class="btn btn-ghost" :disabled="!splashUrlInput.trim() || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="saveSplashUrl">حفظ رابط السبلاش</button>
+            </div>
+            <p v-if="splashMessage" class="form-text mt-3" role="status">{{ splashMessage }}</p>
+          </section>
+          <section class="settings-card login-wallpaper-card">
+            <h3 class="settings-card-title">خلفية تسجيل الدخول عبر Google</h3>
+            <p class="form-text mb-3">تظهر هذه الخلفية على شاشة الدخول قبل تسجيل الدخول، ولا تغيّر خلفية إنشاء الحساب أو السبلاش. لا يُسمح بحفظ الرابط قبل التأكد من تحميل الصورة.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:180px">
+              <img v-if="loginBgPreviewUrl" :src="loginBgPreviewUrl" alt="معاينة خلفية تسجيل الدخول" style="display:block;width:100%;max-height:360px;object-fit:cover" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لتسجيل الدخول</span>
+            </div>
+            <label class="form-label">رابط مباشر للصورة (HTTPS أو HTTP)</label>
+            <input v-model.trim="loginBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/login-background.webp" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!loginBgUrlInput.trim() || loginBgBusy || !auth.can('settings', 'write')" @click="saveLoginBgUrl">
+                <span v-if="loginBgBusy" class="spinner-border spinner-border-sm me-1"></span>
+                {{ loginBgBusy ? 'جارٍ التحقق والحفظ…' : 'التحقق وحفظ خلفية الدخول' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!loginBgSavedUrl || loginBgBusy || !auth.can('settings', 'write')" @click="removeLoginBg">إزالة الخلفية</button>
+            </div>
+            <p v-if="loginBgMessage" class="form-text mt-3" role="status">{{ loginBgMessage }}</p>
+          </section>
+          <section class="settings-card">
+            <h3 class="settings-card-title">خلفية إنشاء الحساب</h3>
+            <p class="form-text mb-3">هذه الصورة تظهر فقط للمستخدم الجديد بعد اختياره المتابعة عبر Google وعند إكمال بيانات حسابه لأول مرة. لا تغيّر خلفية السبلاش ولا شاشة تسجيل الدخول.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="registerBgPreviewUrl" :src="registerBgPreviewUrl" alt="معاينة خلفية إنشاء الحساب" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
+            </div>
+            <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <label class="form-label">أو رابط مباشر لصورة خلفية إنشاء الحساب</label>
+            <input v-model.trim="registerBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/register-background.webp" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
+                {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgUrlInput.trim() || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBgUrl">حفظ رابط الخلفية</button>
+            </div>
+            <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
+          </section>
+        </template>
+
+        <template v-else-if="settingsTab === 'register-background'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">خلفية إنشاء الحساب</h3>
+            <p class="form-text mb-3">هذه الصورة تظهر فقط للمستخدم الجديد بعد اختياره المتابعة عبر Google وعند إكمال بيانات حسابه لأول مرة. لا تغيّر خلفية السبلاش ولا شاشة تسجيل الدخول.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:220px">
+              <img v-if="registerBgPreviewUrl" :src="registerBgPreviewUrl" alt="معاينة خلفية إنشاء الحساب" style="display:block;width:100%;max-height:420px;object-fit:contain" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
+            </div>
+            <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <label class="form-label">أو رابط مباشر لصورة خلفية إنشاء الحساب</label>
+            <input v-model.trim="registerBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/register-background.webp" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
+                {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgUrlInput.trim() || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBgUrl">حفظ رابط الخلفية</button>
+            </div>
+            <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
+          </section>
+        </template>
+
+        <template v-else-if="settingsTab === 'staff-identity'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">هوية السوبر أدمن والأدمن والمانجر</h3>
+            <p class="form-text mb-3">ارفع أصولاً مستقلة لكل رتبة. بعد الحفظ تُستخدم الهوية المخصصة للرتبة فقط، ولا تُعرض هذه الأصول كعناصر قابلة للشراء في المتجر.</p>
+            <div v-if="staffIdentityLoading" class="py-4"><LoadingSpinner /></div>
+            <div v-else>
+              <div v-for="role in staffIdentityRoles" :key="role.key" class="border rounded-4 p-3 mb-3">
+                <div class="d-flex align-items-center gap-2 mb-3"><span class="badge rounded-pill" :style="{background: staffIdentityForm[role.key].accentColor, color:'#111'}">{{ role.title }}</span><span class="small text-secondary">أصول حصرية لهذه الرتبة</span></div>
+                <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">اسم الرتبة الظاهر</label><input v-model="staffIdentityForm[role.key].label" maxlength="32" class="form-control" /></div>
+                  <div class="col-md-6"><label class="form-label">لون الهوية</label><div class="d-flex gap-2"><input v-model="staffIdentityForm[role.key].accentColor" type="color" class="form-control form-control-color" /><input v-model="staffIdentityForm[role.key].accentColor" maxlength="7" class="form-control" dir="ltr" /></div></div></div>
+                <div class="row g-3"><div v-for="asset in staffIdentityAssets" :key="role.key + '-' + asset.key" class="col-md-6 col-xl-4"><div class="h-100 rounded-3 border p-3">
+                  <label class="form-label fw-semibold">{{ asset.title }}</label><div class="d-flex align-items-center justify-content-center rounded-3 bg-body-tertiary mb-2 overflow-hidden" style="min-height:110px">
+                    <SvgaPreview v-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsSvga(staffIdentityForm[role.key][asset.key])" :src="staffIdentityForm[role.key][asset.key]" />
+                    <video v-else-if="staffIdentityForm[role.key][asset.key] && staffIdentityIsVideo(staffIdentityForm[role.key][asset.key])" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" controls muted loop playsinline style="max-width:100%;max-height:140px" />
+                    <img v-else-if="staffIdentityForm[role.key][asset.key]" :src="resolveAsset(staffIdentityForm[role.key][asset.key])" :alt="asset.title" style="max-width:100%;max-height:120px;object-fit:contain" /><span v-else class="small text-secondary">لم يتم رفع ملف</span></div>
+                  <input :ref="el => setStaffIdentityInput(role.key, asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadStaffIdentityAsset(role.key, asset, $event)" />
+                  <div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-secondary btn-sm" :disabled="staffIdentityUploading === role.key + ':' + asset.key" @click="chooseStaffIdentityFile(role.key, asset.key)">{{ staffIdentityUploading === role.key + ':' + asset.key ? 'جارٍ الرفع…' : 'رفع ملف' }}</button>
+                    <button v-if="staffIdentityForm[role.key][asset.key]" type="button" class="btn btn-link btn-sm text-danger" @click="staffIdentityForm[role.key][asset.key] = ''">إزالة</button></div><div class="form-text mt-2">{{ asset.help }}</div>
+                </div></div></div></div>
+              <div class="alert alert-info small">الإطار، الشارة، بطاقة الاسم، بطاقة الرسائل، والدخولية محفوظة كإعدادات هوية رتبة وليست عناصر متجر.</div>
+              <div class="d-flex justify-content-end"><button type="button" class="btn btn-aurora" :disabled="staffIdentitySaving || staffIdentityLoading || !auth.can('settings', 'write')" @click="saveStaffIdentity"><span v-if="staffIdentitySaving" class="spinner-border spinner-border-sm me-1"></span>حفظ هوية الرتب</button></div>
+            </div>
+          </section>
+        </template>
+        <template v-else-if="settingsTab === 'mysterious-man'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">إعدادات الرجل الغامض</h3>
+            <p class="form-text mb-3">
+              ارفع هوية موحّدة للحسابات التي فعّلت وضع الرجل الغامض. عند إيقاف الميزة هنا، تُلغى فوراً لكل المستخدمين وتعود هوياتهم الأصلية، ولا تعود تلقائياً عند إعادة تشغيلها.
+            </p>
+            <div class="border rounded-3 p-3 mb-3">
+              <div class="form-check form-switch">
+                <input id="mysterious-man-enabled" v-model="mysteryForm.enabled" class="form-check-input" type="checkbox" role="switch" />
+                <label class="form-check-label fw-semibold" for="mysterious-man-enabled">تفعيل ميزة الرجل الغامض لجميع المستخدمين</label>
+              </div>
+              <div class="small text-secondary mt-1">عند إيقاف هذا الخيار، سيتم إلغاء التفعيل المحفوظ لجميع الحسابات. يجب على المستخدم تفعيل الميزة مجدداً بعد تشغيلها، مع وجود اشتراك VIP مؤهل وساري.</div>
+            </div>
+            <div class="border rounded-3 p-3 mb-3">
+              <div class="fw-semibold mb-2">اشتراكات VIP المؤهلة للميزة</div>
+              <div class="d-flex flex-wrap gap-3">
+                <div v-for="level in [1,2,3,4,5,6,7]" :key="level" class="form-check">
+                  <input :id="'mysterious-vip-' + level" v-model="mysteryForm.eligibleVipLevels" class="form-check-input" type="checkbox" :value="level" />
+                  <label class="form-check-label" :for="'mysterious-vip-' + level">VIP{{ level }}</label>
+                </div>
+              </div>
+              <div class="small text-secondary mt-1">انتهاء الاشتراك أو إزالته من المستويات المؤهلة يعيد الحساب تلقائياً لوضعه الطبيعي.</div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label">نوع الدخولية الموحدة</label>
+                <select v-model="mysteryForm.entryMode" class="form-select">
+                  <option value="text">دخولية نصية</option>
+                  <option value="video">دخولية فيديو / حركة</option>
+                </select>
+              </div>
+              <div class="col-md-8" v-if="mysteryForm.entryMode === 'text'">
+                <label class="form-label">نص الدخولية</label>
+                <input v-model="mysteryForm.entryText" maxlength="160" class="form-control" placeholder="دخل الرجل الغامض" />
+              </div>
+            </div>
+            <div v-if="mysteryLoading" class="py-4"><LoadingSpinner /></div>
+            <div v-else class="row g-3">
+              <div class="col-md-4" v-for="asset in mysteryAssets" :key="asset.key">
+                <div class="border rounded-3 p-3 h-100">
+                  <h5 class="mb-1">{{ asset.title }}</h5>
+                  <p class="small text-secondary">{{ asset.help }}</p>
+                  <div class="rounded-3 bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height:150px">
+                    <img v-if="asset.key === 'avatarUrl' && mysteryForm[asset.key]" :src="previewMysteryUrl(mysteryForm[asset.key])" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain" />
+                    <video v-else-if="asset.key !== 'avatarUrl' && mysteryForm[asset.key] && /\.(mp4|webm|mov)(\?|$)/i.test(mysteryForm[asset.key])" :src="mysteryForm[asset.key]" controls muted loop style="max-width:100%;max-height:180px"></video>
+                    <a v-else-if="mysteryForm[asset.key]" :href="previewMysteryUrl(mysteryForm[asset.key])" target="_blank" rel="noopener">معاينة الملف المرفوع</a>
+                    <span v-else class="text-secondary small">لم يتم رفع ملف بعد</span>
+                  </div>
+                  <input :ref="el => setMysteryInput(asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadMysteryAsset(asset, $event)" />
+                  <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="mysteryUploading === asset.key" @click="chooseMysteryFile(asset.key)">
+                    <span v-if="mysteryUploading === asset.key" class="spinner-border spinner-border-sm me-1"></span>
+                    {{ mysteryUploading === asset.key ? 'جارٍ الرفع…' : 'اختيار ورفع ملف' }}
+                  </button>
+                  <button v-if="mysteryForm[asset.key]" type="button" class="btn btn-link btn-sm text-danger" @click="mysteryForm[asset.key] = ''">إزالة</button>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-info small mt-3">
+              الصورة: PNG أو JPG أو WEBP. الدخولية والتأثير: MP4 أو WEBM أو SVGA بحسب دعم المشغّل. لن يتم تطبيق تأثير الكتابة في التطبيق قبل ربط مشغّله.
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+              <button type="button" class="btn btn-aurora" :disabled="mysterySaving || mysteryLoading || !auth.can('settings', 'write')" @click="saveMysteryConfig">
+                <span v-if="mysterySaving" class="spinner-border spinner-border-sm me-1"></span>
+                حفظ إعدادات الرجل الغامض
+              </button>
+            </div>
+          </section>
+        </template>
+
         <template v-else-if="settingsTab === 'zego'">
           <ZegoSettingsPanel />
         </template>
@@ -250,8 +439,85 @@
         </template>
 
         <form v-else class="settings-form" @submit.prevent="save">
+          <!-- APP UPDATE -->
+          <template v-if="settingsTab === 'app-update'">
+            <section class="settings-card app-update-admin-card">
+              <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="app-update-admin-icon"><i class="bi bi-cloud-arrow-down-fill" /></div>
+                <div>
+                  <h3 class="settings-card-title mb-1">تحديث JEHO الذكي</h3>
+                  <p class="form-text mb-0">ضع الرابط الذي تريده بالضبط: صفحة موقع تُفتح كما هي، أو ملف APK يُنزّل داخل التطبيق. لن يتم تحويل المستخدم تلقائياً إلى Google Play.</p>
+                </div>
+              </div>
+              <label class="settings-switch mb-3">
+                <div>
+                  <div class="settings-switch-title">نشر التحديث للمستخدمين</div>
+                  <div class="settings-switch-hint">اتركه مغلقاً أثناء تجهيز ملف APK. عند التفعيل يبدأ التطبيق بفحص هذا الإصدار عند التشغيل.</div>
+                </div>
+                <input v-model="appUpdateForm.enabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <label class="settings-switch mb-3">
+                <div>
+                  <div class="settings-switch-title">فرض التحديث على الجميع</div>
+                  <div class="settings-switch-hint">عند التفعيل تظهر صفحة التحديث كاملة الشاشة، ولا يوجد زر «لاحقاً». سيحتاج المستخدم إلى تأكيد التثبيت من Android.</div>
+                </div>
+                <input v-model="appUpdateForm.forceUpdate" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">رقم الإصدار (versionCode)</label>
+                  <input v-model.number="appUpdateForm.latestVersionCode" class="form-control" type="number" min="1" required />
+                  <div class="form-text">رقم صحيح أكبر من رقم النسخة المثبتة حالياً.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">اسم الإصدار</label>
+                  <input v-model.trim="appUpdateForm.latestVersionName" class="form-control" placeholder="2.0.51" required />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">أدنى إصدار مسموح</label>
+                  <input v-model.number="appUpdateForm.minVersionCode" class="form-control" type="number" min="0" />
+                  <div class="form-text">أي نسخة أقدم من هذا الرقم ستُجبر على التحديث.</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">نوع الرابط عند الضغط على «تحديث الآن»</label>
+                  <select v-model="appUpdateForm.linkType" class="form-select mb-3">
+                    <option value="external">فتح الرابط كما هو (موقع / صفحة ويب / رابط خارجي)</option>
+                    <option value="apk">تنزيل ملف APK داخل التطبيق ثم التثبيت</option>
+                    <option value="auto">تلقائي: ملف ينتهي بـ .apk يُنزّل، وما عداه يُفتح كرابط خارجي</option>
+                  </select>
+                  <label class="form-label">رابط التحديث الذي سيستخدمه التطبيق</label>
+                  <input v-model.trim="appUpdateForm.storeUrl" class="form-control" type="url" dir="ltr" placeholder="https://example.com/update أو https://example.com/JEHO.apk" :required="appUpdateForm.enabled" />
+                  <div class="form-text">سيتم استخدام هذا الرابط نفسه دون استبداله برابط Google Play. عند اختيار APK يجب أن يكون رابط الملف قابلاً للتنزيل مباشرة، وأن يكون الملف موقّعاً بنفس شهادة التطبيق وبالحزمة com.Dramizo.Series حتى يثبت فوق النسخة الحالية دون حذف بيانات المستخدم.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">عنوان التحديث بالعربية</label>
+                  <input v-model.trim="appUpdateForm.titleAr" class="form-control" maxlength="120" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">عنوان التحديث بالإنجليزية</label>
+                  <input v-model.trim="appUpdateForm.titleEn" class="form-control" maxlength="120" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">تفاصيل التحديث بالعربية</label>
+                  <textarea v-model.trim="appUpdateForm.messageAr" class="form-control" rows="3" maxlength="600" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">تفاصيل التحديث بالإنجليزية</label>
+                  <textarea v-model.trim="appUpdateForm.messageEn" class="form-control" rows="3" maxlength="600" />
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                <span class="small text-secondary">نسخة البناء الحالية: versionCode 49 · 2.0.51</span>
+                <button type="button" class="btn btn-aurora" :disabled="appUpdateSaving || !canWriteSettings" @click="saveAppUpdate">
+                  <span v-if="appUpdateSaving" class="spinner-border spinner-border-sm me-1" />
+                  حفظ إعدادات التحديث
+                </button>
+              </div>
+            </section>
+          </template>
+
           <!-- GENERAL -->
-          <template v-if="settingsTab === 'general'">
+          <template v-else-if="settingsTab === 'general'">
             <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.general') }}</h3>
               <div class="row g-3">
@@ -297,6 +563,10 @@
                   <input v-model="form.supportInstagram" class="form-control" placeholder="@username" dir="ltr" />
                 </div>
                 <div class="col-md-6">
+                  <label class="form-label">الموقع الرسمي للدعم</label>
+                  <input v-model="form.supportWebsite" class="form-control" placeholder="https://example.com" dir="ltr" />
+                </div>
+                <div class="col-md-6">
                   <label class="form-label">{{ t('settings.supportPhone') }}</label>
                   <input v-model="form.supportPhone" class="form-control" placeholder="+90..." dir="ltr" />
                 </div>
@@ -323,7 +593,11 @@
           </template>
 
           <!-- ECONOMY -->
-          <template v-else-if="settingsTab === 'economy'">
+          <template v-else-if="settingsTab === 'operations'">
+          <OperationalSettingsPanel />
+        </template>
+
+        <template v-else-if="settingsTab === 'economy'">
             <EconomyPanel class="mb-3" />
             <section class="settings-card mb-3">
               <h3 class="settings-card-title">{{ t('settings.economyExplainerTitle') }}</h3>
@@ -358,6 +632,17 @@
             </section>
 
             <section class="settings-card">
+              <h3 class="settings-card-title">دعم النفس وإرسال الهدية للنفس</h3>
+              <label class="settings-switch">
+                <div>
+                  <div class="settings-switch-title">السماح للمستخدم بدعم نفسه</div>
+                  <div class="settings-switch-hint">عند التفعيل يستطيع المستخدم إرسال هدية إلى حسابه. عند الإيقاف يتم منع دعم النفس من السيرفر.</div>
+                </div>
+                <input v-model="form.selfGiftAllowed" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+            </section>
+
+            <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.roomEconomy') }}</h3>
               <div class="row g-3">
                 <div class="col-md-4">
@@ -381,6 +666,13 @@
           <template v-else-if="settingsTab === 'features'">
             <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.appFeatures') }}</h3>
+              <label class="settings-switch">
+                <div>
+                  <div class="settings-switch-title">تحديات PK بين الرومات</div>
+                  <div class="settings-switch-hint">عند الإيقاف تختفي تحديات PK من التطبيق ويتوقف احتساب نقاطها. يتطبق التغيير تلقائياً على الجميع خلال ثوانٍ، ويمكن استخدامه لإيقاف الميزة وقت ضغط السيرفر.</div>
+                </div>
+                <input v-model="form.roomPkEnabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
               <label class="settings-switch">
                 <div>
                   <div class="settings-switch-title">{{ t('settings.luckyBoxesEnabled') }}</div>
@@ -559,18 +851,22 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi, authApi, operatorsApi } from '@/api'
+import { settingsApi, authApi, operatorsApi, mysteriousManApi, staffIdentityApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import SvgaPreview from '@/components/SvgaPreview.vue'
 import EconomyPanel from '@/components/settings/EconomyPanel.vue'
+import OperationalSettingsPanel from '@/components/settings/OperationalSettingsPanel.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
 import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
 import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'
 import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
+import SectionBackgroundPanel from '@/components/settings/SectionBackgroundPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
+import { resolveAsset } from '@/utils/assets'
 import { useAuthStore } from '@/stores/auth'
 import { DASHBOARD_MODULES } from '@/utils/dashboard-permissions'
 
@@ -584,22 +880,460 @@ const CORE_TABS = new Set(['general', 'economy', 'features', 'moderation', 'othe
 const isCoreTab = computed(() => CORE_TABS.has(settingsTab.value))
 const canWriteSettings = computed(() => auth.can('settings', 'write'))
 
+const registerBgFileInput = ref(null)
+const registerBgFile = ref(null)
+const registerBgPreviewUrl = ref('')
+const registerBgSavedUrl = ref('')
+const registerBgUrlInput = ref('')
+const loginBgSavedUrl = ref('')
+const loginBgUrlInput = ref('')
+const loginBgPreviewUrl = ref('')
+const loginBgBusy = ref(false)
+const loginBgMessage = ref('')
+const registerBgBusy = ref(false)
+const registerBgMessage = ref('')
+
+const splashFileInput = ref(null)
+const splashSelectedFile = ref(null)
+const splashPreviewUrl = ref('')
+const splashSavedUrl = ref('')
+const splashUrlInput = ref('')
+const splashDuration = ref(5)
+const splashUploading = ref(false)
+const splashSaving = ref(false)
+const splashMessage = ref('')
+let splashThemeConfig = {}
+
+async function verifyRemoteImage(url) {
+  const resolved = resolveAsset(String(url || '').trim())
+  if (!resolved) throw new Error('رابط الصورة فارغ')
+  await new Promise((resolve, reject) => {
+    const image = new Image()
+    const timeout = window.setTimeout(() => {
+      image.src = ''
+      reject(new Error('انتهت مهلة تحميل الصورة؛ تحقق من الرابط واستضافة الصورة'))
+    }, 12000)
+    image.onload = () => { window.clearTimeout(timeout); resolve(true) }
+    image.onerror = () => { window.clearTimeout(timeout); reject(new Error('تعذّر تحميل الصورة من الرابط؛ تأكد أنه رابط مباشر للصورة')) }
+    image.src = resolved
+  })
+}
+
+async function persistLoginBg(url) {
+  const { data, error: err } = await settingsApi.get()
+  if (err) throw new Error(err.message || 'تعذّر تحميل إعدادات الخلفية.')
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  config = { ...config, version: (Number(config.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    backgrounds: { ...(config.backgrounds || {}), auth: url || '' } }
+  const { error: saveErr } = await settingsApi.update({ app_theme: JSON.stringify(config) })
+  if (saveErr) throw new Error(saveErr.message || 'تعذّر حفظ خلفية تسجيل الدخول.')
+  loginBgSavedUrl.value = url || ''
+  loginBgUrlInput.value = url || ''
+  loginBgPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function saveLoginBgUrl() {
+  const url = loginBgUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { loginBgMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  loginBgBusy.value = true
+  loginBgMessage.value = ''
+  try {
+    await verifyRemoteImage(url)
+    await persistLoginBg(url)
+    loginBgMessage.value = 'تم التحقق من تحميل الصورة وحفظ خلفية تسجيل الدخول.'
+    toast().success(loginBgMessage.value)
+  } catch (error) {
+    loginBgMessage.value = error.message || 'تعذّر التحقق من خلفية الدخول.'
+    toast().danger(loginBgMessage.value)
+  } finally { loginBgBusy.value = false }
+}
+
+async function removeLoginBg() {
+  loginBgBusy.value = true
+  try {
+    await persistLoginBg('')
+    loginBgMessage.value = 'تمت إزالة خلفية تسجيل الدخول.'
+  } catch (error) {
+    loginBgMessage.value = error.message || 'تعذّرت إزالة الخلفية.'
+  } finally { loginBgBusy.value = false }
+}
+
+async function loadRegisterBgSettings() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) { registerBgMessage.value = err.message || 'تعذّر تحميل خلفية إنشاء الحساب.'; return }
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  registerBgSavedUrl.value = config.backgrounds?.register || ''
+  registerBgUrlInput.value = registerBgSavedUrl.value
+  registerBgPreviewUrl.value = registerBgSavedUrl.value ? resolveAsset(registerBgSavedUrl.value) : ''
+  loginBgSavedUrl.value = config.backgrounds?.auth || ''
+  loginBgUrlInput.value = loginBgSavedUrl.value
+  loginBgPreviewUrl.value = loginBgSavedUrl.value ? resolveAsset(loginBgSavedUrl.value) : ''
+}
+
+function selectRegisterBg(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 12 * 1024 * 1024) {
+    registerBgMessage.value = 'اختر PNG أو JPG أو WebP بحجم لا يتجاوز 12 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  registerBgFile.value = file
+  if (registerBgPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(registerBgPreviewUrl.value)
+  registerBgPreviewUrl.value = URL.createObjectURL(file)
+  registerBgMessage.value = ''
+}
+
+async function persistRegisterBg(url) {
+  const { data, error: err } = await settingsApi.get()
+  if (err) throw new Error(err.message || 'تعذّر تحميل إعدادات الخلفية.')
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  config = { ...config, version: (Number(config.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    backgrounds: { ...(config.backgrounds || {}), register: url || '' } }
+  const { error: saveErr } = await settingsApi.update({ app_theme: JSON.stringify(config) })
+  if (saveErr) throw new Error(saveErr.message || 'تعذّر حفظ خلفية إنشاء الحساب.')
+  registerBgSavedUrl.value = url || ''
+  registerBgUrlInput.value = url || ''
+  registerBgPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function saveRegisterBg() {
+  if (!registerBgFile.value) return
+  registerBgBusy.value = true
+  registerBgMessage.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(registerBgFile.value)
+    if (err) throw new Error(err.message || 'تعذّر رفع الصورة.')
+    const uploaded = data?.data || data || {}
+    const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+    if (!url) throw new Error('لم يرجع الخادم رابط الصورة بعد الرفع.')
+    await verifyRemoteImage(url)
+    await persistRegisterBg(url)
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تم حفظ خلفية إنشاء الحساب فقط.'
+    toast().success(registerBgMessage.value)
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّر حفظ الخلفية.'
+    toast().danger(registerBgMessage.value)
+  } finally { registerBgBusy.value = false }
+}
+
+async function saveRegisterBgUrl() {
+  const url = registerBgUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { registerBgMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  registerBgBusy.value = true
+  registerBgMessage.value = ''
+  try {
+    await verifyRemoteImage(url)
+    await persistRegisterBg(url)
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تم حفظ رابط خلفية إنشاء الحساب.'
+    toast().success(registerBgMessage.value)
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّر حفظ رابط الخلفية.'
+    toast().danger(registerBgMessage.value)
+  } finally { registerBgBusy.value = false }
+}
+
+async function removeRegisterBg() {
+  registerBgBusy.value = true
+  try {
+    await persistRegisterBg('')
+    registerBgUrlInput.value = ''
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تمت إزالة خلفية إنشاء الحساب.'
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّرت إزالة الخلفية.'
+  } finally { registerBgBusy.value = false }
+}
+
+async function loadSplashSettings() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) { splashMessage.value = err.message || 'تعذّر تحميل إعداد السبلاش.'; return }
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  try { splashThemeConfig = row?.value ? JSON.parse(row.value) : {} } catch { splashThemeConfig = {} }
+  const splash = splashThemeConfig.splash || {}
+  const items = Array.isArray(splash.items) ? splash.items : []
+  const item = items.find(x => x && x.id === 'dashboard-main-splash' && x.active !== false && x.url) || items.find(x => x && x.active !== false && x.url)
+  splashSavedUrl.value = item?.url || splashThemeConfig.brand?.splashUrl || splashThemeConfig.backgrounds?.splash || ''
+  splashUrlInput.value = splashSavedUrl.value
+  splashPreviewUrl.value = splashSavedUrl.value ? resolveAsset(splashSavedUrl.value) : ''
+  splashDuration.value = Math.max(1, Math.min(5, Number(item?.durationSeconds) || 5))
+}
+
+function selectSplashImage(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    splashMessage.value = 'اختر صورة PNG أو JPG أو WebP.'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    splashMessage.value = 'حجم الصورة يجب ألا يتجاوز 12 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  splashSelectedFile.value = file
+  if (splashPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(splashPreviewUrl.value)
+  splashPreviewUrl.value = URL.createObjectURL(file)
+  splashMessage.value = ''
+}
+
+async function persistSplashImage(url) {
+  const oldSplash = splashThemeConfig.splash || {}
+  const duration = Math.max(1, Math.min(5, Number(splashDuration.value) || 5))
+  const items = url ? [{ id: 'dashboard-main-splash', url, active: true, durationSeconds: duration, sortOrder: 0, targetType: 'home' }] : []
+  splashThemeConfig = {
+    ...splashThemeConfig,
+    version: (Number(splashThemeConfig.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    splash: { ...oldSplash, enabled: true, items },
+    brand: { ...(splashThemeConfig.brand || {}), splashUrl: url || '' },
+    backgrounds: {
+      ...(splashThemeConfig.backgrounds || {}),
+      splash: url || '',
+    },
+  }
+  const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(splashThemeConfig) })
+  if (err) throw new Error(err.message || 'تعذّر حفظ إعداد السبلاش.')
+  splashSavedUrl.value = url || ''
+  splashUrlInput.value = url || ''
+  splashPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function uploadAndSaveSplash() {
+  if (!splashSelectedFile.value) return
+  splashUploading.value = true
+  splashMessage.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(splashSelectedFile.value)
+    if (err) throw new Error(err.message || 'تعذّر رفع الصورة.')
+    const uploaded = data?.data || data || {}
+    const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+    if (!url) throw new Error('تم الرفع لكن لم يرجع الخادم رابط الصورة.')
+    splashSaving.value = true
+    await verifyRemoteImage(url)
+    await persistSplashImage(url)
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تم حفظ صورة السبلاش. ستظهر عند فتح التطبيق مرة أخرى.'
+    toast().success(splashMessage.value)
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر رفع صورة السبلاش أو حفظها.'
+    toast().danger(splashMessage.value)
+  } finally {
+    splashUploading.value = false
+    splashSaving.value = false
+  }
+}
+
+async function saveSplashUrl() {
+  const url = splashUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { splashMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  splashSaving.value = true
+  splashMessage.value = ''
+  try {
+    await verifyRemoteImage(url)
+    await persistSplashImage(url)
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تم حفظ رابط صورة السبلاش. ستظهر عند فتح التطبيق.'
+    toast().success(splashMessage.value)
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر حفظ رابط السبلاش.'
+    toast().danger(splashMessage.value)
+  } finally { splashSaving.value = false }
+}
+
+async function removeSplashImage() {
+  splashSaving.value = true
+  splashMessage.value = ''
+  try {
+    await persistSplashImage('')
+    splashUrlInput.value = ''
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تمت إزالة صورة السبلاش.'
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر إزالة صورة السبلاش.'
+  } finally {
+    splashSaving.value = false
+  }
+}
+
 const settingTabs = computed(() => {
+  // Tabs inherit the narrowest existing module permission. Global/security tabs
+  // remain Super-Admin-only and are not merely disabled for limited staff.
   const tabs = [
-    { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
-    { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
-    { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
-    { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
-    { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
-    { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
-    { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock' },
+    { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders', permission: 'settings' },
+    { id: 'app-update', label: 'تحديث التطبيق', icon: 'bi-cloud-arrow-down', permission: 'settings' },
+    { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin', permission: 'settings' },
+    { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected', superOnly: true },
+    { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image', permission: 'settings' },
+    { id: 'splash', label: 'صورة السبلاش', icon: 'bi-card-image', permission: 'settings' },
+    { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito', superOnly: true },
+    { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles', permission: 'settings' },
+    { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check', permission: 'settings' },
+    { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card', permission: 'settings' },
+    { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin', permission: 'settings' },
+    { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock', self: true },
+    { id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots', permission: 'settings' },
   ]
   if (auth.isSuperAdmin) {
-    tabs.push({ id: 'admins', label: t('settings.tabAdmins'), icon: 'bi-people-fill' })
+    tabs.push({ id: 'admins', label: t('settings.tabAdmins'), icon: 'bi-people-fill', superOnly: true })
   }
-  tabs.push({ id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' })
-  return tabs
+  return tabs.filter((tab) => {
+    if (tab.superOnly) return auth.isSuperAdmin
+    if (tab.self) return true
+    return tab.permission ? auth.can(tab.permission, 'read') : false
+  })
 })
+
+const staffIdentityLoading = ref(false)
+const staffIdentitySaving = ref(false)
+const staffIdentityUploading = ref('')
+const staffIdentityInputs = {}
+const staffIdentityRoles = [{ key: 'super', title: 'Super Admin' }, { key: 'admin', title: 'Admin' }, { key: 'manager', title: 'Manager' }]
+const staffIdentityAssets = [
+  { key: 'frameUrl', title: 'إطار الحساب', help: 'إطار خاص بهذه الرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif,.svga,video/mp4,video/webm' },
+  { key: 'badgeUrl', title: 'شارة / شعار الرتبة', help: 'شارة بصرية خاصة بالرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'nameplateUrl', title: 'بطاقة الاسم', help: 'لوحة اسم مخصصة لهذه الرتبة.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'messageCardUrl', title: 'بطاقة الرسائل', help: 'تصميم بطاقة رسائل الموظف.', accept: 'image/png,image/jpeg,image/webp,image/gif' },
+  { key: 'entryEffectUrl', title: 'الدخولية / تأثير الدخول', help: 'تأثير الدخول المخصص للرتبة.', accept: 'video/mp4,video/webm,video/quicktime,.svga,image/gif' },
+]
+const staffIdentityForm = reactive({
+  super: { label: 'Super Admin', accentColor: '#D8B35B', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+  admin: { label: 'Admin', accentColor: '#9AA8C7', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+  manager: { label: 'Manager', accentColor: '#37A889', badgeUrl: '', frameUrl: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '' },
+})
+function setStaffIdentityInput(role, key, el) { if (el) staffIdentityInputs[role + ':' + key] = el }
+function chooseStaffIdentityFile(role, key) { staffIdentityInputs[role + ':' + key]?.click() }
+function staffIdentityIsSvga(raw) { return /\.svga(\?|$)/i.test(String(raw || '')) }
+function staffIdentityIsVideo(raw) { return /\.(mp4|webm|mov)(\?|$)/i.test(String(raw || '')) }
+async function loadStaffIdentity() {
+  staffIdentityLoading.value = true
+  const { data, error: err } = await staffIdentityApi.get()
+  staffIdentityLoading.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  for (const role of staffIdentityRoles) Object.assign(staffIdentityForm[role.key], cfg[role.key] || {})
+}
+async function uploadStaffIdentityAsset(role, asset, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const image = /\.(png|jpe?g|webp|gif)$/i.test(file.name)
+  const motion = /\.(mp4|webm|mov|svga)$/i.test(file.name)
+  if (!(image || motion) || (asset.key !== 'entryEffectUrl' && !image && asset.key !== 'frameUrl')) { toast().danger('صيغة الملف غير مدعومة لهذا الحقل'); event.target.value = ''; return }
+  const max = motion ? 40 : 8
+  if (file.size > max * 1024 * 1024) { toast().danger('حجم الملف يتجاوز الحد المسموح (' + max + ' ميغابايت)'); event.target.value = ''; return }
+  staffIdentityUploading.value = role + ':' + asset.key
+  const { data, error: err } = await uploadsApi.upload(file)
+  staffIdentityUploading.value = ''; event.target.value = ''
+  if (err) { toast().danger(err.message); return }
+  const uploaded = data?.data || data || {}
+  const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
+  if (!url) { toast().danger('لم يرجع الخادم رابطاً صالحاً للملف'); return }
+  staffIdentityForm[role][asset.key] = url
+  toast().success('تم رفع الملف. اضغط حفظ هوية الرتب لتطبيقه.')
+}
+async function saveStaffIdentity() {
+  if (!auth.can('settings', 'write')) { toast().danger(t('settings.readOnly')); return }
+  staffIdentitySaving.value = true; error.value = ''
+  const { data, error: err } = await staffIdentityApi.update(JSON.parse(JSON.stringify(staffIdentityForm)))
+  staffIdentitySaving.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  for (const role of staffIdentityRoles) Object.assign(staffIdentityForm[role.key], cfg[role.key] || {})
+  success.value = 'تم حفظ إعدادات هوية السوبر أدمن والأدمن والمانجر'
+  toast().success(success.value)
+}
+const mysteryLoading = ref(false)
+const mysterySaving = ref(false)
+const mysteryUploading = ref('')
+const mysteryInputs = {}
+const mysteryForm = reactive({ enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' })
+const mysteryAssets = [
+  { key: 'avatarUrl', title: 'الصورة الشخصية الموحدة', help: 'تظهر بدل الصورة الأصلية في مواضع الهوية المخفية.', accept: 'image/png,image/jpeg,image/webp' },
+  { key: 'entryEffectUrl', title: 'دخولية الرجل الغامض', help: 'فيديو/حركة الدخول الموحدة داخل الرومات.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
+  { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'ملف تأثير اختياري موحد؛ يحتاج دعم مشغّل داخل التطبيق.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
+]
+function previewMysteryUrl(raw) {
+  return resolveAsset(raw)
+}
+function setMysteryInput(key, el) { if (el) mysteryInputs[key] = el }
+function chooseMysteryFile(key) { mysteryInputs[key]?.click() }
+async function loadMysteryConfig() {
+  mysteryLoading.value = true
+  const { data, error: err } = await mysteriousManApi.get()
+  mysteryLoading.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  Object.assign(mysteryForm, {
+    enabled: cfg.enabled === true,
+    eligibleVipLevels: Array.isArray(cfg.eligibleVipLevels) ? cfg.eligibleVipLevels.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7) : [],
+    avatarUrl: String(cfg.avatarUrl || ''),
+    entryMode: cfg.entryMode === 'text' ? 'text' : 'video',
+    entryText: String(cfg.entryText || 'دخل الرجل الغامض'),
+    entryEffectUrl: String(cfg.entryEffectUrl || ''),
+    messageEffectUrl: String(cfg.messageEffectUrl || ''),
+  })
+}
+async function uploadMysteryAsset(asset, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const isAvatar = asset.key === 'avatarUrl'
+  const max = isAvatar ? 8 : 40
+  if (file.size > max * 1024 * 1024) {
+    toast().danger(`حجم الملف يجب ألا يتجاوز ${max} ميغابايت`)
+    event.target.value = ''
+    return
+  }
+  const extOk = isAvatar
+    ? /\.(png|jpe?g|webp)$/i.test(file.name)
+    : /\.(mp4|webm|mov|svga)$/i.test(file.name)
+  if (!extOk) {
+    toast().danger(isAvatar ? 'اختر صورة PNG أو JPG أو WEBP' : 'اختر MP4 أو WEBM أو MOV أو SVGA')
+    event.target.value = ''
+    return
+  }
+  mysteryUploading.value = asset.key
+  const { data, error: err } = await uploadsApi.upload(file)
+  mysteryUploading.value = ''
+  event.target.value = ''
+  if (err) { toast().danger(err.message); return }
+  const uploaded = data?.data || data || {}
+  const url = String(uploaded.url || uploaded.path || (uploaded.filename ? `/uploads/${uploaded.filename}` : '')).trim()
+  if (!url) { toast().danger('تم رفع الملف لكن لم يصل رابط صالح من الخادم'); return }
+  mysteryForm[asset.key] = url
+  toast().success('تم رفع الملف. اضغط حفظ لتطبيق الإعدادات على التطبيق.')
+}
+async function saveMysteryConfig() {
+  if (!auth.can('settings', 'write')) { toast().danger(t('settings.readOnly')); return }
+  mysterySaving.value = true
+  const { data, error: err } = await mysteriousManApi.update({ ...mysteryForm })
+  mysterySaving.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  Object.assign(mysteryForm, cfg)
+  success.value = 'تم حفظ إعدادات الرجل الغامض'
+  toast().success(success.value)
+}
 
 const moduleKeys = DASHBOARD_MODULES
 
@@ -718,7 +1452,6 @@ const saving = ref(false)
 const accountSaving = ref(false)
 const error = ref('')
 const success = ref('')
-
 const accountForm = reactive({
   email: '',
   currentPassword: '',
@@ -787,6 +1520,7 @@ const form = reactive({
   supportWhatsapp: '',
   supportTelegram: '',
   supportInstagram: '',
+  supportWebsite: '',
   supportPhone: '',
   defaultLocale: 'en',
   maintenanceMode: false,
@@ -798,7 +1532,9 @@ const form = reactive({
   supporterMinCoins: 10000,
   legendaryMinCoins: 50000,
   gameWinRewardCoins: 100,
+  selfGiftAllowed: false,
   luckyBoxEnabled: true,
+  roomPkEnabled: false,
   femaleOnlyVoiceHosts: false,
   genderVerificationAutoAccept: true,
   micWithoutHostApproval: true,
@@ -821,6 +1557,21 @@ const form = reactive({
   liveNsfwPermBanStrikes: 5,
 })
 
+const appUpdateSaving = ref(false)
+const appUpdateForm = reactive({
+  enabled: false,
+  latestVersionCode: 49,
+  latestVersionName: '2.0.51',
+  minVersionCode: 0,
+  forceUpdate: false,
+  storeUrl: '',
+  linkType: 'auto',
+  titleAr: 'يوجد تحديث جديد',
+  messageAr: 'حدّث تطبيق JEHO للاستمتاع بالتحسينات والإصلاحات الجديدة.',
+  titleEn: 'A new update is available',
+  messageEn: 'Update JEHO to enjoy the latest improvements and fixes.',
+})
+
 function normalizeAppName(raw) {
   const name = String(raw ?? '').trim()
   if (!name) return 'JEHO CHAT'
@@ -840,20 +1591,31 @@ function normalizeAppName(raw) {
 
 function selectTab(id) {
   settingsTab.value = id
+  if (id === 'mysterious-man') loadMysteryConfig()
+  if (id === 'staff-identity') loadStaffIdentity()
   router.replace({ name: 'settings', query: { tab: id } })
   if (id === 'account') fillAccountFromAuth()
   if (id === 'admins') loadOperators()
 }
 
 function syncTabFromRoute() {
-  const raw = String(route.query.tab || 'general')
-  const allowed = new Set(settingTabs.value.map((x) => x.id))
-  settingsTab.value = allowed.has(raw) ? raw : 'general'
+  const raw = String(route.query.tab || '')
+  const tabs = settingTabs.value
+  const allowed = new Set(tabs.map((x) => x.id))
+  // Never leave a hidden/unpermitted tab active, including after a role refresh.
+  settingsTab.value = allowed.has(raw)
+    ? raw
+    : (allowed.has(settingsTab.value) ? settingsTab.value : (tabs[0]?.id || 'account'))
   if (settingsTab.value === 'account') fillAccountFromAuth()
   if (settingsTab.value === 'admins') loadOperators()
 }
 
+watch(settingsTab, (id) => { if (id === 'splash') { loadSplashSettings(); loadRegisterBgSettings() } })
 watch(() => route.query.tab, syncTabFromRoute)
+watch(settingTabs, () => {
+  const allowed = new Set(settingTabs.value.map((x) => x.id))
+  if (!allowed.has(settingsTab.value)) syncTabFromRoute()
+}, { deep: true })
 
 async function load() {
   loading.value = true
@@ -874,6 +1636,19 @@ async function load() {
   } else if (raw && typeof raw === 'object') {
     Object.assign(map, raw)
   }
+  Object.assign(appUpdateForm, {
+    enabled: ['true', '1', 'yes'].includes(String(map['app.update_enabled'] ?? appUpdateForm.enabled).toLowerCase()),
+    latestVersionCode: Number(map['app.latest_version_code'] ?? appUpdateForm.latestVersionCode) || appUpdateForm.latestVersionCode,
+    latestVersionName: String(map['app.latest_version_name'] ?? appUpdateForm.latestVersionName),
+    minVersionCode: Number(map['app.min_version_code'] ?? appUpdateForm.minVersionCode) || 0,
+    forceUpdate: ['true', '1', 'yes'].includes(String(map['app.update_force'] ?? appUpdateForm.forceUpdate).toLowerCase()),
+    storeUrl: String(map['app.update_store_url'] ?? appUpdateForm.storeUrl),
+    linkType: ['apk', 'external', 'auto'].includes(String(map['app.update_link_type'] ?? appUpdateForm.linkType).toLowerCase()) ? String(map['app.update_link_type'] ?? appUpdateForm.linkType).toLowerCase() : 'auto',
+    titleAr: String(map['app.update_title_ar'] ?? appUpdateForm.titleAr),
+    messageAr: String(map['app.update_message_ar'] ?? appUpdateForm.messageAr),
+    titleEn: String(map['app.update_title_en'] ?? appUpdateForm.titleEn),
+    messageEn: String(map['app.update_message_en'] ?? appUpdateForm.messageEn),
+  })
   const bool = (v, fallback) => {
     if (v === undefined || v === null || v === '') return fallback
     if (typeof v === 'boolean') return v
@@ -890,6 +1665,7 @@ async function load() {
     supportWhatsapp: map.support_whatsapp ?? map.supportWhatsapp ?? form.supportWhatsapp,
     supportTelegram: map.support_telegram ?? map.supportTelegram ?? form.supportTelegram,
     supportInstagram: map.support_instagram ?? map.supportInstagram ?? form.supportInstagram,
+    supportWebsite: map.support_website ?? map.supportWebsite ?? form.supportWebsite,
     supportPhone: map.support_phone ?? map.supportPhone ?? form.supportPhone,
     defaultLocale: map.defaultLocale ?? map.default_locale ?? form.defaultLocale,
     maintenanceMode: bool(map.maintenanceMode ?? map.maintenance_mode, form.maintenanceMode),
@@ -907,7 +1683,12 @@ async function load() {
       map['games.win_reward_coins'] ?? map['game.win_reward_coins'] ?? map.gameWinRewardCoins,
       form.gameWinRewardCoins,
     ),
+    selfGiftAllowed: !bool(
+      map['economy.self_gift_blocked'],
+      !form.selfGiftAllowed,
+    ),
     luckyBoxEnabled: bool(map['lucky_box.enabled'] ?? map.luckyBoxEnabled, form.luckyBoxEnabled),
+    roomPkEnabled: bool(map['features.room_pk_enabled'] ?? map.roomPkEnabled, form.roomPkEnabled),
     femaleOnlyVoiceHosts: bool(
       map['features.female_only_voice_hosts'] ?? map.femaleOnlyVoiceHosts,
       form.femaleOnlyVoiceHosts,
@@ -955,7 +1736,61 @@ async function load() {
 }
 
 function reloadActive() {
-  if (isCoreTab.value) load()
+  if (settingsTab.value === 'splash') loadSplashSettings()
+  if (settingsTab.value === 'register-background') loadRegisterBgSettings()
+  else if (isCoreTab.value || settingsTab.value === 'app-update') load()
+  else if (settingsTab.value === 'staff-identity') loadStaffIdentity()
+  else if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
+  else if (settingsTab.value === 'admins') loadOperators()
+}
+
+async function saveAppUpdate() {
+  if (!auth.can('settings', 'write')) {
+    toast().danger(t('settings.readOnly'))
+    return
+  }
+  const versionCode = Number(appUpdateForm.latestVersionCode)
+  const minVersionCode = Number(appUpdateForm.minVersionCode) || 0
+  const apkUrl = String(appUpdateForm.storeUrl || '').trim()
+  if (!Number.isInteger(versionCode) || versionCode < 1) {
+    toast().danger('رقم الإصدار يجب أن يكون رقماً صحيحاً أكبر من صفر')
+    return
+  }
+  if (minVersionCode > versionCode) {
+    toast().danger('أدنى إصدار لا يمكن أن يكون أكبر من الإصدار الجديد')
+    return
+  }
+  if (appUpdateForm.enabled && !/^https:\/\//i.test(apkUrl)) {
+    toast().danger('أدخل رابط HTTPS للصفحة أو ملف APK قبل نشر التحديث')
+    return
+  }
+  if (apkUrl && !/^https:\/\//i.test(apkUrl)) {
+    toast().danger('يجب أن يبدأ رابط التحميل بـ HTTPS')
+    return
+  }
+  appUpdateSaving.value = true
+  const payload = {
+    'app.update_enabled': String(!!appUpdateForm.enabled),
+    'app.latest_version_code': String(versionCode),
+    'app.latest_version_name': String(appUpdateForm.latestVersionName || '').trim(),
+    'app.min_version_code': String(minVersionCode),
+    'app.update_force': String(!!appUpdateForm.forceUpdate),
+    'app.update_store_url': apkUrl,
+    'app.update_link_type': ['apk', 'external', 'auto'].includes(appUpdateForm.linkType) ? appUpdateForm.linkType : 'auto',
+    'app.update_title_ar': String(appUpdateForm.titleAr || 'يوجد تحديث جديد').trim(),
+    'app.update_message_ar': String(appUpdateForm.messageAr || '').trim(),
+    'app.update_title_en': String(appUpdateForm.titleEn || 'Update available').trim(),
+    'app.update_message_en': String(appUpdateForm.messageEn || '').trim(),
+  }
+  const { error: err } = await settingsApi.update(payload)
+  appUpdateSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  success.value = 'تم حفظ إعدادات تحديث JEHO'
+  toast().success(success.value)
 }
 
 async function save() {
@@ -973,6 +1808,7 @@ async function save() {
     support_whatsapp: String(form.supportWhatsapp ?? ''),
     support_telegram: String(form.supportTelegram ?? ''),
     support_instagram: String(form.supportInstagram ?? ''),
+    support_website: String(form.supportWebsite ?? ''),
     support_phone: String(form.supportPhone ?? ''),
     defaultLocale: String(form.defaultLocale ?? 'ar'),
     maintenanceMode: String(!!form.maintenanceMode),
@@ -985,7 +1821,9 @@ async function save() {
     'room.supporter_min_coins': String(form.supporterMinCoins ?? 10000),
     'room.legendary_min_coins': String(form.legendaryMinCoins ?? 50000),
     'games.win_reward_coins': String(form.gameWinRewardCoins ?? 100),
+    'economy.self_gift_blocked': String(!form.selfGiftAllowed),
     'lucky_box.enabled': String(!!form.luckyBoxEnabled),
+    'features.room_pk_enabled': String(!!form.roomPkEnabled),
     'features.female_only_voice_hosts': String(!!form.femaleOnlyVoiceHosts),
     'gender_verification.auto_accept': String(!!form.genderVerificationAutoAccept),
     'rooms.mic_without_host_approval': String(!!form.micWithoutHostApproval),
@@ -1023,6 +1861,8 @@ onMounted(async () => {
   // Always refresh Super/operator flags so "أدمنز اللوحة" appears after deploy
   await auth.fetchMe()
   syncTabFromRoute()
+  if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
+  if (settingsTab.value === 'staff-identity') loadStaffIdentity()
   fillAccountFromAuth()
   load()
 })

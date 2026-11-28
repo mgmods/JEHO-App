@@ -101,15 +101,19 @@ public class GiftUserAvatarView extends LinearLayout {
         recycler.setAdapter(adapter);
     }
 
-    public void submit(@Nullable List<GiftRecipient> list,
-                       @Nullable String selectedUserId,
+    public void submit(@Nullable List<GiftRecipient> list, @Nullable String selectedUserId,
                        boolean selectAll) {
+        submit(list, selectedUserId, selectAll, null);
+    }
+
+    public void submit(@Nullable List<GiftRecipient> list, @Nullable String selectedUserId,
+                       boolean selectAll, @Nullable List<String> selectedUserIds) {
         recipients.clear();
         if (list != null) recipients.addAll(list);
         allMic = selectAll;
         if (recycler == null) return;
         ensureAdapter();
-        adapter.submit(recipients, selectedUserId, selectAll);
+        adapter.submit(recipients, selectedUserId, selectAll, selectedUserIds);
         setAvatarAllMic(selectAll);
     }
 
@@ -126,12 +130,11 @@ public class GiftUserAvatarView extends LinearLayout {
 
     @NonNull
     public List<GiftRecipient> getSelectMicAccounts() {
-        if (allMic) return new ArrayList<>(recipients);
         List<GiftRecipient> out = new ArrayList<>();
         if (adapter != null) {
-            String id = adapter.getSelectedUserId();
+            List<String> ids = adapter.getSelectedUserIds();
             for (GiftRecipient r : recipients) {
-                if (r != null && id != null && id.equals(r.userId)) out.add(r);
+                if (r != null && r.userId != null && ids.contains(r.userId)) out.add(r);
             }
         }
         return out;

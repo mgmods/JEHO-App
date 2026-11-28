@@ -25,6 +25,7 @@ import com.Dramizo.Series.databinding.ItemAgencyMenuRowBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
@@ -46,10 +47,12 @@ import java.util.Locale;
 /** Agency manage hub — custom menu rows + custom bottom-sheet dialogs. */
 public class AgencyManageActivity extends ThemedActivity {
     public static final String EXTRA_AGENCY_ID = "agency_id";
+    public static final String EXTRA_OPEN_PENDING_REQUESTS = "open_agency_pending_requests";
 
     private ActivityAgencyManageBinding binding;
     private AgencyViewModel vm;
     private String agencyId;
+    private boolean openPendingRequestsFromNotification;
     private boolean isOwner;
     private boolean isPlatformSuper;
     private MiscDtos.AgencyMineDto myAgency;
@@ -72,6 +75,7 @@ public class AgencyManageActivity extends ThemedActivity {
         binding = ActivityAgencyManageBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
+        openPendingRequestsFromNotification = getIntent().getBooleanExtra(EXTRA_OPEN_PENDING_REQUESTS, false);
         if (agencyId == null || agencyId.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
             finish();
@@ -79,6 +83,17 @@ public class AgencyManageActivity extends ThemedActivity {
         }
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnRefresh != null) binding.btnRefresh.setOnClickListener(v -> reload());
+        if (binding.boxAgencyHero != null) {
+            android.graphics.drawable.GradientDrawable heroBackground =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                            new int[]{0xFFF7F4FF, 0xFFFFFFFF, 0xFFF0EBFF});
+            heroBackground.setCornerRadius(dp(24));
+            heroBackground.setStroke(dp(1), 0xFFE2D9FF);
+            binding.boxAgencyHero.setBackground(heroBackground);
+            binding.boxAgencyHero.setElevation(dp(2));
+        }
         vm = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(AgencyViewModel.class);
 
@@ -89,6 +104,12 @@ public class AgencyManageActivity extends ThemedActivity {
         setupMenuRow(binding.menuStyle, R.string.agency_manage_menu_style, v -> dialogNoticeStyle());
         setupMenuRow(binding.menuBranding, R.string.agency_manage_menu_branding, v -> dialogBranding());
         setupMenuRow(binding.menuMall, R.string.agency_manage_menu_mall, v -> openMall("host_badge"));
+        setupMenuRow(binding.menuManagers, R.string.agency_manage_menu_managers,
+                v -> loadMemberDirectory("manager", "مشرفو الوكالة"));
+        setupMenuRow(binding.menuHosts, R.string.agency_manage_menu_hosts,
+                v -> loadMemberDirectory("host", "مضيفو الوكالة"));
+        setupMenuRow(binding.menuMembers, R.string.agency_manage_menu_members,
+                v -> loadMemberDirectory(null, "أعضاء الوكالة"));
 
         binding.menuLive.setOnClickListener(v -> {
             if (myAgency != null && myAgency.isEligibleHost()) {
@@ -125,6 +146,23 @@ public class AgencyManageActivity extends ThemedActivity {
     private void setupMenuRow(ItemAgencyMenuRowBinding row, int labelRes, View.OnClickListener click) {
         if (row == null) return;
         row.tvMenuLabel.setText(labelRes);
+        if (row.imgMenuIcon != null) {
+            int icon = android.R.drawable.ic_menu_manage;
+            if (labelRes == R.string.agency_manage_menu_search) icon = android.R.drawable.ic_menu_search;
+            else if (labelRes == R.string.agency_manage_menu_add) icon = android.R.drawable.ic_input_add;
+            else if (labelRes == R.string.agency_manage_menu_pending) icon = android.R.drawable.ic_menu_agenda;
+            else if (labelRes == R.string.agency_manage_menu_code) icon = android.R.drawable.ic_menu_info_details;
+            else if (labelRes == R.string.agency_manage_menu_style) icon = android.R.drawable.ic_menu_edit;
+            else if (labelRes == R.string.agency_manage_menu_branding) icon = android.R.drawable.ic_menu_gallery;
+            else if (labelRes == R.string.agency_manage_menu_mall) icon = android.R.drawable.ic_menu_view;
+            row.imgMenuIcon.setImageResource(icon);
+            int tint = 0xFF8156D8;
+            if (labelRes == R.string.agency_manage_menu_pending) tint = 0xFF2678D8;
+            else if (labelRes == R.string.agency_manage_menu_style) tint = 0xFFE34F91;
+            else if (labelRes == R.string.agency_manage_menu_code) tint = 0xFF20B96B;
+            else if (labelRes == R.string.agency_manage_menu_mall) tint = 0xFFE0A126;
+            row.imgMenuIcon.setColorFilter(tint);
+        }
         row.getRoot().setOnClickListener(click);
     }
 
@@ -175,6 +213,26 @@ public class AgencyManageActivity extends ThemedActivity {
                 }
                 if (isPlatformSuper) isOwner = true;
 
+                // Never expose the management dashboard from a guessed/deep-linked agency ID.
+                // The server's /mine response must confirm an active owner/manager relationship.
+                String currentRole = mineResult != null && mineResult.success
+                        && mineResult.data != null && mineResult.data.role != null
+                        ? mineResult.data.role.trim().toLowerCase(Locale.US) : "";
+                boolean belongsToRequestedAgency = mineResult != null && mineResult.success
+                        && mineResult.data != null && mineResult.data.agency != null
+                        && mineResult.data.agency.id != null
+                        && agencyId.equals(mineResult.data.agency.id)
+                        && !("pending".equalsIgnoreCase(mineResult.data.membershipStatus)
+                        || "pending".equalsIgnoreCase(mineResult.data.membershipStatus));
+                boolean allowedToManage = isPlatformSuper || (belongsToRequestedAgency
+                        && ("owner".equals(currentRole) || "manager".equals(currentRole)));
+                if (!allowedToManage) {
+                    Toast.makeText(this, "ليس لديك صلاحية إدارة هذه الوكالة", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                isOwner = isPlatformSuper || "owner".equals(currentRole);
+
                 if (mineResult.success && mineResult.data != null && mineResult.data.agency != null
                         && agencyId.equals(mineResult.data.agency.id)) {
                     MiscDtos.AgencyDto ag = mineResult.data.agency;
@@ -182,6 +240,7 @@ public class AgencyManageActivity extends ThemedActivity {
                             ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
                     String role = mineResult.data.role != null
                             ? mineResult.data.role.toLowerCase(Locale.US) : "";
+                    if (binding.tvAgencyRoleBadge != null) binding.tvAgencyRoleBadge.setText(isPlatformSuper ? "سوبر أدمن" : roleAr(role));
                     binding.tvAgencyHeroMeta.setText(getString(
                             R.string.agency_manage_meta_format,
                             Math.max(0, knownTotalMembers > 0
@@ -205,6 +264,7 @@ public class AgencyManageActivity extends ThemedActivity {
                     MiscDtos.AgencyDto ag = r.data;
                     binding.tvAgencyHeroName.setText(
                             ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                    if (binding.tvAgencyRoleBadge != null) binding.tvAgencyRoleBadge.setText("سوبر أدمن");
                     binding.tvAgencyHeroMeta.setText(getString(
                             R.string.agency_manage_meta_format,
                             Math.max(0, knownTotalMembers > 0
@@ -246,6 +306,13 @@ public class AgencyManageActivity extends ThemedActivity {
                         || (myAgency != null && myAgency.isEligibleHost()
                         && myAgency.agency != null && agencyId.equals(myAgency.agency.id));
                 binding.menuLive.setVisibility(canOpen ? View.VISIBLE : View.GONE);
+
+                if (openPendingRequestsFromNotification) {
+                    openPendingRequestsFromNotification = false;
+                    binding.getRoot().post(() -> {
+                        if (!isFinishing()) dialogPending();
+                    });
+                }
             });
         });
     }
@@ -259,6 +326,42 @@ public class AgencyManageActivity extends ThemedActivity {
         sheet.setContentView(content);
         sheet.show();
         return sheet;
+    }
+
+    private void loadMemberDirectory(@Nullable String roleFilter, @NonNull String title) {
+        binding.progressMembers.setVisibility(View.VISIBLE);
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>> result =
+                    ApiCall.execute(c.getAgencyApi().listMembers(agencyId, "", 1, 100, "active"));
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                binding.progressMembers.setVisibility(View.GONE);
+                ArrayList<String> labels = new ArrayList<>();
+                ArrayList<Runnable> actions = new ArrayList<>();
+                if (result.success && result.data != null && result.data.items != null) {
+                    for (MiscDtos.AgencyMemberDto member : result.data.items) {
+                        if (member == null || member.userId == null) continue;
+                        String role = member.role != null ? member.role.toLowerCase(Locale.US) : "";
+                        if (roleFilter != null && !roleFilter.equals(role)) continue;
+                        String name = member.user != null
+                                ? (member.user.displayName != null ? member.user.displayName : member.user.username)
+                                : member.userId;
+                        String publicId = member.user != null ? member.user.displayPublicId() : "";
+                        labels.add((name != null ? name : "—")
+                                + (publicId.isEmpty() ? "" : " · ID " + publicId)
+                                + " · " + roleAr(role));
+                        actions.add(() -> showMemberActions(member, name, publicId,
+                                member.isActive == null || !member.isActive));
+                    }
+                }
+                if (labels.isEmpty()) {
+                    Toast.makeText(this, "لا توجد بيانات ضمن هذا القسم", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showCustomList(title, labels, actions);
+            });
+        });
     }
 
     private void dialogSearchHosts() {
@@ -671,4 +774,8 @@ public class AgencyManageActivity extends ThemedActivity {
         if (type != null) i.putExtra(CosmeticsViewModel.EXTRA_TYPE, type);
         startActivity(i);
     }
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
 }

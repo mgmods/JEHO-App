@@ -4,7 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ios_grouped_bg"
+    android:background="#00160F"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false">
@@ -381,6 +381,7 @@
                             android:id="@+id/tvRoomTitle"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:translationY="-2dp"
                             android:layout_weight="1"
                             android:ellipsize="marquee"
                             android:fadingEdge="horizontal"
@@ -390,7 +391,7 @@
                             android:singleLine="true"
                             android:text="@string/voice_room"
                             android:textColor="@color/white"
-                            android:textSize="12.5sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
 
                         <ImageView
@@ -427,6 +428,18 @@
                         android:textStyle="bold"
                         android:visibility="gone" />
                 </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/btnFollowRoomHeart"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/bg_follow_heart_button"
+                    android:contentDescription="متابعة الروم أو الوكالة"
+                    android:padding="5dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_heart_outline_red"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <ImageView
@@ -589,7 +602,7 @@
         android:clickable="false"
         android:focusable="false"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/headerRoom">
+        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip">
 
         <FrameLayout
             android:id="@+id/hostStageAvatarWrap"
@@ -640,8 +653,8 @@
 
             <ImageView
                 android:id="@+id/imgHostStageSeat"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
@@ -745,13 +758,13 @@
         android:id="@+id/recyclerSeats"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="0dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:nestedScrollingEnabled="false"
         android:overScrollMode="never"
         android:paddingHorizontal="4dp"
-        android:paddingBottom="14dp"
+        android:paddingBottom="6dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
@@ -760,12 +773,13 @@
          Extra top margin so avatars clear seat 9/10 number badges. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowTopHosts"
-        android:layout_width="wrap_content"
-        android:layout_height="26dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        android:importantForAccessibility="no"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="18dp"
-        android:clipChildren="false"
-        android:clipToPadding="false"
+        android:layout_marginTop="28dp"
         android:layoutDirection="ltr"
         android:visibility="gone"
         app:layout_constraintStart_toStartOf="@id/recyclerSeats"
@@ -782,6 +796,10 @@
             android:textColor="@android:color/white"
             android:textSize="10sp"
             android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="فتح ترتيب داعمي الغرفة"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -994,7 +1012,7 @@
     <RelativeLayout
         android:id="@+id/musicCard"
         android:layout_width="310dp"
-        android:layout_height="92dp"
+        android:layout_height="120dp"
         android:layout_marginTop="100dp"
         android:background="@drawable/mc_bg"
         android:clickable="true"
@@ -1068,7 +1086,7 @@
             android:layout_alignParentBottom="true"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="6dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="28dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -1154,6 +1172,60 @@
                 android:src="@drawable/icon_music_list_more" />
         </LinearLayout>
 
+        <SeekBar
+            android:id="@+id/seekMusicVolume"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="88dp"
+            android:layout_marginEnd="38dp"
+            android:layout_marginBottom="0dp"
+            android:max="100"
+            android:progress="100"
+            android:progressDrawable="@drawable/music_voice_seekbar"
+            android:thumb="@drawable/thumb_seekbar_music_volume"
+            android:thumbOffset="0dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:splitTrack="false"
+            android:contentDescription="اسحب الدائرة لرفع أو خفض صوت الموسيقى" />
+
+        <TextView
+            android:id="@+id/btnMusicVolumeDown"
+            android:layout_width="24dp"
+            android:layout_height="22dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="62dp"
+            android:layout_marginBottom="3dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="خفض صوت الموسيقى"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="−"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnMusicVolumeUp"
+            android:layout_width="24dp"
+            android:layout_height="22dp"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="3dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="رفع صوت الموسيقى"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
         <TextView
             android:id="@+id/btnMusicDismiss"
             android:layout_width="36dp"
@@ -1235,7 +1307,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="6dp"
         android:minHeight="110dp"
@@ -1244,61 +1316,66 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowTopHosts"
+        app:layout_constraintTop_toBottomOf="@id/recyclerSeats"
         app:layout_constraintWidth_percent="0.72">
 
-        <!-- Fixed full-width official news bar (not a tall chat bubble) -->
+
+
+        <!-- Room feed tabs occupy the exact former official-news banner position. -->
         <LinearLayout
             android:id="@+id/rowOfficialNews"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="8dp"
-            android:background="@drawable/bg_room_official_banner"
+            android:layout_marginTop="0dp"
+            android:translationY="0dp"
+            android:layout_marginBottom="4dp"
+            android:background="@android:color/transparent"
             android:gravity="center_vertical"
             android:minHeight="32dp"
             android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingTop="5dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="5dp"
+            android:paddingHorizontal="4dp"
             android:visibility="visible">
 
-            <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/room_notice" />
-
             <TextView
-                android:id="@+id/tvOfficialNewsLabel"
+                android:id="@+id/tabRoomAll"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
+                android:layout_height="26dp"
                 android:background="@drawable/bg_room_official_chip"
-                android:paddingHorizontal="7dp"
-                android:paddingVertical="2dp"
-                android:text="@string/official_news"
-                android:textColor="#FFFFFFFF"
-                android:textSize="9sp"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="الجميع"
+                android:textColor="#FFF0D28A"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tabRoomChat"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginStart="4dp"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="دردشة"
+                android:textColor="#D6E6DF"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tabRoomGifts"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginStart="4dp"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="هدية"
+                android:textColor="#D6E6DF"
+                android:textSize="11sp" />
+
+            <!-- Legacy binding retained invisibly; official notice is removed from the room UI. -->
+            <TextView
                 android:id="@+id/tvRoomRules"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:ellipsize="marquee"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:includeFontPadding="false"
-                android:marqueeRepeatLimit="marquee_forever"
-                android:singleLine="true"
-                android:text="@string/respect_rules"
-                android:textColor="#FFF7E19B"
-                android:textSize="11sp" />
+                android:layout_height="0dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ScrollView
@@ -1329,120 +1406,169 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
-        android:elevation="28dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="32dp"
         android:gravity="center_vertical"
         android:layoutDirection="ltr"
-        android:minHeight="56dp"
+        android:minHeight="78dp"
         android:orientation="horizontal"
-        android:paddingHorizontal="6dp"
+        android:paddingHorizontal="4dp"
         android:paddingVertical="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintLeft_toRightOf="@id/roomSideShortcuts"
+        app:layout_constraintRight_toRightOf="parent">
 
-        <!-- Mikoo idle tip pill — tap opens white composer above keyboard -->
-        <TextView
-            android:id="@+id/tvChatInputTips"
-            android:layout_width="0dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_chat_input_tips"
-            android:clickable="true"
-            android:ellipsize="end"
-            android:focusable="true"
-            android:gravity="center_vertical|start"
-            android:maxLines="1"
-            android:paddingStart="16dp"
-            android:paddingEnd="12dp"
-            android:text="@string/room_input_tips"
-            android:textColor="#80FFFFFF"
-            android:textSize="13sp" />
-
-        <!-- Legacy id kept gone; real composer is roomChatComposer -->
-        <LinearLayout
-            android:id="@+id/composeBar"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-
+        <!-- Restored bottom controls: messages, gifts, stickers, seated mic, then composer. -->
         <FrameLayout
-            android:id="@+id/btnMic"
-            android:layout_width="35dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="8dp"
+            android:id="@+id/btnPrivateMsg"
+            android:layout_width="48dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="1dp"
+            android:visibility="visible"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/mic_on"
-            android:visibility="gone">
-
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/chat">
             <ImageView
-                android:id="@+id/imgMicIcon"
-                android:layout_width="35dp"
-                android:layout_height="35dp"
+                android:id="@+id/imgPrivateMsg"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_pro_mic" />
+                android:src="@drawable/ic_room_msg" />
+            <View
+                android:id="@+id/roomPrivateMsgUnreadDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="5dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/bg_unread_badge"
+                android:elevation="10dp"
+                android:visibility="gone" />
         </FrameLayout>
-
+        <!-- Dedicated write-message control: stays visible and opens the room composer. -->
+        <FrameLayout
+            android:id="@+id/btnWriteMessage"
+            android:layout_width="32dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="1dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:contentDescription="@string/room_input_tips"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="✎"
+                android:textColor="#FFFFFFFF"
+                android:textSize="25sp"
+                android:includeFontPadding="false" />
+        </FrameLayout>
         <FrameLayout
             android:id="@+id/btnGift"
-            android:layout_width="45dp"
-            android:layout_height="45dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="50dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/send_gift"
             android:foreground="?attr/selectableItemBackgroundBorderless">
-
             <ImageView
                 android:id="@+id/imgRoomGift"
-                android:layout_width="45dp"
-                android:layout_height="45dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_room_send_gift" />
         </FrameLayout>
-
-        <!-- Seat stickers / reactions — visible on bottom bar (Mikoo-style) -->
         <FrameLayout
             android:id="@+id/btnSeatSticker"
-            android:layout_width="35dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="6dp"
+            android:layout_width="46dp"
+            android:layout_height="50dp"
+            android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/emoji"
             android:foreground="?attr/selectableItemBackgroundBorderless">
-
             <ImageView
                 android:id="@+id/imgSeatSticker"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_asset_emoji" />
         </FrameLayout>
-
-        <!-- Mikoo private messages (white inbox while in room) -->
         <FrameLayout
-            android:id="@+id/btnPrivateMsg"
-            android:layout_width="35dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="6dp"
+            android:id="@+id/btnMic"
+            android:layout_width="46dp"
+            android:layout_height="50dp"
+            android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/chat"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
-
+            android:contentDescription="@string/mic_on"
+            android:visibility="gone">
             <ImageView
-                android:id="@+id/imgPrivateMsg"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:id="@+id/imgMicIcon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_room_msg" />
+                android:src="@drawable/ic_pro_mic" />
         </FrameLayout>
+        <LinearLayout
+            android:id="@+id/bottomComposerInline"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvChatInputTips"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_room_chat_input_tips"
+                android:clickable="true"
+                android:ellipsize="end"
+                android:focusable="true"
+                android:gravity="center_vertical|start"
+                android:maxLines="1"
+                android:minWidth="32dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="8dp"
+                android:text="@string/room_input_tips"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/btnSendChatInline"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_marginStart="0dp"
+                android:background="@drawable/bg_room_send_msg"
+                android:clickable="false"
+                android:contentDescription="@string/send_btn"
+                android:focusable="false"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text=""
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/composeBar"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
         <FrameLayout
             android:id="@+id/btnLock"
@@ -1452,12 +1578,10 @@
 
         <FrameLayout
             android:id="@+id/btnGames"
-            android:layout_width="35dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="6dp"
-            android:background="@android:color/transparent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
             android:contentDescription="@string/nav_games">
-
             <ImageView
                 android:id="@+id/imgRoomGamesButton"
                 android:layout_width="35dp"
@@ -1470,12 +1594,10 @@
 
         <FrameLayout
             android:id="@+id/btnTools"
-            android:layout_width="35dp"
-            android:layout_height="35dp"
-            android:layout_marginStart="6dp"
-            android:background="@android:color/transparent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
             android:contentDescription="@string/settings">
-
             <ImageView
                 android:id="@+id/imgRoomMore"
                 android:layout_width="35dp"
@@ -1487,6 +1609,107 @@
         </FrameLayout>
     </LinearLayout>
 
+        <TextView
+            android:id="@+id/tvMicRequestToast"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_room_dialog_item"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="28dp"
+            android:gravity="center"
+            android:maxWidth="280dp"
+            android:maxLines="2"
+            android:minWidth="210dp"
+            android:minHeight="42dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:text="✋ طلبات الصعود إلى المايك"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
+            app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Transparent side shortcuts: support chest above music, then games and settings. -->
+    <LinearLayout
+        android:id="@+id/roomSideShortcuts"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:layout_marginBottom="14dp"
+        android:background="@android:color/transparent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="0dp"
+        android:elevation="24dp"
+        app:layout_constraintBottom_toBottomOf="@id/bottomBar"
+        app:layout_constraintLeft_toLeftOf="parent">
+
+        <ImageView
+            android:id="@+id/btnRoomSupportChest"
+            android:layout_width="49dp"
+            android:layout_height="49dp"
+            android:layout_marginBottom="-1dp"
+            android:contentDescription="صندوق الدعم"
+            android:padding="1dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_chest_gold"
+            android:background="@android:color/transparent" />
+
+        <ImageView
+            android:id="@+id/btnRoomSideMusic"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:translationY="-6dp"
+            android:contentDescription="الموسيقى"
+            android:padding="1dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_room_music_voice"
+            android:tint="#FFFFFFFF"
+            android:background="@android:color/transparent" />
+
+        <ImageView
+            android:id="@+id/btnRoomSideGames"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_marginTop="2dp"
+            android:translationY="-8dp"
+            android:contentDescription="الألعاب"
+            android:padding="1dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_games"
+            android:background="@android:color/transparent" />
+
+        <TextView
+            android:id="@+id/btnRoomSidePkChallenge"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="2dp"
+            android:contentDescription="تحديات PK"
+            android:gravity="center"
+            android:text="⚔"
+            android:textColor="#FFFFD76A"
+            android:textSize="27sp"
+            android:textStyle="bold"
+            android:background="@android:color/transparent"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/btnRoomSideSettings"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="6dp"
+            android:contentDescription="الإعدادات"
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_settings"
+            android:background="@android:color/transparent" />
+    </LinearLayout>
+
     <!-- Mikoo MultiInputMsgView: full-screen overlay; white send box only (above keyboard) -->
     <FrameLayout
         android:id="@+id/roomChatComposer"
@@ -1495,9 +1718,9 @@
         android:background="#66000000"
         android:clickable="true"
         android:elevation="40dp"
-        android:focusable="true"
+        android:focusable="false"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -1627,8 +1850,8 @@
         android:id="@+id/comboGiftView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="0dp"
         android:layout_marginBottom="96dp"
+        android:layout_marginStart="8dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:elevation="52dp"
@@ -1822,66 +2045,85 @@
         android:id="@+id/luckyWinOverlay"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="#B3000000"
-        android:clickable="true"
-        android:elevation="24dp"
-        android:focusable="true"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:elevation="4dp"
+        android:focusable="false"
+        android:importantForAccessibility="no"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <LinearLayout
-            android:layout_width="280dp"
-            android:layout_height="wrap_content"
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/luckyWinVideo"
+            android:layout_width="320dp"
+            android:layout_height="180dp"
             android:layout_gravity="center"
-            android:background="@drawable/bg_lucky_win_card"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:paddingHorizontal="22dp"
-            android:paddingTop="18dp"
-            android:paddingBottom="22dp">
+            android:background="@android:color/transparent"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone"
+            app:resize_mode="fit"
+            app:surface_type="texture_view"
+            app:use_controller="false" />
 
-            <com.airbnb.lottie.LottieAnimationView
-                android:id="@+id/lottieLuckyWin"
-                android:layout_width="140dp"
-                android:layout_height="140dp"
-                android:scaleType="centerInside"
-                app:lottie_autoPlay="false"
-                app:lottie_fileName="lottie/gift_lucky.json"
-                app:lottie_loop="false" />
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/lottieLuckyWin"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            app:lottie_autoPlay="false"
+            app:lottie_fileName="lottie/gift_lucky.json"
+            app:lottie_loop="false" />
 
-            <ImageView
-                android:id="@+id/imgLuckyWinBox"
-                android:layout_width="88dp"
-                android:layout_height="88dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_asset_chest_gold"
-                android:visibility="gone" />
+        <ImageView
+            android:id="@+id/imgLuckyWinBox"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvLuckyWinTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:gravity="center"
-                android:text="صندوق الحظ"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvLuckyWinTitle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvLuckyWinReward"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:textColor="#FFD54F"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/tvLuckyWinReward"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </FrameLayout>
+
+
+    <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementTickerView
+        android:id="@+id/roomAdvertisementTicker"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="4dp"
+        android:visibility="gone"
+        android:elevation="38dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintVertical_bias="0.52"
+        app:layout_constraintWidth_percent="0.88" />
+
+    <!-- Global room advertisement composer; quota and availability are loaded from the API. -->
+    <!-- Deliberately no view ID: optional composer must not become a required ActivityViewBinding field. -->
+    <com.Dramizo.Series.presentation.voiceroom.RoomAdvertisementComposerView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="118dp"
+        android:elevation="24dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

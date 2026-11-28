@@ -8,6 +8,7 @@
     android:paddingBottom="16dp">
 
     <TextView
+        android:id="@+id/tvEmojiPickerTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
@@ -30,14 +31,33 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="14dp"
         android:layout_marginEnd="16dp"
-        android:text="ملصقات المقاعد"
+        android:text="ملصقات"
         android:textColor="#99FFFFFF"
-        android:textSize="12sp" />
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <HorizontalScrollView
+        android:id="@+id/scrollStickerCategories"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:overScrollMode="never">
+        <LinearLayout
+            android:id="@+id/layoutStickerCategories"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+    </HorizontalScrollView>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerStickers"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
+        android:layout_height="180dp"
         android:layout_marginTop="8dp"
         android:clipToPadding="false"
         android:nestedScrollingEnabled="false"
@@ -47,6 +67,7 @@
 
     <TextView
         android:layout_width="match_parent"
+        android:id="@+id/tvChatEmojisLabel"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"

@@ -6,8 +6,24 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.graphics.Typeface
+import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.LayerDrawable
+import android.view.Gravity
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -15,10 +31,14 @@ import android.view.ViewOutlineProvider
 import android.view.animation.Animation
 import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.ScaleAnimation
 import android.widget.ImageView
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -26,7 +46,7 @@ import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.Dramizo.Series.R
-import com.Dramizo.Series.data.remote.dto.DramaDtos
+import com.Dramizo.Series.data.remote.dto.StoriesDtos
 import com.Dramizo.Series.data.remote.dto.MiscDtos
 import com.Dramizo.Series.databinding.ActivityMainBinding
 import com.Dramizo.Series.di.AppContainer
@@ -34,7 +54,7 @@ import com.Dramizo.Series.domain.model.Result
 import com.Dramizo.Series.presentation.common.ContainerProvider
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper
 import com.Dramizo.Series.presentation.common.ThemedActivity
-import com.Dramizo.Series.presentation.drama.DramaFragment
+import com.Dramizo.Series.presentation.stories.StoriesFragment
 import com.Dramizo.Series.presentation.games.GamesFragment
 import com.Dramizo.Series.presentation.home.HomeFragment
 import com.Dramizo.Series.presentation.messages.MessagesFragment
@@ -43,6 +63,7 @@ import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity
 import com.Dramizo.Series.realtime.RealtimeClient
 import com.Dramizo.Series.rtc.RoomRtcEngine
 import com.Dramizo.Series.service.VoiceRoomForegroundService
+import com.Dramizo.Series.util.ApiOrigin
 import com.Dramizo.Series.util.ApiCall
 import com.Dramizo.Series.util.AppFeatures
 import com.Dramizo.Series.util.AppLoadingOverlay
@@ -81,17 +102,49 @@ class MainActivity : ThemedActivity() {
     }
 
     private var binding: ActivityMainBinding? = null
+    private val unreadBadgeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            updateUnreadMessagesDot(intent?.getIntExtra(
+                com.Dramizo.Series.util.UnreadMessageBadge.EXTRA_COUNT, 0) ?: 0)
+        }
+    }
+
+    private fun updateUnreadMessagesDot(count: Int) {
+        binding?.tabChatUnreadDot?.visibility =
+            if (count > 0) android.view.View.VISIBLE else android.view.View.GONE
+    }
     private var mainPager: ViewPager2? = null
     private var currentPage: Int = 0
-    private var dramaEnabled: Boolean = true
-    private var agencyMine: MiscDtos.AgencyMineDto? = null
+        private var agencyMine: MiscDtos.AgencyMineDto? = null
     private var agencyStateLoaded: Boolean = false
     private var activeRoomDragConfigured: Boolean = false
     private var taskInviteListener: RealtimeClient.RoomListener? = null
     private var playInAppUpdateHelper: PlayInAppUpdateHelper? = null
+    private var hasResumedOnce: Boolean = false
+    private val dashboardIconRefreshHandler = Handler(Looper.getMainLooper())
+    private val dashboardIconRefreshRunnable = object : Runnable {
+        override fun run() {
+            if (isFinishing || isDestroyed || binding == null) return
+            val container = ContainerProvider.from(this@MainActivity)
+            container.ioExecutor.execute {
+                RemoteNavIcons.refreshBlocking(container)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed || binding == null) return@runOnUiThread
+                    applyNavIcons()
+                    (supportFragmentManager.findFragmentByTag("f0") as? HomeFragment)
+                        ?.refreshDashboardVisuals()
+                    (supportFragmentManager.findFragmentByTag("f3") as? ProfileFragment)
+                        ?.refreshDashboardIcons()
+                    (supportFragmentManager.findFragmentByTag("f2") as? MessagesFragment)
+                        ?.refreshDashboardIcons()
+                }
+            }
+            dashboardIconRefreshHandler.postDelayed(this, 60_000L)
+        }
+    }
 
     /** First open of each tab may show a short loader; revisits stay stable. */
-    private val pageWarmed = BooleanArray(5)
+    private val pageWarmed = BooleanArray(4)
 
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -114,6 +167,12 @@ class MainActivity : ThemedActivity() {
         val b = ActivityMainBinding.inflate(layoutInflater)
         binding = b
         setContentView(b.root)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, unreadBadgeReceiver,
+            android.content.IntentFilter(com.Dramizo.Series.util.UnreadMessageBadge.ACTION_CHANGED),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        updateUnreadMessagesDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this))
 
         playInAppUpdateHelper = PlayInAppUpdateHelper(this)
         RemoteTheme.applyActivityBackground(this, "home")
@@ -140,6 +199,10 @@ class MainActivity : ThemedActivity() {
             runOnUiThread {
                 if (binding == null) return@runOnUiThread
                 highlightPage(currentPage)
+                // The home fragment is kept warm in the pager; refresh its existing
+                // header shortcuts after the latest dashboard icon config is cached.
+                (supportFragmentManager.findFragmentByTag("f0") as? HomeFragment)
+                    ?.refreshHeaderShortcutIcons()
             }
         }
         RemoteTheme.applyActivityBackground(this, "home")
@@ -153,12 +216,10 @@ class MainActivity : ThemedActivity() {
         setupMainPager()
 
         b.tabPartyWrap.setOnClickListener { go(R.id.nav_home) }
-        b.tabDramaWrap.setOnClickListener { go(R.id.nav_drama) }
         b.tabGamesWrap.setOnClickListener { go(R.id.nav_games) }
         b.tabChatWrap.setOnClickListener { go(R.id.nav_messages) }
         b.tabMeWrap.setOnClickListener { go(R.id.nav_profile) }
         b.tabParty.setOnClickListener { go(R.id.nav_home) }
-        b.tabDrama.setOnClickListener { go(R.id.nav_drama) }
         b.tabGames.setOnClickListener { go(R.id.nav_games) }
         b.tabChat.setOnClickListener { go(R.id.nav_messages) }
         b.tabMe.setOnClickListener { go(R.id.nav_profile) }
@@ -167,7 +228,7 @@ class MainActivity : ThemedActivity() {
 
         loadAgencyAction(container)
         highlightPage(0)
-        loadDramaConfig(container)
+        maybeShowDailyLoginReward(container)
 
         intent?.let { openFromIntentExtras(it) }
 
@@ -307,7 +368,6 @@ class MainActivity : ThemedActivity() {
         val page = destToPage(destId)
         val pager = mainPager
         if (page < 0 || pager == null) return
-        if (page == 1 && !dramaEnabled) return
         if (pager.currentItem == page) return
         if (destId != R.id.nav_create_room && page < pageWarmed.size && !pageWarmed[page]) {
             AppLoadingOverlay.showUntilReady(this)
@@ -324,18 +384,18 @@ class MainActivity : ThemedActivity() {
         // Bottom tabs are tap-only. Home sub-tabs (حار / دولة / نشاطات) are also tap-only
         // — see HomeFragment.pagerFeed.setUserInputEnabled(false).
         pager.isUserInputEnabled = false
-        // Keep only neighbors warm — avoids freeze on first install.
-        pager.offscreenPageLimit = 1
+        // Keep all primary sections warm so tab switches do not recreate heavy fragments,
+        // rebind lists, or restart image loading.
+        pager.offscreenPageLimit = 4
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun createFragment(position: Int): Fragment = when (position) {
-                1 -> DramaFragment()
-                2 -> GamesFragment()
-                3 -> MessagesFragment()
-                4 -> ProfileFragment()
+                1 -> GamesFragment()
+                2 -> MessagesFragment()
+                3 -> ProfileFragment()
                 else -> HomeFragment()
             }
 
-            override fun getItemCount(): Int = 5
+            override fun getItemCount(): Int = 4
         }
         pager.registerOnPageChangeCallback(
             object : ViewPager2.OnPageChangeCallback() {
@@ -352,10 +412,9 @@ class MainActivity : ThemedActivity() {
 
     private fun destToPage(destId: Int): Int = when (destId) {
         R.id.nav_home -> 0
-        R.id.nav_drama -> 1
-        R.id.nav_games -> 2
-        R.id.nav_messages -> 3
-        R.id.nav_profile -> 4
+        R.id.nav_games -> 1
+        R.id.nav_messages -> 2
+        R.id.nav_profile -> 3
         else -> -1
     }
 
@@ -367,33 +426,32 @@ class MainActivity : ThemedActivity() {
             AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED,
         )
         highlightTab(
-            page == 1, b.tabDrama, b.labelDrama,
+            false, b.tabDrama, b.labelDrama,
             RemoteNavIcons.TAB_DRAMA,
             AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED,
         )
         highlightTab(
-            page == 2, b.tabGames, b.labelGames,
+            page == 1, b.tabGames, b.labelGames,
             RemoteNavIcons.TAB_GAMES,
             AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED,
         )
         highlight(false, b.tabCreateRoom, b.labelCreateRoom)
         highlightTab(
-            page == 3, b.tabChat, b.labelChat,
+            page == 2, b.tabChat, b.labelChat,
             RemoteNavIcons.TAB_CHAT,
             AssetIcons.TAB_CHAT_NORMAL, AssetIcons.TAB_CHAT_SELECTED,
         )
         highlightTab(
-            page == 4, b.tabMe, b.labelMe,
+            page == 3, b.tabMe, b.labelMe,
             RemoteNavIcons.TAB_ME,
             AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED,
         )
     }
 
     private fun pageScreenKey(page: Int): String = when (page) {
-        1 -> "drama"
-        2 -> "game"
-        3 -> "chat"
-        4 -> "profile"
+        1 -> "game"
+        2 -> "chat"
+        3 -> "profile"
         else -> "home"
     }
 
@@ -463,28 +521,405 @@ class MainActivity : ThemedActivity() {
     }
 
     /**
-     * Drama tab show/hide comes only from dashboard drama config.enabled.
+     * Stories tab visibility follows the live dashboard Stories switch.
      */
-    private fun loadDramaConfig(container: AppContainer) {
+    private fun maybeShowDailyLoginReward(container: AppContainer) {
+        val prefs = getSharedPreferences("daily_login_popup", MODE_PRIVATE)
         container.ioExecutor.execute {
-            val r: Result<DramaDtos.DramaConfigDto> =
-                ApiCall.execute(container.dramaApi.config())
+            val result = ApiCall.execute(container.getTasksApi().dailyLoginStatus())
             runOnUiThread {
-                val b = binding ?: return@runOnUiThread
-                val show = r.success && r.data != null && r.data.enabled
-                dramaEnabled = show
-                b.tabDramaWrap.visibility = if (show) View.VISIBLE else View.GONE
-                if (show) {
-                    RemoteNavIcons.bind(
-                        b.tabDrama, RemoteNavIcons.TAB_DRAMA, currentPage == 1,
-                        AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED,
-                    )
+                if (isFinishing || isDestroyed || !result.success) return@runOnUiThread
+                val status = result.data ?: return@runOnUiThread
+                val today = status.today ?: return@runOnUiThread
+                if (!status.enabled || !status.shouldShow || prefs.getString("seen_date", "") == today) return@runOnUiThread
+                showDailyLoginRewardDialog(container, status, prefs)
+            }
+        }
+    }
+
+    /**
+     * Dashboard uploads may return a path relative to the JEHO host.
+     * Glide requires an absolute URL, so resolve relative reward artwork
+     * against the one authoritative JEHO-OWN origin used by this APK.
+     */
+    private fun resolveDailyLoginImageUrl(rawUrl: String?): String {
+        val value = rawUrl?.trim().orEmpty()
+        if (value.isEmpty()) return ""
+        if (value.startsWith("https://", true) || value.startsWith("http://", true)) return value
+        if (value.startsWith("//")) return "https:$value"
+        return ApiOrigin.origin().trimEnd('/') + "/" + value.trimStart('/')
+    }
+
+    private fun dailyLoginThemeColor(status: MiscDtos.DailyLoginStatusDto, key: String, fallback: Int): Int {
+        val raw = status.theme?.get(key)?.toString() ?: return fallback
+        return try { android.graphics.Color.parseColor(raw) } catch (_: Throwable) { fallback }
+    }
+
+    private fun dailyLoginThemeNumber(status: MiscDtos.DailyLoginStatusDto, key: String, fallback: Int): Float {
+        return (status.theme?.get(key) as? Number)?.toFloat() ?: fallback.toFloat()
+    }
+
+    private fun showDailyLoginRewardDialog(
+        container: AppContainer,
+        status: MiscDtos.DailyLoginStatusDto,
+        prefs: SharedPreferences,
+    ) {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+            minimumWidth = (320 * resources.displayMetrics.density).toInt()
+            background = roundedBackground(dailyLoginThemeColor(status, "backgroundColor", Color.rgb(223, 240, 184)), 26, dailyLoginThemeColor(status, "cardBorderColor", Color.rgb(218, 180, 82)))
+            clipToOutline = true
+        }
+        val bgUrl = status.theme?.get("backgroundImageUrl")?.toString()?.trim().orEmpty()
+        if (bgUrl.isNotEmpty()) {
+            val overlayColor = dailyLoginThemeColor(status, "overlayColor", Color.WHITE)
+            val opacity = dailyLoginThemeNumber(status, "overlayOpacity", 0).coerceIn(0f, 1f)
+            Glide.with(this).load(resolveDailyLoginImageUrl(bgUrl)).into(object : com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+                override fun onResourceReady(resource: Drawable, transition: com.bumptech.glide.request.transition.Transition<in Drawable>?) {
+                    val tint = ColorDrawable(Color.argb((opacity * 255).toInt(), Color.red(overlayColor), Color.green(overlayColor), Color.blue(overlayColor)))
+                    root.background = LayerDrawable(arrayOf(resource, tint))
                 }
-                if (!show && mainPager?.currentItem == 1) {
-                    mainPager?.setCurrentItem(0, false)
+                override fun onLoadCleared(placeholder: Drawable?) {}
+            })
+        }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = (dailyLoginThemeNumber(status, "titleTop", 24) * resources.displayMetrics.density).toInt()
+            }
+        }
+        val logoUrl = status.theme?.get("logoUrl")?.toString()?.trim().orEmpty()
+        if (logoUrl.isNotEmpty()) {
+            val logo = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams((44 * resources.displayMetrics.density).toInt(), (44 * resources.displayMetrics.density).toInt()).apply {
+                    marginEnd = (dailyLoginThemeNumber(status, "headerGap", 14) * resources.displayMetrics.density).toInt()
+                }
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+            Glide.with(this).load(resolveDailyLoginImageUrl(logoUrl)).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(logo)
+            top.addView(logo)
+        }
+        val heading = TextView(this).apply {
+            text = status.theme?.get("title")?.toString() ?: "مكافآت تسجيل الدخول لمدة 7 أيام"
+            textSize = 20f
+            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(61, 49, 88)))
+            typeface = when (status.theme?.get("fontFamily")?.toString()) {
+                "serif" -> Typeface.SERIF
+                "sans" -> Typeface.SANS_SERIF
+                else -> Typeface.DEFAULT_BOLD
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+        }
+        val close = TextView(this).apply {
+            text = "×"
+            textSize = 28f
+            setTextColor(Color.rgb(126, 113, 82))
+            gravity = Gravity.CENTER
+            setPadding(pad / 2, 0, pad / 2, 0)
+        }
+        val headerCopy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        headerCopy.addView(heading)
+        headerCopy.addView(TextView(this).apply {
+            text = status.theme?.get("subtitle")?.toString() ?: "سجّل دخولك يومياً واحصل على مكافأتك"
+            textSize = 12f
+            setTextColor(dailyLoginThemeColor(status, "subtitleColor", Color.rgb(118, 107, 128)))
+            setPadding(0, (3 * resources.displayMetrics.density).toInt(), 0, 0)
+        })
+        top.addView(headerCopy)
+        top.addView(close)
+        root.addView(top)
+
+        val daysScroll = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val daysRow = android.widget.GridLayout(this).apply { columnCount = 4 }
+        val dayList = status.days ?: emptyList()
+        for (day in dayList) {
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
+                background = roundedBackground(
+                    if (day.claimed) Color.rgb(237, 249, 241) else Color.rgb(255, 255, 255),
+                    14,
+                    if (day.claimed) Color.rgb(58, 157, 92) else Color.rgb(231, 222, 237),
+                )
+                layoutParams = android.widget.GridLayout.LayoutParams(
+                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
+                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f),
+                ).apply {
+                    width = 0
+                    height = (104 * resources.displayMetrics.density).toInt()
+                    setMargins((5 * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt(), (dailyLoginThemeNumber(status, "cardGap", 12) * resources.displayMetrics.density / 2).toInt())
+                }
+            }
+            tile.elevation = (if (day.day == 7 || day.day == status.currentDay) 3 else 0) * resources.displayMetrics.density
+            tile.addView(TextView(this).apply {
+                text = when {
+                    day.day == 7 -> "🏆 اليوم 7"
+                    day.day == status.currentDay -> "اليوم ${day.day} · الحالي"
+                    else -> "اليوم ${day.day}"
+                }
+                textSize = if (day.day == 7) 10f else 11f
+                setTextColor(if (day.day == 7) Color.rgb(143, 99, 13) else Color.rgb(57, 49, 34))
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            val dayPreview = day.previewUrl ?: day.imageUrl ?: day.iconUrl ?: day.animationUrl
+            if (day.type == "cosmetic" && !dayPreview.isNullOrBlank()) {
+                val dayImage = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams((48 * resources.displayMetrics.density).toInt(), (dailyLoginThemeNumber(status, "cardImageSize", 76) * resources.displayMetrics.density).toInt())
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    contentDescription = day.name ?: "مكافأة اليوم"
+                }
+                Glide.with(this).load(resolveDailyLoginImageUrl(dayPreview)).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(dayImage)
+                tile.addView(dayImage)
+            } else {
+                tile.addView(TextView(this).apply {
+                    text = if (day.type == "coins") "🪙" else "🎁"
+                    textSize = 24f
+                    setPadding(0, pad / 5, 0, pad / 5)
+                })
+            }
+            tile.addView(TextView(this).apply {
+                text = when {
+                    day.claimed -> "✓ تم الاستلام"
+                    day.day == 7 -> "الجائزة الكبرى"
+                    day.day == status.currentDay -> if (day.type == "coins") "${day.amount} كوينز" else (day.name ?: "مكافأة اليوم")
+                    day.type == "coins" -> "${day.amount} كوينز"
+                    else -> "مكافأة قادمة"
+                }
+                textSize = 12f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(
+                    when {
+                        day.claimed -> Color.rgb(42, 139, 78)
+                        day.day == 7 -> Color.rgb(143, 99, 13)
+                        day.day == status.currentDay -> Color.rgb(151, 111, 22)
+                        else -> Color.rgb(127, 119, 102)
+                    },
+                )
+                gravity = Gravity.CENTER
+            })
+            daysRow.addView(tile)
+        }
+        daysScroll.addView(daysRow)
+        root.addView(daysScroll, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = (16 * resources.displayMetrics.density).toInt()
+        })
+
+        val claimButton = Button(this).apply {
+            text = status.theme?.get("buttonText")?.toString() ?: "استلام المكافأة"
+            isAllCaps = false
+            textSize = 16f
+            setTextColor(dailyLoginThemeColor(status, "buttonTextColor", Color.WHITE))
+            background = roundedBackground(dailyLoginThemeColor(status, "buttonColor", Color.rgb(118, 82, 165)), 28, Color.rgb(93, 62, 135))
+            layoutParams = LinearLayout.LayoutParams(-1, (54 * resources.displayMetrics.density).toInt()).apply {
+                topMargin = (18 * resources.displayMetrics.density).toInt()
+                bottomMargin = (16 * resources.displayMetrics.density).toInt()
+            }
+        }
+        root.addView(claimButton)
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        }
+        val dialog = AlertDialog.Builder(this).setView(scroll).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        // Closing the dialog without claiming must not mark today's reward as seen.
+        // Otherwise the user loses the chance to claim it again during the same day.
+        close.setOnClickListener { dialog.dismiss() }
+        claimButton.setOnClickListener {
+            claimButton.isEnabled = false
+            claimButton.text = "جارٍ الاستلام…"
+            container.ioExecutor.execute {
+                val result = ApiCall.execute(container.getTasksApi().claimDailyLogin())
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (result.success) {
+                        // The server has committed the claim. Persist the local display guard
+                        // immediately, then replace the reward grid with a real success state.
+                        prefs.edit().putString("seen_date", status.today).apply()
+                        val payload = result.data
+                        val reward = payload?.get("reward") as? Map<*, *>
+                        val rewardType = reward?.get("type")?.toString().orEmpty()
+                        val rewardName = reward?.get("name")?.toString()?.takeIf { it.isNotBlank() }
+                            ?: if (rewardType.equals("cosmetic", true)) "المكافأة التجميلية" else {
+                                val amount = reward?.get("amount")?.toString()
+                                if (!amount.isNullOrBlank()) "+$amount كوينز" else "مكافأتك اليومية"
+                            }
+                        val previewUrl = listOf("previewUrl", "imageUrl", "iconUrl")
+                            .firstNotNullOfOrNull { key -> reward?.get(key)?.toString()?.takeIf { it.isNotBlank() } }
+                        root.removeAllViews()
+                        root.gravity = Gravity.CENTER
+                        root.setPadding(pad, pad * 2, pad, pad * 2)
+                        root.addView(TextView(this).apply {
+                            text = "✉"
+                            textSize = 42f
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(143, 99, 13)))
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        if (rewardType.equals("cosmetic", true) && !previewUrl.isNullOrBlank()) {
+                            val rewardImage = ImageView(this).apply {
+                                layoutParams = LinearLayout.LayoutParams(
+                                    (116 * resources.displayMetrics.density).toInt(),
+                                    (116 * resources.displayMetrics.density).toInt()
+                                ).apply { gravity = Gravity.CENTER; topMargin = pad / 2 }
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }
+                            root.addView(rewardImage)
+                            Glide.with(this).load(resolveDailyLoginImageUrl(previewUrl))
+                                .placeholder(android.R.drawable.ic_menu_gallery)
+                                .error(android.R.drawable.ic_menu_gallery).into(rewardImage)
+                        }
+                        root.addView(TextView(this).apply {
+                            text = "تم الاستلام"
+                            textSize = 22f
+                            typeface = Typeface.DEFAULT_BOLD
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "titleColor", Color.rgb(61, 49, 88)))
+                            setPadding(0, pad, 0, pad / 3)
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        root.addView(TextView(this).apply {
+                            text = rewardName
+                            textSize = 15f
+                            gravity = Gravity.CENTER
+                            setTextColor(dailyLoginThemeColor(status, "subtitleColor", Color.rgb(118, 107, 128)))
+                        }, LinearLayout.LayoutParams(-1, -2))
+                        root.addView(Button(this).apply {
+                            text = "حسناً"
+                            isAllCaps = false
+                            textSize = 16f
+                            setTextColor(Color.WHITE)
+                            background = roundedBackground(
+                                dailyLoginThemeColor(status, "buttonColor", Color.rgb(118, 82, 165)),
+                                28, Color.rgb(93, 62, 135)
+                            )
+                            setOnClickListener { dialog.dismiss() }
+                        }, LinearLayout.LayoutParams(-1, (52 * resources.displayMetrics.density).toInt()).apply {
+                            topMargin = pad
+                        })
+                        root.requestLayout()
+                    } else {
+                        claimButton.text = "استلام"
+                        claimButton.isEnabled = true
+                        Toast.makeText(this, result.error ?: "تعذر استلام المكافأة، حاول مجددًا", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
+        dialog.show()
+    }
+
+    /** Native Canvas illustration: a softly lit, dimensional gift box (no WebView/assets required). */
+    private inner class ThreeDimensionalGiftView(context: android.content.Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            if (w <= 0f || h <= 0f) return
+            val cx = w * 0.5f
+            val boxTop = h * 0.39f
+            val boxBottom = h * 0.88f
+            val half = w * 0.31f
+            val depth = w * 0.15f
+            val ribbon = w * 0.085f
+
+            paint.shader = android.graphics.RadialGradient(
+                cx, h * 0.52f, w * 0.47f,
+                intArrayOf(Color.argb(70, 255, 220, 125), Color.argb(0, 255, 220, 125)),
+                null, Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, h * 0.5f, w * 0.47f, paint)
+            paint.shader = null
+            paint.color = Color.argb(45, 92, 62, 13)
+            canvas.drawOval(cx - half * 1.1f, boxBottom - 2, cx + half * 1.1f, boxBottom + h * 0.07f, paint)
+
+            val front = Path().apply {
+                moveTo(cx - half, boxTop)
+                lineTo(cx + half, boxTop)
+                lineTo(cx + half, boxBottom - h * 0.02f)
+                lineTo(cx - half, boxBottom - h * 0.02f)
+                close()
+            }
+            paint.shader = LinearGradient(cx - half, boxTop, cx + half, boxBottom,
+                intArrayOf(Color.rgb(255, 205, 76), Color.rgb(226, 151, 28), Color.rgb(178, 103, 14)),
+                null, Shader.TileMode.CLAMP)
+            canvas.drawPath(front, paint)
+            paint.shader = null
+
+            val side = Path().apply {
+                moveTo(cx + half, boxTop)
+                lineTo(cx + half + depth, boxTop - h * 0.07f)
+                lineTo(cx + half + depth, boxBottom - h * 0.09f)
+                lineTo(cx + half, boxBottom - h * 0.02f)
+                close()
+            }
+            paint.shader = LinearGradient(cx + half, boxTop, cx + half + depth, boxBottom,
+                intArrayOf(Color.rgb(199, 126, 17), Color.rgb(133, 74, 8)), null, Shader.TileMode.CLAMP)
+            canvas.drawPath(side, paint)
+            paint.shader = null
+
+            val lid = Path().apply {
+                moveTo(cx - half - w * 0.06f, boxTop)
+                lineTo(cx + half + w * 0.06f, boxTop)
+                lineTo(cx + half + depth + w * 0.04f, boxTop - h * 0.09f)
+                lineTo(cx - half + w * 0.02f, boxTop - h * 0.09f)
+                close()
+            }
+            paint.shader = LinearGradient(cx, boxTop - h * 0.1f, cx, boxTop,
+                intArrayOf(Color.rgb(255, 244, 190), Color.rgb(255, 211, 91), Color.rgb(204, 139, 30)),
+                null, Shader.TileMode.CLAMP)
+            canvas.drawPath(lid, paint)
+            paint.shader = null
+            paint.color = Color.rgb(255, 246, 204)
+            canvas.drawRect(cx - ribbon * 0.5f, boxTop - h * 0.005f, cx + ribbon * 0.5f, boxBottom, paint)
+            canvas.drawRect(cx - half, boxTop + h * 0.15f, cx + half, boxTop + h * 0.15f + ribbon * 0.55f, paint)
+
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = w * 0.045f
+            paint.color = Color.rgb(255, 238, 165)
+            canvas.drawOval(cx - w * 0.22f, boxTop - h * 0.19f, cx + w * 0.005f, boxTop - h * 0.055f, paint)
+            canvas.drawOval(cx - w * 0.005f, boxTop - h * 0.19f, cx + w * 0.22f, boxTop - h * 0.055f, paint)
+            paint.style = Paint.Style.FILL
+            paint.shader = LinearGradient(cx - ribbon, boxTop - h * 0.08f, cx + ribbon, boxTop,
+                intArrayOf(Color.rgb(255, 249, 213), Color.rgb(238, 177, 49)), null, Shader.TileMode.CLAMP)
+            canvas.drawCircle(cx, boxTop - h * 0.055f, w * 0.055f, paint)
+            paint.shader = null
+        }
+    }
+
+    private fun cosmeticTypeLabel(type: String): String = when (type.lowercase()) {
+        "frame", "avatar_frame", "profile_frame" -> "إطار"
+        "entry_effect", "entrance", "entrance_effect", "entry" -> "دخولية"
+        "name_card", "namecard", "name_plate", "nameplate", "title_card" -> "كرت اسم"
+        else -> "عنصر تجميلي"
+    }
+
+    private fun roundedBackground(fill: Int, radiusDp: Int, stroke: Int): GradientDrawable {
+        val drawable = GradientDrawable()
+        drawable.setColor(fill)
+        drawable.cornerRadius = radiusDp * resources.displayMetrics.density
+        drawable.setStroke((1 * resources.displayMetrics.density).toInt().coerceAtLeast(1), stroke)
+        return drawable
+    }
+
+
+    /** Opens the current user's active story from the profile avatar via the inbox story viewer. */
+    fun openOwnStory(userId: String) {
+        if (userId.isBlank()) return
+        go(R.id.nav_messages)
+        binding?.mainPager?.postDelayed({
+            val inbox = supportFragmentManager.findFragmentByTag("f2") as? MessagesFragment
+            inbox?.openOwnStory(userId)
+        }, 360L)
     }
 
     private fun currentScreenKey(): String =
@@ -495,10 +930,33 @@ class MainActivity : ThemedActivity() {
     override fun onResume() {
         super.onResume()
         val container = ContainerProvider.from(this)
+        com.Dramizo.Series.util.UnreadMessageBadge.refresh(this)
+        updateUnreadMessagesDot(com.Dramizo.Series.util.UnreadMessageBadge.current(this))
+        // The initial icon fetch is started in onCreate. Refresh again whenever
+        // the user returns to the foreground so Dashboard changes appear without
+        // requiring an APK update or a manual app restart.
+        if (hasResumedOnce) {
+            container.ioExecutor.execute {
+                RemoteNavIcons.refreshBlocking(container)
+                runOnUiThread {
+                    if (binding == null) return@runOnUiThread
+                    applyNavIcons()
+                    highlightPage(currentPage)
+                }
+            }
+        } else {
+            hasResumedOnce = true
+        }
         loadAgencyAction(container)
-        container.ioExecutor.execute { AppFeatures.refresh(container) }
         bindActiveRoomMini()
         playInAppUpdateHelper?.onResume()
+        dashboardIconRefreshHandler.removeCallbacks(dashboardIconRefreshRunnable)
+        dashboardIconRefreshHandler.postDelayed(dashboardIconRefreshRunnable, 60_000L)
+    }
+
+    override fun onPause() {
+        dashboardIconRefreshHandler.removeCallbacks(dashboardIconRefreshRunnable)
+        super.onPause()
     }
 
     private fun bindActiveRoomMini() {
@@ -835,6 +1293,7 @@ class MainActivity : ThemedActivity() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(unreadBadgeReceiver) } catch (_: Exception) {}
         playInAppUpdateHelper?.onDestroy()
         playInAppUpdateHelper = null
         taskInviteListener?.let {

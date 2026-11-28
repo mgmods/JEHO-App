@@ -1,10 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AdminConversationsController } from './admin-conversations.controller';
+import { ToastManagerController } from './toast-manager.controller';
+import { AdminConversationsService } from './admin-conversations.service';
 import { User } from '../../database/entities/user.entity';
+import { ChatConversation } from '../../database/entities/chat-conversation.entity';
+import { ChatParticipant } from '../../database/entities/chat-participant.entity';
+import { ChatMessage } from '../../database/entities/chat-message.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Room } from '../../database/entities/room.entity';
 import { Gift } from '../../database/entities/gift.entity';
@@ -37,7 +43,6 @@ import { TasksModule } from '../tasks/tasks.module';
 import { RankingModule } from '../ranking/ranking.module';
 import { UsersModule } from '../users/users.module';
 import { RechargeAgentsModule } from '../recharge-agents/recharge-agents.module';
-import { DramaModule } from '../drama/drama.module';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { AgenciesModule } from '../agencies/agencies.module';
@@ -66,6 +71,9 @@ import { GiftsModule } from '../gifts/gifts.module';
       AgencyApplication,
       RoomSeat,
       Notification,
+      ChatConversation,
+      ChatParticipant,
+      ChatMessage,
     ]),
     WalletModule,
     PaymentsModule,
@@ -81,7 +89,6 @@ import { GiftsModule } from '../gifts/gifts.module';
     RankingModule,
     UsersModule,
     RechargeAgentsModule,
-    DramaModule,
     AgenciesModule,
     GiftsModule,
     JwtModule.registerAsync({
@@ -90,13 +97,13 @@ import { GiftsModule } from '../gifts/gifts.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('app.jwt.secret'),
         signOptions: {
-          expiresIn: config.get<string>('app.jwt.expiresIn') || '15m',
+          expiresIn: (config.get<string>('app.jwt.expiresIn') || '15m') as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
         },
       }),
     }),
   ],
-  controllers: [AdminController],
-  providers: [AdminService],
+  controllers: [AdminController, AdminConversationsController, ToastManagerController],
+  providers: [AdminService, AdminConversationsService],
   exports: [AdminService],
 })
 export class AdminModule {}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -13,8 +13,11 @@ import {
   RoomType,
 } from '../../database/entities/room.entity';
 import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
+import { RoomModerator, ModeratorRole } from '../../database/entities/room-moderator.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Gift } from '../../database/entities/gift.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { RechargeOrder, RechargeStatus } from '../../database/entities/recharge-order.entity';
 import { WithdrawRequest, WithdrawStatus } from '../../database/entities/withdraw-request.entity';
@@ -23,7 +26,7 @@ import {
   ReportStatus,
   ReportTargetType,
 } from '../../database/entities/report.entity';
-import { AdminUser } from '../../database/entities/admin-user.entity';
+import { AdminRole, AdminUser } from '../../database/entities/admin-user.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { AbuseLog, AbuseSeverity } from '../../database/entities/abuse-log.entity';
 import { WalletTransaction, TransactionType, CurrencyType } from '../../database/entities/wallet-transaction.entity';
@@ -42,11 +45,14 @@ import { Notification, NotificationType } from '../../database/entities/notifica
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
 import { UserGameItem } from '../../database/entities/user-game-item.entity';
+import { ChatMessage, MessageType } from '../../database/entities/chat-message.entity';
+import { ChatParticipant } from '../../database/entities/chat-participant.entity';
 import { WalletService } from '../wallet/wallet.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { GiftsService } from '../gifts/gifts.service';
+import { invalidateRoomPkEnabledCache } from '../contests/room-pk-feature';
 import { AgenciesService } from '../agencies/agencies.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
@@ -84,6 +90,7 @@ import {
   normalizePermissions,
   type PermissionsMap,
 } from '../../common/dashboard-permissions';
+import { SecurityShieldService } from '../../common/security/security-shield.service';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -192,6 +199,16 @@ export class UpsertGiftDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional({ description: 'CP relationship type for gifts in the CP category' })
+  @IsOptional()
+  @IsString()
+  cpRelationshipType?: string;
+
+  @ApiPropertyOptional({ description: 'CP relationship points awarded per gift unit' })
+  @IsOptional()
+  @IsInt()
+  cpPoints?: number;
 }
 
 export class UpdateUserStatusDto {
@@ -248,9 +265,560 @@ export class AdminService {
     private readonly cosmeticsService: CosmeticsService,
     private readonly giftsService: GiftsService,
     private readonly dataSource: DataSource,
+    private readonly securityShield: SecurityShieldService,
   ) {}
 
-  async dashboard() {
+  async getPublicAgencyRoleBadges() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'agency_role_badges' } });
+    const fallback = { leaderBadgeUrl: '', hostBadgeUrl: '' };
+    if (!row?.value) return fallback;
+    try {
+      const parsed = JSON.parse(row.value);
+      const clean = (value: unknown) => {
+        const url = typeof value === 'string' ? value.trim() : '';
+        // Dashboard uploads may use nested upload folders or API asset routes.
+        const absolute = /^https?:\/\/[^\s]+$/i.test(url);
+        const relative = /^\/?(?:uploads|assets|api)\/[A-Za-z0-9._~!$&()*+,;=:@%/?-]+$/.test(url);
+        return url.length <= 2048 && (absolute || relative) ? url : '';
+      };
+      return { leaderBadgeUrl: clean(parsed?.leaderBadgeUrl), hostBadgeUrl: clean(parsed?.hostBadgeUrl) };
+    } catch {
+      return fallback;
+    }
+  }
+
+  private staffIdentityDefaults() {
+    const role = (label: string, accentColor: string) => ({
+      label, accentColor, badgeUrl: '', frameUrl: '', badgeId: '', nameplateUrl: '', messageCardUrl: '', entryEffectUrl: '',
+    });
+    return {
+      super: role('Super Admin', '#D8B35B'),
+      admin: role('Admin', '#9AA8C7'),
+      manager: role('Manager', '#37A889'),
+      rechargeAgent: role('وكيل شحن', '#D8B35B'),
+      agencyLeader: role('قائد الوكالة', '#D8B35B'),
+      host: role('مضيف', '#37A889'),
+    };
+  }
+
+  async getStaffIdentityConfig() {
+    const defaults = this.staffIdentityDefaults();
+    const row = await this.settingsRepo.findOne({ where: { key: 'staff_identity_config' } });
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      const clean = (role: string) => {
+        const source = parsed?.[role] && typeof parsed[role] === 'object' ? parsed[role] : {};
+        const fallback = defaults[role as keyof typeof defaults];
+        const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
+        const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
+        const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
+        const badgeId = typeof source.badgeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(source.badgeId) ? source.badgeId : '';
+        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), badgeId, nameplateUrl: url('nameplateUrl'), messageCardUrl: url('messageCardUrl'), entryEffectUrl: url('entryEffectUrl') };
+      };
+      return {
+        super: clean('super'), admin: clean('admin'), manager: clean('manager'),
+        rechargeAgent: clean('rechargeAgent'), agencyLeader: clean('agencyLeader'), host: clean('host'),
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchStaffIdentityConfig(input: Record<string, unknown>) {
+    const current = await this.getStaffIdentityConfig();
+    const allowed = ['badgeUrl', 'frameUrl', 'nameplateUrl', 'messageCardUrl', 'entryEffectUrl'];
+    const url = (value: unknown, key: string) => {
+      if (value === undefined) return undefined;
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (raw.length > 2048 || !(/^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(raw))) {
+        throw new BadRequestException('Invalid staff identity asset URL: ' + key);
+      }
+      return raw;
+    };
+    const next: Record<string, any> = {};
+    for (const role of ['super', 'admin', 'manager', 'rechargeAgent', 'agencyLeader', 'host'] as const) {
+      const patch = input[role] && typeof input[role] === 'object' ? input[role] as Record<string, unknown> : {};
+      const base = current[role];
+      const label = patch.label === undefined ? base.label : String(patch.label || '').trim().slice(0, 32);
+      if (!label) throw new BadRequestException('Role label cannot be empty');
+      const accentColor = patch.accentColor === undefined ? base.accentColor : String(patch.accentColor || '');
+      if (!/^#[0-9a-f]{6}$/i.test(accentColor)) throw new BadRequestException('Accent color must be a hex color');
+      const assets: Record<string, string> = {};
+      for (const key of allowed) assets[key] = url(patch[key], key) ?? base[key as keyof typeof base] as string;
+      const badgeId = patch.badgeId === undefined
+        ? base.badgeId
+        : (typeof patch.badgeId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(patch.badgeId) ? patch.badgeId : '');
+      next[role] = { label, accentColor, ...assets, badgeId };
+    }
+    const key = 'staff_identity_config';
+    const existing = await this.settingsRepo.findOne({ where: { key } });
+    if (existing) {
+      existing.value = JSON.stringify(next);
+      existing.description = 'Native admin role identity assets and labels';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key, value: JSON.stringify(next), description: 'Native admin role identity assets and labels',
+      }));
+    }
+    return next;
+  }
+
+  async getToastManagerConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    const defaults = {
+      version: 1,
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+      luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+    };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      const cleanStyle = (key: string, duration: number) => {
+        const raw = parsed?.[key] && typeof parsed[key] === 'object' ? parsed[key] : {};
+        return {
+          backgroundUrl: typeof raw.backgroundUrl === 'string' ? raw.backgroundUrl : '',
+          shineEnabled: raw.shineEnabled !== false,
+          frameGlowEnabled: raw.frameGlowEnabled !== false,
+          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
+          avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? (key === 'giftSend' ? 8 : 8)) || 0)),
+          avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
+          textX: Math.max(0, Math.min(100, Number(raw.textX ?? 25) || 0)),
+          textY: Math.max(0, Math.min(100, Number(raw.textY ?? (key === 'giftSend' ? 50 : 42)) || 0)),
+          bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? (key === 'giftSend' ? 25 : 25)) || 0)),
+          bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? (key === 'giftSend' ? 67 : 62)) || 0)),
+          countX: Math.max(0, Math.min(100, Number(raw.countX ?? 88) || 0)),
+          countY: Math.max(0, Math.min(100, Number(raw.countY ?? 50) || 0)),
+          widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp) || 340))),
+          heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp) || 100))),
+          avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp) || 44))),
+          titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp) || 13))),
+          bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp) || 12))),
+          countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp) || 12))),
+        };
+      };
+      const button = parsed?.luckyButton && typeof parsed.luckyButton === 'object' ? parsed.luckyButton : {};
+      return {
+        version: Math.max(1, Math.floor(Number(parsed.version) || 1)),
+        giftSend: cleanStyle('giftSend', 3),
+        luckyWinNormal: cleanStyle('luckyWinNormal', 4),
+        luckyWinHigh: cleanStyle('luckyWinHigh', 5),
+        luckyButton: {
+          iconUrl: typeof button.iconUrl === 'string' ? button.iconUrl : '',
+          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
+          pulseEnabled: button.pulseEnabled !== false,
+        },
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchToastManagerConfig(input: Record<string, unknown>) {
+    const previous = await this.getToastManagerConfig();
+    const cleanUrl = (value: unknown, key: string) => {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (!raw) return '';
+      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
+      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+      } catch {}
+      throw new BadRequestException(`Invalid ${key} URL`);
+    };
+    const cleanStyle = (key: string, duration: number) => {
+      const raw = input[key] && typeof input[key] === 'object' ? input[key] as Record<string, unknown> : {};
+      const old = previous[key as 'giftSend' | 'luckyWinNormal' | 'luckyWinHigh'];
+      return {
+        backgroundUrl: cleanUrl(raw.backgroundUrl, key),
+        shineEnabled: raw.shineEnabled !== false,
+        frameGlowEnabled: raw.frameGlowEnabled !== false,
+        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
+        avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? old.avatarX) || 0)),
+        avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? old.avatarY) || 0)),
+        textX: Math.max(0, Math.min(100, Number(raw.textX ?? old.textX) || 0)),
+        textY: Math.max(0, Math.min(100, Number(raw.textY ?? old.textY) || 0)),
+        bodyX: Math.max(0, Math.min(100, Number(raw.bodyX ?? old.bodyX) || 0)),
+        bodyY: Math.max(0, Math.min(100, Number(raw.bodyY ?? old.bodyY) || 0)),
+        countX: Math.max(0, Math.min(100, Number(raw.countX ?? old.countX) || 0)),
+        countY: Math.max(0, Math.min(100, Number(raw.countY ?? old.countY) || 0)),
+        widthDp: Math.max(220, Math.min(360, Math.round(Number(raw.widthDp ?? old.widthDp) || 340))),
+        heightDp: Math.max(60, Math.min(180, Math.round(Number(raw.heightDp ?? old.heightDp) || 100))),
+        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(raw.avatarSizeDp ?? old.avatarSizeDp) || 44))),
+        titleSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.titleSizeSp ?? old.titleSizeSp) || 13))),
+        bodySizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.bodySizeSp ?? old.bodySizeSp) || 12))),
+        countSizeSp: Math.max(8, Math.min(30, Math.round(Number(raw.countSizeSp ?? old.countSizeSp) || 12))),
+      };
+    };
+    const button = input.luckyButton && typeof input.luckyButton === 'object' ? input.luckyButton as Record<string, unknown> : {};
+    const current = {
+      version: previous.version + 1,
+      giftSend: cleanStyle('giftSend', 3),
+      luckyWinNormal: cleanStyle('luckyWinNormal', 4),
+      luckyWinHigh: cleanStyle('luckyWinHigh', 5),
+      luckyButton: {
+        iconUrl: cleanUrl(button.iconUrl, 'lucky button icon'),
+        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
+        pulseEnabled: button.pulseEnabled !== false,
+      },
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed global toast styles and lucky button';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'toast_manager_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed global toast styles and lucky button',
+      }));
+    }
+    return current;
+  }
+
+  async getMysteriousManConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    const defaults = { enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        enabled: parsed.enabled === true,
+        eligibleVipLevels: Array.isArray(parsed.eligibleVipLevels) ? [...new Set(parsed.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b) : [],
+        avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
+        entryText: typeof parsed.entryText === 'string' ? parsed.entryText.slice(0, 160) : 'دخل الرجل الغامض',
+        entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
+        messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchMysteriousManConfig(input: Record<string, unknown>) {
+    const cleanUrl = (value: unknown, key: string) => {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (!raw) return '';
+      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
+      // The upload endpoint intentionally returns same-origin paths such as
+      // /uploads/<uuid>. Accept those paths as well as absolute public URLs.
+      // Reject arbitrary relative paths and non-HTTP schemes.
+      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+      } catch {}
+      throw new BadRequestException(`Invalid ${key} URL`);
+    };
+    const eligibleVipLevels = Array.isArray(input.eligibleVipLevels)
+      ? [...new Set(input.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b)
+      : [];
+    const current = {
+      enabled: input.enabled === true,
+      eligibleVipLevels,
+      avatarUrl: cleanUrl(input.avatarUrl, 'avatar'),
+      entryMode: input.entryMode === 'text' ? 'text' : 'video',
+      entryText: (typeof input.entryText === 'string' ? input.entryText.trim() : 'دخل الرجل الغامض').slice(0, 160) || 'دخل الرجل الغامض',
+      entryEffectUrl: cleanUrl(input.entryEffectUrl, 'entry effect'),
+      messageEffectUrl: cleanUrl(input.messageEffectUrl, 'message effect'),
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed Mysterious Man shared media';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'mysterious_man_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed Mysterious Man shared media',
+      }));
+    }
+
+    // A global disable is a hard stop, not just a display policy: clear the
+    // persisted opt-in so users stay in their natural identity if the feature
+    // is enabled again later.
+    if (!current.enabled) {
+      await this.dataSource.query(
+        'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
+      );
+    }
+    return current;
+  }
+
+  async getLuckyCannonConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
+    const defaults = { enabled: true, durationSeconds: 2, soundEnabled: true };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        enabled: parsed.enabled !== false,
+        durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(parsed.durationSeconds) || 2))),
+        soundEnabled: parsed.soundEnabled !== false,
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchLuckyCannonConfig(input: Record<string, unknown>) {
+    const current = {
+      enabled: input.enabled === true,
+      durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(input.durationSeconds) || 2))),
+      soundEnabled: input.soundEnabled !== false,
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed Lucky Gift Cannon configuration';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'lucky_gift_cannon_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed Lucky Gift Cannon configuration',
+      }));
+    }
+    return current;
+  }
+
+  async getSupportChestConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    const defaults = {
+      enabled: false, iconVisible: true, soundEnabled: true,
+      explosionEffect: { enabled: true, mediaUrl: '', soundUrl: '', width: 100, height: 100, startX: 50, startY: 46, endX: 50, endY: 50, durationMs: 1800, opacity: 100 },
+      toast: { enabled: true, backgroundUrl: '', height: 104, yOffset: 72, titleSizeSp: 17, bodySizeSp: 14, giftSizeDp: 58, showWinnerName: true },
+      goalMode: 'coins',
+      coinTarget: 100000, diamondTarget: 10000, giftIds: [], giftSelectionMode: 'all',
+      giftCategories: ['normal', 'lucky', 'cp'],
+      levels: [{
+        level: 1, title: 'الصندوق الذهبي', goalMode: 'coins', rewardDays: 0,
+        coinTarget: 100000, diamondTarget: 0, giftCount: 1,
+        giftCategories: ['normal', 'lucky', 'cp'], giftSelectionMode: 'all', giftIds: [], imageUrl: '',
+        rewards: [{ type: 'coins', amount: 5000, itemId: '' }],
+      }],
+      rewardType: 'none', rewardItemId: '', rewardAmount: 0,
+      instructions: 'لكل روم تقدم مستقل لا يتأثر بمساهمات الرومات الأخرى. عند اكتمال هدف الروم ينفجر صندوقه وتُمنح جميع مكافآته لمفجّر الصندوق.',
+    };
+    if (!row) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        ...defaults,
+        ...parsed,
+        giftSelectionMode: parsed.giftSelectionMode
+          || (Array.isArray(parsed.giftIds) && parsed.giftIds.length ? 'selected' : 'all'),
+      };
+    } catch { return defaults; }
+  }
+
+  async patchSupportChestConfig(input: Record<string, unknown>) {
+    const allowedModes = new Set(['coins', 'diamonds', 'both']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'vip', 'gift']);
+    const allowedCategories = new Set(['normal', 'lucky', 'cp']);
+    const goalMode = String(input.goalMode || 'coins');
+    const rewardType = String(input.rewardType || 'none');
+    if (!allowedModes.has(goalMode)) throw new BadRequestException('Invalid support chest goal mode');
+    if (!allowedRewards.has(rewardType)) throw new BadRequestException('Invalid support chest reward type');
+    const coinTarget = Math.max(0, Math.floor(Number(input.coinTarget) || 0));
+    const diamondTarget = Math.max(0, Math.floor(Number(input.diamondTarget) || 0));
+    if (goalMode === 'coins' && coinTarget < 1) throw new BadRequestException('Coin target must be positive');
+    if (goalMode === 'diamonds' && diamondTarget < 1) throw new BadRequestException('Diamond target must be positive');
+    if (goalMode === 'both' && (coinTarget < 1 || diamondTarget < 1)) throw new BadRequestException('Both targets must be positive');
+    const giftCategories = Array.isArray(input.giftCategories)
+      ? [...new Set(input.giftCategories.map(String).filter(x => allowedCategories.has(x)))]
+      : ['normal', 'lucky', 'cp'];
+    if (!giftCategories.length) throw new BadRequestException('اختر قسماً واحداً على الأقل من أقسام الهدايا');
+    const giftIds = Array.isArray(input.giftIds) ? [...new Set(input.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
+    const giftSelectionMode = String(input.giftSelectionMode || (giftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
+    if (giftSelectionMode === 'selected' && !giftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل أو اختر جميع الهدايا');
+    const rawLevels = Array.isArray(input.levels) ? input.levels as Record<string, any>[] : [];
+    if (rawLevels.length !== 3) throw new BadRequestException('يجب إعداد المستويات الثلاثة لصندوق الدعم قبل الحفظ');
+    const levels = rawLevels.map((level, index) => {
+      const mode = String(level.goalMode || 'coins');
+      if (!allowedModes.has(mode)) throw new BadRequestException('نوع هدف غير صالح في مستوى الصندوق');
+      const levelCoins = Math.max(0, Math.floor(Number(level.coinTarget) || 0));
+      const levelDiamonds = Math.max(0, Math.floor(Number(level.diamondTarget) || 0));
+      if ((mode === 'coins' && levelCoins < 1) || (mode === 'diamonds' && levelDiamonds < 1)
+          || (mode === 'both' && (levelCoins < 1 || levelDiamonds < 1))) {
+        throw new BadRequestException('يجب تحديد هدف صحيح لكل مستوى');
+      }
+      const categories = Array.isArray(level.giftCategories)
+        ? [...new Set(level.giftCategories.map(String).filter(x => allowedCategories.has(x) && giftCategories.includes(x)))]
+        : giftCategories;
+      if (!categories.length) throw new BadRequestException('اختر قسماً مشتركاً واحداً على الأقل للهدايا العامة ولهذا المستوى');
+      const levelGiftIds = Array.isArray(level.giftIds) ? [...new Set(level.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
+      const levelGiftSelectionMode = String(level.giftSelectionMode || (levelGiftIds.length ? 'selected' : 'all')) === 'selected' ? 'selected' : 'all';
+      if (levelGiftSelectionMode === 'selected' && !levelGiftIds.length) throw new BadRequestException('اختر هدية واحدة على الأقل لهذا المستوى أو اختر جميع الهدايا');
+      const features = Array.isArray(level.features)
+        ? [...new Set(level.features.map((value: any) => String(value || '').trim()).filter(Boolean))].slice(0, 20)
+        : String(level.featuresText || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean).slice(0, 20);
+      const rewards = Array.isArray(level.rewards) ? level.rewards.map((reward: any) => {
+        const type = String(reward?.type || '');
+        if (!allowedRewards.has(type) || type === 'none') throw new BadRequestException('نوع مكافأة غير صالح في مستوى الصندوق');
+        const amount = ['frame', 'badge'].includes(type) ? 1 : Math.max(1, Math.floor(Number(reward?.amount) || 1));
+        const itemId = String(reward?.itemId || '').trim().slice(0, 160);
+        if (['frame', 'badge', 'vip', 'gift'].includes(type) && !itemId) throw new BadRequestException('حدد العنصر المطلوب لكل مكافأة');
+        const durationDays = Math.max(0, Math.min(3650, Math.floor(Number(reward?.durationDays ?? level.rewardDays) || 0)));
+        return { type, amount, itemId, durationDays };
+      }) : [];
+      if (!rewards.length) throw new BadRequestException('أضف مكافأة واحدة على الأقل لكل مستوى');
+      return {
+        level: index + 1,
+        title: String(level.title || ('المستوى ' + (index + 1))).slice(0, 80),
+        goalMode: mode, coinTarget: levelCoins, diamondTarget: levelDiamonds,
+        giftCount: Math.max(1, Math.min(100000, Math.floor(Number(level.giftCount) || 1))),
+        giftCategories: categories,
+        giftSelectionMode: levelGiftSelectionMode,
+        giftIds: levelGiftIds,
+        imageUrl: String(level.imageUrl || '').trim().slice(0, 2048),
+        features,
+        rewards,
+        rewardDays: Math.max(0, Math.min(3650, Math.floor(Number(level.rewardDays) || 0))),
+      };
+    });
+    if (!levels.length) throw new BadRequestException('أضف مستوى واحداً على الأقل للصندوق');
+    const frameIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'frame').map(r => r.itemId)))];
+    const badgeIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'badge').map(r => r.itemId)))];
+    const vipIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'vip').map(r => r.itemId)))];
+    const rewardGiftIds = [...new Set(levels.flatMap(x => x.rewards.filter(r => r.type === 'gift').map(r => r.itemId)))];
+    if (frameIds.length) {
+      const active = await this.dataSource.getRepository(Cosmetic).find({ where: { id: In(frameIds), isActive: true } });
+      if (active.length !== frameIds.length) throw new BadRequestException('تأكد أن كل الإطارات المختارة موجودة وفعالة');
+    }
+    if (badgeIds.length) {
+      const active = await this.dataSource.getRepository(Badge).find({ where: { id: In(badgeIds), isActive: true } });
+      if (active.length !== badgeIds.length) throw new BadRequestException('تأكد أن كل الشارات المختارة موجودة وفعالة');
+    }
+    if (vipIds.length) {
+      const active = await this.vipRepo.find({ where: { id: In(vipIds), isActive: true } });
+      if (active.length !== vipIds.length) throw new BadRequestException('تأكد أن كل خطط VIP المختارة موجودة وفعالة');
+    }
+    const allGiftIds = [...new Set([
+      ...(giftSelectionMode === 'selected' ? giftIds : []),
+      ...levels.flatMap(x => x.giftSelectionMode === 'selected' ? x.giftIds : []),
+      ...rewardGiftIds,
+    ])];
+    if (allGiftIds.length) {
+      // Validate only the gift IDs referenced by this configuration. Loading the
+      // entire active gift catalogue on every save needlessly increases latency.
+      const activeGifts = await this.giftsRepo.find({
+        where: { id: In(allGiftIds), isActive: true },
+        select: { id: true } as any,
+      });
+      if (activeGifts.length !== allGiftIds.length) {
+        throw new BadRequestException('يوجد معرّف هدية غير صالح أو غير فعال في إعدادات الصندوق');
+      }
+    }
+    const rawEffect = input.explosionEffect && typeof input.explosionEffect === 'object'
+      ? input.explosionEffect as Record<string, unknown> : {};
+    const mediaUrl = String(rawEffect.mediaUrl || '').trim().slice(0, 2048);
+    const soundUrl = String(rawEffect.soundUrl || '').trim().slice(0, 2048);
+    const validChestMediaUrl = (value: string) => !value || /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(value);
+    if (!validChestMediaUrl(mediaUrl)) {
+      throw new BadRequestException('رابط مؤثر الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    if (!validChestMediaUrl(soundUrl)) {
+      throw new BadRequestException('رابط صوت الانفجار يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    const rawToast = input.toast && typeof input.toast === 'object'
+      ? input.toast as Record<string, unknown> : {};
+    const toastBackgroundUrl = String(rawToast.backgroundUrl || '').trim().slice(0, 2048);
+    if (!validChestMediaUrl(toastBackgroundUrl)) {
+      throw new BadRequestException('رابط خلفية التوست يجب أن يكون HTTPS أو ملفاً داخل /uploads');
+    }
+    const bounded = (value: unknown, fallback: number, min: number, max: number) => {
+      const n = Number(value);
+      return Math.max(min, Math.min(max, Number.isFinite(n) ? n : fallback));
+    };
+    const explosionEffect = {
+      enabled: rawEffect.enabled === true,
+      mediaUrl,
+      soundUrl,
+      width: bounded(rawEffect.width, 100, 10, 180),
+      height: bounded(rawEffect.height, 100, 10, 180),
+      startX: bounded(rawEffect.startX, 50, 0, 100),
+      startY: bounded(rawEffect.startY, 46, 0, 100),
+      endX: bounded(rawEffect.endX, 50, 0, 100),
+      endY: bounded(rawEffect.endY, 50, 0, 100),
+      durationMs: Math.floor(bounded(rawEffect.durationMs, 1800, 400, 8000)),
+      opacity: bounded(rawEffect.opacity, 100, 10, 100),
+    };
+    const toast = {
+      enabled: rawToast.enabled !== false,
+      backgroundUrl: toastBackgroundUrl,
+      height: Math.floor(bounded(rawToast.height, 104, 60, 240)),
+      yOffset: Math.floor(bounded(rawToast.yOffset, 72, 0, 300)),
+      titleSizeSp: bounded(rawToast.titleSizeSp, 17, 10, 36),
+      bodySizeSp: bounded(rawToast.bodySizeSp, 14, 8, 30),
+      giftSizeDp: Math.floor(bounded(rawToast.giftSizeDp, 58, 24, 120)),
+      showWinnerName: rawToast.showWinnerName !== false,
+    };
+    const current = {
+      enabled: input.enabled === true,
+      iconVisible: input.iconVisible !== false,
+      goalMode, coinTarget, diamondTarget, giftIds, giftSelectionMode,
+      giftCategories, levels,
+      rewardType,
+      rewardItemId: String(input.rewardItemId || '').trim(),
+      rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
+      instructions: String(input.instructions || '').slice(0, 3000),
+      soundEnabled: input.soundEnabled !== false,
+      explosionEffect,
+      toast,
+    };
+    // Serialize admin saves and verify the exact value read back from PostgreSQL
+    // in the same transaction. This prevents concurrent saves from silently
+    // overwriting one another and avoids reporting success for an unpersisted value.
+    const persisted = await this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['support_chest_config']);
+      const repo = manager.getRepository(AppSetting);
+      let existing = await repo.findOne({
+        where: { key: 'support_chest_config' },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (existing) {
+        existing.value = JSON.stringify(current);
+        existing.description = 'JEHO support chest multi-level configuration';
+        await repo.save(existing);
+      } else {
+        existing = repo.create({
+          key: 'support_chest_config',
+          value: JSON.stringify(current),
+          description: 'JEHO support chest multi-level configuration',
+        });
+        await repo.save(existing);
+      }
+      const verified = await repo.findOne({ where: { key: 'support_chest_config' } });
+      if (!verified?.value) throw new InternalServerErrorException('تعذّر تأكيد حفظ إعدادات صندوق الدعم في قاعدة البيانات');
+      let readBack: any;
+      try { readBack = JSON.parse(verified.value); }
+      catch { throw new InternalServerErrorException('تعذّرت قراءة إعدادات صندوق الدعم بعد الحفظ'); }
+      if (JSON.stringify(readBack) !== JSON.stringify(current)) {
+        throw new InternalServerErrorException('لم تتطابق إعدادات صندوق الدعم مع النسخة المحفوظة في قاعدة البيانات');
+      }
+      return readBack;
+    });
+    const liveRooms = await this.roomsRepo.find({ where: [{ status: RoomStatus.OPEN }, { status: RoomStatus.LOCKED }], select: { id: true } as any });
+    const configAt = new Date().toISOString();
+    for (const room of liveRooms) {
+      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
+        roomId: room.id, event: 'support_chest:config_updated',
+        payload: { config: persisted }, at: configAt,
+      });
+    }
+    return persisted;
+  }
+
+  async dashboard(staffRole: string = 'super') {
     const [
       users,
       deletedUsers,
@@ -324,7 +892,7 @@ export class AdminService {
     // After a revenue reset, hide legacy totals; keep today's new sales visible.
     const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
 
-    return {
+    const snapshot = {
       brand: 'JEHO CHAT',
       users,
       totalUsers: users,
@@ -342,6 +910,33 @@ export class AdminService {
       totalRevenue: totalRev,
       todayRevenue,
       revenueByProvider: scaledProviders,
+    };
+
+    // The dashboard endpoint is shared by all three native staff ranks.
+    // Return only metrics that each rank is permitted to administer.
+    if (staffRole === 'super') return snapshot;
+    if (staffRole === 'admin') {
+      const adminSnapshot: Record<string, unknown> = { ...snapshot };
+      for (const key of [
+        'pendingWithdraws',
+        'totalRechargeFiat',
+        'revenue',
+        'totalRevenue',
+        'todayRevenue',
+        'revenueByProvider',
+      ]) {
+        delete adminSnapshot[key];
+      }
+      return adminSnapshot;
+    }
+    return {
+      brand: snapshot.brand,
+      rooms: snapshot.rooms,
+      openRooms: snapshot.openRooms,
+      liveStreams: snapshot.liveStreams,
+      streams: snapshot.streams,
+      activeStreams: snapshot.activeStreams,
+      pendingReports: snapshot.pendingReports,
     };
   }
 
@@ -510,6 +1105,7 @@ export class AdminService {
       isAdmin: superAdmin || staffRole === 'operator',
       isSuperAdmin: superAdmin,
       staffRole,
+      status: user.status,
       role: 'admin',
       permissions,
       modules: [...DASHBOARD_MODULES],
@@ -574,6 +1170,7 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     user.status = dto.status;
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(userId);
     await this.abuseRepo.save(
       this.abuseRepo.create({
         userId,
@@ -609,6 +1206,7 @@ export class AdminService {
     user.staffRole = null;
     user.refreshTokenHash = null;
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(userId);
     await this.realtimeGateway.ejectUserEverywhere(userId, 'account_deleted');
     await this.abuseRepo.save(
       this.abuseRepo.create({
@@ -677,6 +1275,9 @@ export class AdminService {
       profile.entryEffectUrl = null;
       profile.entryAnimationUrl = null;
       profile.roomCardUrl = null;
+      profile.profileCardUrl = null;
+      profile.chatBubbleUrl = null;
+      profile.nameplateUrl = null;
       profile.vipBadgeUrl = null;
       profile.levelBadgeUrl = null;
       profile.hostBadgeUrl = null;
@@ -684,6 +1285,54 @@ export class AdminService {
       profile.totalSentCoins = 0;
       profile.totalReceivedDiamonds = 0;
       await manager.save(profile);
+
+      // Release every vanity ID owned by this account and restore its previous
+      // account/room/agency ID where it is still the currently applied value.
+      const vanityRows: Array<Record<string, any>> = await manager.query(
+        `SELECT "publicId", "previousPublicId", "targetType", "targetId", "previousTargetPublicId"
+           FROM vanity_ids
+          WHERE "ownerUserId" = $1
+            AND status IN ('owned', 'reserved')`,
+        [userId],
+      );
+      for (const vanity of vanityRows) {
+        if (vanity.targetType === 'account' && vanity.targetId === userId && vanity.previousPublicId) {
+          const conflict = await manager.query(
+            `SELECT id FROM users WHERE "publicId" = $1 AND id <> $2 LIMIT 1`,
+            [vanity.previousPublicId, userId],
+          );
+          if (!conflict.length) {
+            await manager.update(User, { id: userId, publicId: vanity.publicId }, {
+              publicId: vanity.previousPublicId,
+            });
+          }
+        } else if (vanity.targetType === 'room' && vanity.targetId && vanity.previousTargetPublicId) {
+          await manager.query(
+            `UPDATE rooms SET "publicId" = $1 WHERE id = $2 AND "publicId" = $3`,
+            [vanity.previousTargetPublicId, vanity.targetId, vanity.publicId],
+          );
+        } else if (vanity.targetType === 'agency' && vanity.targetId && vanity.previousTargetPublicId) {
+          await manager.query(
+            `UPDATE agencies SET "publicId" = $1 WHERE id = $2 AND "publicId" = $3`,
+            [vanity.previousTargetPublicId, vanity.targetId, vanity.publicId],
+          );
+        }
+      }
+      await manager.query(
+        `UPDATE vanity_ids
+            SET status = 'available',
+                "ownerUserId" = NULL,
+                "targetType" = NULL,
+                "targetId" = NULL,
+                "reservedUntil" = NULL,
+                "purchasedAt" = NULL,
+                "expiresAt" = NULL,
+                "previousPublicId" = NULL,
+                "previousTargetPublicId" = NULL
+          WHERE "ownerUserId" = $1
+            AND status IN ('owned', 'reserved')`,
+        [userId],
+      );
 
       const cosmeticsDeleted = await manager.delete(UserCosmetic, { userId });
       const gameItemsDeleted = await manager.delete(UserGameItem, { userId });
@@ -709,8 +1358,9 @@ export class AdminService {
         reason: 'admin_reset_baseline',
         at: new Date().toISOString(),
       });
+      await this.realtimeGateway.refreshUserProfile(userId, 'admin_reset_baseline');
     } catch {
-      // ignore realtime failures
+      // The database reset is authoritative even if a live socket is unavailable.
     }
 
     return {
@@ -896,11 +1546,11 @@ export class AdminService {
       return {
         ...r,
         name: r.title,
-        ownerName: r.host?.displayName || r.host?.username || '—',
-        hostName: r.host?.displayName || r.host?.username || '—',
-        hostAvatarUrl: r.host?.avatarUrl || null,
-        hostFrameUrl,
-        hostFrameAnimUrl: equippedFrame || hostFrameUrl,
+        ownerName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
+        hostName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
+        hostAvatarUrl: r.roomKind === RoomKind.SUPPORT ? null : (r.host?.avatarUrl || null),
+        hostFrameUrl: r.roomKind === RoomKind.SUPPORT ? null : hostFrameUrl,
+        hostFrameAnimUrl: r.roomKind === RoomKind.SUPPORT ? null : (equippedFrame || hostFrameUrl),
         membersCount: r.viewerCount ?? 0,
         isSupport: r.roomKind === RoomKind.SUPPORT,
         isLive,
@@ -1155,14 +1805,16 @@ export class AdminService {
       room.emptySince = null;
     } else if (disableSupport) {
       room.roomKind = RoomKind.STANDARD;
-      room.isPersistent = false;
+      // Personal rooms remain persistent even when they are no longer support rooms.
+      room.isPersistent = true;
     }
 
+    // Only agency/support rooms are forced public and free. Persistence alone
+    // must not disable the host's normal room lock/access settings.
     const lockedFree =
       !!room.agencyId ||
       room.roomKind === RoomKind.AGENCY ||
-      room.roomKind === RoomKind.SUPPORT ||
-      room.isPersistent;
+      room.roomKind === RoomKind.SUPPORT;
 
     if (lockedFree) {
       room.status = RoomStatus.OPEN;
@@ -1180,6 +1832,221 @@ export class AdminService {
 
     await this.roomsRepo.save(room);
     return room;
+  }
+
+  /**
+   * Create a genuinely platform-owned persistent room: no host user and no
+   * moderators unless dashboard staff explicitly supplies moderator IDs.
+   */
+  async createPlatformRoom(dto: {
+    title?: string;
+    description?: string;
+    coverUrl?: string;
+    category?: string;
+    seatCount?: number;
+    moderatorIds?: string[];
+  }) {
+    const title = String(dto.title || '').trim().slice(0, 128);
+    if (!title) throw new BadRequestException('اسم الروم مطلوب');
+    const requestedIds = [...new Set((dto.moderatorIds || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean))];
+    const moderatorUsers: User[] = [];
+    for (const publicId of requestedIds) {
+      const user = await this.usersRepo.findOne({ where: { publicId } });
+      if (!user || user.status === UserStatus.DELETED) {
+        throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+      }
+      moderatorUsers.push(user);
+    }
+
+    const seatCount = Math.max(2, Math.min(20, Math.floor(Number(dto.seatCount) || 11)));
+    let publicId = '';
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const candidate = String(Math.floor(100000 + Math.random() * 900000));
+      if (!(await this.roomsRepo.exist({ where: { publicId: candidate } }))) {
+        publicId = candidate;
+        break;
+      }
+    }
+    if (!publicId) throw new ConflictException('تعذر إنشاء آيدي روم فريد');
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const room = manager.create(Room, {
+        publicId,
+        title,
+        description: String(dto.description || '').trim().slice(0, 2000) || null,
+        coverUrl: String(dto.coverUrl || '').trim().slice(0, 512) || null,
+        topic: ['customer_service', 'management', 'official'].includes(String(dto.category || '').trim().toLowerCase())
+          ? String(dto.category).trim().toLowerCase()
+          : 'official',
+        type: RoomType.VOICE,
+        status: RoomStatus.OPEN,
+        hostId: null as any,
+        cohostId: null,
+        seatCount,
+        viewerCount: 0,
+        zegoRoomId: `room_${uuidv4().replace(/-/g, '').slice(0, 16)}`,
+        hasPassword: false,
+        passwordHash: null,
+        isPublic: true,
+        roomKind: RoomKind.SUPPORT,
+        isPersistent: true,
+        activeHostId: null,
+        emptySince: null,
+        accessMode: RoomAccessMode.FREE,
+        entryFeeCoins: 0,
+      });
+      await manager.save(room);
+
+      const seats: RoomSeat[] = [];
+      for (let seatIndex = 0; seatIndex < seatCount; seatIndex += 1) {
+        seats.push(manager.create(RoomSeat, {
+          roomId: room.id,
+          seatIndex,
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isHostSeat: seatIndex === 0,
+          isMuted: false,
+          isModeratorMuted: false,
+        }));
+      }
+      await manager.save(seats);
+
+      if (moderatorUsers.length) {
+        const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
+          roomId: room.id,
+          userId: user.id,
+          role: ModeratorRole.ADMIN,
+          canManageMusic: true,
+          canChangeFrames: true,
+          canControlGames: true,
+          canMute: true,
+          canKick: true,
+          canBan: true,
+          canManageSeats: true,
+          canInvite: true,
+          canManageRoom: true,
+          appointedById: null as any,
+        }));
+        await manager.save(mods);
+      }
+      return {
+        room,
+        moderators: moderatorUsers.map((user) => ({
+          userId: user.id,
+          publicId: user.publicId,
+          displayName: user.displayName || user.username,
+        })),
+      };
+    });
+    return { ...result, isPlatformManaged: true, isPinned: true };
+  }
+
+  /** Add one moderator to an official platform room without replacing existing staff. */
+  async addPlatformRoomModerator(roomId: string, publicIdRaw: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن إضافة مشرفين لرومات المنصة الرسمية فقط');
+    }
+    const publicId = String(publicIdRaw || '').trim();
+    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user || user.status === UserStatus.DELETED) {
+      throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+    }
+    const existing = await this.dataSource.getRepository(RoomModerator).findOne({
+      where: { roomId, userId: user.id },
+    });
+    if (existing) {
+      return {
+        roomId,
+        alreadyModerator: true,
+        moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+      };
+    }
+    const moderator = this.dataSource.getRepository(RoomModerator).create({
+      roomId,
+      userId: user.id,
+      role: ModeratorRole.ADMIN,
+      canManageMusic: true,
+      canChangeFrames: true,
+      canControlGames: true,
+      canMute: true,
+      canKick: true,
+      canBan: true,
+      canManageSeats: true,
+      canInvite: true,
+      canManageRoom: true,
+      appointedById: null as any,
+    });
+    await this.dataSource.getRepository(RoomModerator).save(moderator);
+    return {
+      roomId,
+      added: true,
+      moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+    };
+  }
+
+  /** Remove a moderator from an official platform room by public user ID. */
+  async removePlatformRoomModerator(roomId: string, publicIdRaw: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن رفع المشرفين من رومات المنصة الرسمية فقط');
+    }
+    const publicId = String(publicIdRaw || '').trim();
+    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user) throw new NotFoundException('لم يتم العثور على المستخدم');
+    const result = await this.dataSource.getRepository(RoomModerator).delete({ roomId, userId: user.id });
+    return { roomId, publicId, removed: Number(result.affected || 0) > 0 };
+  }
+
+  /** Replace the moderator list of an official platform room by public user IDs. */
+  async setPlatformRoomModerators(roomId: string, publicIds: string[]) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن إدارة مشرفي المنصة للرومات الرسمية فقط');
+    }
+    const requestedIds = [...new Set((publicIds || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean))];
+    const users: User[] = [];
+    for (const publicId of requestedIds) {
+      const user = await this.usersRepo.findOne({ where: { publicId } });
+      if (!user || user.status === UserStatus.DELETED) {
+        throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+      }
+      users.push(user);
+    }
+    const moderators = await this.dataSource.transaction(async (manager) => {
+      await manager.delete(RoomModerator, { roomId });
+      const rows = users.map((user) => manager.create(RoomModerator, {
+        roomId,
+        userId: user.id,
+        role: ModeratorRole.ADMIN,
+        canManageMusic: true,
+        canChangeFrames: true,
+        canControlGames: true,
+        canMute: true,
+        canKick: true,
+        canBan: true,
+        canManageSeats: true,
+        canInvite: true,
+        canManageRoom: true,
+        appointedById: null as any,
+      }));
+      await manager.save(rows);
+      return users.map((user) => ({
+        userId: user.id,
+        publicId: user.publicId,
+        displayName: user.displayName || user.username,
+      }));
+    });
+    return { roomId, moderators, isPlatformManaged: true, isPinned: true };
   }
 
   async setRoomCustomerService(roomId: string, enabled: boolean) {
@@ -1249,6 +2116,14 @@ export class AdminService {
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
+    const nextCategory = String(dto.category ?? '').trim().toLowerCase();
+    const cpType = String(dto.cpRelationshipType ?? 'love').trim().toLowerCase();
+    if (nextCategory === 'cp' && !['friendship', 'brotherhood', 'love', 'engagement', 'marriage'].includes(cpType)) {
+      throw new BadRequestException('نوع علاقة CP للهدية غير صالح');
+    }
+    if (dto.cpPoints !== undefined && (!Number.isSafeInteger(Number(dto.cpPoints)) || Number(dto.cpPoints) < 0 || Number(dto.cpPoints) > 1000000000)) {
+      throw new BadRequestException('نقاط هدية CP يجب أن تكون بين 0 و1,000,000,000');
+    }
     let gift = id ? await this.giftsRepo.findOne({ where: { id } }) : null;
     if (id && !gift) throw new NotFoundException('Gift not found');
     if (!gift) {
@@ -1286,6 +2161,12 @@ export class AdminService {
       isActive: dto.isActive ?? gift.isActive ?? true,
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
       category: categoryDefault,
+      cpRelationshipType: dto.cpRelationshipType ?? (gift as any).cpRelationshipType ?? 'love',
+      cpPoints: String(categoryDefault || '').toLowerCase() === 'cp'
+        ? (dto.cpPoints !== undefined
+            ? Math.max(0, Math.floor(Number(dto.cpPoints) || 0))
+            : ((gift as any).cpPoints == null ? 0 : Number((gift as any).cpPoints)))
+        : ((gift as any).cpPoints == null ? null : Number((gift as any).cpPoints)),
       brandAgencyId:
         dto.brandAgencyId === undefined
           ? (gift as any).brandAgencyId ?? null
@@ -1538,8 +2419,118 @@ export class AdminService {
     return this.reportsRepo.save(report);
   }
 
+  async getPaidMessageSettings() {
+    const defaults: Record<string, string> = {
+      'paid_messages.enabled': 'false', 'paid_messages.free_count': '3',
+      'paid_messages.price_coins': '10', 'paid_messages.one_way_discount_percent': '25',
+      'paid_messages.price_step_coins': '0', 'paid_messages.price_step_every': '10',
+      'paid_messages.price_max_coins': '10000000', 'paid_messages.refund_window_minutes': '30',
+      'paid_messages.daily_limit': '0', 'paid_messages.app_percent': '20',
+      'paid_messages.host_percent': '70', 'paid_messages.agent_percent': '10',
+    };
+    const rows = await this.settingsRepo.find({ where: Object.keys(defaults).map((key) => ({ key })) });
+    const current = { ...defaults };
+    for (const row of rows) current[row.key] = String(row.value ?? '');
+    return { current, defaults };
+  }
+
+  async patchPaidMessageSettings(body: Record<string, unknown>) {
+    const allowed = new Set([
+      'paid_messages.enabled','paid_messages.free_count','paid_messages.price_coins',
+      'paid_messages.one_way_discount_percent','paid_messages.price_step_coins',
+      'paid_messages.price_step_every','paid_messages.price_max_coins',
+      'paid_messages.refund_window_minutes','paid_messages.daily_limit',
+      'paid_messages.app_percent','paid_messages.host_percent','paid_messages.agent_percent',
+    ]);
+    const values: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(body || {})) {
+      if (!allowed.has(key)) continue;
+      if (key === 'paid_messages.enabled') {
+        values[key] = ['true','1','yes','on'].includes(String(raw).toLowerCase()) ? 'true' : 'false';
+        continue;
+      }
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0) throw new BadRequestException('قيمة غير صالحة: ' + key);
+      const max = key.includes('percent') ? 100 : key.endsWith('refund_window_minutes') ? 10080 : 10000000;
+      if (value > max) throw new BadRequestException('القيمة تتجاوز الحد المسموح: ' + key);
+      values[key] = String(['paid_messages.free_count','paid_messages.price_coins','paid_messages.price_step_coins',
+        'paid_messages.price_step_every','paid_messages.price_max_coins','paid_messages.daily_limit',
+        'paid_messages.refund_window_minutes'].includes(key) ? Math.floor(value) : value);
+    }
+    const splitKeys = ['paid_messages.app_percent','paid_messages.host_percent','paid_messages.agent_percent'];
+    if (splitKeys.some((key) => values[key] !== undefined)) {
+      const loaded = await this.getPaidMessageSettings();
+      const sum = splitKeys.reduce((total, key) => total + Number(values[key] ?? loaded.current[key]), 0);
+      if (Math.abs(sum - 100) > 0.001) throw new BadRequestException('مجموع نسب التطبيق والمضيف والوكيل يجب أن يساوي 100%');
+    }
+    for (const [key, value] of Object.entries(values)) await this.setSetting(key, value, 'إعدادات الرسائل المدفوعة');
+    return this.getPaidMessageSettings();
+  }
+
+  async paidMessageStats() {
+    const messagesRepo = this.dataSource.getRepository(ChatMessage);
+    const participantsRepo = this.dataSource.getRepository(ChatParticipant);
+    const [totalMessages, paidRows, refunds, settings] = await Promise.all([
+      messagesRepo.createQueryBuilder('m').where('m.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] }).getCount(),
+      this.txRepo.find({ where: { referenceType: 'paid_message' }, order: { createdAt: 'DESC' } }),
+      this.txRepo.find({ where: { referenceType: 'paid_message_refund' }, order: { createdAt: 'DESC' } }),
+      this.getPaidMessageSettings(),
+    ]);
+    const debits = paidRows.filter((tx) => Number(tx.amount) < 0);
+    const refundedIds = new Set(refunds.map((tx) => tx.referenceId).filter(Boolean));
+    const ids = [...new Set(debits.map((tx) => tx.referenceId).filter((id): id is string => !!id))];
+    const messages = ids.length ? await messagesRepo.createQueryBuilder('m').where('m.id IN (:...ids)', { ids }).getMany() : [];
+    const byId = new Map(messages.map((m) => [m.id, m]));
+    const convIds = [...new Set(messages.map((m) => m.conversationId))];
+    const participants = convIds.length ? await participantsRepo.createQueryBuilder('p').where('p.conversationId IN (:...ids)', { ids: convIds }).getMany() : [];
+    let replied = 0, pending = 0, expiredUnreplied = 0;
+    const now = Date.now();
+    for (const tx of debits) {
+      const message = byId.get(tx.referenceId || '');
+      if (!message) continue;
+      const metadata = (tx.metadata || {}) as Record<string, unknown>;
+      const rawWindow = metadata.refundWindowMinutes !== undefined ? Number(metadata.refundWindowMinutes) : metadata.refundWindowHours !== undefined ? Number(metadata.refundWindowHours) * 60 : 30;
+      const minutes = Math.max(0, Number.isFinite(rawWindow) ? rawWindow : 30);
+      const deadline = new Date(new Date(message.createdAt).getTime() + minutes * 60_000);
+      const peer = participants.find((p) => p.conversationId === message.conversationId && p.userId !== message.senderId);
+      const hasReply = peer ? await messagesRepo.createQueryBuilder('reply')
+        .where('reply.conversationId = :conversationId', { conversationId: message.conversationId })
+        .andWhere('reply.senderId = :peerId', { peerId: peer.userId })
+        .andWhere('reply.createdAt > :createdAt', { createdAt: message.createdAt })
+        .andWhere('reply.createdAt <= :deadline', { deadline })
+        .andWhere('reply.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
+        .getExists() : false;
+      if (hasReply) replied++;
+      else if (now < deadline.getTime()) pending++;
+      else if (!refundedIds.has(message.id)) expiredUnreplied++;
+    }
+    const spent = debits.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0);
+    const refunded = refunds.reduce((sum, tx) => sum + Math.max(0, Number(tx.amount) || 0), 0);
+    const share = (key: string) => Number(settings.current[key]) || 0;
+    return {
+      totalMessages, paidMessages: debits.length, freeMessages: Math.max(0, totalMessages - debits.length),
+      coinsSpent: spent, coinsRefunded: refunded, replied, pending, expiredUnreplied,
+      replyRatePercent: debits.length ? Math.round(replied / debits.length * 10000) / 100 : 0,
+      earnings: {
+        app: Math.round((spent - refunded) * share('paid_messages.app_percent') / 100),
+        host: Math.round((spent - refunded) * share('paid_messages.host_percent') / 100),
+        agent: Math.round((spent - refunded) * share('paid_messages.agent_percent') / 100),
+        note: 'قيم تقديرية محسوبة من النسب وليست تحويلات أرصدة فعلية',
+      },
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
   async getSettings() {
-    return this.settingsRepo.find({ order: { key: 'ASC' } });
+    const rows = await this.settingsRepo.find({ order: { key: 'ASC' } });
+    // Never return Twilio Auth Token plaintext through the generic settings API.
+    // The dashboard keeps the masked value when it has not been explicitly changed.
+    return rows.map((row) => {
+      if (row.key === 'twilio.auth_token' && String(row.value || '').trim()) {
+        return { ...row, value: '••••••••••••' };
+      }
+      return row;
+    });
   }
 
   /**
@@ -1854,6 +2845,22 @@ export class AdminService {
         // keep original value if JSON is invalid
       }
     }
+    if (key === 'app_theme') {
+      try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const previous = await this.settingsRepo.findOne({ where: { key } });
+        let previousVersion = 0;
+        try { previousVersion = Math.max(0, Number(JSON.parse(previous?.value || '{}')?.version) || 0); }
+        catch { previousVersion = 0; }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          parsed.version = previousVersion + 1;
+          parsed.updatedAt = new Date().toISOString();
+          nextValue = JSON.stringify(parsed);
+        }
+      } catch {
+        // Preserve the submitted value if a legacy theme row is not valid JSON.
+      }
+    }
     if (key === 'app_nav_icons') {
       try {
         const { sanitizeNavIconsConfig } = await import('../config/nav-icons.util');
@@ -1868,7 +2875,11 @@ export class AdminService {
             prevVer = 0;
           }
         }
-        clean.version = prevVer + 1;
+        // Version 4 is the first dashboard-managed catalog format.
+        // Keep that schema version even when the setting row is new or legacy;
+        // otherwise the dashboard mistakes a fresh save for retired bundled data
+        // and clears every uploaded sticker on the next load.
+        clean.version = Math.max(4, prevVer + 1);
         clean.updatedAt = new Date().toISOString();
         nextValue = JSON.stringify(clean);
       } catch {
@@ -1892,7 +2903,10 @@ export class AdminService {
             prevVer = 0;
           }
         }
-        clean.version = prevVer + 1;
+        // v4 is the first dashboard-managed sticker catalog format. Never
+        // downgrade a fresh save to v1 when the setting row is missing/legacy:
+        // the next dashboard load treats versions below 4 as retired bundled data.
+        clean.version = Math.max(4, prevVer + 1);
         clean.updatedAt = new Date().toISOString();
         rememberSeatStickersCache(clean);
         nextValue = JSON.stringify(clean);
@@ -1908,6 +2922,23 @@ export class AdminService {
       if (description) setting.description = description;
     }
     const saved = await this.settingsRepo.save(setting);
+    if (key === 'features.room_pk_enabled') {
+      invalidateRoomPkEnabledCache();
+      const raw = String(nextValue || '').trim().toLowerCase();
+      this.realtimeGateway.emitToAll('contest:pk-status', {
+        enabled: ['1', 'true', 'yes', 'on'].includes(raw),
+        at: new Date().toISOString(),
+      });
+    }
+    if (key === 'app_theme') {
+      let version = 1;
+      try { version = Math.max(1, Number(JSON.parse(nextValue)?.version) || 1); } catch { /* keep fallback */ }
+      this.realtimeGateway.emitToAll('config:updated', {
+        scope: 'app-theme',
+        version,
+        at: new Date().toISOString(),
+      });
+    }
     // New covers / catalog → force clients to drop Glide disk cache.
     if (key === 'app_games') {
       await this.bumpMediaAssetEpoch();
@@ -1937,67 +2968,43 @@ export class AdminService {
     }
   }
 
-  async adminLogin(email: string, password: string) {
-    await this.ensureStaffRoleColumn();
-    await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo
-      .createQueryBuilder('u')
-      .addSelect('u.passwordHash')
-      .where('LOWER(u.email) = :email', { email: email.toLowerCase() })
-      .getOne();
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid admin credentials');
-    }
-    if (!hasDashboardAccess(user)) {
-      throw new UnauthorizedException(
-        'Dashboard access denied — Super owner or limited admin only',
-      );
-    }
-    const staffRole = normalizeStaffRole(user);
-    if (staffRole === 'operator') {
-      const perms = normalizePermissions(user.dashboardPermissions);
-      if (!hasAnyPermission(perms)) {
-        throw new UnauthorizedException(
-          'This admin has no modules enabled — contact Super admin',
-        );
-      }
-    }
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid admin credentials');
+  private publicDashboardAdmin(admin: AdminUser) {
+    const superAdmin = admin.staffRole === 'super' || admin.role === AdminRole.SUPER;
+    const dashboardAdmin = !superAdmin && normalizeStaffRole({ staffRole: admin.staffRole }) === 'admin';
+    const permissions = superAdmin || dashboardAdmin
+      ? fullPermissions()
+      : normalizePermissions(admin.dashboardPermissions);
+    return {
+      id: admin.id,
+      email: admin.email,
+      username: admin.username,
+      displayName: admin.displayName,
+      name: admin.displayName,
+      isAdmin: true,
+      isSuperAdmin: superAdmin,
+      staffRole: superAdmin ? 'super' : dashboardAdmin ? 'admin' : 'operator',
+      status: admin.isActive ? 'active' : 'disabled',
+      role: 'admin',
+      permissions,
+      modules: [...DASHBOARD_MODULES],
+    };
+  }
 
-    // Keep isAdmin + staffRole in sync for Super accounts.
-    let dirty = false;
-    if (staffRole === 'super') {
-      if (!user.isAdmin) {
-        user.isAdmin = true;
-        dirty = true;
-      }
-      if (String(user.staffRole || '').toLowerCase() !== 'super') {
-        user.staffRole = 'super';
-        dirty = true;
-      }
-    } else if (staffRole === 'operator') {
-      // Operators must not look like Super via isAdmin.
-      if (user.isAdmin) {
-        user.isAdmin = false;
-        dirty = true;
-      }
-      if (String(user.staffRole || '').toLowerCase() !== 'operator') {
-        user.staffRole = 'operator';
-        dirty = true;
-      }
-    }
-    if (dirty) await this.usersRepo.save(user);
-
-    const profile = this.publicAdminUser(user);
+  private async issueDashboardToken(admin: AdminUser) {
+    const profile = this.publicDashboardAdmin(admin);
     const accessToken = await this.jwtService.signAsync({
-      sub: user.id,
-      username: user.username,
+      sub: admin.id,
+      tokenType: 'dashboard',
+      username: admin.username,
+      email: admin.email,
       isAdmin: true,
       isSuperAdmin: profile.isSuperAdmin,
       staffRole: profile.staffRole,
+      permissions: profile.permissions,
       role: 'admin',
     });
+    admin.lastLoginAt = new Date();
+    await this.adminUsersRepo.save(admin);
     return {
       accessToken,
       token: accessToken,
@@ -2006,105 +3013,250 @@ export class AdminService {
     };
   }
 
-  async adminMe(userId: string) {
+  private dashboardAdminSchemaReady = false;
+
+  private async ensureDashboardAdminSchema() {
+    if (this.dashboardAdminSchemaReady) return;
+    // Additive-only migration: preserve all existing admin records and user data.
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "displayName" varchar(120) NOT NULL DEFAULT 'Dashboard Admin'
+    `);
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) NOT NULL DEFAULT 'operator'
+    `);
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "dashboardPermissions" jsonb NULL
+    `);
+    this.dashboardAdminSchemaReady = true;
+  }
+
+  private async migrateLegacyDashboardAccounts() {
+    const legacyAdmins = await this.usersRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where(
+        "LOWER(COALESCE(u.staffRole, '')) IN (:...roles) OR u.isAdmin = true",
+        { roles: ['super', 'admin', 'operator'] },
+      )
+      .getMany();
+
+    for (const legacy of legacyAdmins) {
+      const staffRole = normalizeStaffRole(legacy);
+      if (!hasDashboardAccess(legacy) || !legacy.email || !legacy.passwordHash) continue;
+
+      const alreadyLinked = await this.adminUsersRepo.findOne({
+        where: { linkedUserId: legacy.id },
+      });
+      if (alreadyLinked) continue;
+
+      const email = String(legacy.email).trim().toLowerCase();
+      const emailTaken = await this.adminUsersRepo.findOne({ where: { email } });
+      if (emailTaken) continue;
+
+      const baseUsername = String(legacy.username || email.split('@')[0])
+        .replace(/[^a-zA-Z0-9_]/g, '')
+        .slice(0, 36) || 'admin';
+      let username = baseUsername;
+      if (await this.adminUsersRepo.findOne({ where: { username } })) {
+        username = `${baseUsername.slice(0, 36)}_${legacy.id.replace(/-/g, '').slice(0, 8)}`.slice(0, 48);
+      }
+
+      const migrated = this.adminUsersRepo.create({
+        email,
+        username,
+        displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
+        passwordHash: legacy.passwordHash,
+        role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
+        staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
+        dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
+          ? fullPermissions() as Record<string, string>
+          : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
+        linkedUserId: legacy.id,
+        isActive: legacy.status === UserStatus.ACTIVE,
+      });
+      await this.adminUsersRepo.save(migrated);
+    }
+  }
+
+  async adminLogin(email: string, password: string) {
+    await this.ensureDashboardAdminSchema();
+    await this.ensureStaffRoleColumn();
     await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user || !hasDashboardAccess(user)) {
+    // Do not scan and migrate every legacy user on every login. The targeted
+    // legacy lookup below safely imports only the account attempting to sign in.
+    const identifier = String(email || '').trim().toLowerCase();
+    if (!identifier || !password) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    // Dashboard accounts are checked first and are fully independent of app users.
+    const admin = await this.adminUsersRepo
+      .createQueryBuilder('a')
+      .addSelect('a.passwordHash')
+      .where('(LOWER(a.email) = :identifier OR LOWER(a.username) = :identifier)', { identifier })
+      .getOne();
+
+    if (admin) {
+      if (!admin.isActive || !(await bcrypt.compare(password, admin.passwordHash))) {
+        throw new UnauthorizedException('Invalid admin credentials');
+      }
+
+      // Repair an older dashboard copy only when its linked legacy account
+      // independently proves Super Admin status with the same password.
+      // This is additive and does not alter any user, wallet, or room data.
+      let isSuperAdmin =
+        admin.role === AdminRole.SUPER ||
+        normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
+      let staffRole = normalizeStaffRole({ staffRole: admin.staffRole });
+      let perms = staffRole === 'admin' || isSuperAdmin
+        ? fullPermissions()
+        : normalizePermissions(admin.dashboardPermissions);
+      if (!isSuperAdmin && !hasAnyPermission(perms)) {
+        const legacyQuery = this.usersRepo
+          .createQueryBuilder('u')
+          .addSelect('u.passwordHash');
+        if (admin.linkedUserId) {
+          legacyQuery.where('u.id = :linkedUserId', { linkedUserId: admin.linkedUserId });
+        } else {
+          legacyQuery.where(
+            '(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)',
+            { identifier },
+          );
+        }
+        const legacy = await legacyQuery.getOne();
+        const legacyRole = normalizeStaffRole(legacy);
+        if (
+          legacy &&
+          legacy.passwordHash &&
+          (legacyRole === 'super' || legacyRole === 'admin') &&
+          (await bcrypt.compare(password, legacy.passwordHash))
+        ) {
+          admin.role = legacyRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR;
+          admin.staffRole = legacyRole;
+          admin.dashboardPermissions = fullPermissions() as Record<string, string>;
+          await this.adminUsersRepo.save(admin);
+          isSuperAdmin = legacyRole === 'super';
+          staffRole = legacyRole;
+          perms = normalizePermissions(admin.dashboardPermissions);
+        }
+      }
+
+      if (!isSuperAdmin && !hasAnyPermission(perms)) {
+        throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
+      }
+      return this.issueDashboardToken(admin);
+    }
+
+    // One-time, non-destructive bootstrap for existing dashboard admins.
+    // After this copy is created, app status/role/password changes no longer affect dashboard access.
+    await this.ensureStaffRoleColumn();
+    await this.ensureDashboardPermissionsColumn();
+    const legacy = await this.usersRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)', { identifier })
+      .getOne();
+
+    if (!legacy || !legacy.passwordHash || !hasDashboardAccess(legacy)) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+    if (!(await bcrypt.compare(password, legacy.passwordHash))) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    const staffRole = normalizeStaffRole(legacy);
+    const adminEmail = String(legacy.email || identifier).trim().toLowerCase();
+    const username = String(legacy.username || identifier.split('@')[0]).slice(0, 48);
+    const duplicateUsername = await this.adminUsersRepo.findOne({ where: { username } });
+    const safeUsername = duplicateUsername
+      ? `${username.slice(0, 38)}_${legacy.id.replace(/-/g, '').slice(0, 8)}`
+      : username;
+    const migrated = this.adminUsersRepo.create({
+      email: adminEmail,
+      username: safeUsername,
+      displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
+      passwordHash: legacy.passwordHash,
+      role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
+      staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
+      dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
+        ? fullPermissions() as Record<string, string>
+        : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
+      linkedUserId: legacy.id,
+      isActive: true,
+    });
+    const saved = await this.adminUsersRepo.save(migrated);
+    if (staffRole !== 'super' && !hasAnyPermission(saved.dashboardPermissions)) {
+      throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
+    }
+    return this.issueDashboardToken(saved);
+  }
+
+  async adminMe(adminId: string) {
+    const admin = await this.adminUsersRepo.findOne({ where: { id: adminId } });
+    if (!admin || !admin.isActive) {
       throw new UnauthorizedException('Dashboard access required');
     }
-    return this.publicAdminUser(user);
+    return this.publicDashboardAdmin(admin);
   }
 
   /**
-   * Self-service: update dashboard login email and/or password.
-   * Requires current password. Super or limited operator for own account.
+   * Update dashboard-only credentials. This never writes to the mobile users table.
    */
   async updateAdminCredentials(
-    userId: string,
-    dto: {
-      currentPassword: string;
-      newEmail?: string;
-      newPassword?: string;
-    },
+    adminId: string,
+    dto: { currentPassword: string; newEmail?: string; newPassword?: string },
   ) {
-    const user = await this.usersRepo
-      .createQueryBuilder('u')
-      .addSelect('u.passwordHash')
-      .where('u.id = :id', { id: userId })
+    const admin = await this.adminUsersRepo
+      .createQueryBuilder('a')
+      .addSelect('a.passwordHash')
+      .where('a.id = :id', { id: adminId })
       .getOne();
-    if (!user || !hasDashboardAccess(user)) {
+    if (!admin || !admin.isActive) {
       throw new UnauthorizedException('Dashboard access required');
     }
-    if (!user.passwordHash) {
-      throw new BadRequestException('This account has no password set');
-    }
-    const ok = await bcrypt.compare(String(dto.currentPassword || ''), user.passwordHash);
-    if (!ok) {
+    if (!(await bcrypt.compare(String(dto.currentPassword || ''), admin.passwordHash))) {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    const nextEmailRaw = dto.newEmail != null ? String(dto.newEmail).trim().toLowerCase() : '';
+    const nextEmail = dto.newEmail != null ? String(dto.newEmail).trim().toLowerCase() : '';
     const nextPassword = dto.newPassword != null ? String(dto.newPassword) : '';
-    if (!nextEmailRaw && !nextPassword) {
+    if (!nextEmail && !nextPassword) {
       throw new BadRequestException('Provide a new email and/or a new password');
     }
-
-    if (nextEmailRaw) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmailRaw)) {
+    if (nextEmail) {
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail)) {
         throw new BadRequestException('Invalid email address');
       }
-      if (nextEmailRaw !== String(user.email || '').toLowerCase()) {
-        const taken = await this.usersRepo
-          .createQueryBuilder('u')
-          .where('LOWER(u.email) = :email', { email: nextEmailRaw })
-          .andWhere('u.id != :id', { id: user.id })
-          .getOne();
-        if (taken) {
-          throw new ConflictException('Email is already in use');
-        }
-        user.email = nextEmailRaw;
-      }
+      const taken = await this.adminUsersRepo
+        .createQueryBuilder('a')
+        .where('LOWER(a.email) = :email', { email: nextEmail })
+        .andWhere('a.id != :id', { id: admin.id })
+        .getOne();
+      if (taken) throw new ConflictException('Email is already in use');
+      admin.email = nextEmail;
     }
-
-    let passwordHash: string | null = null;
     if (nextPassword) {
       if (nextPassword.length < 8) {
         throw new BadRequestException('New password must be at least 8 characters');
       }
-      passwordHash = await bcrypt.hash(nextPassword, 12);
-      user.passwordHash = passwordHash;
+      admin.passwordHash = await bcrypt.hash(nextPassword, 12);
     }
-
-    await this.usersRepo.save(user);
-
-    const linked = await this.adminUsersRepo.find({
-      where: [{ linkedUserId: user.id }],
-    });
-    for (const row of linked) {
-      if (nextEmailRaw) row.email = nextEmailRaw;
-      if (passwordHash) row.passwordHash = passwordHash;
-      await this.adminUsersRepo.save(row);
-    }
-
-    return {
-      ok: true,
-      email: user.email,
-      username: user.username,
-      message: 'Admin credentials updated',
-    };
+    await this.adminUsersRepo.save(admin);
+    return { ok: true, email: admin.email, username: admin.username, message: 'Admin credentials updated' };
   }
 
-  // ─── Multi-admin operators (Super only) ─────────────────────
-
+  // Dashboard operators live exclusively in admin_users; no app-user row is created or modified.
   async listDashboardOperators() {
-    await this.ensureDashboardPermissionsColumn();
-    const items = await this.usersRepo
-      .createQueryBuilder('u')
-      .where('LOWER(COALESCE(u.staffRole, \'\')) = :role', { role: 'operator' })
-      .orderBy('u.createdAt', 'DESC')
-      .getMany();
+    await this.ensureDashboardAdminSchema();
+    const items = await this.adminUsersRepo.find({
+      where: { staffRole: 'operator' },
+      order: { createdAt: 'DESC' },
+    });
     return {
-      items: items.map((u) => this.publicAdminUser(u)),
+      items: items.map((admin) => this.publicDashboardAdmin(admin)),
       modules: [...DASHBOARD_MODULES],
     };
   }
@@ -2115,119 +3267,70 @@ export class AdminService {
     displayName?: string;
     permissions?: Record<string, string>;
   }) {
-    await this.ensureStaffRoleColumn();
-    await this.ensureDashboardPermissionsColumn();
-    const email = String(dto.email || '')
-      .trim()
-      .toLowerCase();
+    const email = String(dto.email || '').trim().toLowerCase();
     const password = String(dto.password || '');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
       throw new BadRequestException('Invalid email address');
     }
     if (password.length < 8) {
       throw new BadRequestException('Password must be at least 8 characters');
     }
-    const perms = normalizePermissions(dto.permissions);
-    if (!hasAnyPermission(perms)) {
-      throw new BadRequestException(
-        'Grant at least one module as read or write',
-      );
+    const permissions = normalizePermissions(dto.permissions);
+    if (!hasAnyPermission(permissions)) {
+      throw new BadRequestException('Grant at least one module as read or write');
     }
-    const existing = await this.usersRepo
-      .createQueryBuilder('u')
-      .where('LOWER(u.email) = :email', { email })
-      .getOne();
-    if (existing) {
-      // Promote existing user to operator only if not Super.
-      if (isDashboardSuper(existing)) {
-        throw new ConflictException('This email belongs to Super admin');
-      }
-      existing.staffRole = 'operator';
-      existing.isAdmin = false;
-      existing.dashboardPermissions = perms as Record<string, string>;
-      existing.passwordHash = await bcrypt.hash(password, 12);
-      if (dto.displayName?.trim()) {
-        existing.displayName = dto.displayName.trim();
-      }
-      if (!existing.email) existing.email = email;
-      await this.usersRepo.save(existing);
-      return this.publicAdminUser(existing);
-    }
+    const existing = await this.adminUsersRepo.findOne({ where: { email } });
+    if (existing) throw new ConflictException('Dashboard email is already in use');
 
-    const baseUsername =
-      email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) ||
-      'admin';
-    let username = baseUsername.slice(0, 24);
-    let n = 0;
-    while (await this.usersRepo.findOne({ where: { username } })) {
-      n += 1;
-      username = `${baseUsername.slice(0, 20)}${n}`;
+    const base = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 36) || 'admin';
+    let username = base;
+    let suffix = 0;
+    while (await this.adminUsersRepo.findOne({ where: { username } })) {
+      suffix += 1;
+      username = `${base.slice(0, 40)}_${suffix}`.slice(0, 48);
     }
-    const user = this.usersRepo.create({
+    const linked = await this.usersRepo.findOne({ where: { email } });
+    const admin = this.adminUsersRepo.create({
       email,
       username,
-      displayName: (dto.displayName || baseUsername || 'Admin').trim(),
+      displayName: String(dto.displayName || base || 'Admin').trim().slice(0, 120),
       passwordHash: await bcrypt.hash(password, 12),
+      role: AdminRole.MODERATOR,
       staffRole: 'operator',
-      isAdmin: false,
-      dashboardPermissions: perms as Record<string, string>,
-      status: UserStatus.ACTIVE,
-      emailVerified: true,
+      dashboardPermissions: permissions as Record<string, string>,
+      linkedUserId: linked?.id || null,
+      isActive: true,
     });
-    await this.usersRepo.save(user);
-    return this.publicAdminUser(user);
+    return this.publicDashboardAdmin(await this.adminUsersRepo.save(admin));
   }
 
   async updateDashboardOperator(
     id: string,
-    dto: {
-      displayName?: string;
-      password?: string;
-      permissions?: Record<string, string>;
-      active?: boolean;
-    },
+    dto: { displayName?: string; password?: string; permissions?: Record<string, string>; active?: boolean },
   ) {
-    await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || !isDashboardOperator(user)) {
-      throw new NotFoundException('Limited admin not found');
-    }
+    const admin = await this.adminUsersRepo.findOne({ where: { id, staffRole: 'operator' } });
+    if (!admin) throw new NotFoundException('Limited admin not found');
     if (dto.displayName != null) {
-      user.displayName = String(dto.displayName).trim() || user.displayName;
+      admin.displayName = String(dto.displayName).trim().slice(0, 120) || admin.displayName;
     }
     if (dto.password) {
-      if (String(dto.password).length < 8) {
-        throw new BadRequestException('Password must be at least 8 characters');
-      }
-      user.passwordHash = await bcrypt.hash(String(dto.password), 12);
+      if (String(dto.password).length < 8) throw new BadRequestException('Password must be at least 8 characters');
+      admin.passwordHash = await bcrypt.hash(String(dto.password), 12);
     }
     if (dto.permissions != null) {
-      const perms = normalizePermissions(dto.permissions);
-      if (!hasAnyPermission(perms)) {
-        throw new BadRequestException(
-          'Grant at least one module as read or write',
-        );
-      }
-      user.dashboardPermissions = perms as Record<string, string>;
+      const permissions = normalizePermissions(dto.permissions);
+      if (!hasAnyPermission(permissions)) throw new BadRequestException('Grant at least one module as read or write');
+      admin.dashboardPermissions = permissions as Record<string, string>;
     }
-    if (typeof dto.active === 'boolean') {
-      user.status = dto.active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
-    }
-    user.staffRole = 'operator';
-    user.isAdmin = false;
-    await this.usersRepo.save(user);
-    return this.publicAdminUser(user);
+    if (typeof dto.active === 'boolean') admin.isActive = dto.active;
+    return this.publicDashboardAdmin(await this.adminUsersRepo.save(admin));
   }
 
   async removeDashboardOperator(id: string) {
-    const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || !isDashboardOperator(user)) {
-      throw new NotFoundException('Limited admin not found');
-    }
-    user.staffRole = null;
-    user.isAdmin = false;
-    user.dashboardPermissions = null;
-    await this.usersRepo.save(user);
+    const admin = await this.adminUsersRepo.findOne({ where: { id, staffRole: 'operator' } });
+    if (!admin) throw new NotFoundException('Limited admin not found');
+    admin.isActive = false;
+    await this.adminUsersRepo.save(admin);
     return { ok: true };
   }
 
@@ -2373,6 +3476,7 @@ export class AdminService {
       relations: ['profile', 'wallet'],
     });
     if (!user) throw new NotFoundException('User not found');
+    const originalUserLevel = Number(user.level || 1);
 
     const displayName =
       typeof body.displayName === 'string'
@@ -2476,14 +3580,61 @@ export class AdminService {
     // VIP level shortcut: assign by numeric level if vipLevel provided.
     if (body.vipLevel != null && Number.isFinite(Number(body.vipLevel))) {
       const vipLevel = Math.max(0, Math.floor(Number(body.vipLevel)));
+      const previousVip = await this.userVipRepo.findOne({
+        where: { userId: id, isActive: true },
+        order: { level: 'DESC' },
+      });
+      const previousVipLevel =
+        previousVip && (!previousVip.expiresAt || previousVip.expiresAt > new Date())
+          ? Number(previousVip.level || 0)
+          : 0;
       if (vipLevel <= 0) {
         await this.revokeActiveVip(id);
       } else {
         await this.assignVipByLevel(id, vipLevel);
       }
+
+      if (vipLevel < previousVipLevel) {
+        // Lowering VIP must immediately remove wear that the new tier no longer
+        // qualifies for, instead of leaving stale equipped frames/entry effects.
+        await this.dataSource.query(
+          `UPDATE user_cosmetics owned
+              SET equipped = false
+             FROM cosmetics cosmetic
+            WHERE owned."cosmeticId" = cosmetic.id
+              AND owned."userId" = $1
+              AND owned.equipped = true
+              AND COALESCE(cosmetic."minVipLevel", 0) > $2`,
+          [id, vipLevel],
+        );
+        profile.vipBadgeUrl = null;
+        profile.hostBadgeUrl = null;
+        await this.profilesRepo.save(profile);
+        user.profile = profile;
+      }
+    }
+
+    if (body.level != null && Number.isFinite(Number(body.level))) {
+      const newLevel = Math.max(1, Math.min(9999, Math.floor(Number(body.level))));
+      await this.dataSource.query(
+        `UPDATE user_cosmetics owned
+            SET equipped = false
+           FROM cosmetics cosmetic
+          WHERE owned."cosmeticId" = cosmetic.id
+            AND owned."userId" = $1
+            AND owned.equipped = true
+            AND COALESCE(cosmetic."minUserLevel", 0) > $2`,
+        [id, newLevel],
+      );
+      if (newLevel < originalUserLevel) {
+        profile.levelBadgeUrl = null;
+        await this.profilesRepo.save(profile);
+        user.profile = profile;
+      }
     }
 
     await this.usersRepo.save(user);
+    this.securityShield.invalidateUserBanCache(id);
     if (user.status !== UserStatus.ACTIVE) {
       await this.realtimeGateway.ejectUserEverywhere(
         id,
@@ -2494,6 +3645,7 @@ export class AdminService {
       where: { id },
       relations: ['profile', 'wallet'],
     });
+    await this.realtimeGateway.refreshUserProfile(id, 'admin_user_updated');
     return this.mapAdminUser(refreshed!);
   }
 
@@ -2536,7 +3688,9 @@ export class AdminService {
       items.map((r: any) => ({
         ...r,
         userName: r.user?.displayName || r.user?.username || '—',
+        userPublicId: r.user?.publicId || null,
         coins: r.coins ?? r.coinAmount ?? 0,
+        shamCashReceipt: r.provider === 'sham_cash' ? (r.providerPayload || null) : null,
         providerLabel:
           r.provider === 'sham_cash'
             ? 'شام كاش'
@@ -2564,35 +3718,77 @@ export class AdminService {
     );
   }
 
-  async completeRechargeOrder(orderId: string, providerPaymentId?: string, note?: string) {
+  async completeRechargeOrder(orderId: string, providerPaymentId?: string, note?: string, adminId?: string) {
     const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('طلب الشحن غير موجود');
     if (order.status !== RechargeStatus.PENDING) {
       throw new BadRequestException('الطلب ليس معلّقاً');
     }
+    const payload = (order.providerPayload || {}) as Record<string, any>;
+    if (order.provider === 'sham_cash' && !payload.receiptSubmittedAt) {
+      throw new BadRequestException('لا يمكن اعتماد طلب شام كاش قبل استلام الإيصال');
+    }
+
     const completed = await this.walletService.completeRecharge(
       orderId,
       providerPaymentId || `admin_confirm_${Date.now()}`,
     );
-    if (note) {
-      completed.providerPayload = {
-        ...(completed.providerPayload || {}),
-        adminNote: note,
-        confirmedAt: new Date().toISOString(),
-      };
-      await this.rechargeRepo.save(completed);
+    completed.providerPayload = {
+      ...((completed.providerPayload || {}) as Record<string, any>),
+      ...(note ? { adminNote: note } : {}),
+      confirmedAt: new Date().toISOString(),
+      ...(adminId ? { confirmedBy: adminId } : {}),
+      ...(completed.provider === 'sham_cash' ? { receiptStatus: 'approved' } : {}),
+    };
+    await this.rechargeRepo.save(completed);
+
+    if (completed.provider === 'sham_cash') {
+      await this.notificationsService.notifyUser(
+        completed.userId,
+        NotificationType.WALLET,
+        'تم تأكيد الدفع بنجاح',
+        `تمت مراجعة إيصال شام كاش وتفعيل باقتك بنجاح. تمت إضافة ${Number(completed.coins || 0) + Number(completed.bonusCoins || 0)} كوينز إلى حسابك.`,
+        {
+          kind: 'sham_cash_payment_approved',
+          orderId: completed.id,
+          targetUserId: completed.userId,
+          userId: completed.userId,
+          publicUserId: (await this.usersRepo.findOne({ where: { id: completed.userId }, select: ['publicId'] }))?.publicId || null,
+          coins: Number(completed.coins || 0) + Number(completed.bonusCoins || 0),
+          sku: completed.sku,
+        },
+      );
     }
     return completed;
   }
 
-  async cancelRechargeOrder(orderId: string) {
+  async cancelRechargeOrder(orderId: string, note?: string) {
     const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('طلب الشحن غير موجود');
     if (order.status !== RechargeStatus.PENDING) {
       throw new BadRequestException('الطلب ليس معلّقاً');
     }
     order.status = RechargeStatus.CANCELLED;
-    return this.rechargeRepo.save(order);
+    const payload = (order.providerPayload || {}) as Record<string, any>;
+    if (order.provider === 'sham_cash') {
+      order.providerPayload = {
+        ...payload,
+        receiptStatus: 'rejected',
+        rejectionReason: String(note || 'تعذر التحقق من التحويل').trim().slice(0, 300),
+        rejectedAt: new Date().toISOString(),
+      };
+    }
+    const saved = await this.rechargeRepo.save(order);
+    if (order.provider === 'sham_cash' && payload.receiptSubmittedAt) {
+      await this.notificationsService.notifyUser(
+        order.userId,
+        NotificationType.WALLET,
+        'تعذر قبول إيصال التحويل',
+        String(note || 'تعذر التحقق من إيصال شام كاش. يرجى مراجعة الإدارة وإعادة إرسال طلب جديد.').trim().slice(0, 300),
+        { kind: 'sham_cash_payment_rejected', orderId: order.id, targetUserId: order.userId, userId: order.userId },
+      );
+    }
+    return saved;
   }
 
   listRechargePackages() {
@@ -2627,6 +3823,9 @@ export class AdminService {
       badgeUrl:
         p.badgeUrl ||
         `/assets/cosmetics/vip/vip_medal_mikoo_${Math.min(7, Math.max(1, p.level || 1))}.png?v=20260801vip7`,
+      visuals: (p.benefits as any)?.visuals || {},
+      vipMainIconUrl: ((p.benefits as any)?.visuals || {}).vipMainIconUrl || null,
+      vipHorizontalBadgeUrl: ((p.benefits as any)?.visuals || {}).vipHorizontalBadgeUrl || null,
       benefits: p.benefits?.extra?.length
         ? p.benefits.extra
         : [
@@ -2678,6 +3877,17 @@ export class AdminService {
       extra: Array.isArray(body.benefits) ? body.benefits : [],
     };
     if (Array.isArray(body.benefits)) benefits.extra = body.benefits;
+    // Keep tier-specific visual assets in the existing JSON column: additive,
+    // backward-compatible, and no table reset or destructive migration required.
+    const incomingVisuals = body.visuals && typeof body.visuals === 'object' && !Array.isArray(body.visuals)
+      ? body.visuals as Record<string, unknown>
+      : null;
+    const currentVisuals = (benefits as any).visuals && typeof (benefits as any).visuals === 'object'
+      ? (benefits as any).visuals
+      : {};
+    if (incomingVisuals) {
+      (benefits as any).visuals = { ...currentVisuals, ...incomingVisuals };
+    }
     if (!plan) {
       plan = this.vipRepo.create({
         level,
@@ -2694,6 +3904,7 @@ export class AdminService {
       }
       if (body.level != null) plan.level = level;
       plan.benefits = benefits;
+      if (body.badgeUrl !== undefined) plan.badgeUrl = String(body.badgeUrl || '').trim() || null;
       if (typeof body.isActive === 'boolean') plan.isActive = body.isActive;
     }
     return this.vipRepo.save(plan);
@@ -2707,17 +3918,31 @@ export class AdminService {
     return { deleted: true, id };
   }
 
-  async assignVip(body: { userId: string; planId: string }) {
+  async assignVip(body: { userId: string; planId: string; days?: number; permanent?: boolean }) {
     const plan = await this.vipRepo.findOne({ where: { id: body.planId } });
     if (!plan) throw new NotFoundException('VIP plan not found');
-    const user = await this.usersRepo.findOne({ where: { id: body.userId } });
+    // Native admin accepts the public User ID shown in the app as well as the internal UUID.
+    const lookup = String(body.userId || '').trim();
+    if (!lookup) throw new BadRequestException('User ID is required');
+    const user = await this.usersRepo.findOne({
+      where: [{ id: lookup }, { publicId: lookup }],
+    });
     if (!user) throw new NotFoundException('User not found');
-    await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
+    const permanent = body.permanent === true;
+    const days = Number(body.days ?? 30);
+    // The controller applies rank-specific limits (Admin: 1/3/7/15; Super Admin: 7/15/30 or permanent).
+    if (!permanent && ![1, 3, 7, 15, 30].includes(days)) {
+      throw new BadRequestException('VIP duration must be 1, 3, 7, 15 or 30 days, or permanent=true');
+    }
+    await this.userVipRepo.update({ userId: user.id, isActive: true }, { isActive: false });
     const startsAt = new Date();
-    const expiresAt = new Date(startsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
-    return this.userVipRepo.save(
+    // UserVip.expiresAt is non-null in the existing schema; year 9999 represents permanent VIP without a migration.
+    const expiresAt = permanent
+      ? new Date('9999-12-31T23:59:59.999Z')
+      : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
+    const grant = await this.userVipRepo.save(
       this.userVipRepo.create({
-        userId: body.userId,
+        userId: user.id,
         vipPlanId: plan.id,
         level: plan.level,
         startsAt,
@@ -2725,6 +3950,28 @@ export class AdminService {
         isActive: true,
       }),
     );
+    try {
+      const durationText = permanent ? 'دائمة – بدون تاريخ انتهاء' : days + ' يوم';
+      await this.notificationsService.create({
+        userId: user.id,
+        type: NotificationType.SYSTEM,
+        title: 'تم إرسال VIP لك من الإدارة',
+        body: 'تم إرسال VIP مستوى ' + plan.level + ' لك من الإدارة. مدة الصلاحية: ' + durationText + '.',
+        data: {
+          officialNews: true,
+          adminVipGrant: true,
+          vipId: grant.id,
+          vipPlanId: plan.id,
+          vipLevel: plan.level,
+          expiresAt: grant.expiresAt,
+          durationDays: permanent ? null : days,
+        },
+        sendPush: true,
+      });
+    } catch {
+      // Notification failure must not roll back the already committed VIP grant.
+    }
+    return grant;
   }
 
   async revokeVip(id: string) {
@@ -2812,7 +4059,14 @@ export class AdminService {
       }
 
       application.reviewNote = note || null;
-      application.reviewedById = adminId;
+      // Dashboard staff IDs belong to admin_users, while agency_applications.reviewedById
+      // references users(id). Only persist the reviewer when that ID exists in users;
+      // otherwise PostgreSQL rejects the approval with an agency_applications FK error.
+      const reviewerUser = await manager.findOne(User, {
+        where: { id: adminId },
+        select: ['id'],
+      });
+      application.reviewedById = reviewerUser?.id ?? null;
       application.reviewedAt = new Date();
       if (action === 'reject' || action === 'request_changes') {
         application.status =
@@ -3421,6 +4675,14 @@ export class AdminService {
       order: { createdAt: 'DESC' },
     });
     return paginate(items, total, query.page || 1, query.limit || 20);
+  }
+
+  async notificationsFcmStatus() {
+    return this.notificationsService.fcmDeliveryStatus();
+  }
+
+  async sendNotificationsFcmTest(adminUserId: string) {
+    return this.notificationsService.sendFcmTest(adminUserId);
   }
 
   async sendNotification(body: {

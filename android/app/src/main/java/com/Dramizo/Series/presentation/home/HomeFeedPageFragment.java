@@ -57,7 +57,8 @@ public class HomeFeedPageFragment extends Fragment {
         recycler.setClipToPadding(false);
         recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recycler.setItemAnimator(null);
-        recycler.setItemViewCacheSize(20);
+        // Keep four rows of recycled room cards warm without pinning 20 image-heavy holders.
+        recycler.setItemViewCacheSize(8);
         float d = getResources().getDisplayMetrics().density;
         // Mikoo fragment_home_live_list: paddingStart=3, paddingEnd=10
         recycler.setPadding((int) (3 * d), (int) (10 * d), (int) (10 * d), (int) (96 * d));
@@ -142,8 +143,8 @@ public class HomeFeedPageFragment extends Fragment {
     }
 
     private boolean idsPrefixMatch(List<RoomDtos.RoomDto> filtered, int prefix) {
-        if (roomAdapter == null || roomAdapter.getRoomCount() < prefix) return false;
-        return roomAdapter.getRoomCount() == prefix;
+        return roomAdapter != null && roomAdapter.getRoomCount() >= prefix
+                && roomAdapter.matchesPrefix(filtered, prefix);
     }
 
     private String countryFilter() {
@@ -189,8 +190,18 @@ public class HomeFeedPageFragment extends Fragment {
             ((HomeFragment) parent).openVoiceRoomFromPage(room);
         } else if (room != null && room.id != null) {
             RecentRoomsStore.remember(requireContext(), room);
+            // Keep the standalone feed path as fast as the HomeFragment route:
+            // start the HTTP join before the large room Activity is inflated.
+            com.Dramizo.Series.util.RoomJoinPrefetch.begin(
+                    requireContext(), room.id, null);
             Intent i = new Intent(requireContext(), VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+            if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+                i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID,
+                        room.displayRoomId.trim());
+            }
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                    com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room));
             startActivity(i);
         }
     }

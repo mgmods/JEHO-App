@@ -33,6 +33,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { normalizeStaffRole } from '../../common/staff-role';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 import { ZegoTokenService } from '../zego/zego-token.service';
 
@@ -49,7 +50,23 @@ const ALLOWED_ROOM_EVENTS = new Set([
   'chat:message',
   'room:summon',
   'room:chat_cleared',
+  'room:music_volume',
+  'challenge:wheel:spin',
+  'challenge:wheel:close',
 ]);
+
+const CHALLENGE_WHEEL_ITEMS = [
+  'فقرة تحدي الالغاز',
+  'فقرة رسالة من مجهول',
+  'فقرة الاسئلة',
+  'فقرة تحدي الاجابة السريعة بين شخصين',
+  'فقرة كرسي الإعتراف',
+  'فقرة احزر الاغنية او اكمل المثل التالي',
+  'فقرة المايك المفخخ',
+  'فقرة صراحة ام جراءة',
+  'فقرة الحزازير',
+  'فقرة حقيقتان وكذبة',
+] as const;
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -61,6 +78,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly onlineUsers = new Map<string, Set<string>>();
+  /** Delay disconnect cleanup so brief network/socket reconnects do not eject room members. */
+  private readonly roomDisconnectCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private static readonly ROOM_RECONNECT_GRACE_MS = 30_000;
+  /** Live-session music gain; defaults to full volume and does not alter mic gain. */
+  private readonly roomMusicVolumes = new Map<string, number>();
+  /** Prevent two staff members from starting overlapping challenge-wheel spins. */
+  private readonly roomChallengeWheelLocks = new Map<string, number>();
+  private mysteriousPolicyCache: { row: AppSetting | null; failed: boolean; expiresAt: number } | null = null;
+  private mysteriousPolicyLookup?: Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }>;
+  /** Last server-authoritative room alias per connected account; refreshed on join/toggle. */
+  private readonly mysteriousIdentityCache = new Map<string, {
+    displayName: string;
+    username: string;
+    frameUrl: string | null;
+  }>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -92,6 +124,54 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly moderation: ContentModerationService,
     private readonly zegoTokenService: ZegoTokenService,
   ) {}
+
+  /** Cache the tiny dashboard policy briefly to avoid a database read for every chat message. */
+  private async mysteriousPolicy(): Promise<{ row: AppSetting | null; failed: boolean; expiresAt: number }> {
+    const now = Date.now();
+    if (this.mysteriousPolicyCache && this.mysteriousPolicyCache.expiresAt > now) {
+      return this.mysteriousPolicyCache;
+    }
+    if (this.mysteriousPolicyLookup) return this.mysteriousPolicyLookup;
+    this.mysteriousPolicyLookup = this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } })
+      .then((row) => ({ row, failed: false, expiresAt: Date.now() + 5_000 }))
+      .catch(() => ({ row: null, failed: true, expiresAt: Date.now() + 2_000 }))
+      .then((result) => {
+        this.mysteriousPolicyCache = result;
+        return result;
+      })
+      .finally(() => { this.mysteriousPolicyLookup = undefined; });
+    return this.mysteriousPolicyLookup;
+  }
+
+  /** Keep realtime identity in lockstep with VIP status and the dashboard's live policy. */
+  private async isMysteriousModeEligible(user: User | null | undefined, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    const currentPolicy = await this.mysteriousPolicy();
+    if (currentPolicy.failed) return false; // fail closed when eligibility cannot be verified
+    const policyRow = currentPolicy.row;
+    const benefits = vip.vipPlan?.benefits as any;
+    if (policyRow) {
+      let policy: any = {};
+      try {
+        policy = typeof policyRow.value === 'string'
+          ? JSON.parse(policyRow.value)
+          : (policyRow.value || {});
+      } catch {
+        return false;
+      }
+      const levels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && levels.includes(level);
+    }
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
+  }
 
   async handleConnection(client: AuthSocket) {
     try {
@@ -140,13 +220,47 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       .in(`user:${client.userId}`)
       .fetchSockets();
     if (remainingSockets.length === 0) {
+      // Give mobile clients time to reconnect after brief network changes or app backgrounding.
+      // A successful room:join cancels this timer, so users are not removed during reconnect.
       for (const roomId of joinedRoomIds) {
-        await this.autoLeaveSeatOnDisconnect(client.userId, roomId);
+        this.scheduleDisconnectCleanup(client.userId, roomId);
       }
     }
     for (const roomId of joinedRoomIds) {
       await this.emitRoomMembers(roomId);
     }
+  }
+
+  private disconnectCleanupKey(userId: string, roomId: string): string {
+    return `${userId}:${roomId}`;
+  }
+
+  private cancelDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.disconnectCleanupKey(userId, roomId);
+    const timer = this.roomDisconnectCleanupTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      this.roomDisconnectCleanupTimers.delete(key);
+    }
+  }
+
+  private scheduleDisconnectCleanup(userId: string, roomId: string): void {
+    const key = this.disconnectCleanupKey(userId, roomId);
+    this.cancelDisconnectCleanup(userId, roomId);
+    const timer = setTimeout(async () => {
+      this.roomDisconnectCleanupTimers.delete(key);
+      try {
+        // A reconnect on any socket cancels cleanup, including reconnects across tabs/devices.
+        const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+        if (sockets.length > 0) return;
+        await this.autoLeaveSeatOnDisconnect(userId, roomId);
+      } catch (err) {
+        this.logger.warn(
+          `Delayed disconnect cleanup failed for ${userId}/${roomId}: ${(err as Error).message}`,
+        );
+      }
+    }, RealtimeGateway.ROOM_RECONNECT_GRACE_MS);
+    this.roomDisconnectCleanupTimers.set(key, timer);
   }
 
   /** When the user's last socket drops, free any voice-room mic seat they occupied. */
@@ -158,6 +272,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }),
       this.roomsRepo.findOne({ where: { id: roomId } }),
     ]);
+    const leaveIdentity = room
+      ? await this.buildJoinPayload(userId, roomId, room.hostId)
+      : null;
     if (seated) {
       await this.roomSeats.update(
         { roomId, userId },
@@ -171,7 +288,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(`room:${roomId}`).emit('room:event', {
         roomId,
         event: 'room:seat_left',
-        payload: { roomId, userId },
+        payload: {
+          roomId,
+          userId,
+          displayName: leaveIdentity?.displayName || null,
+          username: leaveIdentity?.username || null,
+          avatarUrl: leaveIdentity?.avatarUrl || null,
+          mysteriousMan: leaveIdentity?.mysteriousMan === true,
+        },
         at: new Date().toISOString(),
       });
     }
@@ -195,6 +319,44 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     void this.emitRoomMembers(roomId);
   }
 
+  /** Resolve a user's currently joined voice room from authenticated Socket.IO presence. */
+  async activeRoomForUser(userId: string): Promise<string | null> {
+    if (!userId) return null;
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      const profiles = (socket.data as any)?.roomProfiles || {};
+      for (const roomId of Object.keys(profiles)) {
+        if (!socket.rooms.has(`room:${roomId}`)) continue;
+        const room = await this.roomsRepo.findOne({
+          where: { id: roomId },
+          select: ['id', 'status'],
+        });
+        if (room && room.status !== RoomStatus.CLOSED) return room.id;
+      }
+    }
+    return null;
+  }
+
+  /** Resolve the active room and its public title for privacy-approved presence display. */
+  async activeRoomDetailsForUser(userId: string): Promise<{ roomId: string; roomName: string } | null> {
+    if (!userId) return null;
+    const sockets = await this.server.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      const profiles = (socket.data as any)?.roomProfiles || {};
+      for (const roomId of Object.keys(profiles)) {
+        if (!socket.rooms.has(`room:${roomId}`)) continue;
+        const room = await this.roomsRepo.findOne({
+          where: { id: roomId },
+          select: ['id', 'title', 'status'],
+        });
+        if (room && room.status !== RoomStatus.CLOSED) {
+          return { roomId: room.id, roomName: room.title || 'غرفة صوتية' };
+        }
+      }
+    }
+    return null;
+  }
+
   @SubscribeMessage('room:join')
   async onRoomJoin(
     @ConnectedSocket() client: AuthSocket,
@@ -209,6 +371,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     if (!data?.roomId || !client.userId) return;
 
+    // A successful room rejoin cancels pending cleanup from an earlier socket drop.
+    this.cancelDisconnectCleanup(client.userId, data.roomId);
     const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
     if (!room) return { error: 'Room not found' };
     if (room.status === RoomStatus.CLOSED) return { error: 'Room is closed' };
@@ -238,13 +402,36 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
     const profilePayload = await this.buildJoinPayload(client.userId, data.roomId, room.hostId);
 
+    // Avoid replaying club-entry announcements on socket rejoin, duplicate tabs,
+    // or a second device. Only announce a real transition from absent to present.
+    const roomChannel = `room:${data.roomId}`;
+    const alreadyInRoomOnThisSocket = client.rooms.has(roomChannel);
+    const existingRoomSockets = alreadyInRoomOnThisSocket
+      ? []
+      : await this.server.in(roomChannel).fetchSockets();
+    const userAlreadyPresent = alreadyInRoomOnThisSocket ||
+      existingRoomSockets.some((socket) => socket.data?.userId === client.userId);
+
     client.data.roomProfiles = client.data.roomProfiles || {};
     client.data.roomProfiles[data.roomId] = profilePayload;
-    client.join(`room:${data.roomId}`);
+    client.join(roomChannel);
+    // Voice-room advertising is globally synchronized across active room clients.
+    client.join('rooms:all');
+    const musicVolume = this.roomMusicVolumes.get(data.roomId);
+    if (musicVolume !== undefined) {
+      client.emit('room:event', {
+        roomId: data.roomId,
+        event: 'room:music_volume',
+        payload: { volume: musicVolume },
+        at: new Date().toISOString(),
+      });
+    }
     this.server.to(`room:${data.roomId}`).emit('room:user_joined', {
       roomId: data.roomId,
       ...profilePayload,
     });
+
+    // Legacy supporter-club announcements are disabled because this relation is not in the current schema.
 
     const membersPayload = await this.emitRoomMembers(data.roomId);
     this.server.to(`room:${data.roomId}`).emit('room:event', {
@@ -261,6 +448,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private async buildJoinPayload(userId: string, roomId: string, hostId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     const profile = await this.profilesRepo.findOne({ where: { userId } });
+    // Resolve approved agency identity independently from room staff permissions.
+    // Legacy supporter-club relation is not part of the current schema.
+    const agencyClub = null;
     const activeCosmeticRows: Array<{
       type: string;
       previewUrl: string | null;
@@ -321,16 +511,30 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       null;
     const vip = await this.userVipRepo.findOne({
       where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
+      relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
     const vipLevel = effectiveVipLevel(
       Number(vip?.level || 0),
       Number(profile?.totalSentCoins || 0),
     );
+    const benefits = vip?.vipPlan?.benefits as any;
+    const mysteriousMode = await this.isMysteriousModeEligible(user, vip);
+    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    const mysteriousFrameUrl = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
+    if (mysteriousMode) {
+      this.mysteriousIdentityCache.set(userId, {
+        displayName: 'الرجل الغامض',
+        username: 'mysterious_man',
+        frameUrl: mysteriousFrameUrl || null,
+      });
+    } else {
+      this.mysteriousIdentityCache.delete(userId);
+    }
     const spent = await this.roomSpendCoins(userId, roomId);
     const supporterTier = await this.resolveSupporterTier(vipLevel, spent);
-    const displayName = user?.displayName || user?.username || 'User';
-    const avatarUrl = user?.avatarUrl || null;
+    const displayName = mysteriousMode ? 'الرجل الغامض' : (user?.displayName || user?.username || 'User');
+    const avatarUrl = mysteriousMode ? null : (user?.avatarUrl || null);
     const entryEffectUrl =
       (entryRow ? entryRow.previewUrl : null) ||
       activeUrl(profile?.entryEffectUrl) ||
@@ -373,7 +577,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           normalizeUrl(c.previewUrl) === normalizeUrl(previewUrl) ||
           normalizeUrl(c.animationUrl) === normalizeUrl(animationUrl),
       )?.meta as Record<string, unknown> | null) ?? null;
-    const entryEffectMeta = metaFor(entryEffectUrl, entryAnimationUrl);
+    const rawEntryEffectMeta = metaFor(entryEffectUrl, entryAnimationUrl);
+    // Private-entry ownership and admin-only notes must never be broadcast to the room.
+    // Keep only the visual playback hints the existing room renderer understands.
+    const entryEffectMeta = rawEntryEffectMeta?.privateEntry === true
+      ? {
+          effectPriority: rawEntryEffectMeta.effectPriority,
+          renderMode: rawEntryEffectMeta.renderMode,
+          aspectRatio: rawEntryEffectMeta.aspectRatio,
+          textSafeArea: rawEntryEffectMeta.textSafeArea,
+          durationMs: rawEntryEffectMeta.privateVideoDurationMs ?? rawEntryEffectMeta.durationMs,
+        }
+      : rawEntryEffectMeta;
     const cosmeticMeta =
       entryEffectUrl || entryAnimationUrl ? entryEffectMeta : null;
     const metadataPriority = Number(cosmeticMeta?.effectPriority);
@@ -388,7 +603,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     return {
       userId,
-      username: user?.username || displayName,
+      agencyClub,
+      username: mysteriousMode ? 'mysterious_man' : (user?.username || displayName),
       displayName,
       avatarUrl,
       vipLevel,
@@ -397,7 +613,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       entryAnimationUrl,
       animationUrl: entryAnimationUrl,
       roomCardUrl,
-      vipBadgeUrl,
+      vipBadgeUrl: mysteriousMode ? (mysteriousFrameUrl || vipBadgeUrl) : vipBadgeUrl,
+      frameUrl: mysteriousMode ? (mysteriousFrameUrl || vipBadgeUrl) : vipBadgeUrl,
+      mysteriousMan: mysteriousMode,
       levelBadgeUrl,
       hostBadgeUrl,
       isHost,
@@ -467,6 +685,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!data?.roomId) return;
     if (client.data.roomProfiles) delete client.data.roomProfiles[data.roomId];
     client.leave(`room:${data.roomId}`);
+    // Keep global ad fan-out membership only while this socket is in at least
+    // one active room; a later room:join will subscribe it again automatically.
+    if (Object.keys(client.data.roomProfiles || {}).length === 0) {
+      client.leave('rooms:all');
+    }
 
     const membersPayload = await this.emitRoomMembers(data.roomId);
     const viewerCount = membersPayload?.viewerCount ?? 0;
@@ -617,7 +840,88 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: 'Event payload is too large' };
     }
     let payload: Record<string, unknown> = { ...incoming, userId: client.userId };
-    if (data.event === 'room:summon') {
+    if (data.event === 'challenge:wheel:spin' || data.event === 'challenge:wheel:close') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      const isRoomLead =
+        !!room &&
+        (room.hostId === client.userId ||
+          room.activeHostId === client.userId ||
+          room.cohostId === client.userId);
+      let canManageWheel = isRoomLead;
+      if (!canManageWheel) {
+        const user = await this.usersRepo.findOne({
+          where: { id: client.userId },
+          select: ['id', 'staffRole', 'isAdmin'],
+        });
+        const platformRole = normalizeStaffRole(user);
+        canManageWheel = platformRole === 'manager' ||
+          platformRole === 'admin' ||
+          platformRole === 'super';
+      }
+      if (!canManageWheel) {
+        const mod = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        canManageWheel = mod?.canManageRoom === true ||
+          mod?.canKick === true ||
+          mod?.canBan === true;
+      }
+      if (!canManageWheel) return { error: 'Only room staff can manage the challenge wheel' };
+
+      if (data.event === 'challenge:wheel:close') {
+        this.roomChallengeWheelLocks.delete(data.roomId);
+        this.server.to(`room:${data.roomId}`).emit('room:event', {
+          roomId: data.roomId,
+          event: 'challenge:wheel:closed',
+          payload: { roomId: data.roomId, userId: client.userId, closedAt: new Date().toISOString() },
+          from: { userId: client.userId, username: String(profile.username || client.username || '') },
+          at: new Date().toISOString(),
+        });
+        return { ok: true, closed: true };
+      }
+
+      // The server chooses the outcome; clients only animate this authoritative result.
+      const now = Date.now();
+      const lockedUntil = this.roomChallengeWheelLocks.get(data.roomId) || 0;
+      if (lockedUntil > now) return { error: 'The challenge wheel is already spinning' };
+      const index = Math.floor(Math.random() * CHALLENGE_WHEEL_ITEMS.length);
+      const startAt = now + 1200;
+      this.roomChallengeWheelLocks.set(data.roomId, startAt + 6200);
+      const wheelPayload = {
+        userId: client.userId,
+        index,
+        label: CHALLENGE_WHEEL_ITEMS[index],
+        spinId: `${Date.now()}-${client.userId}`,
+        startAt,
+      };
+      this.server.to(`room:${data.roomId}`).emit('room:event', {
+        roomId: data.roomId,
+        event: 'challenge:wheel:result',
+        payload: wheelPayload,
+        from: { userId: client.userId, username: String(profile.username || client.username || '') },
+        at: new Date().toISOString(),
+      });
+      return { ok: true, ...wheelPayload };
+    } else if (data.event === 'room:music_volume') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      if (!room) return { error: 'Room not found' };
+      let canControlMusic =
+        room.hostId === client.userId ||
+        room.activeHostId === client.userId ||
+        room.cohostId === client.userId;
+      if (!canControlMusic) {
+        const mod = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        canControlMusic = mod?.canManageMusic === true;
+      }
+      if (!canControlMusic) return { error: 'Music permission is required' };
+      const rawVolume = Number(incoming.volume);
+      if (!Number.isFinite(rawVolume)) return { error: 'Invalid music volume' };
+      const volume = Math.max(0, Math.min(1, rawVolume));
+      this.roomMusicVolumes.set(data.roomId, volume);
+      payload = { userId: client.userId, volume };
+    } else if (data.event === 'room:summon') {
       payload = {
         userId: client.userId,
         hostId: client.userId,
@@ -732,12 +1036,24 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         (agencyRoom ? hostBadgeUrl : vipBadgeUrl) ||
         (typeof incoming.frameUrl === 'string' && incoming.frameUrl) ||
         null;
+      const senderUser = await this.usersRepo.findOne({ where: { id: client.userId! } });
+      const senderVip = await this.userVipRepo.findOne({
+        where: { userId: client.userId!, isActive: true, expiresAt: MoreThan(new Date()) },
+        relations: ['vipPlan'],
+        order: { level: 'DESC' },
+      });
+      const senderBenefits = senderVip?.vipPlan?.benefits as any;
+      const mysteriousMan = await this.isMysteriousModeEligible(senderUser, senderVip);
+      const roomDisplayName = mysteriousMan
+        ? 'الرجل الغامض'
+        : (profile.displayName || client.username || 'User');
       payload = {
         text,
         userId: client.userId,
-        name: profile.displayName || client.username || 'User',
-        displayName: profile.displayName || client.username || 'User',
-        avatarUrl: profile.avatarUrl || null,
+        name: roomDisplayName,
+        displayName: roomDisplayName,
+        avatarUrl: mysteriousMan ? null : (profile.avatarUrl || null),
+        mysteriousMan,
         vipLevel: Number(profile.vipLevel || 0),
         userLevel: Math.max(1, Number(profile.userLevel || 1)),
         wealthScore: wealthLevel,
@@ -745,10 +1061,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         totalSentCoins: Number(profile.totalSentCoins || incoming.totalSentCoins || 0),
         charmScore: charmLevel,
         charmLevel,
-        frameUrl,
-        vipBadgeUrl,
-        hostBadgeUrl,
-        isHost: !!profile.isHost,
+        frameUrl: mysteriousMan ? null : frameUrl,
+        vipBadgeUrl: mysteriousMan ? null : vipBadgeUrl,
+        hostBadgeUrl: mysteriousMan ? null : hostBadgeUrl,
+        isHost: mysteriousMan ? false : !!profile.isHost,
       };
     } else if (data.event === 'room:like') {
       const finite = (value: unknown) => {
@@ -787,26 +1103,84 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           }
           rememberSeatStickersCache(cfg);
         }
+        if (!cfg || cfg.enabled === false) {
+          return { error: 'Seat stickers are disabled' };
+        }
+        const sticker = (cfg.items || []).find((item) =>
+          item && item.isActive !== false && item.key === emojiKey && item.url);
+        if (!sticker) return { error: 'Invalid reaction' };
+        const category = (cfg.categories || []).find((item) => item.id === sticker.categoryId && item.isActive !== false);
+        if (!category) return { error: 'Sticker category is unavailable' };
+        const requiredAudience = category.audience !== 'all' ? category.audience : sticker.audience;
+        if (requiredAudience === 'male' || requiredAudience === 'female') {
+          const user = await this.usersRepo.findOne({
+            where: { id: client.userId },
+            select: ['id', 'gender', 'genderVerified'],
+          });
+          if (!user || user.gender !== requiredAudience ||
+              (requiredAudience === 'female' && user.genderVerified !== true)) {
+            return { error: 'This sticker is not available for this account' };
+          }
+        }
+        const requiredVipLevel = Math.max(
+          Number(sticker.requiredVipLevel) || 1,
+          Number(category.requiredVipLevel) || 1,
+        );
+        if (sticker.accessType === 'vip' || category.accessType === 'vip' || requiredVipLevel > 1) {
+          const vip = await this.userVipRepo.findOne({
+            where: { userId: client.userId, isActive: true },
+          });
+          const vipLevel = effectiveVipLevel(Number(vip?.level || 0));
+          if (!vip || (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) ||
+              vipLevel < Math.max(1, requiredVipLevel)) {
+            return { error: 'VIP level required' };
+          }
+        }
+        if (sticker.accessType === 'cp' || category.accessType === 'cp' ||
+            sticker.requiresCp || category.requiresCp) {
+          const activeCp = await this.profilesRepo.manager.query(
+            `SELECT id FROM cp_relationships
+              WHERE status = 'active'
+                AND ("userAId" = $1 OR "userBId" = $1)
+              LIMIT 1`,
+            [client.userId],
+          );
+          if (!activeCp?.length) return { error: 'An active CP relationship is required' };
+          const cpEnabled = await this.settingsRepo.findOne({ where: { key: 'cp.enabled.relationship' } });
+          if (cpEnabled && !['true', '1', 'on', 'enabled'].includes(String(cpEnabled.value).toLowerCase())) {
+            return { error: 'CP is disabled' };
+          }
+        }
+        if (sticker.accessType === 'paid' || category.accessType === 'paid') {
+          return { error: 'Purchase is required for this sticker' };
+        }
         stickerUrl = resolveActiveStickerUrl(cfg, emojiKey) || '';
       } catch {
-        stickerUrl = '';
+        return { error: 'Unable to validate seat sticker' };
       }
-      if (!stickerUrl) {
-        // Legacy fallback while catalog migrates.
-        if (!/^e(0[1-9]|[1-6]\d|7[0-4])$/.test(emojiKey)) {
-          return { error: 'Invalid reaction' };
-        }
-      }
+      if (!stickerUrl) return { error: 'Invalid reaction' };
       payload = {
         userId: client.userId,
         emojiKey,
         ...(stickerUrl ? { url: stickerUrl } : {}),
       };
     } else if (data.event === 'lucky:opened') {
+      // Preserve the dashboard-uploaded video for every room member. A shared
+      // server clock lets each client compensate for local device clock drift.
+      const serverNow = Date.now();
       payload = {
         userId: client.userId,
         displayName: profile.displayName || client.username || 'User',
+        username: profile.username || 'mysterious_man',
+        avatarUrl: profile.avatarUrl || null,
+        mysteriousMan: profile.mysteriousMan === true,
         rewardLabel: String(incoming.rewardLabel || 'جائزة').slice(0, 80),
+        openId: String(incoming.openId || '').slice(0, 80),
+        videoUrl: typeof incoming.videoUrl === 'string'
+          ? incoming.videoUrl.trim().slice(0, 1024)
+          : null,
+        serverNow,
+        playAt: serverNow + 2200,
       };
     } else if (data.event === 'room:typing') {
       payload = { userId: client.userId, isTyping: incoming.isTyping === true };
@@ -816,7 +1190,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       roomId: data.roomId,
       event: data.event,
       payload,
-      from: { userId: client.userId, username: client.username },
+      from: { userId: client.userId, username: String(profile.username || client.username || '') },
       at: new Date().toISOString(),
     });
 
@@ -957,6 +1331,48 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`user:${userId}`).emit(event, payload);
   }
 
+  /**
+   * Rebuild authoritative room-profile snapshots after dashboard changes.
+   * This avoids stale cached VIP/cosmetic data on the user's own client and on
+   * every other participant currently viewing that user in a room.
+   */
+  async refreshUserProfile(userId: string, reason = 'admin_update') {
+    if (!this.server || !userId) return;
+    const userSockets = await this.server.in(`user:${userId}`).fetchSockets();
+    const roomIds = new Set<string>();
+    for (const socket of userSockets) {
+      for (const roomId of Object.keys(socket.data?.roomProfiles || {})) {
+        roomIds.add(roomId);
+      }
+    }
+
+    for (const roomId of roomIds) {
+      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+      if (!room) continue;
+      const payload = await this.buildJoinPayload(userId, roomId, room.hostId);
+      const roomSockets = await this.server.in(`room:${roomId}`).fetchSockets();
+      for (const socket of roomSockets) {
+        if (socket.data?.userId !== userId) continue;
+        socket.data.roomProfiles = socket.data.roomProfiles || {};
+        socket.data.roomProfiles[roomId] = payload;
+      }
+      this.emitToRoom(roomId, 'room:user_joined', {
+        roomId,
+        ...payload,
+        profileUpdated: true,
+        updateReason: reason,
+        at: new Date().toISOString(),
+      });
+      await this.emitRoomMembers(roomId);
+    }
+
+    const event = { userId, reason, at: new Date().toISOString() };
+    this.emitToUser(userId, 'user:profile_updated', event);
+    // Public, non-sensitive invalidation event: clients can reload this user's
+    // profile/card data even when they are not sharing a room with them.
+    this.emitToAll('user:profile_updated', event);
+  }
+
   private async enforceChatViolation(
     roomId: string,
     userId: string,
@@ -986,15 +1402,17 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
               isModeratorMuted: false,
             },
           );
-          const user = await this.usersRepo.findOne({ where: { id: userId } });
+          const identity = await this.buildJoinPayload(userId, roomId, room.hostId);
           this.emitToRoom(roomId, 'room:event', {
             roomId,
             event: 'room:seat_left',
             payload: {
               roomId,
               userId,
-              username: user?.username || null,
-              displayName: user?.displayName || user?.username || null,
+              username: identity.username || null,
+              displayName: identity.displayName || 'مستخدم',
+              avatarUrl: identity.avatarUrl || null,
+              mysteriousMan: identity.mysteriousMan === true,
               forced: true,
               reason: reason || 'auto_moderation',
             },
@@ -1119,13 +1537,69 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /**
+   * Sanitize every room/global event from the current server-side identity cache.
+   * This is the final guard for event types emitted by independent modules (gifts,
+   * games, seats, PK, lucky wins, and room notices), not just chat messages.
+   */
+  private maskMysteriousEventValue(value: any): any {
+    if (Array.isArray(value)) return value.map((item) => this.maskMysteriousEventValue(item));
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    const output: Record<string, any> = {};
+    for (const [key, child] of Object.entries(value)) {
+      output[key] = this.maskMysteriousEventValue(child);
+    }
+    const identityFor = (id: unknown) =>
+      typeof id === 'string' && id ? this.mysteriousIdentityCache.get(id) : undefined;
+    const applyActor = (identity: { displayName: string; username: string; frameUrl: string | null }) => {
+      if ('displayName' in output) output.displayName = identity.displayName;
+      if ('name' in output) output.name = identity.displayName;
+      if ('username' in output) output.username = identity.username;
+      if ('avatarUrl' in output) output.avatarUrl = null;
+      if ('avatar' in output) output.avatar = null;
+      if ('imageUrl' in output) output.imageUrl = null;
+      if ('image' in output) output.image = null;
+      if ('photoUrl' in output) output.photoUrl = null;
+      if ('photo' in output) output.photo = null;
+      if ('profileImageUrl' in output) output.profileImageUrl = null;
+      if ('mysteriousMan' in output) output.mysteriousMan = true;
+      if ('frameUrl' in output) output.frameUrl = identity.frameUrl;
+      if ('vipBadgeUrl' in output) output.vipBadgeUrl = identity.frameUrl;
+      if ('hostBadgeUrl' in output) output.hostBadgeUrl = null;
+      if ('isHost' in output) output.isHost = false;
+    };
+    const actor = identityFor(output.userId);
+    if (actor) applyActor(actor);
+    const sender = identityFor(output.senderId);
+    if (sender) {
+      if ('senderName' in output) output.senderName = sender.displayName;
+      if ('senderAvatarUrl' in output) output.senderAvatarUrl = null;
+      if ('senderAvatar' in output) output.senderAvatar = null;
+      if ('senderImageUrl' in output) output.senderImageUrl = null;
+      if ('senderMysteriousMan' in output) output.senderMysteriousMan = true;
+      if ('senderHostBadgeUrl' in output) output.senderHostBadgeUrl = null;
+      if ('senderVipBadgeUrl' in output) output.senderVipBadgeUrl = sender.frameUrl;
+    }
+    const receiver = identityFor(output.receiverId);
+    if (receiver) {
+      if ('receiverName' in output) output.receiverName = receiver.displayName;
+      if ('receiverAvatarUrl' in output) output.receiverAvatarUrl = null;
+      if ('receiverAvatar' in output) output.receiverAvatar = null;
+      if ('receiverImageUrl' in output) output.receiverImageUrl = null;
+      if ('receiverMysteriousMan' in output) output.receiverMysteriousMan = true;
+      if ('receiverHostBadgeUrl' in output) output.receiverHostBadgeUrl = null;
+      if ('receiverVipBadgeUrl' in output) output.receiverVipBadgeUrl = receiver.frameUrl;
+    }
+    return output;
+  }
+
   emitToRoom(roomId: string, event: string, payload: unknown) {
-    this.server.to(`room:${roomId}`).emit(event, payload);
+    this.server.to(`room:${roomId}`).emit(event, this.maskMysteriousEventValue(payload));
   }
 
   /** Fan-out to every connected socket (Mikoo-style global celebration toasts). */
   emitToAll(event: string, payload: unknown) {
-    this.server.emit(event, payload);
+    this.server.emit(event, this.maskMysteriousEventValue(payload));
   }
 
   async ejectRoom(roomId: string, reason: string) {
@@ -1140,6 +1614,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     for (const socket of sockets) {
       if (socket.data.roomProfiles) delete socket.data.roomProfiles[roomId];
       await socket.leave(channel);
+      if (Object.keys(socket.data.roomProfiles || {}).length === 0) {
+        await socket.leave('rooms:all');
+      }
     }
   }
 
@@ -1150,6 +1627,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       if (socket.data.userId !== userId) continue;
       if (socket.data.roomProfiles) delete socket.data.roomProfiles[roomId];
       await socket.leave(channel);
+      if (Object.keys(socket.data.roomProfiles || {}).length === 0) {
+        await socket.leave('rooms:all');
+      }
     }
     await this.emitRoomMembers(roomId);
   }

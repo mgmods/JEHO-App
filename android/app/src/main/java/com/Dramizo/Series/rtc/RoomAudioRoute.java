@@ -7,6 +7,8 @@ import android.os.Build;
 
 import androidx.annotation.Nullable;
 
+import com.Dramizo.Series.AuraLiveApp;
+
 /**
  * Room voice routing: prefer wired / BT headsets over forced loudspeaker.
  */
@@ -106,9 +108,24 @@ public final class RoomAudioRoute {
         try {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
             boolean external = hasExternalHeadset(context);
-            am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+
+            // Background room playback belongs to the foreground media service.
+            // Never reclaim the VoIP communication mode from WhatsApp or another
+            // foreground recorder due to delayed route/mic callbacks.
+            if (RoomAudioSession.isExternalCaptureSuspended()) {
+                RoomAudioSession.release(context);
+                am.setSpeakerphoneOn(false);
+                return;
+            }
+            if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+                // Yield call mode/focus so WhatsApp can capture, but preserve the
+                // RTC-selected speaker route so room playback remains audible.
+                RoomAudioSession.releaseForBackground(context);
+                return;
+            }
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            applyCommunicationDevice(am, wantOpenSpeaker && !external);
             // SCO only for HFP/BLE voice headsets — never on pure A2DP (causes lag/crash with WebRTC).
             if (hasBluetoothScoHeadset(context) && am.isBluetoothScoAvailableOffCall()) {
                 try {
@@ -134,7 +151,10 @@ public final class RoomAudioRoute {
                 am.setBluetoothScoOn(false);
             } catch (Throwable ignored) {
             }
-            am.setSpeakerphoneOn(false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try { am.clearCommunicationDevice(); } catch (Throwable ignored) {}
+            }
+            try { am.setSpeakerphoneOn(false); } catch (Throwable ignored) {}
             am.setMode(AudioManager.MODE_NORMAL);
         } catch (Throwable ignored) {
         }
@@ -148,9 +168,47 @@ public final class RoomAudioRoute {
         try {
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return;
+            if (RoomAudioSession.isExternalCaptureSuspended()) {
+                RoomAudioSession.release(context);
+                return;
+            }
+            if (!AuraLiveApp.isAppInForeground()) {
+                // Do not reclaim call mode in background; retain the current output
+                // route for the active room stream.
+                RoomAudioSession.releaseForBackground(context);
+                return;
+            }
             boolean external = hasExternalHeadset(context);
-            am.setSpeakerphoneOn(wantOpenSpeaker && !external);
+            applyCommunicationDevice(am, wantOpenSpeaker && !external);
         } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * Android 12+ routes communication audio through an explicit communication device.
+     * The legacy speakerphone flag alone is not reliable on newer audio stacks.
+     */
+    private static void applyCommunicationDevice(AudioManager am, boolean wantSpeaker) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                if (wantSpeaker) {
+                    java.util.List<AudioDeviceInfo> devices = am.getAvailableCommunicationDevices();
+                    if (devices != null) {
+                        for (AudioDeviceInfo device : devices) {
+                            if (device != null
+                                    && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                                if (am.setCommunicationDevice(device)) return;
+                            }
+                        }
+                    }
+                }
+                am.clearCommunicationDevice();
+                am.setSpeakerphoneOn(false);
+            } catch (Throwable ignored) {
+                try { am.setSpeakerphoneOn(wantSpeaker); } catch (Throwable ignoredAgain) {}
+            }
+        } else {
+            try { am.setSpeakerphoneOn(wantSpeaker); } catch (Throwable ignored) {}
         }
     }
 

@@ -23,6 +23,8 @@ public class SettingsViewModel extends ViewModel {
     private final MutableLiveData<Boolean> loggedOut = new MutableLiveData<>();
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<String> message = new MutableLiveData<>();
+    private final MutableLiveData<AuthDtos.UserDto> dmPrivacy = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> dmPrivacySaving = new MutableLiveData<>(false);
 
     public SettingsViewModel(AppContainer c) { this.c = c; }
 
@@ -30,6 +32,8 @@ public class SettingsViewModel extends ViewModel {
     public LiveData<Boolean> getLoggedOut() { return loggedOut; }
     public LiveData<String> getError() { return error; }
     public LiveData<String> getMessage() { return message; }
+    public LiveData<AuthDtos.UserDto> getDmPrivacy() { return dmPrivacy; }
+    public LiveData<Boolean> getDmPrivacySaving() { return dmPrivacySaving; }
 
     public boolean isDarkMode() { return c.getSessionManager().isDarkMode(); }
     public boolean isMuteMessageNotifications() {
@@ -60,6 +64,33 @@ public class SettingsViewModel extends ViewModel {
 
     public void setFriendsOnlyMessages(boolean enabled) {
         c.getSessionManager().setFriendsOnlyMessages(enabled);
+    }
+
+    /** Always load privacy from the server; local preferences are not an access-control source. */
+    public void loadDmPrivacy() {
+        c.getIoExecutor().execute(() -> {
+            Result<AuthDtos.UserDto> result = c.getUserRepository().getMe();
+            if (result.success && result.data != null) dmPrivacy.postValue(result.data);
+            else error.postValue(result.error != null ? result.error : "تعذر تحميل إعدادات خصوصية الرسائل");
+        });
+    }
+
+    public void saveDmPrivacy(boolean enabled, String audience) {
+        c.getIoExecutor().execute(() -> {
+            dmPrivacySaving.postValue(true);
+            MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
+            request.dmEnabled = enabled;
+            request.dmAudience = audience;
+            Result<AuthDtos.UserDto> result = c.getUserRepository().updateProfile(request);
+            dmPrivacySaving.postValue(false);
+            if (result.success && result.data != null) {
+                dmPrivacy.postValue(result.data);
+                message.postValue("تم حفظ خصوصية الرسائل");
+            } else {
+                error.postValue(result.error != null ? result.error : "تعذر حفظ إعدادات خصوصية الرسائل");
+                loadDmPrivacy();
+            }
+        });
     }
 
     public void setLanguage(String lang) {

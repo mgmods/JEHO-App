@@ -17,7 +17,7 @@ import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 
 /**
  * One-tap "My Room": enter/create a <b>personal</b> STANDARD room using
- * profile name + avatar. Agency live is a separate flow ({@link AgencyRoomLauncher}).
+ * profile name + optional avatar. Agency live is a separate flow ({@link AgencyRoomLauncher}).
  */
 public final class MyRoomLauncher {
     private MyRoomLauncher() {}
@@ -36,11 +36,6 @@ public final class MyRoomLauncher {
             Toast.makeText(activity, "أكمل اسمك في الملف الشخصي أولاً", Toast.LENGTH_LONG).show();
             return;
         }
-        if (avatar == null || avatar.trim().isEmpty()) {
-            Toast.makeText(activity, "أضف صورة شخصية أولاً", Toast.LENGTH_LONG).show();
-            return;
-        }
-
         c.getIoExecutor().execute(() -> {
             // Prefer existing PERSONAL owned room — never open agency room from "My room".
             Result<com.Dramizo.Series.data.remote.dto.MiscDtos.ListResult<RoomDtos.RoomDto>> listed =
@@ -48,32 +43,51 @@ public final class MyRoomLauncher {
             if (listed.success && listed.data != null && listed.data.items != null) {
                 RoomDtos.RoomDto owned = MyRoomCardBinder.findOwnedPersonal(listed.data.items, myId);
                 if (owned != null && owned.id != null && !owned.id.isEmpty()) {
-                    activity.runOnUiThread(() -> enter(activity, owned.id));
+                    activity.runOnUiThread(() -> enter(activity, owned, null));
                     return;
                 }
             }
 
-            RoomDtos.CreateRoomRequest req =
-                    RoomDtos.CreateRoomRequest.personalRoom(display.trim(), avatar);
-            Result<RoomDtos.JoinRoomResult> created = ApiCall.execute(c.getRoomApi().create(req));
             activity.runOnUiThread(() -> {
-                if (!created.success || created.data == null || created.data.room == null
-                        || created.data.room.id == null) {
-                    Toast.makeText(activity,
-                            created.error != null ? created.error : activity.getString(R.string.error_generic),
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                enter(activity, created.data.room.id);
+                if (activity.isFinishing()) return;
+                RoomSeatCountPicker.show(activity, 10, guestSeatCount -> {
+                    c.getIoExecutor().execute(() -> {
+                        RoomDtos.CreateRoomRequest req =
+                                RoomDtos.CreateRoomRequest.personalRoom(display.trim(), avatar);
+                        req.seatCount = Math.min(31, Math.max(2, guestSeatCount + 1));
+                        Result<RoomDtos.JoinRoomResult> created =
+                                ApiCall.execute(c.getRoomApi().create(req));
+                        activity.runOnUiThread(() -> {
+                            if (activity.isFinishing()) return;
+                            if (!created.success || created.data == null || created.data.room == null
+                                    || created.data.room.id == null) {
+                                Toast.makeText(activity,
+                                        created.error != null ? created.error
+                                                : activity.getString(R.string.error_generic),
+                                        Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            enter(activity, created.data.room, created.data);
+                        });
+                    });
+                });
             });
         });
     }
 
-    private static void enter(@NonNull Activity activity, @NonNull String roomId) {
-        RoomJoinPrefetch.begin(activity, roomId, null);
+    private static void enter(@NonNull Activity activity, @NonNull RoomDtos.RoomDto room,
+                              @Nullable RoomDtos.JoinRoomResult session) {
+        String roomId = room.id;
+        if (session == null || !RoomJoinPrefetch.seedReady(roomId, session)) {
+            RoomJoinPrefetch.begin(activity, roomId, null);
+        }
         Intent i = new Intent(activity, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
         i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, true);
+        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, room.displayRoomId.trim());
+        }
+        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY, false);
         activity.startActivity(i);
     }
 

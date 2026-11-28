@@ -97,7 +97,22 @@ public final class ApiCall {
             return "RATE_LIMIT"; // swallowed by UI helpers — soft backoff, no spam toast
         }
         if (code == 401 || (message != null && message.toLowerCase().contains("unauthorized"))) {
-            return "انتهت الجلسة، سجّل الدخول مرة أخرى";
+            String lower = message != null ? message.toLowerCase() : "";
+            // Login also returns HTTP 401 for wrong credentials. Do not mislabel
+            // a failed login as an expired session.
+            if (lower.contains("invalid credentials")) {
+                return "اسم المستخدم أو كلمة المرور غير صحيحة";
+            }
+            if (lower.contains("account is restricted") || lower.contains("account is disabled")) {
+                return "هذا الحساب مقيّد أو غير متاح";
+            }
+            if (lower.contains("refresh token") || lower.contains("expired token")
+                    || lower.contains("missing authentication token")
+                    || lower.contains("invalid or expired token")) {
+                return "انتهت صلاحية الجلسة، سجّل الدخول مرة أخرى";
+            }
+            if (message != null && !message.trim().isEmpty()) return message;
+            return "تعذّر التحقق من تسجيل الدخول، حاول مرة أخرى";
         }
         if (message != null) {
             String lower = message.toLowerCase();

@@ -7,12 +7,50 @@ import java.util.Map;
 public final class MiscDtos {
     private MiscDtos() {}
 
+    public static class DailyLoginStatusDto {
+        @SerializedName("enabled") public boolean enabled;
+        @SerializedName("shouldShow") public boolean shouldShow;
+        @SerializedName("alreadyClaimed") public boolean alreadyClaimed;
+        @SerializedName("streak") public int streak;
+        @SerializedName("currentDay") public int currentDay;
+        @SerializedName("today") public String today;
+        @SerializedName("reward") public DailyLoginRewardDto reward;
+        @SerializedName("days") public List<DailyLoginRewardDto> days;
+        @SerializedName("theme") public Map<String, Object> theme;
+    }
+
+    public static class DailyLoginRewardDto {
+        @SerializedName("day") public int day;
+        @SerializedName("type") public String type;
+        @SerializedName("amount") public long amount;
+        @SerializedName("label") public String label;
+        @SerializedName("name") public String name;
+        @SerializedName("cosmeticCode") public String cosmeticCode;
+        @SerializedName("durationDays") public int durationDays;
+        @SerializedName("previewUrl") public String previewUrl;
+        @SerializedName("animationUrl") public String animationUrl;
+        @SerializedName("imageUrl") public String imageUrl;
+        @SerializedName("iconUrl") public String iconUrl;
+        @SerializedName("cosmeticType") public String cosmeticType;
+        @SerializedName("claimed") public boolean claimed;
+    }
+
+    public static class MysteriousManConfigDto {
+        @SerializedName("avatarUrl") public String avatarUrl;
+        @SerializedName("entryMode") public String entryMode;
+        @SerializedName("entryText") public String entryText;
+        @SerializedName("entryEffectUrl") public String entryEffectUrl;
+        @SerializedName("messageEffectUrl") public String messageEffectUrl;
+    }
+
     public static class VipPlanDto {
         @SerializedName("id") public String id;
         @SerializedName("level") public int level;
         @SerializedName("name") public String name;
         @SerializedName("coinPriceMonthly") public int coinPriceMonthly;
         @SerializedName("badgeUrl") public String badgeUrl;
+        @SerializedName("vipMainIconUrl") public String vipMainIconUrl;
+        @SerializedName("vipHorizontalBadgeUrl") public String vipHorizontalBadgeUrl;
         @SerializedName("benefits") public VipBenefits benefits;
         @SerializedName("isActive") public boolean isActive;
     }
@@ -144,6 +182,7 @@ public final class MiscDtos {
         @SerializedName("targetName") public String targetName;
         @SerializedName("score") public long score;
         @SerializedName("user") public AuthDtos.UserDto user;
+        @SerializedName("meta") public Map<String, Object> meta;
     }
 
     public static class NotificationDto {
@@ -169,14 +208,19 @@ public final class MiscDtos {
         @SerializedName("bio") public String bio;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("coverUrl") public String coverUrl;
+        @SerializedName("profileCoverUrls") public java.util.List<String> profileCoverUrls;
         @SerializedName("gender") public String gender;
         @SerializedName("birthday") public String birthday;
         @SerializedName("country") public String country;
         @SerializedName("showOnlineStatus") public Boolean showOnlineStatus;
         @SerializedName("allowDmFromStrangers") public Boolean allowDmFromStrangers;
+        @SerializedName("dmEnabled") public Boolean dmEnabled;
+        @SerializedName("dmAudience") public String dmAudience;
         @SerializedName("dmGiftGateEnabled") public Boolean dmGiftGateEnabled;
         @SerializedName("dmRequiredGiftId") public String dmRequiredGiftId;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
+        @SerializedName("displayedMedalIds") public java.util.List<String> displayedMedalIds;
+        @SerializedName("mysteriousMode") public Boolean mysteriousMode;
 
         public UpdateProfileRequest() {}
 
@@ -314,6 +358,7 @@ public final class MiscDtos {
 
     /** Store update prompt from GET /config/app-update. */
     public static class AppUpdateDto {
+        @SerializedName("enabled") public boolean enabled;
         @SerializedName("latestVersionCode") public int latestVersionCode;
         @SerializedName("latestVersionName") public String latestVersionName;
         @SerializedName("minVersionCode") public int minVersionCode;
@@ -323,6 +368,8 @@ public final class MiscDtos {
         @SerializedName("titleEn") public String titleEn;
         @SerializedName("messageEn") public String messageEn;
         @SerializedName("storeUrl") public String storeUrl;
+        /** apk = download/install APK, external = open configured URL, auto = infer from URL. */
+        @SerializedName("linkType") public String linkType;
     }
 
     /** Public ZEGOCLOUD client config from GET /config/zego (AppID only — AppSign never sent). */
@@ -339,6 +386,7 @@ public final class MiscDtos {
         @SerializedName("whatsapp") public String whatsapp;
         @SerializedName("telegram") public String telegram;
         @SerializedName("instagram") public String instagram;
+        @SerializedName("website") public String website;
         @SerializedName("email") public String email;
         @SerializedName("phone") public String phone;
     }
@@ -351,6 +399,7 @@ public final class MiscDtos {
         @SerializedName("accountName") public String accountName;
         @SerializedName("accountId") public String accountId;
         @SerializedName("instructions") public String instructions;
+        @SerializedName("qrImageUrl") public String qrImageUrl;
     }
 
     /** Bottom tab icons from GET /config/nav-icons (PNG/JPG URLs). */
@@ -362,6 +411,11 @@ public final class MiscDtos {
         @SerializedName("games") public NavIconPairDto games;
         @SerializedName("chat") public NavIconPairDto chat;
         @SerializedName("me") public NavIconPairDto me;
+        @SerializedName("profileActions") public Map<String, String> profileActions;
+        @SerializedName("channelIcons") public Map<String, String> channelIcons;
+        @SerializedName("homeShortcuts") public Map<String, String> homeShortcuts;
+        @SerializedName("officialNewsVerified") public Boolean officialNewsVerified;
+        @SerializedName("adminMessagesVerified") public Boolean adminMessagesVerified;
     }
 
     public static class NavIconPairDto {
@@ -370,11 +424,33 @@ public final class MiscDtos {
         @SerializedName("icon") public String icon;
     }
 
+    /** Agency role badge artwork from GET /config/agency-role-badges. */
+    public static class AgencyRoleBadgesDto {
+        @SerializedName("leaderBadgeUrl") public String leaderBadgeUrl;
+        @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
+    }
+
     /** Seat mic stickers from GET /config/seat-stickers. */
     public static class SeatStickersDto {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;
+        @SerializedName("enabled") public boolean enabled = true;
+        @SerializedName("categories") public java.util.List<SeatStickerCategoryDto> categories;
         @SerializedName("items") public java.util.List<SeatStickerItemDto> items;
+    }
+
+    public static class SeatStickerCategoryDto {
+        @SerializedName("id") public String id;
+        @SerializedName("name") public String name;
+        @SerializedName("iconUrl") public String iconUrl;
+        @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("isActive") public boolean isActive = true;
+        @SerializedName("accessType") public String accessType;
+        @SerializedName("priceCoins") public long priceCoins;
+        @SerializedName("durationDays") public int durationDays;
+        @SerializedName("audience") public String audience;
+        @SerializedName("requiredVipLevel") public int requiredVipLevel;
+        @SerializedName("requiresCp") public boolean requiresCp;
     }
 
     public static class SeatStickerItemDto {
@@ -383,6 +459,12 @@ public final class MiscDtos {
         @SerializedName("url") public String url;
         @SerializedName("name") public String name;
         @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("accessType") public String accessType;
+        @SerializedName("priceCoins") public long priceCoins;
+        @SerializedName("audience") public String audience;
+        @SerializedName("requiredVipLevel") public int requiredVipLevel;
+        @SerializedName("requiresCp") public boolean requiresCp;
+        @SerializedName("categoryId") public String categoryId;
     }
 
     public static class ThemeDto {
@@ -392,6 +474,7 @@ public final class MiscDtos {
         @SerializedName("colors") public ThemeColors colors;
         @SerializedName("backgrounds") public ThemeBackgrounds backgrounds;
         @SerializedName("assets") public Map<String, String> assets;
+        @SerializedName("splash") public SplashConfigDto splash;
 
         public static ThemeDto defaults() {
             ThemeDto t = new ThemeDto();
@@ -412,8 +495,30 @@ public final class MiscDtos {
             t.backgrounds = new ThemeBackgrounds();
             // Empty — wallpapers/icons ship inside the APK.
             t.assets = new java.util.HashMap<>();
+            t.splash = new SplashConfigDto();
+            // Hide Skip until a cached/server dashboard preference explicitly enables it.
+            t.splash.skipEnabled = false;
+            t.splash.items = new java.util.ArrayList<>();
             return t;
         }
+    }
+
+    public static class SplashConfigDto {
+        @SerializedName("enabled") public boolean enabled = true;
+        @SerializedName("skipEnabled") public boolean skipEnabled = false;
+        @SerializedName("items") public List<SplashItemDto> items;
+    }
+
+    public static class SplashItemDto {
+        @SerializedName("id") public String id;
+        @SerializedName("url") public String url;
+        @SerializedName("durationSeconds") public int durationSeconds = 5;
+        @SerializedName("active") public boolean active = true;
+        @SerializedName("sortOrder") public int sortOrder = 0;
+        @SerializedName("target") public String target;
+        @SerializedName("targetType") public String targetType;
+        @SerializedName("targetId") public String targetId;
+        @SerializedName("targetUrl") public String targetUrl;
     }
 
     public static class ThemeBrand {
@@ -436,6 +541,7 @@ public final class MiscDtos {
     public static class ThemeBackgrounds {
         @SerializedName("app") public String app;
         @SerializedName("auth") public String auth;
+        @SerializedName("register") public String register;
         @SerializedName("splash") public String splash;
         @SerializedName("home") public String home;
         @SerializedName("profile") public String profile;
@@ -447,6 +553,8 @@ public final class MiscDtos {
         @SerializedName("appNight") public String appNight;
         @SerializedName("homeHeader") public String homeHeader;
         @SerializedName("roomDefault") public String roomDefault;
+        /** Single shared wallpaper configured for the four main tabs only. */
+        @SerializedName("allSections") public String allSections;
     }
 
     public static class TickerDto {
@@ -470,6 +578,10 @@ public final class MiscDtos {
         @SerializedName("current") public int current;
         @SerializedName("target") public int target;
         @SerializedName("progressLabel") public String progressLabel;
+        @SerializedName("medalId") public String medalId;
+        @SerializedName("medalName") public String medalName;
+        @SerializedName("medalImageUrl") public String medalImageUrl;
+        @SerializedName("description") public String description;
 
         public boolean isHostTask() {
             return "host".equalsIgnoreCase(audience) || "host".equalsIgnoreCase(section);
@@ -581,6 +693,51 @@ public final class MiscDtos {
         @SerializedName("diamondUsdRate") public double diamondUsdRate;
     }
 
+    public static class AgencyStatsDto {
+        @SerializedName("agencyId") public String agencyId;
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("name") public String name;
+        @SerializedName("memberCount") public int memberCount;
+        @SerializedName("dailyDiamonds") public long dailyDiamonds;
+        @SerializedName("weeklyDiamonds") public long weeklyDiamonds;
+        @SerializedName("monthlyDiamonds") public long monthlyDiamonds;
+        @SerializedName("activeHostsToday") public int activeHostsToday;
+        @SerializedName("activeHostsThisWeek") public int activeHostsThisWeek;
+        @SerializedName("activeHostsThisMonth") public int activeHostsThisMonth;
+        @SerializedName("newMembersToday") public int newMembersToday;
+        @SerializedName("newMembersThisWeek") public int newMembersThisWeek;
+        @SerializedName("newMembersThisMonth") public int newMembersThisMonth;
+        @SerializedName("lastGiftActivityAt") public String lastGiftActivityAt;
+        @SerializedName("targetEnabled") public boolean targetEnabled;
+        @SerializedName("targetPeriod") public String targetPeriod;
+        @SerializedName("targetPeriodKey") public String targetPeriodKey;
+        @SerializedName("totalDiamonds") public long totalDiamonds;
+        @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+        @SerializedName("commissionPercent") public double commissionPercent;
+        @SerializedName("members") public List<AgencyMemberPeriodStatDto> members;
+    }
+
+    public static class AgencyMemberPeriodStatDto {
+        @SerializedName("userId") public String userId;
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("role") public String role;
+        @SerializedName("membershipStartedAt") public String membershipStartedAt;
+        @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+        @SerializedName("dailyDiamonds") public long dailyDiamonds;
+        @SerializedName("weeklyDiamonds") public long weeklyDiamonds;
+        @SerializedName("monthlyDiamonds") public long monthlyDiamonds;
+        @SerializedName("lastGiftAt") public String lastGiftAt;
+        @SerializedName("targetEnabled") public boolean targetEnabled;
+        @SerializedName("targetPeriod") public String targetPeriod;
+        @SerializedName("targetPeriodKey") public String targetPeriodKey;
+        @SerializedName("targetProgress") public long targetProgress;
+        @SerializedName("currentTargetName") public String currentTargetName;
+        @SerializedName("currentTargetThreshold") public long currentTargetThreshold;
+        @SerializedName("targetRemaining") public long targetRemaining;
+        @SerializedName("targetProgressPercent") public int targetProgressPercent;
+    }
+
     public static class AgencyMineDto {
         @SerializedName("agency") public AgencyDto agency;
         @SerializedName("role") public String role;
@@ -631,7 +788,9 @@ public final class MiscDtos {
         @SerializedName("partner") public AuthDtos.UserDto partner;
         @SerializedName("bondScore") public long bondScore;
         @SerializedName("level") public int level;
+        @SerializedName("currentLevelAt") public long currentLevelAt;
         @SerializedName("nextLevelAt") public long nextLevelAt;
+        @SerializedName("progressPercent") public double progressPercent;
         @SerializedName("relationId") public String relationId;
     }
 
@@ -655,12 +814,14 @@ public final class MiscDtos {
         @SerializedName("isActive") public boolean isActive;
         @SerializedName("opensToday") public int opensToday;
         @SerializedName("remainingToday") public int remainingToday;
+        @SerializedName("videoUrl") public String videoUrl;
     }
 
     public static class LuckyBoxRewardDto {
         @SerializedName("openId") public String openId;
         @SerializedName("boxCode") public String boxCode;
         @SerializedName("boxTitle") public String boxTitle;
+        @SerializedName("videoUrl") public String videoUrl;
         @SerializedName("reward") public LuckyReward reward;
         @SerializedName("remainingToday") public int remainingToday;
     }

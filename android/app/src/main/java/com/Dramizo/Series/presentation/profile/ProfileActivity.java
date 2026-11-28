@@ -5,21 +5,45 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.AlertDialog;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
+import android.view.LayoutInflater;
+import android.view.Gravity;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.graphics.drawable.Drawable;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import com.Dramizo.Series.data.remote.dto.BadgeDto;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
+import com.Dramizo.Series.databinding.ItemGiftHistoryBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import android.widget.ImageView;
+import android.widget.HorizontalScrollView;
 
 import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
@@ -27,6 +51,7 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.UserSocialNav;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AgencyUi;
+import com.Dramizo.Series.util.AgencyRoleBadgeCache;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
@@ -36,17 +61,71 @@ import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.ServerAssets;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.RemoteNavIcons;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
+import java.util.Locale;
 import java.text.NumberFormat;
 
 public class ProfileActivity extends ThemedActivity {
+    // Profile UI refinements: compact medals, clean supporters, moments-only navigation.
+    // Profile inline supporters and gifts use live gift aggregates, never social followers.
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
+    private AppContainer container;
+    private ProfileViewModel profileVm;
+    private String profileTargetUserId;
     private boolean isFollowingTarget;
+    private boolean isOwnProfile;
+    private final Handler profileHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mysteriousModeRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            if (isOwnProfile) bindMysteriousMode(true);
+            profileHandler.postDelayed(this, 60_000L);
+        }
+    };
+    private AnimatorSet cpHeartAnimator;
+    private String loadedProfileId = "";
+    private final java.util.ArrayList<String> profileCoverGallery = new java.util.ArrayList<>();
+    private int profileCoverIndex = 0;
+    private float coverTouchStartX = 0f;
+    private final Runnable profileCoverAdvance = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed() || profileCoverGallery.size() < 2) return;
+            showProfileCover((profileCoverIndex + 1) % profileCoverGallery.size());
+            profileHandler.postDelayed(this, 3000L);
+        }
+    };
+    private com.Dramizo.Series.realtime.RealtimeClient.UserListener cpConfigListener;
+    private String cpProfileTargetId = "";
+    private String cpProfileOwnAvatarUrl = "";
+    private String cpProfileOwnFrameUrl = "";
+    private int cpProfileOwnVipLevel = 0;
+    private String cpProfileOwnVipTouUrl = "";
+    private String cpProfileOwnHostBadgeUrl = "";
+    private Map<String, Object> cpProfileOwnHostBadgeMeta;
+    private String roomTrackingRoomId;
+    private String roomTrackingRoomName = "";
+    private final Runnable roomPresenceRefresh = new Runnable() {
+        @Override public void run() {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            if (!isOwnProfile && loadedProfileId != null && !loadedProfileId.isEmpty()) {
+                refreshRoomPresence(loadedProfileId);
+                profileHandler.postDelayed(this, 15_000L);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,25 +135,104 @@ public class ProfileActivity extends ThemedActivity {
         setContentView(binding.getRoot());
         ViewCompat.setOnApplyWindowInsetsListener(binding.btnBack, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
-            lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
-            v.setLayoutParams(lp);
+            ViewGroup.LayoutParams raw = v.getLayoutParams();
+            if (raw instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+                lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+                v.setLayoutParams(lp);
+            } else {
+                ViewGroup.MarginLayoutParams lp = new ViewGroup.MarginLayoutParams(
+                        raw != null ? raw.width : ViewGroup.LayoutParams.WRAP_CONTENT,
+                        raw != null ? raw.height : ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.topMargin = bars.top + (int) (8 * getResources().getDisplayMetrics().density);
+                v.setLayoutParams(lp);
+            }
             return insets;
         });
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
-        AppContainer container = ContainerProvider.from(this);
-        ProfileViewModel vm = new ViewModelProvider(this, new ViewModelFactory(container))
+        container = ContainerProvider.from(this);
+        RemoteNavIcons.hydrateFromCache(container);
+        // Profile action icons are the original Follow/Message/Room row, moved
+        // directly below the public ID. Do not create a second sticky icon row.
+        container.getIoExecutor().execute(() -> RemoteNavIcons.refreshBlocking(container));
+        cpConfigListener = new com.Dramizo.Series.realtime.RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                runOnUiThread(() -> {
+                    if (binding == null || isFinishing() || isDestroyed()
+                            || cpProfileTargetId == null || cpProfileTargetId.trim().isEmpty()) return;
+                    // Re-read the authoritative CP profile data so dashboard-edited
+                    // level names, backgrounds and logos update without reopening the profile.
+                    loadPublicCpRelationship(cpProfileTargetId, cpProfileOwnAvatarUrl,
+                            cpProfileOwnFrameUrl, cpProfileOwnVipLevel, cpProfileOwnVipTouUrl,
+                            cpProfileOwnHostBadgeUrl, cpProfileOwnHostBadgeMeta);
+                });
+            }
+        };
+        com.Dramizo.Series.realtime.RealtimeClient.getInstance().addUserListener(cpConfigListener);
+        profileVm = new ViewModelProvider(this, new ViewModelFactory(container))
                 .get(ProfileViewModel.class);
+        ProfileViewModel vm = profileVm;
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
+        profileTargetUserId = userId;
         String myId = container.getSessionManager().getUserId();
+        AuthDtos.UserDto signedInUser = container.getSessionManager().getUser();
+        if (myId != null && myId.equals(userId == null || userId.isEmpty() ? myId : userId)
+                && StaffRoleHelper.isStaff(signedInUser)) {
+            TextView adminEntry = new TextView(this);
+            String roleLabel = StaffRoleHelper.badgeAr(signedInUser);
+            adminEntry.setText("🛡️  مركز إدارة JEHO  ·  " + roleLabel);
+            adminEntry.setTextSize(14f);
+            adminEntry.setTypeface(adminEntry.getTypeface(), Typeface.BOLD);
+            adminEntry.setTextColor(Color.WHITE);
+            adminEntry.setGravity(Gravity.CENTER);
+            adminEntry.setPadding(16, 16, 16, 16);
+            GradientDrawable adminBackground = new GradientDrawable(
+                    GradientDrawable.Orientation.RIGHT_LEFT,
+                    new int[] { 0xFF282C63, 0xFF6A4CC4 });
+            adminBackground.setCornerRadius(18f * getResources().getDisplayMetrics().density);
+            adminEntry.setBackground(adminBackground);
+            LinearLayout.LayoutParams adminLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            adminLp.setMargins(16, 16, 16, 12);
+            binding.contentRoot.addView(adminEntry, adminLp);
+            adminEntry.setOnClickListener(v -> {
+                AuthDtos.UserDto latest = container.getSessionManager().getUser();
+                if (!StaffRoleHelper.isStaff(latest)) {
+                    Toast.makeText(this, "لم تعد لديك صلاحية الوصول إلى مركز الإدارة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(this, AdminConsoleActivity.class));
+            });
+        }
+        // Keep the original Follow/Message/Room controls at the bottom of the profile.
+        // Remove only the duplicate sticky icon row near the identity card.
+        placeProfileIdentityBadgesUnderId();
+        ensureProfileIdentityStatsVisible();
+        removeDuplicateProfileInlineActions();
+
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
+        // The badges-and-medals cabinet is available from the Details page only.
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
+        if (binding.rowEarnedBadges != null) binding.rowEarnedBadges.setVisibility(View.GONE);
+        if (binding.rowProfileAchievementBadges != null) {
+            binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+            binding.rowProfileAchievementBadges.setOnClickListener(v -> openBadgeCabinet(targetUserIdHold[0]));
+        }
+        // Keep the VIP, charm and wealth chips visible on the light profile card.
+        if (binding.rowProfileMedals != null) binding.rowProfileMedals.setVisibility(View.VISIBLE);
+
+        if (binding.rowMoments != null) {
+            binding.rowMoments.setOnClickListener(v -> openProfileDetails());
+        }
+
         // Mikoo card taps on full profile page.
         if (binding.cellProfileFollowers != null) {
             binding.cellProfileFollowers.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
+                String id = loadedProfileId;
                 if (id == null || id.isEmpty()) return;
                 UserSocialNav.openFollowers(this, id, myId);
             });
@@ -93,12 +251,21 @@ public class ProfileActivity extends ThemedActivity {
                 UserSocialNav.openVisitors(this, id, myId);
             });
         }
+        if (binding.sectionProfileSupporters != null) {
+            binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
+            binding.sectionProfileSupporters.setOnClickListener(v -> openProfileSupportersPage(targetUserIdHold[0]));
+        }
+        if (binding.tvProfileSupportersAll != null) {
+            binding.tvProfileSupportersAll.setOnClickListener(v -> openProfileSupportersPage(targetUserIdHold[0]));
+        }
+        // Gift history is accessed from Details only; keep its existing dedicated screen/design.
+        if (binding.recyclerProfileGiftHistory != null && binding.recyclerProfileGiftHistory.getParent() instanceof View) {
+            ((View) binding.recyclerProfileGiftHistory.getParent()).setVisibility(View.GONE);
+        }
+
+        // Button 2 is the Details shortcut; the supporters panel remains independent.
         if (binding.propProfileSupporters != null) {
-            binding.propProfileSupporters.setOnClickListener(v -> {
-                String id = targetUserIdHold[0];
-                if (id == null || id.isEmpty()) return;
-                UserSocialNav.openFollowers(this, id, myId);
-            });
+            binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
         }
         if (binding.propProfileFriends != null) {
             binding.propProfileFriends.setOnClickListener(v -> {
@@ -109,8 +276,10 @@ public class ProfileActivity extends ThemedActivity {
         }
 
         binding.btnFollow.setOnClickListener(v -> {
-            if (userId == null) return;
-            if (myId != null && userId.equals(myId)) {
+            // Use the loaded profile UUID rather than a possible public-ID/deep-link value.
+            String targetId = targetUserIdHold[0];
+            if (targetId == null || targetId.trim().isEmpty()) return;
+            if (myId != null && targetId.equals(myId)) {
                 Toast.makeText(this, "هذا حسابك", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -119,14 +288,14 @@ public class ProfileActivity extends ThemedActivity {
             container.getIoExecutor().execute(() -> {
                 Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
                         unfollow
-                                ? container.getUserApi().unfollow(userId)
-                                : container.getUserApi().follow(userId));
+                                ? container.getUserApi().unfollow(targetId)
+                                : container.getUserApi().follow(targetId));
                 runOnUiThread(() -> {
                     binding.btnFollow.setEnabled(true);
                     if (r.success) {
                         isFollowingTarget = !unfollow;
-                        binding.btnFollow.setText(
-                                isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setContentDescription(getString(isFollowingTarget ? R.string.unfollow : R.string.follow));
                         Toast.makeText(this,
                                 isFollowingTarget ? "تمت المتابعة" : "تم إلغاء المتابعة",
                                 Toast.LENGTH_SHORT).show();
@@ -138,43 +307,32 @@ public class ProfileActivity extends ThemedActivity {
                 });
             });
         });
-        binding.btnFriend.setOnClickListener(v -> {
-            if (userId == null) return;
-            if (myId != null && userId.equals(myId)) {
-                Toast.makeText(this, "هذا حسابك", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            sendSocialRequest(userId, "friend", "صداقة");
-        });
-        if (binding.btnFriend != null) {
-            binding.btnFriend.setOnLongClickListener(v -> {
-                if (userId == null || myId == null || userId.equals(myId)) return false;
-                AuraDialogHelper.confirm(this,
-                        "إلغاء الصداقة",
-                        "هل تريد إزالة هذا المستخدم من قائمة الأصدقاء؟",
-                        "إلغاء الصداقة",
-                        () -> {
-                            container.getIoExecutor().execute(() -> {
-                                Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
-                                        container.getUserApi().unfriend(userId));
-                                runOnUiThread(() -> {
-                                    if (r.success) {
-                                        Toast.makeText(this, "تم إلغاء الصداقة", Toast.LENGTH_SHORT).show();
-                                        vm.loadUser(userId);
-                                    } else {
-                                        Toast.makeText(this,
-                                                r.error != null ? r.error : getString(R.string.error_generic),
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                });
-                            });
-                        },
-                        getString(android.R.string.cancel),
-                        null);
-                return true;
+        // CP relationships are initiated only by sending the configured CP gift.
+        // Keep the legacy view hidden for old layouts; never expose a profile request action.
+        binding.btnCpRequest.setVisibility(View.GONE);
+        binding.btnCpRequest.setOnClickListener(null);
+        if (binding.btnMore != null) {
+            binding.btnMore.setOnClickListener(v -> showProfileMoreMenu(targetUserIdHold[0]));
+        }
+        if (binding.btnRoom != null) {
+            binding.btnRoom.setOnClickListener(v -> {
+                if (roomTrackingRoomId == null || roomTrackingRoomId.trim().isEmpty()) {
+                    Toast.makeText(this, "هذا المستخدم ليس في غرفة حالياً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                openTrackedRoom();
             });
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnFollowSticky != null) binding.btnFollowSticky.setOnClickListener(v -> binding.btnFollow.performClick());
+        if (binding.btnMessageSticky != null) binding.btnMessageSticky.setOnClickListener(v -> binding.btnMessage.performClick());
+        if (binding.btnRoomSticky != null) binding.btnRoomSticky.setOnClickListener(v -> binding.btnRoom.performClick());
+        if (binding.btnRoomTracking != null) {
+            binding.btnRoomTracking.setOnClickListener(v -> openTrackedRoom());
+        }
+        if (binding.btnRoomTrackingPrivacy != null) {
+            binding.btnRoomTrackingPrivacy.setOnClickListener(v -> showRoomTrackingPrivacyDialog());
+        }
         binding.btnMessage.setOnClickListener(v -> {
             if (userId == null || userId.isEmpty()) return;
             if (myId != null && userId.equals(myId)) {
@@ -212,34 +370,81 @@ public class ProfileActivity extends ThemedActivity {
             });
         });
 
-        binding.rowGiftHistory.setOnClickListener(v ->
-                startActivity(new Intent(this, GiftHistoryActivity.class)));
-
+        // Received gifts are shown directly in the profile as a horizontal swipeable strip.
         if (userId != null && myId != null && !userId.equals(myId)) {
             container.getIoExecutor().execute(() -> {
                 try { container.getUserApi().visit(userId).execute(); } catch (Exception ignored) {}
             });
         }
 
+        // Wait for the incoming public ID/deep link to resolve to a UUID before enabling follow.
+        binding.btnFollow.setEnabled(false);
         vm.getUser().observe(this, user -> {
             if (user == null) return;
+            binding.btnFollow.setEnabled(true);
+            boolean ownProfile = myId != null && myId.equals(user.id);
+            isOwnProfile = ownProfile;
+            binding.btnCpRequest.setVisibility(View.GONE);
+            // The mysterious-mode activation control belongs only in Me -> Profile.
+            // Never expose an activation/cancel switch from a public profile opened from a room.
+            if (binding.rowProfileMysteriousMode != null) {
+                binding.rowProfileMysteriousMode.setVisibility(View.GONE);
+            }
+            // Fail closed: only the owner can see the control, and it stays hidden until
+            // the server confirms an active VIP that includes Mysterious Man.
+            if (ownProfile) {
+                bindMysteriousMode(true);
+                profileHandler.removeCallbacks(mysteriousModeRefresh);
+                profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+            } else {
+                profileHandler.removeCallbacks(mysteriousModeRefresh);
+            }
+            if (binding.btnRoomTrackingPrivacy != null) {
+                binding.btnRoomTrackingPrivacy.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
+            }
+            if (ownProfile) {
+                binding.btnRoomTracking.setVisibility(View.GONE);
+                profileHandler.removeCallbacks(roomPresenceRefresh);
+            } else {
+                refreshRoomPresence(user.id);
+                profileHandler.removeCallbacks(roomPresenceRefresh);
+                profileHandler.postDelayed(roomPresenceRefresh, 15_000L);
+            }
+            loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
+                    user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
-
-            // Same dark VIP sheet wash as room user card.
-            if (binding.userCardBg != null) {
-                AgencyUi.applyUserCardSheet(binding.userCardBg, null, vip);
+            if (binding.imgVipMainIcon != null) {
+                String mainVipIconUrl = vip > 0 ? user.vipMainIconUrl : null;
+                if (mainVipIconUrl == null || mainVipIconUrl.trim().isEmpty()) {
+                    binding.imgVipMainIcon.setVisibility(View.GONE);
+                    binding.imgVipMainIcon.setImageDrawable(null);
+                } else {
+                    binding.imgVipMainIcon.setVisibility(View.VISIBLE);
+                    com.Dramizo.Series.util.ServerAssets.load(binding.imgVipMainIcon, mainVipIconUrl.trim());
+                }
             }
 
-            binding.tvDisplayName.setText(
-                    user.displayName != null && !user.displayName.isEmpty()
-                            ? user.displayName
-                            : "مستخدم");
+            // Public profiles use the app's light settings palette, independent of room VIP-card styling.
+            if (binding.userCardBg != null) {
+                binding.userCardBg.setBackgroundResource(R.drawable.bg_profile_panel);
+            }
+
+            String profileDisplayName = user.displayName != null && !user.displayName.isEmpty()
+                    ? user.displayName : "مستخدم";
+            // Custom display-rank/medal system is retired from the app UI.
+            binding.tvDisplayName.setText(profileDisplayName);
+            com.Dramizo.Series.util.VipNameStyle.bind(binding.tvDisplayName, user);
+            Glide.with(binding.imgCustomDisplayRank).clear(binding.imgCustomDisplayRank);
+            binding.imgCustomDisplayRank.setVisibility(View.GONE);
             GenderVerifiedBadge.bind(binding.tvDisplayName, null, user.genderVerified);
             bindGenderIcon(binding.imgGender, user.gender);
 
             final String publicId = user.displayPublicId();
-            binding.tvUsername.setText(publicId.isEmpty() ? "ID:—" : ("ID:" + publicId));
+            binding.tvUsername.setText(publicId.isEmpty() ? "—" : publicId);
+            binding.tvUsername.setTag(user.id);
+            com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
+                    container.getVanityApi(), publicId, user.vipLevel);
             binding.btnCopyId.setOnClickListener(v -> {
                 if (publicId.isEmpty()) {
                     Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
@@ -262,42 +467,55 @@ public class ProfileActivity extends ThemedActivity {
             int friends = Math.max(0, user.friendsCount);
             if (user.id != null && !user.id.isEmpty()) {
                 targetUserIdHold[0] = user.id;
+                loadedProfileId = user.id;
+                if (binding.sectionProfileSupporters != null) {
+                    binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
+                }
+                loadProfileMedals(user.id);
+
+                loadProfileSupporters(user.id);
+                loadProfileGiftStrip(user.id);
             }
             if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(followers));
             if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
             if (binding.tvStatFans != null) binding.tvStatFans.setText(formatScore(visitors));
-            if (binding.tvPropProfileSupporters != null) {
-                binding.tvPropProfileSupporters.setText(formatScore(followers));
-            }
-            if (binding.tvPropProfileFriends != null) {
-                binding.tvPropProfileFriends.setText(formatScore(friends));
-            }
             if (binding.tvStats != null) {
                 binding.tvStats.setText(getString(R.string.user_card_stat_following) + " " + followers
                         + " · " + getString(R.string.user_card_stat_fans) + " " + following
                         + " · " + getString(R.string.user_card_stat_visitors) + " " + visitors);
             }
             bindStaffBadge(user);
+            bindAgencyRoleBadge(user);
+            // Agency/competition role badges must not sit over the profile avatar.
+            // The agency information strip remains available separately below the profile.
+            bindAgencyStrip(user.agency, user.agencyClub);
 
             // Level chip (same pill as card member chip).
             binding.tvLevelChip.setText(String.valueOf(level));
             binding.tvLevelChip.setBackgroundResource(R.drawable.bg_user_card_id_chip);
-            binding.tvLevelChip.setTextColor(0xFFE0F7FA);
+            binding.tvLevelChip.setTextColor(0xFF4F3C91);
             binding.tvLevelChip.setCompoundDrawablesRelative(null, null, null, null);
 
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
+            // Earned/gifted profile badges are loaded into the swipeable strip beneath the ID row.
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
                     : Math.max(0, user.wealthScore);
-            binding.tvVipChip.setText("VIP" + vip);
-            binding.tvVipChip.setVisibility(vip > 0 ? View.VISIBLE : View.GONE);
-            if (vip > 0) {
-                binding.tvVipChip.setBackgroundResource(R.drawable.bg_chip_vip);
-                binding.tvVipChip.setTextColor(0xFFFFFFFF);
+            if (binding.tvVipChip != null) { binding.tvVipChip.setText(null); binding.tvVipChip.setVisibility(View.GONE); }
+            if (binding.imgVipMedal != null) { binding.imgVipMedal.setImageDrawable(null); binding.imgVipMedal.setVisibility(View.GONE); }
+            if (binding.imgVipHorizontalBadge != null) {
+                String horizontalVipUrl = vip > 0 ? user.vipHorizontalBadgeUrl : null;
+                if (horizontalVipUrl == null || horizontalVipUrl.trim().isEmpty()) {
+                    binding.imgVipHorizontalBadge.setVisibility(View.GONE);
+                    binding.imgVipHorizontalBadge.setImageDrawable(null);
+                } else {
+                    binding.imgVipHorizontalBadge.setVisibility(View.VISIBLE);
+                    com.Dramizo.Series.util.ServerAssets.load(binding.imgVipHorizontalBadge, horizontalVipUrl.trim());
+                }
             }
             binding.tvCharmChip.setText(formatScore(charm));
             binding.tvCharmChip.setVisibility(View.VISIBLE);
@@ -308,27 +526,36 @@ public class ProfileActivity extends ThemedActivity {
             binding.tvWealthChip.setBackgroundResource(R.drawable.bg_chip_wealth);
             binding.tvWealthChip.setTextColor(0xFFFFFFFF);
 
-            bindVipHead(
-                    binding.imgVipHead,
-                    vip,
-                    user.vipHeadUrl != null ? user.vipHeadUrl : VipStyle.fixedHeadPath(vip));
+            // Do not overlay VIP head artwork on the cover: it was stretching across the banner.
+            if (binding.imgVipHead != null) {
+                binding.imgVipHead.setVisibility(View.GONE);
+                binding.imgVipHead.setImageDrawable(null);
+            }
             bindVipMedal(binding.imgVipMedal, vip, user.levelBadgeUrl);
             bindEntryRide(
                     binding.imgEntryRide,
                     firstNonEmpty(user.entryAnimationUrl, user.entryEffectUrl));
 
-            // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
-            String nobilityFrame = VipStyle.profileNobilityFrameUrl(vip, user.vipTouUrl);
-            String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+            // Only the actually equipped personal frame is shown here.
+            // An empty vipBadgeUrl means the user unequipped their frame; do not
+            // silently replace it with a VIP-tier fallback frame.
+            String profileFrame = AvatarCosmetics.avatarFrameUrl(user);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
                     binding.imgFrame,
                     user.avatarUrl,
                     profileFrame,
-                    user.hostBadgeUrl,
-                    user.hostBadgeMeta,
+                    null,
+                    null,
                     1);
+            // Secure only the enlarged avatar viewer; the profile screen itself remains screenshot-able.
+            binding.imgAvatar.setOnClickListener(v -> {
+                if (user.avatarUrl == null || user.avatarUrl.trim().isEmpty()) return;
+                Intent secureImage = new Intent(ProfileActivity.this, SecureProfileImageActivity.class);
+                secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_URL, user.avatarUrl);
+                startActivity(secureImage);
+            });
             com.Dramizo.Series.util.HostSignalView.prefetchWear(this, profileFrame);
             if (binding.imgHostBadge != null) {
                 binding.imgHostBadge.setVisibility(View.GONE);
@@ -343,54 +570,39 @@ public class ProfileActivity extends ThemedActivity {
             if (Boolean.TRUE.equals(user.isOnline)) {
                 binding.tvLastSeen.setVisibility(View.VISIBLE);
                 binding.tvLastSeen.setText(R.string.online_now);
-                binding.tvLastSeen.setTextColor(0xFF7CFFB2);
+                binding.tvLastSeen.setTextColor(0xFF16865B);
             } else if (user.lastSeenAt != null && !user.lastSeenAt.isEmpty()) {
                 binding.tvLastSeen.setVisibility(View.VISIBLE);
                 binding.tvLastSeen.setText(DeviceTimeFormat.lastSeen(this, user.lastSeenAt));
-                binding.tvLastSeen.setTextColor(0x99FFFFFF);
+                binding.tvLastSeen.setTextColor(0xFF73798D);
             } else {
                 binding.tvLastSeen.setVisibility(View.GONE);
             }
 
-            if (user.coverUrl != null && !user.coverUrl.isEmpty()) {
-                Glide.with(this)
-                        .load(AssetCatalog.absoluteUrl(user.coverUrl))
-                        .placeholder(ImagePlaceholder.cover())
-                        .into(binding.imgCover);
-            } else {
-                binding.imgCover.setImageResource(ImagePlaceholder.cover());
-            }
+            bindProfileCoverGallery(user.profileCoverUrls, user.coverUrl);
             if (myId != null && myId.equals(user.id)) {
                 binding.btnFollow.setVisibility(View.GONE);
-                if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.GONE);
             } else {
                 binding.btnFollow.setVisibility(View.VISIBLE);
-                if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.VISIBLE);
                 isFollowingTarget = Boolean.TRUE.equals(user.isFollowing);
-                binding.btnFollow.setText(
-                        isFollowingTarget ? R.string.unfollow : R.string.follow);
+                binding.btnFollow.setText(isFollowingTarget ? R.string.unfollow : R.string.follow);
+                if (binding.btnFollowSticky != null) binding.btnFollowSticky.setContentDescription(getString(isFollowingTarget ? R.string.unfollow : R.string.follow));
             }
 
-            // Property strip
-            String agencyId = null;
-            if (binding.tvProfileAgencyName != null) {
-                if (user.agency != null
-                        && user.agency.name != null
-                        && !user.agency.name.isEmpty()) {
-                    binding.tvProfileAgencyName.setText(user.agency.name.trim());
-                } else {
-                    binding.tvProfileAgencyName.setText(R.string.user_card_prop_family);
-                }
+            // Only show the agency/family tile when the backend confirms an active
+            // membership. Deleted or suspended agencies must disappear from every profile.
+            // Profile tabs are fixed: ملكية / لحظاتي. Agency navigation remains available
+            // from the dedicated agency strip elsewhere, not by replacing the tab label.
+            if (binding.propProfileFamily != null) {
+                binding.propProfileFamily.setVisibility(View.VISIBLE);
+                binding.propProfileFamily.setOnClickListener(v -> showProfileProperty());
             }
-            if (user.agency != null && user.agency.id != null && !user.agency.id.isEmpty()) {
-                agencyId = user.agency.id;
+            if (binding.tvProfileAgencyName != null) binding.tvProfileAgencyName.setText("ملكية");
+            if (binding.propProfileSupporters != null) {
+                binding.propProfileSupporters.setVisibility(View.VISIBLE);
+                binding.propProfileSupporters.setOnClickListener(v -> openProfileDetails());
             }
-            UserSocialNav.bindFamilyClick(
-                    this,
-                    binding.propProfileFamily,
-                    agencyId,
-                    null);
-            bindAgencyStrip(user.agency);
+            if (binding.tvPropProfileSupporters != null) binding.tvPropProfileSupporters.setText("تفاصيل");
         });
         vm.getError().observe(this, e -> {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
@@ -398,42 +610,424 @@ public class ProfileActivity extends ThemedActivity {
         if (userId != null) vm.loadUser(userId); else vm.loadMe();
     }
 
+
+
+    private void openProfileSupportersPage(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        Intent supporters = new Intent(this, SupportersActivity.class);
+        supporters.putExtra(EXTRA_USER_ID, profileId);
+        startActivity(supporters);
+    }
+
+    /** Top accounts that actually sent gifts to this profile — never followers. */
+    private void loadProfileSupporters(String profileId) {
+        if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
+        if (binding.sectionProfileSupporters != null) binding.sectionProfileSupporters.setVisibility(View.VISIBLE);
+        RecyclerView recycler = binding.recyclerProfileSupporters;
+        recycler.setVisibility(View.VISIBLE);
+        recycler.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        recycler.setNestedScrollingEnabled(false);
+        container.getIoExecutor().execute(() -> {
+            Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().supporters(profileId));
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto> supporters =
+                        result.success && result.data != null ? result.data : new java.util.ArrayList<>();
+                recycler.setVisibility(View.VISIBLE);
+                recycler.setAdapter(new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                    @NonNull @Override
+                    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                        View item = LayoutInflater.from(parent.getContext())
+                                .inflate(R.layout.item_profile_supporter, parent, false);
+                        return new RecyclerView.ViewHolder(item) {};
+                    }
+                    @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+                        com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto supporter = supporters.get(position);
+                        ImageView avatar = holder.itemView.findViewById(R.id.imgSupporterAvatar);
+                        ImageView frame = holder.itemView.findViewById(R.id.imgSupporterFrame);
+                        com.Dramizo.Series.util.HostSignalView liveFrame = holder.itemView.findViewById(R.id.supporterHostSignal);
+                        TextView name = holder.itemView.findViewById(R.id.tvSupporterName);
+                        name.setText(supporter.displayName == null || supporter.displayName.trim().isEmpty()
+                                ? supporter.username : supporter.displayName);
+                        TextView diamonds = holder.itemView.findViewById(R.id.tvSupporterDiamonds);
+                        if (diamonds != null) {
+                            diamonds.setVisibility(View.VISIBLE);
+                            diamonds.setText("◆ " + formatSupportAmount(supporter.totalSupport));
+                        }
+                        AvatarCosmetics.bindStacked(avatar, frame, liveFrame, supporter.avatarUrl, supporter.frameUrl, null);
+                        holder.itemView.setOnClickListener(v -> {
+                            String id = profileId;
+                            if (id == null || id.trim().isEmpty()) return;
+                            Intent supporters = new Intent(ProfileActivity.this, SupportersActivity.class);
+                            supporters.putExtra(EXTRA_USER_ID, id);
+                            startActivity(supporters);
+                        });
+                    }
+                    @Override public int getItemCount() { return supporters.size(); }
+                });
+                binding.tvProfileSupportersEmpty.setVisibility(supporters.isEmpty() ? View.VISIBLE : View.GONE);
+                if (binding.tvPropProfileSupporters != null) {
+                    binding.tvPropProfileSupporters.setText("تفاصيل");
+                }
+            });
+        });
+    }
+
+    /** Compact gift cabinet embedded in the profile; horizontal swipe, no navigation tap. */
+    private void loadProfileGiftStrip(String profileId) {
+        if (binding == null || profileId == null || profileId.trim().isEmpty()) return;
+        RecyclerView recycler = binding.recyclerProfileGiftHistory;
+        int profileWidthDp = getResources().getConfiguration().screenWidthDp;
+        int giftColumns = profileWidthDp >= 420 ? 4 : 3;
+        recycler.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, giftColumns));
+        recycler.setNestedScrollingEnabled(false);
+        List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new java.util.ArrayList<>();
+        RecyclerView.Adapter<GiftStripHolder> adapter = new RecyclerView.Adapter<GiftStripHolder>() {
+            @NonNull @Override
+            public GiftStripHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                ItemGiftHistoryBinding item = ItemGiftHistoryBinding.inflate(
+                        LayoutInflater.from(parent.getContext()), parent, false);
+                item.getRoot().setLayoutParams(new RecyclerView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        (int) (132 * getResources().getDisplayMetrics().density)));
+                return new GiftStripHolder(item);
+            }
+            @Override public void onBindViewHolder(@NonNull GiftStripHolder holder, int position) {
+                com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto gift = gifts.get(position);
+                holder.binding.tvGiftName.setText(gift.giftName == null ? "هدية" : gift.giftName);
+                holder.binding.tvGiftMeta.setText("× " + NumberFormat.getNumberInstance(Locale.US)
+                        .format(Math.max(0L, gift.quantity)));
+                Glide.with(holder.binding.imgGift).load(AssetCatalog.absoluteUrl(gift.giftIconUrl))
+                        .placeholder(ImagePlaceholder.gift()).error(ImagePlaceholder.gift())
+                        .into(holder.binding.imgGift);
+            }
+            @Override public int getItemCount() { return gifts.size(); }
+        };
+        recycler.setAdapter(adapter);
+        container.getIoExecutor().execute(() -> {
+            Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().receivedHistory(profileId));
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                gifts.clear();
+                if (result.success && result.data != null) gifts.addAll(result.data);
+                adapter.notifyDataSetChanged();
+                binding.tvProfileGiftsEmpty.setVisibility(gifts.isEmpty() ? View.VISIBLE : View.GONE);
+            });
+        });
+    }
+
+    private static final class GiftStripHolder extends RecyclerView.ViewHolder {
+        final ItemGiftHistoryBinding binding;
+        GiftStripHolder(ItemGiftHistoryBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+    }
+
+    private void refreshRoomPresence(String targetId) {
+        if (targetId == null || targetId.trim().isEmpty() || container == null) return;
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().roomPresence(targetId));
+            boolean inRoom = result.success && result.data != null
+                    && Boolean.TRUE.equals(result.data.get("inRoom"));
+            String roomId = inRoom && result.data.get("roomId") != null
+                    ? String.valueOf(result.data.get("roomId")) : null;
+            String roomName = inRoom && result.data.get("roomName") != null
+                    ? String.valueOf(result.data.get("roomName")) : "";
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()
+                        || !targetId.equals(loadedProfileId)) return;
+                roomTrackingRoomId = roomId;
+                roomTrackingRoomName = roomName;
+                if (binding.btnRoomTracking != null) {
+                    boolean visible = inRoom && roomId != null && !roomId.isEmpty();
+                    binding.btnRoomTracking.setText(visible
+                            ? "●  في غرفة: " + (roomName.isEmpty() ? "غرفة صوتية" : roomName) : "");
+                    binding.btnRoomTracking.setVisibility(visible ? View.VISIBLE : View.GONE);
+                }
+            });
+        });
+    }
+
+    private void openTrackedRoom() {
+        String roomId = roomTrackingRoomId;
+        if (roomId == null || roomId.trim().isEmpty()) return;
+        Intent intent = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+        startActivity(intent);
+    }
+
+    private void showRoomTrackingPrivacyDialog() {
+        if (container == null) return;
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().roomTrackingPrivacy());
+            String current = result.success && result.data != null && result.data.get("audience") != null
+                    ? String.valueOf(result.data.get("audience")) : "everyone";
+            String[] values = {"everyone", "followers", "friends", "nobody"};
+            String[] labels = {"الجميع", "المتابعون", "الأصدقاء", "لا أحد"};
+            int selected = 0;
+            for (int i = 0; i < values.length; i++) if (values[i].equals(current)) selected = i;
+            final int checked = selected;
+            runOnUiThread(() -> new AlertDialog.Builder(this)
+                    .setTitle("من يستطيع تتبعي؟")
+                    .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                        dialog.dismiss();
+                        saveRoomTrackingPrivacy(values[which]);
+                    })
+                    .setNegativeButton("إغلاق", null)
+                    .show());
+        });
+    }
+
+    private void saveRoomTrackingPrivacy(String audience) {
+        container.getIoExecutor().execute(() -> {
+            Map<String, String> body = new HashMap<>();
+            body.put("audience", audience);
+            Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().updateRoomTrackingPrivacy(body));
+            runOnUiThread(() -> Toast.makeText(this,
+                    result.success ? "تم تحديث خصوصية تتبع الغرف" :
+                            (result.error != null ? result.error : "تعذر حفظ إعداد الخصوصية"),
+                    Toast.LENGTH_SHORT).show());
+        });
+    }
+
+    private void openBadgeCabinet(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        Intent intent = new Intent(this, MedalActivity.class);
+        intent.putExtra(EXTRA_USER_ID, profileId);
+        startActivity(intent);
+    }
+
+    /** Shows earned medals in a horizontally swipeable strip above Moments. */
+    
+
     private String formatScore(long value) {
         return NumberFormat.getIntegerInstance(getResources().getConfiguration().getLocales().get(0))
                 .format(Math.max(0, value));
     }
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
-        if (binding == null || binding.tvStaffBadge == null) return;
-        if (!StaffRoleHelper.isStaff(user)) {
+        if (binding == null || binding.tvStaffBadge == null || user == null) return;
+        // Cosmetic gifted rank takes the same visual slot but never changes real permissions.
+        String customName = user.customDisplayRankName;
+        String customUrl = user.customDisplayRankImageUrl;
+        if (customName != null && !customName.trim().isEmpty()) {
+            showProfileRoleBadge(customName, customUrl);
+            return;
+        }
+        boolean rechargeAgent = user.isRechargeAgent;
+        boolean agencyOwner = user.agency != null && "owner".equalsIgnoreCase(user.agency.role);
+        if (agencyOwner && !StaffRoleHelper.isStaff(user) && !rechargeAgent) {
+            clearProfileRoleBadgeAsset();
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
-        String role = StaffRoleHelper.normalize(user);
+        if (!StaffRoleHelper.isStaff(user) && !rechargeAgent) {
+            clearProfileRoleBadgeAsset();
+            binding.tvStaffBadge.setVisibility(View.GONE);
+            return;
+        }
+        String role = StaffRoleHelper.isStaff(user) ? StaffRoleHelper.normalize(user) : "rechargeAgent";
+        String fallback = StaffRoleHelper.isStaff(user)
+                ? StaffRoleHelper.badgeAr(user) : "وكيل شحن";
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
-        binding.tvStaffBadge.setText(StaffRoleHelper.badgeAr(user));
-        binding.tvStaffBadge.setBackgroundResource(
-                StaffRoleHelper.SUPER.equals(role)
-                        ? R.drawable.bg_chip_staff_super
-                        : R.drawable.bg_chip_staff_manager);
+        binding.tvStaffBadge.setText(fallback);
+        binding.tvStaffBadge.setTag(role);
+        StaffIdentityConfigCache.load(this, () -> {
+            if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
+            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+            String label = latest.label == null || latest.label.trim().isEmpty() ? fallback : latest.label;
+            showProfileRoleBadge(StaffRoleHelper.genderizeLabel(label, user.gender), latest.badgeUrl);
+            if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
+                try {
+                    binding.imgFrame.setVisibility(View.VISIBLE);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(latest.frameUrl)).into(binding.imgFrame);
+                    com.Dramizo.Series.util.StaffIdentityFrameMotion.start(binding.imgFrame);
+                } catch (Exception ignored) { }
+            }
+        });
+    }
+
+    private void clearProfileRoleBadgeAsset() {
+        if (binding == null || binding.tvStaffBadge == null) return;
+        com.Dramizo.Series.util.StaffIdentityFrameMotion.stop(binding.imgFrame);
+        ViewGroup parent = binding.tvStaffBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_custom_display_rank_image") : null;
+        if (image != null) {
+            Glide.with(this).clear(image);
+            image.setVisibility(View.GONE);
+        }
+    }
+
+    private void showProfileRoleBadge(String label, String imageUrl) {
+        if (binding == null || binding.tvStaffBadge == null) return;
+        ViewGroup parent = binding.tvStaffBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.tvStaffBadge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_custom_display_rank_image") : null;
+        if (imageUrl != null && !imageUrl.trim().isEmpty() && parent != null) {
+            binding.tvStaffBadge.setVisibility(View.GONE);
+            if (image == null) {
+                image = new ImageView(this);
+                image.setTag("jeho_custom_display_rank_image");
+                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                int badgeWidth = dpProfile(136);
+                int badgeHeight = dpProfile(34);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(badgeWidth, badgeHeight);
+                lp.setMargins(dpProfile(4), 0, dpProfile(4), 0);
+                int index = Math.min(parent.indexOfChild(binding.tvStaffBadge) + 1, parent.getChildCount());
+                parent.addView(image, index, lp);
+            }
+            image.setVisibility(View.VISIBLE);
+            Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl.trim())).into(image);
+            image.setContentDescription(label);
+        } else {
+            if (image != null) {
+                Glide.with(this).clear(image);
+                image.setVisibility(View.GONE);
+            }
+            binding.tvStaffBadge.setText(label == null ? "" : label);
+            binding.tvStaffBadge.setVisibility(label == null || label.trim().isEmpty() ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /** Agency identity is separate from platform-staff badges so both can be shown together. */
+    /** Always show the agency role as readable text on the profile, including hosts. */
+    /** Always show the agency role as readable text on the profile, including hosts. */
+    private void bindAgencyRoleBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null || binding.agencyRoleBadgeContainer == null
+                || binding.tvAgencyRoleBadge == null || binding.imgAgencyRoleBadge == null) return;
+        // A person gets one administrative identity at a time. Platform staff and
+        // recharge-agent ranks take precedence over an additional agency-role badge.
+        if (user != null && (StaffRoleHelper.isStaff(user) || user.isRechargeAgent)) {
+            binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
+            binding.tvAgencyRoleBadge.setText("");
+            binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+            Glide.with(this).clear(binding.imgAgencyRoleBadge);
+            binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+            return;
+        }
+
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency =
+                user == null ? null : user.agency;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club =
+                user == null ? null : user.agencyClub;
+        String agencyRole = agency != null && agency.role != null
+                ? agency.role.trim().toLowerCase(Locale.US) : "";
+        String clubRole = club != null && club.role != null
+                ? club.role.trim().toLowerCase(Locale.US) : "";
+        String role = isAgencyDisplayRole(agencyRole) ? agencyRole : clubRole;
+        role = role.replace('-', '_').replace("agency_", "");
+
+        String label;
+        boolean leader = "owner".equals(role) || "leader".equals(role);
+        if (leader) {
+            label = "قائد الوكالة";
+        } else if ("host".equals(role)) {
+            label = "مضيف";
+        } else if ("manager".equals(role) || "admin".equals(role)) {
+            label = "أدمن وكالة";
+        } else {
+            binding.agencyRoleBadgeContainer.setVisibility(View.GONE);
+            binding.tvAgencyRoleBadge.setText("");
+            binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+            binding.imgAgencyRoleBadge.setImageDrawable(null);
+            return;
+        }
+
+        binding.agencyRoleBadgeContainer.setVisibility(View.VISIBLE);
+        binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+        binding.imgAgencyRoleBadge.setImageDrawable(null);
+        binding.tvAgencyRoleBadge.setText(StaffRoleHelper.genderizeLabel(label, user == null ? null : user.gender));
+        binding.tvAgencyRoleBadge.setTextColor(android.graphics.Color.WHITE);
+        binding.tvAgencyRoleBadge.setBackgroundResource(
+                leader ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
+        binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
+        String identityKey = leader ? "agencyLeader" : ("host".equals(role) ? "host" : "");
+        if (!identityKey.isEmpty()) {
+            StaffIdentityConfigCache.load(this, () -> {
+                if (binding == null || binding.agencyRoleBadgeContainer == null) return;
+                StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(identityKey);
+                if (identity.badgeUrl != null && !identity.badgeUrl.trim().isEmpty()) {
+                    binding.tvAgencyRoleBadge.setVisibility(View.GONE);
+                    binding.imgAgencyRoleBadge.setVisibility(View.VISIBLE);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(identity.badgeUrl.trim()))
+                            .into(binding.imgAgencyRoleBadge);
+                    binding.imgAgencyRoleBadge.setContentDescription(
+                            StaffRoleHelper.genderizeLabel(identity.label, user == null ? null : user.gender));
+                } else {
+                    binding.imgAgencyRoleBadge.setVisibility(View.GONE);
+                    binding.tvAgencyRoleBadge.setText(StaffRoleHelper.genderizeLabel(
+                            identity.label == null || identity.label.trim().isEmpty() ? label : identity.label,
+                            user == null ? null : user.gender));
+                    binding.tvAgencyRoleBadge.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+    }
+
+    private boolean isAgencyDisplayRole(String role) {
+        if (role == null) return false;
+        String normalized = role.trim().toLowerCase(Locale.US).replace('-', '_').replace("agency_", "");
+        return "owner".equals(normalized) || "leader".equals(normalized)
+                || "host".equals(normalized) || "manager".equals(normalized)
+                || "admin".equals(normalized);
     }
 
     private void bindAgencyStrip(
             @androidx.annotation.Nullable
-            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
+            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency,
+            @androidx.annotation.Nullable
+            com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club) {
         if (binding == null || binding.rowProfileAgency == null) return;
         if (agency == null || agency.name == null || agency.name.trim().isEmpty()) {
-            binding.rowProfileAgency.setVisibility(View.GONE);
+            if (club == null || club.label == null || club.label.trim().isEmpty()) {
+                profileAgencyVisibleBeforeDetails = false;
+                binding.rowProfileAgency.setVisibility(View.GONE);
+                return;
+            }
+            profileAgencyVisibleBeforeDetails = true;
+            profileAgencyVisibleBeforeDetails = true;
+            binding.rowProfileAgency.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
+            if (binding.tvAgencyName != null) {
+                binding.tvAgencyName.setText(club.agencyName == null || club.agencyName.trim().isEmpty()
+                        ? club.label.trim() : club.agencyName.trim());
+            }
+            if (binding.tvAgencyGid != null) binding.tvAgencyGid.setVisibility(View.GONE);
+            if (binding.imgAgencyBannerBg != null) binding.imgAgencyBannerBg.setVisibility(View.GONE);
+            if (binding.tvAgencyLevel != null) binding.tvAgencyLevel.setVisibility(View.GONE);
+            if (binding.imgAgencyLogo != null) {
+                String logo = club.agencyLogoUrl;
+                if (logo != null && !logo.trim().isEmpty()) {
+                    com.bumptech.glide.Glide.with(this).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(logo))
+                            .placeholder(R.drawable.icon_agency).error(R.drawable.icon_agency)
+                            .centerCrop().into(binding.imgAgencyLogo);
+                } else {
+                    binding.imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                }
+            }
+            final String clubAgencyId = club.agencyId;
+            binding.rowProfileAgency.setOnClickListener(v -> {
+                if (clubAgencyId != null && !clubAgencyId.trim().isEmpty()) {
+                    AgencyFamilyInfoSheet.show(this, clubAgencyId);
+                }
+            });
             return;
         }
-        binding.rowProfileAgency.setVisibility(View.VISIBLE);
+        profileAgencyVisibleBeforeDetails = true;
+        binding.rowProfileAgency.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
         if (binding.tvAgencyName != null) {
             binding.tvAgencyName.setText(agency.name.trim());
         }
         if (binding.tvAgencyGid != null) {
             String gid = agency.publicId != null ? agency.publicId.trim() : "";
             binding.tvAgencyGid.setVisibility(View.VISIBLE);
-            binding.tvAgencyGid.setText(gid.isEmpty() ? "GID: —" : ("GID:" + gid));
+            binding.tvAgencyGid.setText(gid.isEmpty() ? "ID الوكالة: غير متاح" : ("ID الوكالة: " + gid));
         }
         int tier = agency.level > 0
                 ? agency.level
@@ -450,6 +1044,119 @@ public class ProfileActivity extends ThemedActivity {
                         this, agencyId, agency.logoUrl, agency.coverUrl);
             } catch (Exception ignored) {
             }
+        });
+    }
+
+    private void bindMysteriousMode(boolean ownProfile) {
+        if (binding == null || binding.rowProfileMysteriousMode == null) return;
+        binding.rowProfileMysteriousMode.setVisibility(View.GONE);
+        if (!ownProfile) return;
+
+        binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+        binding.switchMysteriousMode.setEnabled(false);
+        binding.tvMysteriousModeHint.setText("جارٍ التحقق من اشتراك VIP...");
+        new Thread(() -> {
+            Result<Map<String, Object>> result = container.getVipRepository().mysteriousModeStatus();
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing()) return;
+                if (result == null || !result.success || result.data == null) {
+                    // Do not expose a VIP-only feature when eligibility cannot be verified.
+                    binding.rowProfileMysteriousMode.setVisibility(View.GONE);
+                    binding.switchMysteriousMode.setEnabled(false);
+                    return;
+                }
+                Map<String, Object> status = result.data;
+                boolean eligible = Boolean.TRUE.equals(status.get("eligible"));
+                boolean enabled = eligible && Boolean.TRUE.equals(status.get("enabled"));
+                binding.rowProfileMysteriousMode.setVisibility(eligible ? View.VISIBLE : View.GONE);
+                if (!eligible) {
+                    binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+                    binding.switchMysteriousMode.setChecked(false);
+                    binding.switchMysteriousMode.setEnabled(false);
+                    return;
+                }
+                binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+                binding.switchMysteriousMode.setChecked(enabled);
+                binding.switchMysteriousMode.setEnabled(eligible);
+                binding.tvMysteriousModeHint.setText(eligible
+                        ? (enabled ? "مفعّل — هويتك مخفية داخل الغرف" : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه")
+                        : "يتطلب اشتراك VIP يتضمن ميزة الرجل الغامض");
+                binding.switchMysteriousMode.setOnCheckedChangeListener((button, checked) -> {
+                    button.setEnabled(false);
+                    new Thread(() -> {
+                        Result<Map<String, Object>> changed = container.getVipRepository().setMysteriousMode(checked);
+                        runOnUiThread(() -> {
+                            if (binding == null || isFinishing()) return;
+                            button.setEnabled(eligible);
+                            if (changed != null && changed.success && changed.data != null) {
+                                boolean actual = Boolean.TRUE.equals(changed.data.get("enabled"));
+                                button.setOnCheckedChangeListener(null);
+                                button.setChecked(actual);
+                                button.setOnCheckedChangeListener((b, value) -> {
+                                    b.setEnabled(false);
+                                    new Thread(() -> {
+                                        Result<Map<String, Object>> next = container.getVipRepository().setMysteriousMode(value);
+                                        runOnUiThread(() -> {
+                                            if (binding == null || isFinishing()) return;
+                                            b.setEnabled(eligible);
+                                            if (next != null && next.success && next.data != null) {
+                                                boolean saved = Boolean.TRUE.equals(next.data.get("enabled"));
+                                                b.setOnCheckedChangeListener(null);
+                                                b.setChecked(saved);
+                                                binding.tvMysteriousModeHint.setText(saved
+                                                        ? "مفعّل — هويتك مخفية داخل الغرف"
+                                                        : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                                                bindMysteriousModeListener(eligible);
+                                            } else {
+                                                b.setOnCheckedChangeListener(null);
+                                                b.setChecked(!value);
+                                                bindMysteriousModeListener(eligible);
+                                                Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                                    }).start();
+                                });
+                                binding.tvMysteriousModeHint.setText(actual
+                                        ? "مفعّل — هويتك مخفية داخل الغرف"
+                                        : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                            } else {
+                                button.setOnCheckedChangeListener(null);
+                                button.setChecked(!checked);
+                                bindMysteriousModeListener(eligible);
+                                Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }).start();
+                });
+            });
+        }).start();
+    }
+
+    private void bindMysteriousModeListener(boolean eligible) {
+        if (binding == null || binding.switchMysteriousMode == null) return;
+        binding.switchMysteriousMode.setOnCheckedChangeListener((button, checked) -> {
+            button.setEnabled(false);
+            new Thread(() -> {
+                Result<Map<String, Object>> changed = container.getVipRepository().setMysteriousMode(checked);
+                runOnUiThread(() -> {
+                    if (binding == null || isFinishing()) return;
+                    button.setEnabled(eligible);
+                    if (changed != null && changed.success && changed.data != null) {
+                        boolean saved = Boolean.TRUE.equals(changed.data.get("enabled"));
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(saved);
+                        binding.tvMysteriousModeHint.setText(saved
+                                ? "مفعّل — هويتك مخفية داخل الغرف"
+                                : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                        bindMysteriousModeListener(eligible);
+                    } else {
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(!checked);
+                        bindMysteriousModeListener(eligible);
+                        Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }).start();
         });
     }
 
@@ -478,19 +1185,11 @@ public class ProfileActivity extends ThemedActivity {
             @androidx.annotation.Nullable ImageView medal,
             int vipLevel,
             @androidx.annotation.Nullable String levelBadgeUrl) {
-        if (medal == null) return;
-        if (vipLevel <= 0) {
+        // Medal visuals are intentionally hidden with the retired profile badge cabinet.
+        if (medal != null) {
             medal.setVisibility(View.GONE);
             medal.setImageDrawable(null);
-            return;
         }
-        String path = levelBadgeUrl;
-        if (path == null || path.isEmpty() || !path.contains("vip_medal")) {
-            int t = Math.min(7, Math.max(1, vipLevel));
-            path = "/assets/cosmetics/vip/vip_medal_mikoo_" + t + ".png";
-        }
-        medal.setVisibility(View.VISIBLE);
-        ServerAssets.load(medal, path);
     }
 
     private void bindEntryRide(
@@ -549,6 +1248,639 @@ public class ProfileActivity extends ThemedActivity {
         return null;
     }
 
+    private static String firstNonEmptyValue(Object... values) {
+        if (values == null) return null;
+        for (Object value : values) {
+            if (value == null) continue;
+            String text = String.valueOf(value).trim();
+            if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) return text;
+        }
+        return null;
+    }
+
+    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl,
+            int ownVipLevel, String ownVipTouUrl, String ownHostBadgeUrl,
+            Map<String, Object> ownHostBadgeMeta) {
+        cpProfileTargetId = targetId == null ? "" : targetId;
+        cpProfileOwnAvatarUrl = ownAvatarUrl == null ? "" : ownAvatarUrl;
+        cpProfileOwnFrameUrl = ownFrameUrl == null ? "" : ownFrameUrl;
+        cpProfileOwnVipLevel = ownVipLevel;
+        cpProfileOwnVipTouUrl = ownVipTouUrl == null ? "" : ownVipTouUrl;
+        cpProfileOwnHostBadgeUrl = ownHostBadgeUrl == null ? "" : ownHostBadgeUrl;
+        cpProfileOwnHostBadgeMeta = ownHostBadgeMeta;
+        if (targetId == null || targetId.trim().isEmpty()) {
+            hideProfileCpRelationship();
+            return;
+        }
+        // Clear the previous profile's CP level icon while the new relationship is loading.
+        if (binding.imgCpLevelIcon != null) {
+            binding.imgCpLevelIcon.setImageDrawable(null);
+            binding.imgCpLevelIcon.setVisibility(View.GONE);
+        }
+        container.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().cpProfileRelationships(targetId));
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    // Older accounts may still have their active CP stored in the legacy
+                    // social-bond ledger. Preserve that relationship instead of hiding it
+                    // just because the newer cp_relationships table has no row yet.
+                    loadLegacyCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
+                    return;
+                }
+                Map<String, Object> relation = result.data.get(0);
+                // The public CP endpoint has returned several compatible payload shapes over
+                // time. Resolve the linked account from explicit partner fields so every entry
+                // point (search, ranking, chat, room, and direct profile) uses the same real data.
+                String relationStatus = relation.get("status") == null ? ""
+                        : String.valueOf(relation.get("status")).trim().toLowerCase(java.util.Locale.ROOT);
+                if (Boolean.FALSE.equals(relation.get("isActive"))
+                        || Boolean.FALSE.equals(relation.get("active"))
+                        || relation.get("endedAt") != null
+                        || relationStatus.contains("ended") || relationStatus.contains("reject")
+                        || relationStatus.contains("expired") || relationStatus.contains("pending")
+                        || relationStatus.contains("inactive")) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                Object partnerObj = relation.get("partner");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("partnerUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("linkedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("relatedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("otherUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
+                Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                // Compatibility fallback for older API/search payloads that flatten the
+                // partner fields instead of returning the nested "partner" object.
+                if (partner == null) {
+                    Map<String, Object> flattenedPartner = new HashMap<>();
+                    Object flattenedId = firstNonEmpty(
+                            relation.get("partnerId") == null ? null : String.valueOf(relation.get("partnerId")),
+                            relation.get("linkedUserId") == null ? null : String.valueOf(relation.get("linkedUserId")),
+                            relation.get("relatedUserId") == null ? null : String.valueOf(relation.get("relatedUserId")),
+                            relation.get("otherUserId") == null ? null : String.valueOf(relation.get("otherUserId")),
+                            relation.get("counterpartId") == null ? null : String.valueOf(relation.get("counterpartId")));
+                    if (flattenedId != null) flattenedPartner.put("id", flattenedId);
+                    Object flattenedName = firstNonEmpty(
+                            relation.get("partnerDisplayName") == null ? null : String.valueOf(relation.get("partnerDisplayName")),
+                            relation.get("partnerUsername") == null ? null : String.valueOf(relation.get("partnerUsername")));
+                    if (flattenedName != null) flattenedPartner.put("displayName", flattenedName);
+                    Object flattenedAvatar = firstNonEmpty(
+                            relation.get("partnerAvatarUrl") == null ? null : String.valueOf(relation.get("partnerAvatarUrl")),
+                            relation.get("partner_avatar_url") == null ? null : String.valueOf(relation.get("partner_avatar_url")),
+                            relation.get("partnerProfileImageUrl") == null ? null : String.valueOf(relation.get("partnerProfileImageUrl")),
+                            relation.get("partnerPhotoUrl") == null ? null : String.valueOf(relation.get("partnerPhotoUrl")),
+                            relation.get("partnerPicture") == null ? null : String.valueOf(relation.get("partnerPicture")),
+                            relation.get("partnerImageUrl") == null ? null : String.valueOf(relation.get("partnerImageUrl")));
+                    if (flattenedAvatar != null) flattenedPartner.put("avatarUrl", flattenedAvatar);
+                    Object flattenedFrame = firstNonEmpty(
+                            relation.get("partnerFrameUrl") == null ? null : String.valueOf(relation.get("partnerFrameUrl")),
+                            relation.get("partnerVipBadgeUrl") == null ? null : String.valueOf(relation.get("partnerVipBadgeUrl")));
+                    if (flattenedFrame != null) flattenedPartner.put("vipBadgeUrl", flattenedFrame);
+                    if (!flattenedPartner.isEmpty()) partner = flattenedPartner;
+                }
+                String name = "";
+                String avatar = "";
+                String partnerFrameUrl = "";
+                String partnerHostBadgeUrl = "";
+                Map<String, ?> partnerHostBadgeMeta = null;
+                int partnerVipLevel = 0;
+                String partnerVipTouUrl = "";
+                String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
+                if (partner != null) {
+                    Object displayName = partner.get("displayName");
+                    Object username = partner.get("username");
+                    name = displayName != null && !String.valueOf(displayName).trim().isEmpty()
+                            ? String.valueOf(displayName).trim()
+                            : username != null ? String.valueOf(username).trim() : "";
+                    Object avatarValue = firstNonEmpty(
+                            partner.get("avatarUrl") == null ? null : String.valueOf(partner.get("avatarUrl")),
+                            partner.get("avatar") == null ? null : String.valueOf(partner.get("avatar")),
+                            partner.get("profileImageUrl") == null ? null : String.valueOf(partner.get("profileImageUrl")),
+                            partner.get("photoUrl") == null ? null : String.valueOf(partner.get("photoUrl")),
+                            partner.get("picture") == null ? null : String.valueOf(partner.get("picture")),
+                            partner.get("imageUrl") == null ? null : String.valueOf(partner.get("imageUrl")),
+                            partner.get("profilePicture") == null ? null : String.valueOf(partner.get("profilePicture")),
+                            partner.get("photo") == null ? null : String.valueOf(partner.get("photo")),
+                            partner.get("avatar_url") == null ? null : String.valueOf(partner.get("avatar_url")),
+                            partner.get("profile_image_url") == null ? null : String.valueOf(partner.get("profile_image_url")));
+                    avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
+                    Object frameValue = partner.get("vipBadgeUrl");
+                    partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
+                    Object vipLevelValue = partner.get("vipLevel");
+                    partnerVipLevel = parsePositiveInt(vipLevelValue, 0);
+                    Object vipTouValue = partner.get("vipTouUrl");
+                    partnerVipTouUrl = vipTouValue == null ? "" : String.valueOf(vipTouValue).trim();
+                    Object hostBadgeValue = partner.get("hostBadgeUrl");
+                    partnerHostBadgeUrl = hostBadgeValue == null ? "" : String.valueOf(hostBadgeValue).trim();
+                    Object hostMetaValue = partner.get("hostBadgeMeta");
+                    if (hostMetaValue instanceof Map) {
+                        partnerHostBadgeMeta = (Map<String, ?>) hostMetaValue;
+                    }
+                    // Match the same profile-frame resolution used for the profile owner:
+                    // equipped frame first, otherwise the partner's real VIP nobility frame.
+                    if (partnerFrameUrl.isEmpty()) {
+                        String vipFrame = VipStyle.profileNobilityFrameUrl(partnerVipLevel, partnerVipTouUrl);
+                        partnerFrameUrl = vipFrame == null ? "" : vipFrame;
+                    }
+                }
+                // Only the active relationship and its real partner payload are required;
+                // the top pair intentionally shows no partner name or relationship text.
+                if (partner == null) {
+                    loadLegacyCpRelationship(targetId, ownAvatarUrl, ownFrameUrl);
+                    return;
+                }
+                binding.tvProfileCpLabel.setVisibility(View.GONE);
+                // The profile owner is the first avatar; the actual linked account is the
+                // second. Keep this same pair when the profile is opened from search,
+                // ranking, chat, or a direct profile link.
+                String resolvedOwnFrame = ownFrameUrl == null ? "" : ownFrameUrl.trim();
+                if (resolvedOwnFrame.isEmpty()) {
+                    String vipFrame = VipStyle.profileNobilityFrameUrl(ownVipLevel, ownVipTouUrl);
+                    resolvedOwnFrame = vipFrame == null ? "" : vipFrame;
+                }
+                // These two avatar views start as GONE in the shared profile layout.
+                // Make them visible before binding; AvatarCosmetics loads the real server URL
+                // and wear, but intentionally does not change the caller's visibility.
+                binding.imgProfileCpSelf.setVisibility(View.VISIBLE);
+                binding.imgProfileCpPartner.setVisibility(View.VISIBLE);
+                binding.imgProfileCpPartner.setOnClickListener(null);
+                binding.tvProfileCpHeart.setOnClickListener(null);
+                binding.imgProfileCpCvPartner.setOnClickListener(null);
+                binding.tvProfileCpCvHeart.setOnClickListener(null);
+                binding.rowProfileCpCv.setOnClickListener(null);
+                com.Dramizo.Series.util.AvatarCosmetics.bindWear(
+                        binding.imgProfileCpSelf,
+                        binding.imgProfileCpSelfFrame,
+                        ownAvatarUrl,
+                        resolvedOwnFrame,
+                        ownHostBadgeUrl,
+                        null,
+                        ownHostBadgeMeta);
+                // The partner's frame comes from that linked account's real equipped wear,
+                // with the same VIP fallback used on their own profile.
+                bindCpPartnerAvatarAndFrame(avatar, partnerFrameUrl, partnerHostBadgeUrl);
+
+                // Mirror the same live relationship into the decorative CV card.
+                bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
+                bindRealCpAvatar(binding.imgProfileCpCvPartner, avatar);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvSelfFrame, resolvedOwnFrame);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvPartnerFrame, partnerFrameUrl);
+                int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
+                long relationshipDays = cpDurationDays(relation.get("startedAt"));
+                binding.tvProfileCpCvType.setText(cpTypeLabel(type));
+                if (binding.tvProfileCpCvPartnerName != null) {
+                    binding.tvProfileCpCvPartnerName.setText(name == null || name.trim().isEmpty() ? "الشريك" : name.trim());
+                    binding.tvProfileCpCvPartnerName.setVisibility(View.VISIBLE);
+                }
+                binding.tvProfileCpCvHeart.setText("♥");
+                Object presentationObject = relation.get("presentation");
+                Map<?, ?> levelPresentation = presentationObject instanceof Map ? (Map<?, ?>) presentationObject : java.util.Collections.emptyMap();
+                String cardBackground = firstNonEmptyValue(
+                        levelPresentation.get("cardBackgroundUrl"),
+                        relation.get("cardBackgroundUrl"));
+                applyCpCardBackground(cardBackground == null ? "" : cardBackground);
+                String levelTitleValue = firstNonEmptyValue(
+                        relation.get("profileTitle"),
+                        relation.get("levelName"),
+                        levelPresentation.get("title"));
+                String levelTitle = levelTitleValue == null ? "" : levelTitleValue;
+                binding.tvProfileCpCvLevel.setText(levelTitle.isEmpty() ? "Lv." + relationshipLevel : levelTitle);
+                // CP level artwork is a standalone horizontal profile icon, not a medal.
+                // Use only the configured level logo; never put it in the medal showcase.
+                String cpLevelIconValue = firstNonEmptyValue(
+                        relation.get("levelLogoUrl"),
+                        levelPresentation.get("levelLogoUrl"),
+                        levelPresentation.get("logoUrl"));
+                String cpLevelIconUrl = cpLevelIconValue == null ? "" : cpLevelIconValue;
+                if (binding.imgCpLevelIcon != null) {
+                    if (!cpLevelIconUrl.isEmpty()) {
+                        binding.imgCpLevelIcon.setVisibility(View.VISIBLE);
+                        Glide.with(ProfileActivity.this)
+                                .load(AssetCatalog.absoluteUrl(cpLevelIconUrl))
+                                .fitCenter()
+                                .into(binding.imgCpLevelIcon);
+                    } else {
+                        binding.imgCpLevelIcon.setImageDrawable(null);
+                        binding.imgCpLevelIcon.setVisibility(View.GONE);
+                    }
+                }
+                String durationText;
+                if (relationshipDays >= 365) {
+                    long years = relationshipDays / 365;
+                    long months = (relationshipDays % 365) / 30;
+                    durationText = years + " سنة" + (months > 0 ? " و" + months + " شهر" : "");
+                } else if (relationshipDays >= 30) {
+                    durationText = (relationshipDays / 30) + " شهر و" + (relationshipDays % 30) + " يوم";
+                } else {
+                    durationText = relationshipDays + " يوم";
+                }
+                binding.tvProfileCpCvDays.setText("♥ معاً منذ " + durationText);
+                binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
+
+                // Show exactly two portraits in the upper profile area: reuse the larger
+                // profile portrait slot for the linked pair instead of leaving a third copy.
+                if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+                binding.rowProfileCp.setVisibility(View.VISIBLE);
+                binding.btnCpRequest.setVisibility(View.GONE);
+                startProfileCpHeartAnimation();
+            });
+        });
+    }
+
+    /**
+     * Read-only compatibility path for relationships created by the legacy social-bond system.
+     * It prefers the public profile endpoint; for the signed-in user it also falls back to /me/cp
+     * on older servers that do not yet expose the public route.
+     */
+    private void loadLegacyCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
+        if (targetId == null || targetId.trim().isEmpty() || container == null) {
+            hideProfileCpRelationship();
+            return;
+        }
+        String myId = container.getSessionManager().getUserId();
+        boolean ownProfile = myId != null && myId.equals(targetId);
+        container.getIoExecutor().execute(() -> {
+            // The pinned JEHO-OWN API exposes /cp/me (list payload), while newer builds also
+            // expose /users/me/cp (single status payload). Read the established route first.
+            if (ownProfile) {
+                Result<List<Map<String, Object>>> ownRelations =
+                        com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCpRelationships());
+                if (ownRelations.success && ownRelations.data != null) {
+                    for (Map<String, Object> relation : ownRelations.data) {
+                        if (relation == null) continue;
+                        Object statusValue = relation.get("status");
+                        String status = statusValue == null ? "active"
+                                : String.valueOf(statusValue).trim().toLowerCase(java.util.Locale.ROOT);
+                        if (!status.isEmpty() && !status.equals("active")) continue;
+                        Object partnerValue = relation.get("partner");
+                        if (!(partnerValue instanceof Map)) partnerValue = relation.get("partnerUser");
+                        if (!(partnerValue instanceof Map)) partnerValue = relation.get("linkedUser");
+                        if (!(partnerValue instanceof Map)) continue;
+                        Map<?, ?> partnerMap = (Map<?, ?>) partnerValue;
+                        String partnerAvatar = partnerMap.get("avatarUrl") == null ? null
+                                : String.valueOf(partnerMap.get("avatarUrl"));
+                        String partnerFrame = partnerMap.get("vipBadgeUrl") == null ? null
+                                : String.valueOf(partnerMap.get("vipBadgeUrl"));
+                        Object levelValue = relation.get("level");
+                        int level = levelValue instanceof Number
+                                ? Math.max(1, ((Number) levelValue).intValue()) : 1;
+                        final String finalPartnerAvatar = partnerAvatar;
+                        final String finalPartnerFrame = partnerFrame;
+                        final int finalLevel = level;
+                        runOnUiThread(() -> bindLegacyCpRelationshipUi(
+                                ownAvatarUrl, ownFrameUrl, finalPartnerAvatar, finalPartnerFrame, finalLevel));
+                        return;
+                    }
+                }
+            }
+
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> resolved =
+                    com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().publicCp(targetId));
+            if ((!resolved.success || resolved.data == null || !resolved.data.hasCp
+                    || resolved.data.partner == null) && ownProfile) {
+                resolved = com.Dramizo.Series.util.ApiCall.execute(container.getUserApi().myCp());
+            }
+            final Result<com.Dramizo.Series.data.remote.dto.MiscDtos.CpStatusDto> legacy = resolved;
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                if (!legacy.success || legacy.data == null || !legacy.data.hasCp
+                        || legacy.data.partner == null) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                AuthDtos.UserDto partner = legacy.data.partner;
+                bindLegacyCpRelationshipUi(ownAvatarUrl, ownFrameUrl, partner.avatarUrl,
+                        partner.vipBadgeUrl, legacy.data.level);
+            });
+        });
+    }
+
+    private void bindLegacyCpRelationshipUi(String ownAvatarUrl, String ownFrameUrl,
+            String partnerAvatarUrl, String partnerFrameUrl, int level) {
+        if (isFinishing() || binding == null) return;
+        bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+        bindRealCpAvatar(binding.imgProfileCpPartner, partnerAvatarUrl);
+        binding.imgProfileCpPartner.setOnClickListener(null);
+        binding.tvProfileCpHeart.setOnClickListener(null);
+        binding.imgProfileCpCvPartner.setOnClickListener(null);
+        binding.tvProfileCpCvHeart.setOnClickListener(null);
+        binding.rowProfileCpCv.setOnClickListener(null);
+        com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
+        com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
+        binding.tvProfileCpLabel.setVisibility(View.GONE);
+        binding.tvProfileCpCvType.setText("♥ علاقة CB");
+        binding.tvProfileCpCvHeart.setText("♥");
+        binding.tvProfileCpCvLevel.setText("Lv." + Math.max(1, level));
+        binding.tvProfileCpCvDays.setText("علاقة نشطة");
+        applyCpCardBackground("");
+        profileCpVisibleBeforeDetails = true;
+        binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
+        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+        binding.rowProfileCp.setVisibility(View.VISIBLE);
+        binding.btnCpRequest.setVisibility(View.GONE);
+        startProfileCpHeartAnimation();
+    }
+
+    private void applyCpCardBackground(String url) {
+        if (binding == null || binding.rowProfileCpCv == null) return;
+        String value = url == null ? "" : url.trim();
+        if (value.isEmpty()) {
+            binding.rowProfileCpCv.setBackgroundResource(R.drawable.home_bg_cp);
+            return;
+        }
+        Glide.with(this).load(value).into(new CustomTarget<Drawable>() {
+            @Override public void onResourceReady(Drawable resource, Transition<? super Drawable> transition) {
+                if (binding != null && !isFinishing()) {
+                    // Set only the card background; layout bounds and child positions remain unchanged.
+                    binding.rowProfileCpCv.setBackground(resource);
+                }
+            }
+            @Override public void onLoadCleared(Drawable placeholder) {
+                if (binding != null) binding.rowProfileCpCv.setBackgroundResource(R.drawable.home_bg_cp);
+            }
+        });
+    }
+
+    private int parsePositiveInt(Object value, int fallback) {
+        try {
+            int parsed = Integer.parseInt(String.valueOf(value));
+            return parsed > 0 ? parsed : fallback;
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private long cpDurationDays(Object startedAtValue) {
+        if (startedAtValue == null) return 0L;
+        java.util.Date startedAt = null;
+        if (startedAtValue instanceof java.util.Date) {
+            startedAt = (java.util.Date) startedAtValue;
+        } else {
+            String raw = String.valueOf(startedAtValue).trim();
+            String[] patterns = {
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                    "yyyy-MM-dd'T'HH:mm:ssX",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    "yyyy-MM-dd"
+            };
+            for (String pattern : patterns) {
+                try {
+                    java.text.SimpleDateFormat format =
+                            new java.text.SimpleDateFormat(pattern, java.util.Locale.US);
+                    format.setLenient(false);
+                    format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    startedAt = format.parse(raw);
+                    if (startedAt != null) break;
+                } catch (Exception ignored) { }
+            }
+        }
+        if (startedAt == null) return 0L;
+        return Math.max(0L, (System.currentTimeMillis() - startedAt.getTime()) / 86400000L);
+    }
+
+    private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
+        if (imageView == null) return;
+        if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+            imageView.setImageDrawable(null);
+            imageView.setVisibility(View.GONE);
+            return;
+        }
+        imageView.setVisibility(View.VISIBLE);
+        // Shared loader normalizes relative API paths, retries failed placeholders correctly,
+        // and preserves animated GIF/WebP profile photos.
+        com.Dramizo.Series.util.AvatarImageLoader.load(imageView, avatarUrl.trim());
+    }
+
+    private void startProfileCpHeartAnimation() {
+        if (binding == null || binding.tvProfileCpHeart == null) return;
+        if (cpHeartAnimator != null) cpHeartAnimator.cancel();
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f);
+        for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY, alpha}) {
+            animator.setDuration(900L);
+            animator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.RESTART);
+        }
+        cpHeartAnimator = new AnimatorSet();
+        cpHeartAnimator.playTogether(scaleX, scaleY, alpha);
+        cpHeartAnimator.start();
+    }
+
+    private void hideProfileCpRelationship() {
+        if (binding == null) return;
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
+        if (binding.imgCpLevelIcon != null) {
+            binding.imgCpLevelIcon.setImageDrawable(null);
+            binding.imgCpLevelIcon.setVisibility(View.GONE);
+        }
+
+        // Keep the CP card visible for every profile, including users who are not
+        // linked yet. The second portrait is an intentional, tappable empty slot.
+        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
+        binding.rowProfileCp.setVisibility(View.VISIBLE);
+        binding.imgProfileCpSelf.setVisibility(View.VISIBLE);
+        binding.imgProfileCpPartner.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.AvatarCosmetics.bindWear(
+                binding.imgProfileCpSelf, binding.imgProfileCpSelfFrame,
+                cpProfileOwnAvatarUrl, cpProfileOwnFrameUrl,
+                cpProfileOwnHostBadgeUrl, null, cpProfileOwnHostBadgeMeta);
+        binding.imgProfileCpPartner.setImageDrawable(cpEmptyPartnerDrawable());
+        binding.imgProfileCpPartnerFrame.setVisibility(View.GONE);
+        binding.imgProfileCpPartner.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.tvProfileCpHeart.setText("+");
+        binding.tvProfileCpHeart.setOnClickListener(v -> showUnlinkedCpActions());
+
+        bindRealCpAvatar(binding.imgProfileCpCvSelf, cpProfileOwnAvatarUrl);
+        binding.imgProfileCpCvPartner.setImageDrawable(cpEmptyPartnerDrawable());
+        binding.imgProfileCpCvPartner.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.imgProfileCpCvPartnerFrame.setVisibility(View.GONE);
+        binding.tvProfileCpCvType.setText("♥ علاقة CP");
+        if (binding.tvProfileCpCvPartnerName != null) {
+            binding.tvProfileCpCvPartnerName.setText("اضغط على الصورة لإضافة شريك");
+            binding.tvProfileCpCvPartnerName.setVisibility(View.VISIBLE);
+        }
+        binding.tvProfileCpCvHeart.setText("+");
+        binding.tvProfileCpCvHeart.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.tvProfileCpCvLevel.setText("بانتظار الارتباط");
+        binding.tvProfileCpCvDays.setText("أرسل هدية CP من الروم لبدء العلاقة");
+        applyCpCardBackground("");
+        binding.rowProfileCpCv.setVisibility(profileDetailsExpanded ? View.GONE : View.VISIBLE);
+        binding.rowProfileCpCv.setOnClickListener(v -> showUnlinkedCpActions());
+        binding.rowProfileCpCv.setContentDescription("بطاقة CP غير مرتبطة، اضغط لمعرفة طريقة الارتباط");
+        profileCpVisibleBeforeDetails = true;
+    }
+
+    private android.graphics.drawable.Drawable cpEmptyPartnerDrawable() {
+        android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+        shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        shape.setColor(android.graphics.Color.rgb(255, 239, 246));
+        shape.setStroke((int) (2 * getResources().getDisplayMetrics().density),
+                android.graphics.Color.rgb(224, 126, 166));
+        return shape;
+    }
+
+    private void showUnlinkedCpActions() {
+        if (isFinishing() || binding == null) return;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("علاقة CP")
+                .setMessage("هذا الحساب غير مرتبط حالياً. يمكنك بدء محادثة معه، ولإتمام ارتباط CP أرسل له هدية CP من داخل الروم.")
+                .setPositiveButton("إرسال رسالة", (dialog, which) -> {
+                    if (binding != null && binding.btnMessage != null) binding.btnMessage.performClick();
+                })
+                .setNegativeButton("إرسال هدية CP", (dialog, which) -> {
+                    if (roomTrackingRoomId != null && !roomTrackingRoomId.trim().isEmpty()) {
+                        openTrackedRoom();
+                    } else {
+                        Toast.makeText(this,
+                                "ادخل إلى روم يتواجد فيه المستخدم ثم أرسل له هدية CP",
+                                Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNeutralButton("إلغاء", null)
+                .show();
+    }
+
+    private String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CB";
+        }
+    }
+
+    /** Render the server-saved medal showcase under the public ID for every viewer. */
+    private void loadProfileMedals(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty() || binding == null) return;
+        AppContainer c = container != null ? container : ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            AuthDtos.UserDto viewed = null;
+            List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = java.util.Collections.emptyList();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AuthDtos.UserDto>> ur =
+                        c.getUserApi().getUser(profileId).execute();
+                if (ur.isSuccessful() && ur.body() != null) viewed = ur.body().data;
+            } catch (Exception ignored) { }
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> br =
+                        c.getUserApi().earnedBadges(profileId).execute();
+                if (br.isSuccessful() && br.body() != null && br.body().data != null) earned = br.body().data;
+            } catch (Exception ignored) { }
+            final AuthDtos.UserDto profile = viewed;
+            final List<com.Dramizo.Series.data.remote.dto.BadgeDto> owned = earned;
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing()) return;
+                LinearLayout strip = findViewById(R.id.medalShowcaseItems);
+                View showcase = findViewById(R.id.medalShowcase);
+                if (strip == null || showcase == null) return;
+                strip.removeAllViews();
+                List<String> selected = profile != null && profile.displayedMedalIds != null
+                        ? new ArrayList<>(profile.displayedMedalIds) : new ArrayList<>();
+                // If the user has not pinned a custom selection, show earned medals by default.
+                // This keeps the medals visible on both the main profile and the Details tab.
+                if (selected.isEmpty() && owned != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : owned) {
+                        if (badge != null && badge.earned && badge.id != null
+                                && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                            selected.add(badge.id);
+                        }
+                    }
+                }
+                // Always refresh the showcase after profile data arrives; an empty selection
+                // must not leave a stale hidden row when switching between profile owners.
+                showcase.setVisibility(View.GONE);
+                if (!selected.isEmpty()) {
+                    int displayedMedalCount = 0;
+                    for (String key : selected) {
+                        if (displayedMedalCount >= 5) break;
+                        if (key == null) continue;
+                        String imageUrl = null;
+                        String label = "ميدالية";
+                        if (key.startsWith("vip:")) {
+                            int vip = profile != null ? Math.max(0, profile.vipLevel) : 0;
+                            if (vip <= 0) {
+                                try { vip = Integer.parseInt(key.substring(4)); } catch (Exception ignored) { }
+                            }
+                            if (vip <= 0 || vip > 7) continue;
+                            imageUrl = profile != null && profile.levelBadgeUrl != null
+                                    && !profile.levelBadgeUrl.trim().isEmpty()
+                                    ? profile.levelBadgeUrl
+                                    : "/assets/visual-system/vip/vip_medal_mikoo_" + vip + ".png";
+                            label = "VIP " + vip;
+                        } else {
+                            for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : owned) {
+                                if (badge != null && badge.earned && key.equals(badge.id)
+                                        && badge.imageUrl != null && !badge.imageUrl.trim().isEmpty()) {
+                                    imageUrl = badge.imageUrl;
+                                    label = badge.name == null ? "ميدالية" : badge.name;
+                                    break;
+                                }
+                            }
+                        }
+                        if (imageUrl == null) continue;
+                        LinearLayout item = new LinearLayout(this);
+                        item.setOrientation(LinearLayout.VERTICAL);
+                        item.setGravity(Gravity.CENTER);
+                        int width = Math.round(27 * getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams itemLp = new LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+                        itemLp.setMargins(0, 0, Math.round(5 * getResources().getDisplayMetrics().density), 0);
+                        item.setLayoutParams(itemLp);
+                        ImageView image = new ImageView(this);
+                        int size = Math.round(19 * getResources().getDisplayMetrics().density);
+                        image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+                        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        image.setContentDescription(label);
+                        item.addView(image);
+    
+                        strip.addView(item);
+                        displayedMedalCount++;
+                        Glide.with(this).load(AssetCatalog.absoluteUrl(imageUrl))
+                                .placeholder(R.drawable.ic_medal_default)
+                                .error(R.drawable.ic_medal_default).into(image);
+                    }
+                    showcase.setVisibility(strip.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+                }
+                if (binding.rowProfileMedals != null) {
+                    binding.rowProfileMedals.setVisibility(View.VISIBLE);
+                }
+                // Keep the existing earned-medal cabinet populated for backward compatibility.
+                List<com.Dramizo.Series.data.remote.dto.BadgeDto> badges =
+                        owned == null ? java.util.Collections.emptyList() : owned;
+                binding.rowBadges.setVisibility(badges.isEmpty() ? View.GONE : View.VISIBLE);
+                binding.rowEarnedBadges.removeAllViews();
+                if (badges.isEmpty()) {
+                    binding.rowEarnedBadges.setVisibility(View.GONE);
+                } else {
+                    binding.rowEarnedBadges.setVisibility(View.VISIBLE);
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : badges) {
+                        if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                        ImageView image = new ImageView(this);
+                        int size = Math.round(48 * getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                        lp.setMargins(0, 0, Math.round(8 * getResources().getDisplayMetrics().density), 0);
+                        image.setLayoutParams(lp);
+                        image.setContentDescription(badge.name == null ? "ميدالية" : badge.name);
+                        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        binding.rowEarnedBadges.addView(image);
+                        Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                                .placeholder(R.drawable.ic_medal_default)
+                                .error(R.drawable.ic_medal_default).into(image);
+                    }
+                }
+            });
+        });
+    }
+
     private void sendSocialRequest(String targetId, String type, String labelAr) {
         AppContainer container = ContainerProvider.from(this);
         container.getIoExecutor().execute(() -> {
@@ -568,20 +1900,667 @@ public class ProfileActivity extends ThemedActivity {
         });
     }
 
+    private void bindProfileCoverGallery(List<String> urls, String fallbackCover) {
+        profileHandler.removeCallbacks(profileCoverAdvance);
+        profileCoverGallery.clear();
+        if (urls != null) {
+            for (String url : urls) {
+                if (url != null && !url.trim().isEmpty() && !profileCoverGallery.contains(url.trim())) {
+                    profileCoverGallery.add(url.trim());
+                }
+                if (profileCoverGallery.size() == 5) break;
+            }
+        }
+        if (profileCoverGallery.isEmpty() && fallbackCover != null && !fallbackCover.trim().isEmpty()) {
+            profileCoverGallery.add(fallbackCover.trim());
+        }
+        profileCoverIndex = 0;
+        showProfileCover(0);
+        binding.imgCover.setClickable(true);
+        binding.imgCover.setOnClickListener(v -> {
+            if (profileCoverGallery.size() == 1) {
+                openSecureProfileImage(profileCoverGallery.get(profileCoverIndex));
+            }
+        });
+        binding.imgCover.setOnTouchListener((view, event) -> {
+            if (profileCoverGallery.size() < 2) return false;
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                coverTouchStartX = event.getX();
+                return true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                float delta = event.getX() - coverTouchStartX;
+                if (Math.abs(delta) > 35f) {
+                    int next = delta < 0
+                            ? (profileCoverIndex + 1) % profileCoverGallery.size()
+                            : (profileCoverIndex - 1 + profileCoverGallery.size()) % profileCoverGallery.size();
+                    showProfileCover(next);
+                    profileHandler.removeCallbacks(profileCoverAdvance);
+                    profileHandler.postDelayed(profileCoverAdvance, 3000L);
+                } else if (profileCoverIndex >= 0 && profileCoverIndex < profileCoverGallery.size()) {
+                    openSecureProfileImage(profileCoverGallery.get(profileCoverIndex));
+                }
+                return true;
+            }
+            return true;
+        });
+        if (profileCoverGallery.size() > 1) profileHandler.postDelayed(profileCoverAdvance, 3000L);
+    }
+
+    private void showProfileCover(int index) {
+        if (binding == null) return;
+        if (profileCoverGallery.isEmpty()) {
+            binding.imgCover.setImageResource(ImagePlaceholder.cover());
+            return;
+        }
+        profileCoverIndex = Math.max(0, Math.min(index, profileCoverGallery.size() - 1));
+        com.Dramizo.Series.util.AvatarImageLoader.loadMedia(
+                binding.imgCover, profileCoverGallery.get(profileCoverIndex), ImagePlaceholder.cover());
+    }
+
+    private void openSecureProfileImage(@Nullable String imageUrl) {
+        if (imageUrl == null || imageUrl.trim().isEmpty() || isFinishing() || isDestroyed()) return;
+        Intent secureImage = new Intent(ProfileActivity.this, SecureProfileImageActivity.class);
+        secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_URL, imageUrl.trim());
+        secureImage.putExtra(SecureProfileImageActivity.EXTRA_IMAGE_IS_COVER, true);
+        startActivity(secureImage);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        // Re-fetch the profile after returning from the cosmetics store so equip/unequip
+        // is reflected immediately on the avatar, without requiring an app restart.
+        if (profileVm != null) {
+            if (isOwnProfile || profileTargetUserId == null || profileTargetUserId.trim().isEmpty()) {
+                profileVm.loadMe(true);
+            } else {
+                profileVm.loadUser(profileTargetUserId);
+            }
+        }
         if (binding != null && binding.webProfileHostSignal != null
                 && binding.webProfileHostSignal.getVisibility() == android.view.View.VISIBLE) {
             binding.webProfileHostSignal.resumeMotion();
         }
+        if (isOwnProfile) {
+            // Recheck immediately on return and periodically while the screen stays open.
+            // Expiry or a dashboard feature disable hides the switch without requiring
+            // the user to leave/reopen the profile.
+            bindMysteriousMode(true);
+            profileHandler.removeCallbacks(mysteriousModeRefresh);
+            profileHandler.postDelayed(mysteriousModeRefresh, 60_000L);
+        } else if (loadedProfileId != null && !loadedProfileId.isEmpty()) {
+            profileHandler.removeCallbacks(roomPresenceRefresh);
+            refreshRoomPresence(loadedProfileId);
+            profileHandler.postDelayed(roomPresenceRefresh, 15_000L);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        profileHandler.removeCallbacks(mysteriousModeRefresh);
+        profileHandler.removeCallbacks(roomPresenceRefresh);
+        profileHandler.removeCallbacks(profileCoverAdvance);
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        profileHandler.removeCallbacks(mysteriousModeRefresh);
+        profileHandler.removeCallbacks(profileCoverAdvance);
+        if (cpConfigListener != null) {
+            com.Dramizo.Series.realtime.RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+            cpConfigListener = null;
+        }
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
         if (binding != null && binding.webProfileHostSignal != null) {
             binding.webProfileHostSignal.destroy();
         }
         super.onDestroy();
     }
+    private void showProfileMoreMenu(String targetId) {
+        if (targetId == null || targetId.trim().isEmpty()) return;
+        String[] items = {"حظر المستخدم", "إلغاء"};
+        new AlertDialog.Builder(this)
+                .setItems(items, (dialog, which) -> {
+                    if (which != 0) return;
+                    new AlertDialog.Builder(this)
+                            .setTitle("حظر المستخدم")
+                            .setMessage("هل تريد حظر هذا المستخدم؟")
+                            .setNegativeButton("إلغاء", null)
+                            .setPositiveButton("حظر", (d, w) -> {
+                                container.getIoExecutor().execute(() -> {
+                                    Map<String, String> body = new HashMap<>();
+                                    body.put("reason", "profile");
+                                    Result<Object> result = com.Dramizo.Series.util.ApiCall.execute(
+                                            container.getUserApi().block(targetId, body));
+                                    runOnUiThread(() -> Toast.makeText(this,
+                                            result.success ? "تم حظر المستخدم" : 
+                                            (result.error != null ? result.error : "تعذر تنفيذ الحظر"),
+                                            Toast.LENGTH_SHORT).show());
+                                });
+                            })
+                            .show();
+                })
+                .show();
+    }
+
+
+    private void openProfileMomentsLegacy() {
+        String id = loadedProfileId;
+        if (id == null || id.trim().isEmpty()) return;
+        Intent moments = new Intent(this, ProfileDetailsActivity.class);
+        moments.putExtra(ProfileDetailsActivity.EXTRA_USER_ID, id);
+        startActivity(moments);
+    }
+
+    private boolean profileDetailsExpanded = false;
+    private boolean profileDetailsViewsAttached = false;
+    private boolean profileAgencyVisibleBeforeDetails = false;
+    private boolean profileCpVisibleBeforeDetails = false;
+
+    private void setProfileTab(boolean details) {
+        if (binding == null) return;
+        if (binding.tvProfileAgencyName != null) {
+            binding.tvProfileAgencyName.setTextColor(details ? 0xFFB58AAE : 0xFFFFFFFF);
+        }
+        if (binding.tvPropProfileSupporters != null) {
+            binding.tvPropProfileSupporters.setText("تفاصيل");
+            binding.tvPropProfileSupporters.setTextColor(details ? 0xFFFFFFFF : 0xFFB58AAE);
+        }
+        if (binding.profilePropertyUnderline != null) {
+            binding.profilePropertyUnderline.setVisibility(details ? View.GONE : View.VISIBLE);
+        }
+        if (binding.profileDetailsUnderline != null) {
+            binding.profileDetailsUnderline.setVisibility(details ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /** Details tab: moments first, then medals/badges, then gifts. */
+    private void openProfileMomentsOnly() {
+        String id = loadedProfileId;
+        if (id == null || id.trim().isEmpty()) return;
+        Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, id);
+        startActivity(intent);
+    }
+
+    private void openProfileDetails() {
+        if (binding == null || binding.profileDetailsInlinePanel == null) return;
+        profileDetailsExpanded = true;
+        setProfileTab(true);
+
+        profileAgencyVisibleBeforeDetails = binding.rowProfileAgency != null
+                && binding.rowProfileAgency.getVisibility() == View.VISIBLE;
+        profileCpVisibleBeforeDetails = binding.rowProfileCpCv != null
+                && binding.rowProfileCpCv.getVisibility() == View.VISIBLE;
+
+        if (binding.rowProfileAgency != null) binding.rowProfileAgency.setVisibility(View.GONE);
+        if (binding.rowProfileCpCv != null) binding.rowProfileCpCv.setVisibility(View.GONE);
+        if (binding.rowProfileMedals != null) {
+            binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        }
+        if (binding.rowProfileAchievementBadges != null) binding.rowProfileAchievementBadges.setVisibility(View.GONE);
+        if (binding.rowBadges != null) binding.rowBadges.setVisibility(View.GONE);
+        if (binding.rowGiftHistory != null) binding.rowGiftHistory.setVisibility(View.GONE);
+
+        LinearLayout panel = binding.profileDetailsInlinePanel;
+        if (!profileDetailsViewsAttached) {
+            panel.removeAllViews();
+            panel.setPadding(dpProfile(2), dpProfile(2), dpProfile(2), dpProfile(8));
+
+            addProfilePreviewSection(panel, "اللحظات", "عرض الكل", v -> openProfileMomentsOnly());
+            addProfilePreviewSection(panel, "الشارات والمداليات", "عرض الكل", v -> openBadgeCabinet(loadedProfileId));
+            addProfilePreviewSection(panel, "الهدايا", "عرض الكل", v -> {
+                if (loadedProfileId == null || loadedProfileId.trim().isEmpty()) return;
+                Intent intent = new Intent(this, GiftHistoryActivity.class);
+                intent.putExtra(GiftHistoryActivity.EXTRA_USER_ID, loadedProfileId);
+                startActivity(intent);
+            });
+            profileDetailsViewsAttached = true;
+        }
+        panel.setVisibility(View.VISIBLE);
+
+        loadProfileMomentsPreview(loadedProfileId);
+        loadProfileMedalsPreview(loadedProfileId);
+        loadProfileGiftsPreview(loadedProfileId);
+    }
+
+    /** Move the existing identity badges row directly after the public ID, without cloning it. */
+    private void placeProfileIdentityBadgesUnderId() {
+        if (binding == null || binding.rowUserId == null || binding.rowProfileMedals == null) return;
+        ViewGroup target = binding.rowUserId.getParent() instanceof ViewGroup
+                ? (ViewGroup) binding.rowUserId.getParent() : null;
+        if (target == null) return;
+        View badges = binding.rowProfileMedals;
+        if (badges.getParent() instanceof ViewGroup) {
+            ((ViewGroup) badges.getParent()).removeView(badges);
+        }
+        int idIndex = target.indexOfChild(binding.rowUserId);
+        if (idIndex >= 0) target.addView(badges, idIndex + 1);
+
+        // Keep the configured CP level emblem in the same identity strip under the public ID.
+        // Reparent the existing view (do not clone it) so the live CP loader continues to update it.
+        if (binding.imgCpLevelIcon != null && badges instanceof android.widget.HorizontalScrollView) {
+            android.widget.HorizontalScrollView scroll = (android.widget.HorizontalScrollView) badges;
+            ViewGroup identityStrip = scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof ViewGroup
+                    ? (ViewGroup) scroll.getChildAt(0) : null;
+            if (identityStrip != null && binding.imgCpLevelIcon.getParent() != identityStrip) {
+                if (binding.imgCpLevelIcon.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) binding.imgCpLevelIcon.getParent()).removeView(binding.imgCpLevelIcon);
+                }
+                LinearLayout.LayoutParams cpIconParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dpProfile(24));
+                cpIconParams.setMargins(dpProfile(6), 0, dpProfile(4), 0);
+                binding.imgCpLevelIcon.setLayoutParams(cpIconParams);
+                binding.imgCpLevelIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                identityStrip.addView(binding.imgCpLevelIcon);
+            }
+        }
+    }
+
+    /** Remove the duplicate CP-adjacent action row from the view tree; keep the original bottom row. */
+    private void removeDuplicateProfileInlineActions() {
+        if (binding == null || binding.profileInlineActions == null) return;
+        View duplicate = binding.profileInlineActions;
+        duplicate.setVisibility(View.GONE);
+        if (duplicate.getParent() instanceof ViewGroup) {
+            ((ViewGroup) duplicate.getParent()).removeView(duplicate);
+        }
+    }
+
+    private void ensureProfileIdentityStatsVisible() {
+        if (binding == null || binding.rowProfileMedals == null) return;
+        binding.rowProfileMedals.setVisibility(View.VISIBLE);
+        binding.rowProfileMedals.setAlpha(1f);
+        if (binding.imgVipMedal != null) binding.imgVipMedal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (binding.imgRankIcon != null) {
+            binding.imgRankIcon.setVisibility(View.VISIBLE);
+            binding.imgRankIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        }
+        if (binding.tvCharmChip != null) binding.tvCharmChip.setVisibility(View.VISIBLE);
+        if (binding.imgWealthIcon != null) binding.imgWealthIcon.setVisibility(View.VISIBLE);
+        if (binding.tvWealthChip != null) binding.tvWealthChip.setVisibility(View.VISIBLE);
+    }
+
+    private void bindStickyProfileActionIcons() {
+        if (binding == null) return;
+        // Use ImageViews rather than text buttons: uploaded PNG/SVG icons remain centered
+        // and visible even though these actions intentionally have no text labels.
+        if (binding.btnFollowSticky != null) {
+            binding.btnFollowSticky.setVisibility(View.VISIBLE);
+            binding.btnFollowSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnFollowSticky, "profileFollow", R.drawable.ic_profile_action_follow);
+        }
+        if (binding.btnMessageSticky != null) {
+            binding.btnMessageSticky.setVisibility(View.VISIBLE);
+            binding.btnMessageSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnMessageSticky, "profileMessage", R.drawable.ic_profile_action_message);
+        }
+        if (binding.btnRoomSticky != null) {
+            binding.btnRoomSticky.setVisibility(View.VISIBLE);
+            binding.btnRoomSticky.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            RemoteNavIcons.bindProfileAction(binding.btnRoomSticky, "profileRoom", R.drawable.ic_profile_action_room);
+        }
+    }
+
+    private int dpProfile(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void addProfilePreviewSection(LinearLayout panel, String title, String actionText,
+            View.OnClickListener action) {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setPadding(dpProfile(8), dpProfile(8), dpProfile(8), dpProfile(8));
+        section.setBackground(roundProfile(0xFF211A22, 0xFF3D303F, 16));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(0xFFFFFFFF);
+        titleView.setTextSize(16);
+        titleView.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        header.addView(titleView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView more = new TextView(this);
+        more.setText(actionText + "  ›");
+        more.setTextColor(0xFFFF79B9);
+        more.setTextSize(11);
+        more.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        more.setPadding(dpProfile(8), dpProfile(6), dpProfile(4), dpProfile(6));
+        more.setOnClickListener(action);
+        header.addView(more);
+        section.addView(header);
+
+        HorizontalScrollView horizontal = new HorizontalScrollView(this);
+        horizontal.setHorizontalScrollBarEnabled(false);
+        horizontal.setFillViewport(false);
+        horizontal.setClipToPadding(false);
+        horizontal.setPadding(0, dpProfile(6), 0, 0);
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.HORIZONTAL);
+        preview.setGravity(Gravity.CENTER_VERTICAL);
+        preview.setTag("profile_preview_" + title);
+        preview.setClipChildren(false);
+        preview.setClipToPadding(false);
+        horizontal.addView(preview, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        section.addView(horizontal, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        panel.addView(section, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {{
+            bottomMargin = dpProfile(8);
+        }});
+    }
+
+    private android.graphics.drawable.Drawable roundProfile(int fill, int stroke, int radiusDp) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(fill);
+        d.setCornerRadius(dpProfile(radiusDp));
+        d.setStroke(dpProfile(1), stroke);
+        return d;
+    }
+
+    private LinearLayout findProfilePreview(String title) {
+        if (binding == null || binding.profileDetailsInlinePanel == null) return null;
+        String tag = "profile_preview_" + title;
+        for (int i = 0; i < binding.profileDetailsInlinePanel.getChildCount(); i++) {
+            View section = binding.profileDetailsInlinePanel.getChildAt(i);
+            if (section instanceof ViewGroup) {
+                View found = section.findViewWithTag(tag);
+                if (found instanceof LinearLayout) return (LinearLayout) found;
+            }
+        }
+        return null;
+    }
+
+    private void loadProfileMomentsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("اللحظات");
+        if (preview == null) return;
+        preview.removeAllViews();
+        if (profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<Map<String, Object>> posts = new ArrayList<>();
+            try {
+                retrofit2.Response<ApiResponse<List<Map<String, Object>>>> response =
+                        container.getUserApi().userMoments(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    posts.addAll(response.body().data);
+                }
+            } catch (Exception ignored) { }
+            final List<Map<String, Object>> latest = posts.size() > 4
+                    ? new ArrayList<>(posts.subList(0, 4)) : posts;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("اللحظات");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد لحظات منشورة");
+                    return;
+                }
+                addProfileMomentGrid(target, latest);
+            });
+        });
+    }
+
+    private void addProfileMomentGrid(LinearLayout parent, List<Map<String, Object>> posts) {
+        parent.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < posts.size(); i++) {
+            Map<String, Object> post = posts.get(i);
+            LinearLayout tile = new LinearLayout(this);
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+            tile.setGravity(Gravity.CENTER);
+            tile.setBackground(roundProfile(0xFFFFFFFF, 0xFF4A3A48, 12));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dpProfile(142), dpProfile(110));
+            lp.setMargins(dpProfile(3), dpProfile(2), dpProfile(5), dpProfile(2));
+            parent.addView(tile, lp);
+            String imageUrl = stringProfile(post, "imageUrl");
+            if (!imageUrl.isEmpty()) {
+                ImageView image = new ImageView(this);
+                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                tile.addView(image, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+                Glide.with(this).load(imageUrl).centerCrop().placeholder(ImagePlaceholder.cover()).into(image);
+            } else {
+                TextView body = new TextView(this);
+                body.setText(stringProfile(post, "body"));
+                body.setTextColor(0xFF3A313A);
+                body.setTextSize(11);
+                body.setMaxLines(4);
+                body.setGravity(Gravity.CENTER);
+                tile.addView(body, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(76)));
+            }
+            TextView likes = new TextView(this);
+            likes.setText("♡ " + stringProfile(post, "likeCount"));
+            likes.setTextColor(0xFFB70F52);
+            likes.setTextSize(9);
+            likes.setGravity(Gravity.CENTER);
+            tile.addView(likes, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
+            tile.setOnClickListener(v -> {
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, loadedProfileId);
+                startActivity(intent);
+            });
+        }
+    }
+
+    private void loadProfileMedalsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("الشارات والمداليات");
+        if (preview == null || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<BadgeDto> earned = new ArrayList<>();
+            try {
+                retrofit2.Response<ApiResponse<List<BadgeDto>>> response =
+                        container.getUserApi().earnedBadges(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    for (BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned && badge.imageUrl != null
+                                && !badge.imageUrl.trim().isEmpty()) earned.add(badge);
+                    }
+                }
+            } catch (Exception ignored) { }
+            final List<BadgeDto> latest = earned.size() > 4
+                    ? new ArrayList<>(earned.subList(0, 4)) : earned;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("الشارات والمداليات");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد شارات أو مداليات");
+                    return;
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                target.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dpProfile(104)));
+                for (BadgeDto badge : latest) {
+                    LinearLayout item = new LinearLayout(this);
+                    item.setOrientation(LinearLayout.VERTICAL);
+                    item.setGravity(Gravity.CENTER);
+                    item.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+                    row.addView(item, new LinearLayout.LayoutParams(dpProfile(76), dpProfile(100)));
+                    ImageView icon = new ImageView(this);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    item.addView(icon, new LinearLayout.LayoutParams(dpProfile(52), dpProfile(58)));
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default).into(icon);
+                    TextView name = new TextView(this);
+                    name.setText(badge.name == null ? "مدالية" : badge.name);
+                    name.setTextColor(0xFFFFFFFF);
+                    name.setTextSize(9);
+                    name.setGravity(Gravity.CENTER);
+                    name.setMaxLines(1);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    item.addView(name, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(22)));
+                }
+            });
+        });
+    }
+
+    private void loadProfileGiftsPreview(String profileId) {
+        LinearLayout preview = findProfilePreview("الهدايا");
+        if (preview == null || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> gifts = new ArrayList<>();
+            try {
+                Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto>> result =
+                        com.Dramizo.Series.util.ApiCall.execute(container.getGiftApi().receivedHistory(profileId));
+                if (result.success && result.data != null) gifts.addAll(result.data);
+            } catch (Exception ignored) { }
+            final List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto> latest =
+                    gifts.size() > 4 ? new ArrayList<>(gifts.subList(0, 4)) : gifts;
+            runOnUiThread(() -> {
+                if (binding == null || !profileDetailsExpanded) return;
+                LinearLayout target = findProfilePreview("الهدايا");
+                if (target == null) return;
+                target.removeAllViews();
+                if (latest.isEmpty()) {
+                    addProfileEmptyPreview(target, "لا توجد هدايا مستلمة بعد");
+                    return;
+                }
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                target.addView(row, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(104)));
+                for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftReceivedSummaryDto gift : latest) {
+                    LinearLayout item = new LinearLayout(this);
+                    item.setOrientation(LinearLayout.VERTICAL);
+                    item.setGravity(Gravity.CENTER);
+                    item.setPadding(dpProfile(4), dpProfile(4), dpProfile(4), dpProfile(4));
+                    row.addView(item, new LinearLayout.LayoutParams(0, dpProfile(100), 1f));
+                    ImageView icon = new ImageView(this);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    item.addView(icon, new LinearLayout.LayoutParams(dpProfile(54), dpProfile(54)));
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(gift.giftIconUrl))
+                            .placeholder(ImagePlaceholder.gift()).into(icon);
+                    TextView name = new TextView(this);
+                    name.setText(gift.giftName == null ? "هدية" : gift.giftName);
+                    name.setTextColor(0xFFFFFFFF);
+                    name.setTextSize(9);
+                    name.setGravity(Gravity.CENTER);
+                    name.setMaxLines(1);
+                    name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    item.addView(name, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(20)));
+                    TextView qty = new TextView(this);
+                    qty.setText("× " + NumberFormat.getNumberInstance(Locale.US)
+                            .format(Math.max(0L, gift.quantity)));
+                    qty.setTextColor(0xFFFFD36A);
+                    qty.setTextSize(8);
+                    qty.setGravity(Gravity.CENTER);
+                    item.addView(qty, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dpProfile(18)));
+                }
+            });
+        });
+    }
+
+    private void addProfileEmptyPreview(LinearLayout parent, String text) {
+        TextView empty = new TextView(this);
+        empty.setText(text);
+        empty.setTextColor(0xFFB9A7B8);
+        empty.setTextSize(11);
+        empty.setGravity(Gravity.CENTER);
+        parent.addView(empty, new LinearLayout.LayoutParams(
+                dpProfile(220), dpProfile(72)));
+    }
+
+    private String formatSupportAmount(long value) {
+        long amount = Math.max(0L, value);
+        if (amount >= 1_000_000_000L) return trimSupportDecimal(amount / 1_000_000_000.0) + "B";
+        if (amount >= 1_000_000L) return trimSupportDecimal(amount / 1_000_000.0) + "M";
+        if (amount >= 1_000L) return trimSupportDecimal(amount / 1_000.0) + "K";
+        return NumberFormat.getNumberInstance(Locale.US).format(amount);
+    }
+
+    private String trimSupportDecimal(double value) {
+        if (value >= 100) return String.format(Locale.US, "%.0f", value);
+        return String.format(Locale.US, "%.1f", value).replace(".0", "");
+    }
+
+    private String stringProfile(Map<String, Object> map, String key) {
+        if (map == null || map.get(key) == null) return "";
+        return String.valueOf(map.get(key));
+    }
+
+    /** Switch back to the ownership tab; its content stays in the profile. */
+    private void showProfileProperty() {
+        if (binding == null) return;
+        profileDetailsExpanded = false;
+        setProfileTab(false);
+        if (binding.profileDetailsInlinePanel != null) binding.profileDetailsInlinePanel.setVisibility(View.GONE);
+        if (binding.rowProfileAgency != null) {
+            binding.rowProfileAgency.setVisibility(profileAgencyVisibleBeforeDetails ? View.VISIBLE : View.GONE);
+        }
+        if (binding.rowProfileCpCv != null) {
+            binding.rowProfileCpCv.setVisibility(profileCpVisibleBeforeDetails ? View.VISIBLE : View.GONE);
+        }
+        if (binding.rowProfileAgency != null && binding.rowProfileAgency.getVisibility() == View.GONE
+                && binding.rowProfileCpCv != null && binding.rowProfileCpCv.getVisibility() == View.GONE) {
+            // Keep the ownership tab useful even when the profile has no agency/CP content.
+            // No fake ownership data is created.
+        }
+    }
+
+    private void addProfileDetailStat(android.widget.LinearLayout parent, String label,
+            String value, Runnable action) {
+        android.widget.LinearLayout item = new android.widget.LinearLayout(this);
+        item.setOrientation(android.widget.LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(6, 6, 6, 6);
+        item.setClickable(true);
+        item.setFocusable(true);
+        TextView count = new TextView(this);
+        count.setText(value);
+        count.setTextColor(0xFFFFFFFF);
+        count.setTextSize(16);
+        count.setTypeface(null, android.graphics.Typeface.BOLD);
+        item.addView(count);
+        TextView title = new TextView(this);
+        title.setText(label);
+        title.setTextColor(0xFFBDB3C4);
+        title.setTextSize(11);
+        item.addView(title);
+        item.setOnClickListener(v -> action.run());
+        parent.addView(item, new android.widget.LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+    }
+
+    private void bindCpPartnerAvatarAndFrame(String avatarUrl, String frameUrl, String hostBadgeUrl) {
+        if (binding == null) return;
+        bindRealCpAvatar(binding.imgProfileCpPartner, avatarUrl);
+        // Do not use legacy host/agency/competition badge artwork as a CP/profile frame.
+        String selectedFrame = frameUrl == null ? "" : frameUrl.trim();
+        String selectedLower = selectedFrame.toLowerCase(Locale.ROOT);
+        if (selectedLower.contains("contest") || selectedLower.contains("competition")
+                || (selectedLower.contains("agency") && selectedLower.contains("badge"))
+                || selectedLower.contains("host_badge")) {
+            selectedFrame = "";
+        }
+        ImageView frame = binding.imgProfileCpPartnerFrame;
+        if (frame == null) return;
+        if (selectedFrame.isEmpty()) {
+            Glide.with(this).clear(frame);
+            frame.setImageDrawable(null);
+            frame.setVisibility(View.GONE);
+            return;
+        }
+        frame.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        frame.setVisibility(View.VISIBLE);
+        // Preserve the full transparent frame silhouette; do not circle-clip the artwork.
+        Glide.with(this).load(AssetCatalog.absoluteUrl(selectedFrame))
+                .fitCenter().into(frame);
+        frame.bringToFront();
+    }
+
 }

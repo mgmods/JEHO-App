@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
@@ -13,8 +13,9 @@ import {
 import { setGameOdds } from './game-odds-runtime';
 
 @Injectable()
-export class GameOddsSettingsService implements OnModuleInit {
+export class GameOddsSettingsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(GameOddsSettingsService.name);
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(
     @InjectRepository(AppSetting)
@@ -32,6 +33,15 @@ export class GameOddsSettingsService implements OnModuleInit {
       );
       setGameOdds(DEFAULT_GAME_ODDS);
     }
+    // Keep each running backend instance in sync with dashboard changes stored in AppSetting.
+    this.refreshTimer = setInterval(() => {
+      void this.reload().catch((e) => this.log.warn(`game settings refresh failed: ${e instanceof Error ? e.message : String(e)}`));
+    }, 5000);
+    this.refreshTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
   async reload(): Promise<GameOddsConfig> {
@@ -70,7 +80,31 @@ export class GameOddsSettingsService implements OnModuleInit {
     if (body?.preset && typeof body.preset === 'string') {
       next = applyGameOddsPreset(body.preset, current);
     } else {
-      next = sanitizeGameOdds({ ...current, ...body });
+      const incomingRates = body?.gameWinRates && typeof body.gameWinRates === 'object' && !Array.isArray(body.gameWinRates)
+        ? body.gameWinRates as Record<string, unknown>
+        : {};
+      const mergedRates: Record<string, number> = { ...current.gameWinRates };
+      for (const [id, value] of Object.entries(incomingRates)) {
+        const key = String(id).trim().toLowerCase();
+        const rate = Number(value);
+        if (key && Number.isFinite(rate)) mergedRates[key] = rate;
+      }
+      const clearRates = Array.isArray(body?.clearGameWinRates)
+        ? body.clearGameWinRates.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean)
+        : [];
+      clearRates.forEach((id) => delete mergedRates[id]);
+      const incomingBetSettings = body?.gameBetSettings && typeof body.gameBetSettings === 'object' && !Array.isArray(body.gameBetSettings)
+        ? body.gameBetSettings as Record<string, unknown>
+        : {};
+      const mergedBetSettings: Record<string, unknown> = { ...current.gameBetSettings };
+      for (const [id, value] of Object.entries(incomingBetSettings)) {
+        const key = String(id).trim().toLowerCase();
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(key) || !value || typeof value !== 'object') continue;
+        mergedBetSettings[key] = { ...(mergedBetSettings[key] as Record<string, unknown> || {}), ...(value as Record<string, unknown>) };
+      }
+      const patch = { ...body, gameWinRates: mergedRates, gameBetSettings: mergedBetSettings };
+      delete (patch as Record<string, unknown>).clearGameWinRates;
+      next = sanitizeGameOdds({ ...current, ...patch });
     }
     next.version = (current.version || 1) + 1;
     next.updatedAt = new Date().toISOString();
@@ -88,10 +122,27 @@ export class GameOddsSettingsService implements OnModuleInit {
       row.value = JSON.stringify(next);
     }
     await this.settingsRepo.save(row);
-    setGameOdds(next);
+
+    // Verify the persisted representation, not only the in-memory value just written.
+    const persisted = await this.settingsRepo.findOne({
+      where: { key: GAME_ODDS_SETTING_KEY },
+    });
+    if (!persisted?.value) {
+      throw new Error('Game odds settings were not readable after save');
+    }
+    let persistedConfig: GameOddsConfig;
+    try {
+      persistedConfig = sanitizeGameOdds(JSON.parse(persisted.value));
+    } catch {
+      persistedConfig = sanitizeGameOdds(persisted.value);
+    }
+    if (persistedConfig.version !== next.version) {
+      throw new Error('Game odds settings read-back version does not match the saved version');
+    }
+    setGameOdds(persistedConfig);
     this.log.log(
-      `game odds updated rtp=${next.playerRtp} spinHit=${next.spinHitRate} crashRake=${next.crashCashoutRake}`,
+      `game odds updated rtp=${persistedConfig.playerRtp} spinHit=${persistedConfig.spinHitRate} crashRake=${persistedConfig.crashCashoutRake}`,
     );
-    return gameOddsClientPayload(next);
+    return gameOddsClientPayload(persistedConfig);
   }
 }

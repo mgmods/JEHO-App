@@ -58,6 +58,14 @@ public interface WalletApi {
     Call<ApiResponse<WalletDtos.ShamCashOrderInfo>> shamCashOrderStatus(
             @retrofit2.http.Path("id") String id);
 
+    @POST("payments/sham-cash/orders/{id}/receipt")
+    Call<ApiResponse<Map<String, Object>>> submitShamCashReceipt(
+            @retrofit2.http.Path("id") String id, @Body Map<String, Object> body);
+
+    @POST("payments/sham-cash/orders/{id}/cancel")
+    Call<ApiResponse<Map<String, Object>>> cancelShamCashOrder(
+            @retrofit2.http.Path("id") String id);
+
     @GET("payments/binance-pay/orders/{id}")
     Call<ApiResponse<WalletDtos.BinanceWalletStatusResult>> binancePayOrderStatus(
             @retrofit2.http.Path("id") String id);

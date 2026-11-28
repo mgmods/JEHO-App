@@ -51,7 +51,14 @@ public final class RoomUiHelper {
         }
         badge.setVisibility(View.VISIBLE);
         if (isSupportRoom(room)) {
-            badge.setText(R.string.room_badge_support);
+            String category = room.topic != null ? room.topic.trim().toLowerCase(java.util.Locale.ROOT) : "";
+            if ("management".equals(category)) {
+                badge.setText("إدارة المنصة");
+            } else if ("customer_service".equals(category)) {
+                badge.setText("خدمة العملاء");
+            } else {
+                badge.setText("رسمي");
+            }
             badge.setBackgroundResource(R.drawable.bg_room_badge_support);
             if (verifiedIcon != null) verifiedIcon.setVisibility(View.GONE);
         } else if (isAgencyRoom(room)) {
@@ -75,16 +82,12 @@ public final class RoomUiHelper {
         lockOverlay.setVisibility(room != null && room.hasPassword ? View.VISIBLE : View.GONE);
     }
 
-    /** Numeric id for room header/search — prefers API displayRoomId, then host publicId. */
+    /** Independent numeric room ID; never fall back to the host's account ID. */
     @NonNull
     public static String displayRoomId(@Nullable RoomDtos.RoomDto room) {
         if (room == null) return "—";
         if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
             return room.displayRoomId.trim();
-        }
-        if (room.host != null) {
-            String pid = room.host.displayPublicId();
-            if (!pid.isEmpty()) return pid;
         }
         return "—";
     }

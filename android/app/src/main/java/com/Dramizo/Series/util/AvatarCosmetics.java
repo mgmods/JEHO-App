@@ -35,6 +35,7 @@ public final class AvatarCosmetics {
         }
         frameView.setVisibility(View.VISIBLE);
         frameView.setAlpha(1f);
+        clipFrameArtworkToAvatar(frameView);
         loadWearImage(frameView, frameUrl);
         applyWearMeta(frameView, meta, 1f);
         // Keep the frame above the circular face in every stack.
@@ -42,7 +43,8 @@ public final class AvatarCosmetics {
             frameView.bringToFront();
         } catch (Exception ignored) {
         }
-        // ImageView frames stay static. Live-style motion lives only in HostSignalView.
+        // Still artwork stays still; animated GIF/WebP drawables keep native playback.
+        // GIF/video/SVGA wear uses HostSignalView through bindWear on shared surfaces.
     }
 
     /** Decode frames at view size — huge PNGs otherwise freeze lists/profile. */
@@ -63,13 +65,18 @@ public final class AvatarCosmetics {
             // Cap decode size — frames never need 2K+ pixels on list rows.
             px = Math.min(Math.max(px, 64), 512);
             try {
-                Glide.with(view)
-                        .load(AssetCatalog.absoluteUrl(url))
-                        .override(px, px)
-                        .fitCenter()
-                        .dontAnimate()
-                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                        .into(view);
+                com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> request =
+                        Glide.with(view)
+                                .load(AssetCatalog.absoluteUrl(url))
+                                .override(px, px)
+                                .fitCenter()
+                                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC);
+                // Preserve native GIF / animated-WebP playback; only freeze still artwork.
+                String lower = url.toLowerCase(java.util.Locale.US);
+                boolean animatedImage = lower.matches("(?s).*\\.(gif|webp)(?:[?#].*)?$")
+                        || CosmeticMedia.isAnimatedWear(url);
+                if (!animatedImage) request.dontAnimate();
+                request.into(view);
             } catch (Exception ignored) {
                 // Destroyed activity / detached view — ignore.
             }
@@ -186,7 +193,7 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostMeta) {
         // HostSignalView: wing-flap motion for host badges AND VIP PNG frames (Mikoo-style).
         if (hostSignalView != null && frameUrl != null && !frameUrl.isEmpty()
-                && (isHostSignalUrl(frameUrl) || hostMeta != null || isWearFrameUrl(frameUrl))) {
+                && (shouldUseLiveWear(frameUrl) || hostMeta != null)) {
             bindHostLikeLive(hostSignalView, avatarView, frameView, avatarUrl, frameUrl, hostMeta, 1);
             return;
         }
@@ -205,6 +212,13 @@ public final class AvatarCosmetics {
             frameView.setImageDrawable(null);
             if (avatarView != null) resetWearTransform(avatarView);
         }
+    }
+
+    /** Keep still frames still; only playable media and native host frames use live rendering. */
+    private static boolean shouldUseLiveWear(@Nullable String url) {
+        return isHostSignalUrl(url)
+                || isAnimatedWearMedia(url)
+                || CosmeticMedia.isAnimatedWear(url);
     }
 
     public static boolean isHostSignalUrl(@Nullable String url) {
@@ -247,6 +261,9 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
+        // Agency/host/competition role marks are not avatar cosmetics; keep VIP frames only.
+        hostBadgeUrl = null;
+        frameUrl = isContestWear(frameUrl) ? null : frameUrl;
         boolean hasBadge = hostBadgeUrl != null && !hostBadgeUrl.isEmpty();
         boolean hasFrame = frameUrl != null && !frameUrl.isEmpty();
         if (avatarView != null) resetWearTransform(avatarView);
@@ -260,6 +277,7 @@ public final class AvatarCosmetics {
             if (target != null) {
                 target.setVisibility(View.VISIBLE);
                 target.setAlpha(1f);
+                clipFrameArtworkToAvatar(target);
                 // Frame/badge fills the stack; do not inflate past the box (clips lists).
                 applyWearMeta(target, hostBadgeMeta, 1f);
                 loadWearImage(target, hostBadgeUrl);
@@ -377,14 +395,30 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> meta,
             float defaultScale) {
         if (target == null) return;
-        float scale = metaFloat(meta, "scale", defaultScale);
-        float ox = metaFloat(meta, "offsetX", 0f);
-        float oy = metaFloat(meta, "offsetY", 0f);
-        float density = target.getResources().getDisplayMetrics().density;
+        // Wearables are borders around the avatar, never oversized overlays.
+        float scale = Math.max(0.75f, Math.min(1.0f, metaFloat(meta, "scale", defaultScale)));
         target.setScaleX(scale);
         target.setScaleY(scale);
-        target.setTranslationX(ox * density);
-        target.setTranslationY(oy * density);
+        target.setTranslationX(0f);
+        target.setTranslationY(0f);
+    }
+
+    /**
+     * Avatar photos are circular throughout JEHO. Clip wearable artwork to that same
+     * circular silhouette so rectangular canvases/background panels cannot cover the
+     * photo or spill outside its bounds; transparent frame details remain visible on edge.
+     */
+    private static void clipFrameArtworkToAvatar(@Nullable ImageView frame) {
+        if (frame == null) return;
+        frame.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            frame.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override public void getOutline(View view, android.graphics.Outline outline) {
+                    outline.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            });
+            frame.setClipToOutline(true);
+        }
     }
 
     private static void resetWearTransform(@Nullable View v) {
@@ -393,6 +427,14 @@ public final class AvatarCosmetics {
         v.setScaleY(1f);
         v.setTranslationX(0f);
         v.setTranslationY(0f);
+    }
+
+    /** Contest condition marks are not avatar cosmetics and must never render as frames. */
+    private static boolean isContestWear(@Nullable String url) {
+        if (url == null) return false;
+        String value = url.toLowerCase(java.util.Locale.ROOT);
+        return value.contains("contest") || value.contains("competition")
+                || value.contains("مسابقة") || value.contains("شرط");
     }
 
     private static float metaFloat(@Nullable Map<String, ?> meta, String key, float fallback) {
@@ -437,8 +479,86 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
+        String selectedUrl = hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty()
+                ? hostBadgeUrl : frameUrl;
+        Map<String, ?> selectedMeta = selectedUrl == hostBadgeUrl ? hostBadgeMeta : frameMeta;
+        if (isAnimatedWearMedia(selectedUrl)) {
+            HostSignalView signal = findOrCreateWearSignal(avatarView, frameView);
+            if (signal != null && bindHostLikeLive(
+                    signal, avatarView, frameView, avatarUrl, selectedUrl, selectedMeta, 1)) {
+                return;
+            }
+        } else {
+            HostSignalView existing = findWearSignal(avatarView, frameView);
+            if (existing != null) {
+                existing.setOnFrameReadyListener(null);
+                existing.clearSignal();
+            }
+        }
         bindAvatar(avatarView, avatarUrl);
         applyHostWear(frameView, null, avatarView, frameUrl, hostBadgeUrl, frameMeta, hostBadgeMeta);
+    }
+
+    private static boolean isAnimatedWearMedia(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return false;
+        // Use the same playback-capable renderer for every supported moving wear
+        // format across profile, chat, ranking, friends, recipients and room lists.
+        // In particular, WebP must not take a different path just because its
+        // extension is also used by still images; HostSignalView handles it safely.
+        return CosmeticMedia.isAnimatedWear(url);
+    }
+
+    @Nullable
+    private static HostSignalView findWearSignal(
+            @Nullable ImageView avatarView, @Nullable ImageView frameView) {
+        android.view.View parent = avatarView != null ? (android.view.View) avatarView.getParent()
+                : frameView != null ? (android.view.View) frameView.getParent() : null;
+        if (parent instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) parent;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.view.View child = group.getChildAt(i);
+                if (child instanceof HostSignalView) return (HostSignalView) child;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static HostSignalView findOrCreateWearSignal(
+            @Nullable ImageView avatarView, @Nullable ImageView frameView) {
+        HostSignalView existing = findWearSignal(avatarView, frameView);
+        if (existing != null) return existing;
+        if (avatarView == null || frameView == null
+                || avatarView.getParent() != frameView.getParent()
+                || !(avatarView.getParent() instanceof android.widget.FrameLayout)) {
+            return null;
+        }
+        android.widget.FrameLayout parent = (android.widget.FrameLayout) avatarView.getParent();
+        HostSignalView signal = new HostSignalView(parent.getContext());
+        signal.setVisibility(View.GONE);
+        parent.addView(signal, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        signal.bringToFront();
+        return signal;
+    }
+
+    /**
+     * Resolve one personal frame for every surface. An explicitly equipped store/VIP
+     * frame wins; otherwise an active VIP membership may use its dashboard-configured
+     * tier frame. Never render both frames together.
+     */
+    @Nullable
+    public static String avatarFrameUrl(
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (user == null) return null;
+        if (user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()) {
+            return user.vipBadgeUrl.trim();
+        }
+        if (user.vipLevel > 0 && user.vipFrameUrl != null && !user.vipFrameUrl.trim().isEmpty()) {
+            return user.vipFrameUrl.trim();
+        }
+        return null;
     }
 
     /** Prefer this for lists / profile — VIP frame only (host signal is agency-room wear). */
@@ -455,7 +575,7 @@ public final class AvatarCosmetics {
                 avatarView,
                 frameView,
                 user.avatarUrl,
-                user.vipBadgeUrl,
+                avatarFrameUrl(user),
                 null,
                 null,
                 null);
@@ -475,22 +595,33 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
         String wearKey = String.valueOf(avatarUrl) + '|' + String.valueOf(vipFrameUrl);
+        boolean hasWear = vipFrameUrl != null && !vipFrameUrl.trim().isEmpty();
         if (hostSignal != null) {
             Object prev = hostSignal.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)
-                    && (hostSignal.getVisibility() == View.VISIBLE
-                    || (avatarView != null && avatarView.getVisibility() == View.VISIBLE))) {
-                // Already bound this wear — skip clear/reload flash on every /me refresh.
+            boolean animatedFrameReady = hostSignal.getVisibility() == View.VISIBLE
+                    && hostSignal.getAlpha() > 0.01f;
+            boolean staticFrameReady = frameView != null
+                    && frameView.getVisibility() == View.VISIBLE
+                    && frameView.getDrawable() != null;
+            boolean avatarReady = avatarView == null || avatarView.getVisibility() == View.VISIBLE;
+            if (wearKey.equals(prev) && avatarReady
+                    && (animatedFrameReady || staticFrameReady || !hasWear)) {
+                // Skip reload only when the actual frame is visible; an avatar alone must not
+                // cache a failed animated-frame load as a completed profile render.
                 return;
             }
             hostSignal.setTag(R.id.tag_wear_key, wearKey);
         } else if (avatarView != null) {
             Object prev = avatarView.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)) return;
+            boolean staticFrameReady = frameView != null
+                    && frameView.getVisibility() == View.VISIBLE
+                    && frameView.getDrawable() != null;
+            if (wearKey.equals(prev) && (staticFrameReady || !hasWear)) return;
             avatarView.setTag(R.id.tag_wear_key, wearKey);
         }
         // Personal profile: animate VIP frame via HostSignalView when present.
-        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()) {
+        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()
+                && shouldUseLiveWear(vipFrameUrl)) {
             boolean live = bindHostLikeLive(
                     hostSignal, avatarView, frameView, avatarUrl, vipFrameUrl, null,
                     Math.max(1, fallbackLevel));
@@ -530,14 +661,14 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             boolean agencyRoom,
             int fallbackLevel) {
-        final boolean hasHost =
-                hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty();
-        final String wearUrl = (agencyRoom && hasHost) ? hostBadgeUrl : vipFrameUrl;
-        final Map<String, ?> wearMeta = (agencyRoom && hasHost) ? hostBadgeMeta : null;
-
-        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()) {
+        // The equipped VIP/avatar frame is personal cosmetics and must remain the
+        // same in agency rooms, personal rooms and every other room. Agency host
+        // identity artwork is not a replacement for the user's equipped frame.
+        final String wearUrl = vipFrameUrl;
+        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()
+                && shouldUseLiveWear(wearUrl)) {
             boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, wearMeta,
+                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, null,
                     fallbackLevel);
             if (live) {
                 if (hostBadgeView != null) {
@@ -548,18 +679,20 @@ public final class AvatarCosmetics {
             }
         }
         if (hostSignal != null) {
+            hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
+        }
+        if (hostBadgeView != null) {
+            hostBadgeView.setVisibility(View.GONE);
+            hostBadgeView.setImageDrawable(null);
         }
         if (avatarView != null) {
             avatarView.setVisibility(View.VISIBLE);
             bindAvatar(avatarView, avatarUrl);
         }
-        if (agencyRoom && hasHost) {
-            applyHostWear(frameView, hostBadgeView, avatarView, null, hostBadgeUrl, null, hostBadgeMeta);
-        } else {
-            applyHostWear(frameView, hostBadgeView, avatarView, vipFrameUrl, null, null, null);
-        }
+        applyHostWear(frameView, null, avatarView, vipFrameUrl, null, null, null);
     }
 
     /** Frame without reloading avatar — VIP frame only outside agency rooms. */
@@ -575,7 +708,7 @@ public final class AvatarCosmetics {
                 frameView,
                 null,
                 avatarView,
-                user.vipBadgeUrl,
+                avatarFrameUrl(user),
                 null,
                 null,
                 null);

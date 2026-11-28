@@ -23,26 +23,84 @@ function loadEnvFile(filePath: string) {
 }
 
 loadEnvFile(resolve(process.cwd(), '.env'));
-loadEnvFile(resolve(process.cwd(), '.env.example'));
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
 ) as Function[];
 
 async function seed() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminUsername = process.env.ADMIN_USERNAME?.trim();
+  if (!adminEmail || !adminPassword || adminPassword.length < 16 || !adminUsername) {
+    throw new Error('Set ADMIN_EMAIL, ADMIN_USERNAME, and a unique ADMIN_PASSWORD of at least 16 characters in backend/.env before seeding.');
+  }
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  let parsedDatabaseUrl: URL | undefined;
+  if (databaseUrl) {
+    try {
+      parsedDatabaseUrl = new URL(databaseUrl);
+    } catch {
+      throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
+    }
+  }
+  const dbHost = parsedDatabaseUrl?.hostname || process.env.DB_HOST?.trim();
+  const dbUsername =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.username) : '') ||
+    process.env.DB_USERNAME?.trim();
+  const dbPassword =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.password) : '') ||
+    process.env.DB_PASSWORD;
+  const dbDatabase =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.pathname.replace(/^\//, '')) : '') ||
+    process.env.DB_DATABASE?.trim();
+  const dbPort = Number(parsedDatabaseUrl?.port || process.env.DB_PORT || 5432);
+  if (!dbHost || !dbUsername || !dbPassword || !dbDatabase) {
+    throw new Error('Set DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE before seeding.');
+  }
+
+  const connectionOptions = {
+    type: 'postgres' as const,
+    ...(databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: dbHost,
+          port: dbPort,
+          username: dbUsername,
+          password: dbPassword,
+          database: dbDatabase,
+        }),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  };
+
+  // Prepare only the dedicated JEHO-OWN schema; never create or sync tables in public.
+  const bootstrap = new DataSource({
+    ...connectionOptions,
+    entities: [],
+    synchronize: false,
+  });
+  await bootstrap.initialize();
+  try {
+    // TypeORM's PostgreSQL UUID columns use uuid_generate_v4() by default.
+    // Supabase projects do not always have uuid-ossp enabled, so enable it
+    // before schema synchronization. This is scoped to the current database
+    // and does not touch any application tables outside JEHO-OWN.
+    await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+    await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+  } finally {
+    await bootstrap.destroy();
+  }
+
   const ds = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME || 'auralive',
-    password: process.env.DB_PASSWORD || 'auralive_secret',
-    database: process.env.DB_DATABASE || 'auralive',
+    ...connectionOptions,
+    schema: 'jeho_own',
+    extra: { options: '-c search_path=jeho_own,extensions,public' },
     entities: entityList,
     synchronize: true,
   });
 
   await ds.initialize();
-  console.log('Connected — seeding JEHO CHAT…');
+  console.log('Connected — seeding JEHO-OWN…');
 
   const vipRepo = ds.getRepository(entities.VipPlan);
   const cosmeticRepo = ds.getRepository(entities.Cosmetic);
@@ -292,10 +350,6 @@ async function seed() {
   const _cosmeticsDone = true;
   void _cosmeticsDone;
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@auralive.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@AuraLive2024';
-  const adminUsername = process.env.ADMIN_USERNAME || 'auralive_admin';
-
   let adminUser = await userRepo.findOne({ where: { email: adminEmail } });
   if (!adminUser) {
     const passwordHash = await bcrypt.hash(adminPassword, 12);
@@ -304,7 +358,7 @@ async function seed() {
         email: adminEmail,
         username: adminUsername,
         passwordHash,
-        displayName: 'JEHO CHAT Admin',
+        displayName: 'JEHO-OWN Admin',
         isAdmin: true,
         emailVerified: true,
         level: 50,
@@ -315,8 +369,11 @@ async function seed() {
       walletRepo.create({ userId: adminUser.id, coins: 100000, diamonds: 100000 }),
     );
     console.log(`  Admin user ${adminEmail} created`);
-  } else if (!adminUser.isAdmin) {
+  } else {
+    adminUser.passwordHash = await bcrypt.hash(adminPassword, 12);
+    adminUser.username = adminUsername;
     adminUser.isAdmin = true;
+    adminUser.emailVerified = true;
     await userRepo.save(adminUser);
   }
 
@@ -333,10 +390,18 @@ async function seed() {
       }),
     );
     console.log('  AdminUser record created');
+  } else {
+    adminRecord.username = adminUsername;
+    adminRecord.passwordHash = await bcrypt.hash(adminPassword, 12);
+    adminRecord.role = AdminRole.SUPER;
+    adminRecord.linkedUserId = adminUser.id;
+    adminRecord.isActive = true;
+    await adminRepo.save(adminRecord);
+    console.log('  AdminUser record synchronized');
   }
 
   const defaults: Array<[string, string, string]> = [
-    ['brand_name', 'JEHO CHAT', 'Product brand name'],
+    ['brand_name', 'JEHO-OWN', 'Product brand name'],
     ['coin_to_diamond_rate', '0.35', 'Legacy note: gift diamond capped at coin×0.35; actual mint is gift.diamondValue'],
     ['diamond_to_fiat', '0.00005', 'Withdraw conversion USD per diamond'],
     ['min_withdraw_diamonds', '10000', 'Minimum withdraw amount'],
@@ -358,7 +423,7 @@ async function seed() {
   }
 
   await ds.destroy();
-  console.log('JEHO CHAT seed complete.');
+  console.log('JEHO-OWN seed complete.');
 }
 
 seed().catch((err) => {

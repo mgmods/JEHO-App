@@ -21,6 +21,8 @@ import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -32,6 +34,13 @@ public class LoginActivity extends ThemedActivity {
     private ActivityLoginBinding binding;
     private AuthViewModel viewModel;
     private GoogleSignInClient googleClient;
+    private boolean registerMode = false;
+
+    @Override
+    protected boolean wantsRemoteThemeChrome() {
+        // Login wallpaper is dashboard-controlled and must update without an APK rebuild.
+        return true;
+    }
 
     @Override
     protected boolean wantsContentSystemPadding() {
@@ -61,7 +70,7 @@ public class LoginActivity extends ThemedActivity {
                 } catch (ApiException e) {
                     binding.progress.setVisibility(View.GONE);
                     String detail = e.getStatusCode() == 10
-                            ? "SHA-1 غير مطابق في Firebase (رمز 10)"
+                            ? "إعداد Google OAuth غير مطابق: راجع SHA-1 للـAPK واسم الحزمة في Google Cloud (رمز 10)"
                             : ("رمز " + e.getStatusCode());
                     Toast.makeText(this, "فشل تسجيل Google: " + detail, Toast.LENGTH_LONG).show();
                 }
@@ -79,13 +88,29 @@ public class LoginActivity extends ThemedActivity {
                 .get(AuthViewModel.class);
 
         if (ContainerProvider.from(this).getSessionManager().isLoggedIn()) {
-            AuthDtos.UserDto cached = ContainerProvider.from(this).getSessionManager().getUser();
-            Intent next = ProfileSetupActivity.isProfileComplete(cached)
-                    ? new Intent(this, MainActivity.class)
-                    : new Intent(this, ProfileSetupActivity.class);
-            copyPendingDeepLink(getIntent(), next);
-            startActivity(next);
-            finish();
+            AppContainer container = ContainerProvider.from(this);
+            container.getIoExecutor().execute(() -> {
+                AuthDtos.UserDto resolved = null;
+                try {
+                    Result<AuthDtos.UserDto> fresh = container.getProfileUseCase.me();
+                    if (fresh != null && fresh.success && fresh.data != null) {
+                        resolved = fresh.data;
+                        container.getSessionManager().updateCachedUser(resolved);
+                    }
+                } catch (Exception ignored) {
+                    // Use the last saved profile if the server cannot be reached.
+                }
+                if (resolved == null) resolved = container.getSessionManager().getUser();
+                final AuthDtos.UserDto user = resolved;
+                runOnUiThread(() -> {
+                    Intent next = ProfileSetupActivity.isProfileComplete(user)
+                            ? new Intent(LoginActivity.this, MainActivity.class)
+                            : new Intent(LoginActivity.this, ProfileSetupActivity.class);
+                    copyPendingDeepLink(getIntent(), next);
+                    startActivity(next);
+                    finish();
+                });
+            });
             return;
         }
 
@@ -116,7 +141,14 @@ public class LoginActivity extends ThemedActivity {
             googleClient.signOut().addOnCompleteListener(t ->
                     googleLauncher.launch(googleClient.getSignInIntent()));
         });
-        // Email / create-account / phone / guest stay hidden — Google only.
+
+        // Google is the only sign-in method exposed in the app.
+        // Keep the existing Google/Firebase flow unchanged.
+        binding.authForm.setVisibility(View.GONE);
+        binding.tvAuthDivider.setVisibility(View.GONE);
+        binding.googleLoginGroup.setVisibility(View.VISIBLE);
+        binding.tvLoginHint.setVisibility(View.VISIBLE);
+        // Password and registration views remain in the legacy binding only; they are not active.
 
         viewModel.getLoading().observe(this, loading ->
                 binding.progress.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
@@ -125,37 +157,144 @@ public class LoginActivity extends ThemedActivity {
         });
         viewModel.getAuthSuccess().observe(this, result -> {
             if (result == null) return;
-            AuthDtos.UserDto user = result.user != null
-                    ? result.user
-                    : ContainerProvider.from(this).getSessionManager().getUser();
-            Intent next;
-            if (ProfileSetupActivity.isProfileComplete(user)) {
-                String pendingRoom = getIntent() != null
-                        ? getIntent().getStringExtra("pending_room_id") : null;
-                if (pendingRoom == null || pendingRoom.isEmpty()) {
-                    pendingRoom = com.Dramizo.Series.util.InviteReferralHelper.peekPendingRoom(this);
+            AppContainer container = ContainerProvider.from(this);
+            // Login DTOs can omit country/gender for an existing account. Resolve /me first
+            // so returning users are not sent through profile creation again.
+            container.getIoExecutor().execute(() -> {
+                AuthDtos.UserDto resolvedUser = null;
+                try {
+                    Result<AuthDtos.UserDto> fresh = container.getProfileUseCase.me();
+                    if (fresh != null && fresh.success && fresh.data != null) {
+                        resolvedUser = fresh.data;
+                        String identifier = result.user != null && result.user.username != null
+                                ? result.user.username
+                                : (result.user != null && result.user.email != null
+                                        ? result.user.email : resolvedUser.username);
+                        resolvedUser = container.getSessionManager()
+                                .restoreSavedAccountProfile(resolvedUser, identifier);
+                        container.getSessionManager().updateCachedUser(resolvedUser);
+                    }
+                } catch (Exception ignored) {
+                    // Keep a successful login usable if /me is temporarily unavailable.
                 }
-                if (pendingRoom != null && !pendingRoom.isEmpty()) {
-                    next = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
-                    next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoom);
-                    next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_IS_HOST, false);
-                    com.Dramizo.Series.util.InviteReferralHelper.takePendingRoom(this);
-                } else {
-                    next = new Intent(this, MainActivity.class);
+                if (resolvedUser == null) {
+                    // A previous logout stores a per-account profile snapshot. Prefer
+                    // that richer snapshot over a partial login DTO when /me is unavailable.
+                    AuthDtos.UserDto loginUser = result.user;
+                    AuthDtos.UserDto savedUser = loginUser != null
+                            ? container.getSessionManager().getSavedAccountUser(loginUser.username)
+                            : null;
+                    if (savedUser != null && loginUser != null
+                            && loginUser.id != null && loginUser.id.equals(savedUser.id)
+                            && ProfileSetupActivity.isProfileComplete(savedUser)) {
+                        resolvedUser = savedUser;
+                        container.getSessionManager().updateCachedUser(savedUser);
+                    } else {
+                        resolvedUser = loginUser != null
+                                ? container.getSessionManager().restoreSavedAccountProfile(
+                                        loginUser, loginUser.username != null
+                                                ? loginUser.username : loginUser.email)
+                                : container.getSessionManager().getUser();
+                        if (resolvedUser != null) {
+                            container.getSessionManager().updateCachedUser(resolvedUser);
+                        }
+                    }
                 }
-            } else {
-                next = new Intent(this, ProfileSetupActivity.class);
-            }
-            copyPendingDeepLink(getIntent(), next);
-            // Also carry Play Install Referrer code saved before login.
-            String stored = com.Dramizo.Series.util.InviteReferralHelper.peekPendingCode(this);
-            if (stored != null && !stored.isEmpty()) {
-                next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_PENDING_INVITE, stored);
-                next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_OPEN_INVITE, true);
-            }
-            startActivity(next);
-            finish();
+                final AuthDtos.UserDto user = resolvedUser;
+                runOnUiThread(() -> continueAfterAuth(result, user));
+            });
         });
+    }
+
+    private void continueAfterAuth(AuthDtos.AuthResult result, AuthDtos.UserDto user) {
+        Intent next;
+        if (ProfileSetupActivity.isProfileComplete(user)) {
+            String pendingRoom = getIntent() != null
+                    ? getIntent().getStringExtra("pending_room_id") : null;
+            if (pendingRoom == null || pendingRoom.isEmpty()) {
+                pendingRoom = com.Dramizo.Series.util.InviteReferralHelper.peekPendingRoom(this);
+            }
+            if (pendingRoom != null && !pendingRoom.isEmpty()) {
+                next = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+                next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoom);
+                next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_IS_HOST, false);
+                com.Dramizo.Series.util.InviteReferralHelper.takePendingRoom(this);
+            } else {
+                next = new Intent(this, MainActivity.class);
+            }
+        } else {
+            next = new Intent(this, ProfileSetupActivity.class);
+        }
+        copyPendingDeepLink(getIntent(), next);
+        String stored = com.Dramizo.Series.util.InviteReferralHelper.peekPendingCode(this);
+        if (stored != null && !stored.isEmpty()) {
+            next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_PENDING_INVITE, stored);
+            next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_OPEN_INVITE, true);
+        }
+        startActivity(next);
+        finish();
+    }
+
+    private void setRegisterMode(boolean register) {
+        registerMode = register;
+        binding.emailLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.confirmPasswordLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.googleLoginGroup.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.tvAuthDivider.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.tvLoginHint.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.usernameLayout.setVisibility(View.GONE);
+        binding.identifierLayout.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.btnAuthSubmit.setText(register ? R.string.register : R.string.login);
+        binding.btnAuthMode.setText(register ? R.string.login : R.string.create_account);
+        binding.tvLoginHint.setText(register
+                ? R.string.login_google_or_password_hint
+                : R.string.login_google_or_password_hint);
+    }
+
+    private void submitPasswordAuth() {
+        // Passwords are compared and submitted exactly as entered; never trim
+        // either field because even a trailing character must remain significant.
+        String password = binding.etAuthPassword.getText() == null
+                ? "" : binding.etAuthPassword.getText().toString();
+        if (password.length() < 6) {
+            binding.etAuthPassword.setError(getString(R.string.password_min_length));
+            binding.etAuthPassword.requestFocus();
+            return;
+        }
+        if (registerMode) {
+            String confirmPassword = binding.etAuthConfirmPassword.getText() == null
+                    ? "" : binding.etAuthConfirmPassword.getText().toString();
+            if (confirmPassword.isEmpty() || !password.equals(confirmPassword)) {
+                binding.etAuthConfirmPassword.setError("كلمتا المرور غير متطابقتين");
+                binding.etAuthConfirmPassword.requestFocus();
+                return;
+            }
+            binding.etAuthPassword.setError(null);
+            binding.etAuthConfirmPassword.setError(null);
+        }
+        if (!registerMode) {
+            String identifier = binding.etAuthIdentifier.getText() == null
+                    ? "" : binding.etAuthIdentifier.getText().toString().trim();
+            if (identifier.isEmpty()) {
+                binding.etAuthIdentifier.setError(getString(R.string.required_field));
+                binding.etAuthIdentifier.requestFocus();
+                return;
+            }
+            viewModel.login(identifier, password);
+            return;
+        }
+
+        String email = binding.etAuthEmail.getText() == null
+                ? "" : binding.etAuthEmail.getText().toString().trim();
+        String username = "";
+        String displayName = "";
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etAuthEmail.setError(getString(R.string.valid_email_required));
+            binding.etAuthEmail.requestFocus();
+            return;
+        }
+        // Username is generated by the server and is never shown during signup.
+        viewModel.register(email, password, "", "");
     }
 
     static void copyPendingDeepLink(Intent from, Intent to) {

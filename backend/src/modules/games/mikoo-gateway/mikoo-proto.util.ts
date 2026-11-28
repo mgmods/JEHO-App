@@ -1,3 +1,4 @@
+import { secureGameRandom } from '../secure-game-rng';
 /** Minimal protobuf encode/decode for Mikoo hash-game messages. */
 
 import {
@@ -549,6 +550,7 @@ function encodeBountyBetStuArr(bets: Array<{ iconId: number; money: number }>): 
 /** bounty-football TableInfoRes — unlocks board after login. */
 export function encodeBountyFootballTableInfoRes(data: {
   state: number;
+  chips?: number[];
   timeLeft: number;
   curTurn: number;
   history?: number[];
@@ -562,7 +564,7 @@ export function encodeBountyFootballTableInfoRes(data: {
   /** Wheel light stop 1..16 (never 0). */
   turnPos?: number;
 }): Buffer {
-  const chips = BOUNTY_FOOTBALL_CHIPS;
+  const chips = data.chips?.length ? data.chips : BOUNTY_FOOTBALL_CHIPS;
   const ratios = BOUNTY_FOOTBALL_RATIOS;
   const history = (data.history ?? []).slice(-12);
   const turnPos = Math.max(1, Math.min(16, data.turnPos || 1));
@@ -718,7 +720,6 @@ export function encodeBountyFootballGetRankDataRes(
 /** 7updown TableInfo — different from crash. */
 const SEVEN_UP_AREA_RATIOS: Record<number, number> = { 1: 2, 2: 5, 3: 2 };
 const SEVEN_UP_CHIPS = chipsList();
-const SEVEN_UP_CHIP_CSV = MIKOO_BET_CHIPS.join(',');
 
 function encode7UpBetArea(data: {
   id: number;
@@ -814,7 +815,10 @@ export function encodeTableInfo7UpDown(data: {
   history?: number[];
   /** Area pools — down=1, seven=2, up=3. */
   betInfo?: Array<{ id: number; totalBet?: number; myBet?: number; ratio?: number }>;
+  chips?: number[];
 }): Buffer {
+  const availableChips = data.chips?.length ? data.chips : SEVEN_UP_CHIPS;
+  const chipCsv = availableChips.join(',');
   const history = data.history ?? [1, 2, 3, 1, 3, 2, 1, 3];
   // Client enum: betting=1, over=2 only — never send 3.
   const state = data.state === 1 ? 1 : 2;
@@ -842,11 +846,11 @@ export function encodeTableInfo7UpDown(data: {
     parts.push(Buffer.concat([tag(8, 2), writeVarint(area.length), area]));
   }
   // betConf@9 chips: id, betMin, conf csv
-  const chips = [
-    { id: 1, min: 50, conf: SEVEN_UP_CHIP_CSV },
-    { id: 2, min: 100, conf: SEVEN_UP_CHIP_CSV },
+  const chipConfigs = [
+    { id: 1, min: availableChips[0] ?? 50, conf: chipCsv },
+    { id: 2, min: availableChips[1] ?? availableChips[0] ?? 100, conf: chipCsv },
   ];
-  for (const c of chips) {
+  for (const c of chipConfigs) {
     const row = encodeMessage([
       pbUInt32(1, c.id),
       pbUInt32(2, c.min),
@@ -855,7 +859,7 @@ export function encodeTableInfo7UpDown(data: {
     parts.push(Buffer.concat([tag(9, 2), writeVarint(row.length), row]));
   }
   // AvailableChips@14 int32 — unlocks expanded bet tray
-  for (const chip of SEVEN_UP_CHIPS) {
+  for (const chip of availableChips) {
     parts.push(pbInt32(14, chip));
   }
   return encodeMessage(parts);
@@ -1040,13 +1044,13 @@ export function encodeCleopatraBetRes(data: {
 }): Buffer {
   const win = Math.max(0, Math.floor(data.winMoney || 0));
   const rowCounts = [6, 7, 7, 7, 6];
-  const winSym = 1 + Math.floor(Math.random() * 8);
+  const winSym = 1 + Math.floor(secureGameRandom() * 8);
   const cells: Buffer[] = [];
   for (let col = 0; col < rowCounts.length; col++) {
     const rows = rowCounts[col];
     for (let row = 0; row < rows; row++) {
       const number =
-        win > 0 && row === 2 ? winSym : 1 + Math.floor(Math.random() * 9);
+        win > 0 && row === 2 ? winSym : 1 + Math.floor(secureGameRandom() * 9);
       const pos = encodeMessage([
         pbInt32(1, row),
         pbInt32(2, col),
@@ -1106,7 +1110,7 @@ export function encodeOlympiansBetRes(data: {
   const cols = 6;
   const rows = 5;
   const win = Math.max(0, Math.floor(data.winMoney || 0));
-  const winSymbol = 1 + Math.floor(Math.random() * 8);
+  const winSymbol = 1 + Math.floor(secureGameRandom() * 8);
   const paidMult =
     data.mult && data.mult > 0
       ? data.mult
@@ -1120,11 +1124,11 @@ export function encodeOlympiansBetRes(data: {
     for (let row = 0; row < rows; row++) {
       // Scatter decorative mults so players see x2 / x10 / x50 values on symbols.
       const decor =
-        Math.random() < 0.18 ? randomWinMult() : 1;
+        secureGameRandom() < 0.18 ? randomWinMult() : 1;
       board.push({
         row,
         col,
-        number: 1 + Math.floor(Math.random() * 9),
+        number: 1 + Math.floor(secureGameRandom() * 9),
         mul: decor,
       });
     }
@@ -1187,14 +1191,14 @@ export function encodeSugarBetRes(data: {
       const mul =
         win > 0 && row === 2 && col < 5
           ? Math.max(1, paidMult)
-          : Math.random() < 0.15
+          : secureGameRandom() < 0.15
             ? randomWinMult()
             : 1;
       matrix.push(
         encodeMessage([
           pbInt32(1, row),
           pbInt32(2, col),
-          pbInt32(3, 1 + Math.floor(Math.random() * 8)),
+          pbInt32(3, 1 + Math.floor(secureGameRandom() * 8)),
           pbInt32(4, mul),
         ]),
       );
@@ -1228,7 +1232,7 @@ export function encodeMegawaysBetRes(data: {
   const win = Math.max(0, Math.floor(data.winMoney ?? 0));
   const reelCount = 6;
   const heights = [5, 6, 5, 7, 6, 5];
-  const winSym = 1 + Math.floor(Math.random() * 8);
+  const winSym = 1 + Math.floor(secureGameRandom() * 8);
   const reels: Buffer[] = [];
   for (let col = 0; col < reelCount; col++) {
     const h = heights[col] ?? 5;
@@ -1237,7 +1241,7 @@ export function encodeMegawaysBetRes(data: {
       nums.push(
         win > 0 && row === Math.floor(h / 2)
           ? winSym
-          : 1 + Math.floor(Math.random() * 10),
+          : 1 + Math.floor(secureGameRandom() * 10),
       );
     }
     // numList: repeated int32 list@1
@@ -1267,10 +1271,10 @@ export function encodePirateBetRes(data: {
   tipType?: number;
 }): Buffer {
   const win = Math.max(0, Math.floor(data.winMoney));
-  const winIcon = 1 + Math.floor(Math.random() * 8);
+  const winIcon = 1 + Math.floor(secureGameRandom() * 8);
   const icons: number[] = [];
   for (let i = 0; i < 15; i++) {
-    icons.push(1 + Math.floor(Math.random() * 8));
+    icons.push(1 + Math.floor(secureGameRandom() * 8));
   }
   // Paint a simple middle-row match when winning so bingoLine matches board.
   if (win > 0) {
@@ -1309,12 +1313,12 @@ export function encodeDoSlotsRsp(data: {
 }): Buffer {
   const icons: number[] = [];
   for (let i = 0; i < 15; i++) {
-    icons.push(1 + Math.floor(Math.random() * 9));
+    icons.push(1 + Math.floor(secureGameRandom() * 9));
   }
   const win = Math.max(0, Math.floor(data.winMoney));
   const isBingo = win > 0 ? 1 : 0;
   // Paint middle row (indices 5..9) as a 5-of-a-kind when winning.
-  const winIcon = 1 + Math.floor(Math.random() * 8);
+  const winIcon = 1 + Math.floor(secureGameRandom() * 8);
   if (isBingo) {
     for (let col = 0; col < 5; col++) icons[5 + col] = winIcon;
   }
@@ -1354,7 +1358,7 @@ export function encodeFortuneGemsRes(data: {
   const icons: Buffer[] = [];
   // 5x3 grid typical for fortune gems
   for (let i = 0; i < 15; i++) {
-    icons.push(pbUInt32(6, 1 + Math.floor(Math.random() * 8)));
+    icons.push(pbUInt32(6, 1 + Math.floor(secureGameRandom() * 8)));
   }
   const isWin = data.winMoney > 0 ? 1 : 0;
   const winMult = Math.max(0, Math.floor(data.mult ?? (isWin ? randomWinMult() : 0)));
@@ -1374,12 +1378,16 @@ export function encodeFortuneGemsRes(data: {
 }
 
 /** Minimal GameCfgRes for fortune gems (unlocks spin UI). */
-export function encodeFortuneGameCfgRes(): Buffer {
-  const betMult = MIKOO_BET_CHIPS.map((n) => pbUInt32(4, n));
+export function encodeFortuneGameCfgRes(
+  chips: number[] = [...MIKOO_BET_CHIPS],
+  minBet = 50,
+  maxBet = 10_000,
+): Buffer {
+  const betMult = chips.map((n) => pbUInt32(4, n));
   const cfg = encodeMessage([
     pbUInt32(1, 1), // gameSwitch on
-    pbUInt32(2, 10000), // maxBet
-    pbUInt32(3, 50), // minBet
+    pbUInt32(2, maxBet), // maxBet
+    pbUInt32(3, minBet), // minBet
     ...betMult,
   ]);
   return encodeMessage([
@@ -1394,13 +1402,17 @@ export function encodeFortuneGameCfgRes(): Buffer {
  * (after stripping quotes), so they MUST be JSON array strings like "[1,2,5]".
  * Paylines are cell indices on a 3×5 board (row-major 0..14).
  */
-export function encodeLineSlotsGameCfgRsp(): Buffer {
+export function encodeLineSlotsGameCfgRsp(
+  chips: number[] = [...MIKOO_BET_CHIPS],
+  minBet = 50,
+  maxBet = 10_000,
+): Buffer {
   const defaultCfg = encodeMessage([
-    pbInt32(1, 50), // BasicBetLimit
-    pbInt32(2, 50), // MinBet
+    pbInt32(1, maxBet), // BasicBetLimit
+    pbInt32(2, minBet), // MinBet
     pbInt32(3, 3), // ScrollGrid (rows)
     pbInt32(4, 0), // BonusTrunCount
-    pbString(5, JSON.stringify([...MIKOO_BET_CHIPS])), // BetMult — stake tray
+    pbString(5, JSON.stringify([...chips])), // BetMult — stake tray
     pbString(6, '[10,20,50,100]'), // AutoSpinCount — JSON array
   ]);
   const symbols: Buffer[] = [];
@@ -1569,6 +1581,7 @@ export function encodeLuckCarTableInfo(data: {
   curTurn?: number;
   totalBet?: number;
   myBets?: number[];
+  chips?: number[];
 }): Buffer {
   // Client enum: betting=1, over=2 only.
   const state = data.state === 1 ? 1 : 2;
@@ -1601,7 +1614,7 @@ export function encodeLuckCarTableInfo(data: {
   parts.push(pbInt32(17, 1)); // trackType
   parts.push(pbInt32(18, 0)); // trackPos
   // Client does JSON.parse(chipsConf) then pushes into Instance.chipsConf[].
-  parts.push(pbString(23, JSON.stringify(LUCK_CAR_CHIPS)));
+  parts.push(pbString(23, JSON.stringify(data.chips?.length ? data.chips : LUCK_CAR_CHIPS)));
   return encodeMessage(parts);
 }
 

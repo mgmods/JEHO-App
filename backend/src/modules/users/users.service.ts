@@ -39,6 +39,7 @@ import { effectiveVipLevel } from '../../common/vip-progress';
 import { fixedVipFrameUrl, fixedVipHeadUrl, isStaticVipTouUrl } from '../../common/vip-visual';
 import { AgencyMember, AgencyMemberStatus } from '../../database/entities/agency-member.entity';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
+import { RechargeAgent, RechargeAgentStatus } from '../../database/entities/recharge-agent.entity';
 
 const LEVEL_THRESHOLDS = [
   0, 100, 500, 1500, 4000, 10000, 25000, 60000, 150000, 400000, 1000000,
@@ -68,6 +69,7 @@ export class UsersService {
     @InjectRepository(ProfileVisit) private readonly visitsRepo: Repository<ProfileVisit>,
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
     @InjectRepository(AgencyMember) private readonly agencyMembersRepo: Repository<AgencyMember>,
+    @InjectRepository(RechargeAgent) private readonly rechargeAgentsRepo: Repository<RechargeAgent>,
     private readonly dataSource: DataSource,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
@@ -76,6 +78,75 @@ export class UsersService {
     @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly tasksService?: TasksService,
   ) {}
+
+  private roomTrackingSettingKey(userId: string) { return `room_tracking:${userId}`; }
+
+  async getRoomTrackingPrivacy(userId: string) {
+    const rows = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+      [this.roomTrackingSettingKey(userId)],
+    );
+    const audience = String(rows?.[0]?.value || 'everyone').toLowerCase();
+    return { audience: ['everyone', 'followers', 'friends', 'nobody'].includes(audience) ? audience : 'everyone' };
+  }
+
+  async setRoomTrackingPrivacy(userId: string, audience: string) {
+    const normalized = String(audience || '').trim().toLowerCase();
+    if (!['everyone', 'followers', 'friends', 'nobody'].includes(normalized)) {
+      throw new BadRequestException('Invalid room tracking audience');
+    }
+    await this.dataSource.query(
+      `INSERT INTO app_settings (key, value, description)
+       VALUES ($1, $2, 'User room presence privacy')
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, "updatedAt" = NOW()`,
+      [this.roomTrackingSettingKey(userId), normalized],
+    );
+    return { audience: normalized };
+  }
+
+  async getRoomPresence(viewerId: string, targetId: string) {
+    if (!viewerId || !targetId || viewerId === targetId) return { inRoom: false };
+    // A block in either direction always overrides room-tracking audience settings.
+    const blocked = await this.blocksRepo.findOne({
+      where: [
+        { blockerId: viewerId, blockedId: targetId },
+        { blockerId: targetId, blockedId: viewerId },
+      ],
+      select: ['id'],
+    });
+    if (blocked) return { inRoom: false };
+    const privacy = await this.getRoomTrackingPrivacy(targetId);
+    let allowed = privacy.audience === 'everyone';
+    if (!allowed && privacy.audience === 'followers') {
+      allowed = !!(await this.followsRepo.findOne({ where: { followerId: viewerId, followingId: targetId } }));
+    } else if (!allowed && privacy.audience === 'friends') {
+      allowed = !!(await this.socialRepo.findOne({ where: [
+        { fromUserId: viewerId, toUserId: targetId, type: SocialRequestType.FRIEND, status: SocialRequestStatus.ACCEPTED },
+        { fromUserId: targetId, toUserId: viewerId, type: SocialRequestType.FRIEND, status: SocialRequestStatus.ACCEPTED },
+      ] }));
+    }
+    if (!allowed || privacy.audience === 'nobody') return { inRoom: false };
+    const activeRoom = await this.realtimeGateway.activeRoomDetailsForUser(targetId);
+    return activeRoom
+      ? { inRoom: true, roomId: activeRoom.roomId, roomName: activeRoom.roomName }
+      : { inRoom: false };
+  }
+
+  /** Expired timed medals must disappear from the profile showcase on every profile read. */
+  private async cleanupExpiredMedalShowcase(userId: string, profile?: UserProfile | null): Promise<void> {
+    if (!profile || !Array.isArray(profile.displayedMedalIds) || !profile.displayedMedalIds.length) return;
+    const expired = await this.dataSource.query(
+      'SELECT "badgeId" FROM "jeho_own"."user_badges" WHERE "userId" = $1 AND "expiresAt" IS NOT NULL AND "expiresAt" <= NOW()',
+      [userId],
+    ) as Array<{ badgeId: string }>;
+    if (!expired.length) return;
+    const expiredIds = new Set(expired.map((row) => String(row.badgeId)));
+    const next = profile.displayedMedalIds.filter((id) => !expiredIds.has(String(id)));
+    if (next.length !== profile.displayedMedalIds.length) {
+      profile.displayedMedalIds = next;
+      await this.profilesRepo.save(profile);
+    }
+  }
 
   private economyStats(profile?: UserProfile | null) {
     const received = Math.max(0, Number(profile?.totalReceivedDiamonds ?? 0));
@@ -121,11 +192,79 @@ export class UsersService {
 
   private async withWearMeta<T extends Record<string, unknown>>(flat: T): Promise<T & {
     hostBadgeMeta: Record<string, unknown> | null;
+    customDisplayRankName: string | null;
+    customDisplayRankImageUrl: string | null;
+    customDisplayRankAnimated: boolean;
   }> {
-    const hostBadgeMeta = await this.wearMetaForUrl(
-      flat.hostBadgeUrl as string | null | undefined,
-    );
-    return { ...flat, hostBadgeMeta };
+    // Resolve optional decorative rank as public display metadata; never use it for permissions.
+    const userId = String(flat.id || '');
+    const [hostBadgeMeta, ranks] = await Promise.all([
+      this.wearMetaForUrl(flat.hostBadgeUrl as string | null | undefined),
+      userId ? this.dataSource.query(
+        `SELECT b.name AS "name", b."imageUrl" AS "imageUrl", b."isAnimated" AS "isAnimated"
+           FROM user_badges ub
+           JOIN badges b ON b.id = ub."badgeId"
+          WHERE ub."userId" = $1 AND b.category = 'display_rank'
+            AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
+          ORDER BY ub."grantedAt" DESC, b."sortOrder" ASC
+          LIMIT 1`,
+        [userId],
+      ) : Promise.resolve([]),
+    ]);
+    const rank = ranks?.[0];
+    return {
+      ...flat, hostBadgeMeta,
+      customDisplayRankName: rank?.name ? String(rank.name) : null,
+      customDisplayRankImageUrl: rank?.imageUrl ? String(rank.imageUrl) : null,
+      customDisplayRankAnimated: rank?.isAnimated === true || rank?.isAnimated === 'true',
+    };
+  }
+
+  /** Return the saved vanity-ID style only to the account that currently owns/equips it. */
+  private async withPublicIdStyle<T extends Record<string, unknown>>(flat: T, userId: string): Promise<T> {
+    const publicId = String(flat.publicId || '').trim();
+    if (!publicId) return {
+      ...flat,
+      publicIdStyleMode: 'none',
+      publicIdStyleVipLevel: 1,
+      publicIdStyleColor1: null,
+      publicIdStyleColor2: null,
+      publicIdStyleColor3: null,
+      publicIdStyleGlow: false,
+      publicIdStyleIconUrl: null,
+    } as T;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT "styleMode", "styleVipLevel", "styleColor1", "styleColor2", "styleColor3", "styleGlow", "styleIconUrl"
+         FROM vanity_ids
+         WHERE "publicId" = $1 AND "ownerUserId" = $2 AND status = 'owned'
+           AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+           AND ("targetType" = 'account' OR "targetType" IS NULL)
+         LIMIT 1`,
+        [publicId, userId],
+      );
+      const row = rows?.[0];
+      return {
+        ...flat,
+        publicIdStyleMode: row?.styleMode || 'none',
+        publicIdStyleVipLevel: Math.min(7, Math.max(1, Number(row?.styleVipLevel) || 1)),
+        publicIdStyleColor1: row?.styleColor1 || null,
+        publicIdStyleColor2: row?.styleColor2 || null,
+        publicIdStyleColor3: row?.styleColor3 || null,
+        publicIdStyleGlow: row?.styleGlow === true,
+        publicIdStyleIconUrl: row?.styleIconUrl || null,
+      } as T;
+    } catch {
+      return {
+        ...flat,
+        publicIdStyleMode: 'none',
+        publicIdStyleVipLevel: 1,
+        publicIdStyleColor1: null,
+        publicIdStyleColor2: null,
+        publicIdStyleColor3: null,
+        publicIdStyleGlow: false,
+      } as T;
+    }
   }
 
   /**
@@ -145,7 +284,7 @@ export class UsersService {
   }
 
     private async resolveActiveAgency(userId: string) {
-    const row = await this.agencyMembersRepo.findOne({
+    let row = await this.agencyMembersRepo.findOne({
       where: {
         userId,
         isActive: true,
@@ -154,7 +293,18 @@ export class UsersService {
       relations: ['agency'],
       order: { joinedAt: 'DESC' },
     });
-    const agency = row?.agency;
+    // Agency owners are still identified even if legacy data has no owner membership row.
+    // A deleted/inactive agency never produces a public badge.
+    let agency = row?.agency || null;
+    if (!agency) {
+      const owned = await this.dataSource.getRepository(Agency).findOne({
+        where: { ownerId: userId, status: AgencyStatus.ACTIVE },
+      });
+      if (owned) {
+        agency = owned;
+        row = { role: 'owner' } as any;
+      }
+    }
     if (!agency || agency.status !== AgencyStatus.ACTIVE) return null;
     // Prefer stored logo; fall back to any agency room cover (often the brand image).
     let coverUrl: string | null = null;
@@ -230,9 +380,14 @@ export class UsersService {
       isSuperAdmin: staffRole === 'super',
       bio: p?.bio ?? user['bio'] ?? null,
       coverUrl: p?.coverUrl ?? null,
+      profileCoverUrls: Array.isArray(p?.profileCoverUrls) ? p.profileCoverUrls : (p?.coverUrl ? [p.coverUrl] : []),
       entryEffectUrl: p?.entryEffectUrl ?? null,
       entryAnimationUrl: p?.entryAnimationUrl ?? null,
       roomCardUrl: p?.roomCardUrl ?? null,
+      profileCardUrl: p?.profileCardUrl ?? null,
+      chatBubbleUrl: p?.chatBubbleUrl ?? null,
+      nameplateUrl: p?.nameplateUrl ?? null,
+      voiceWaveUrl: p?.voiceWaveUrl ?? null,
       vipBadgeUrl: wearVip,
       levelBadgeUrl: p?.levelBadgeUrl ?? null,
       hostBadgeUrl: p?.hostBadgeUrl ?? null,
@@ -259,10 +414,62 @@ export class UsersService {
       ...newbie,
       showOnlineStatus: p?.showOnlineStatus ?? true,
       allowDmFromStrangers: p?.allowDmFromStrangers ?? true,
+      dmEnabled: p?.dmEnabled ?? true,
+      dmAudience: p?.dmAudience ?? 'everyone',
       dmGiftGateEnabled: p?.dmGiftGateEnabled ?? false,
       dmRequiredGiftId: p?.dmRequiredGiftId ?? null,
       lastSeenAt: user.updatedAt,
+      // Never leak the stored opt-in flag directly. Eligibility is verified against
+      // the current VIP subscription and dashboard policy at response time.
+      mysteriousMode: false,
+      mysteriousMan: false,
     };
+  }
+
+  private async isMysteriousModeAllowed(user: User, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user?.mysteriousMode) return false;
+    return this.isMysteriousModeEligible(user, vip);
+  }
+
+  private async isMysteriousModeEligible(user: User, vip: UserVip | null | undefined): Promise<boolean> {
+    if (!user || !vip || !vip.isActive) return false;
+    if (vip.expiresAt && new Date(vip.expiresAt).getTime() <= Date.now()) return false;
+    const level = Number(vip.level || 0);
+    if (!Number.isInteger(level) || level < 1 || level > 7) return false;
+
+    // Fail closed: when the policy cannot be verified, never show the anonymous
+    // identity to other users. This also makes a dashboard disable take effect now,
+    // rather than waiting for the background reconciliation timer.
+    let rows: Array<{ value?: string | Record<string, unknown> }> = [];
+    try {
+      rows = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+        ['mysterious_man_config'],
+      );
+    } catch {
+      return false;
+    }
+
+    if (Array.isArray(rows) && rows.length > 0) {
+      let policy: any = {};
+      try {
+        policy = typeof rows[0]?.value === 'string'
+          ? JSON.parse(rows[0].value)
+          : (rows[0]?.value || {});
+      } catch {
+        return false;
+      }
+      const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((n: number) =>
+            Number.isInteger(n) && n >= 1 && n <= 7)
+        : [];
+      return policy.enabled === true && allowedLevels.includes(level);
+    }
+
+    // Compatibility for installations before the dashboard policy was first saved.
+    const benefits = vip.vipPlan?.benefits as any;
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
+    return Array.isArray(extra) && extra.includes('mysterious_man');
   }
 
   async getMe(userId: string) {
@@ -271,6 +478,7 @@ export class UsersService {
       relations: ['profile', 'wallet'],
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredMedalShowcase(userId, user.profile);
     const now = new Date();
     const vip = await this.userVipsRepo.findOne({
       where: { userId, isActive: true },
@@ -284,18 +492,45 @@ export class UsersService {
       Number(user.profile?.totalSentCoins || 0),
     );
     const agency = await this.resolveActiveAgency(userId);
-    return this.withWearMeta(
-      this.applyFixedVipWear(
-        {
-          ...this.flatten(user),
-          activeVip: vipValid,
-          vipLevel,
-          genderVerified: verification.genderVerified,
-          genderVerificationStatus: verification.genderVerificationStatus,
-          agency,
-        },
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
+    const flat = this.applyFixedVipWear(
+      {
+        ...this.flatten(user),
+        activeVip: vipValid,
         vipLevel,
-      ),
+        genderVerified: verification.genderVerified,
+        genderVerificationStatus: verification.genderVerificationStatus,
+        agency,
+        agencyClub,
+      },
+      vipLevel,
+    );
+    // VIP-tier media is controlled from Dashboard > VIP. Apply it at read time
+    // so changing a plan updates active members without overwriting their stored profile data.
+    const vipVisuals = (vipValid?.vipPlan?.benefits as any)?.visuals || {};
+    const mysteriousManEligible = await this.isMysteriousModeEligible({ ...user, mysteriousMode: true } as User, vipValid);
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vipValid);
+    const withVipVisuals = {
+      ...flat,
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
+      mysteriousManEligible,
+      vipHeadUrl: vipValid?.vipPlan?.badgeUrl || flat.vipHeadUrl,
+      vipMainIconUrl: vipVisuals.vipMainIconUrl || null,
+      vipHorizontalBadgeUrl: vipVisuals.vipHorizontalBadgeUrl || null,
+      vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
+      vipFrameUrl: vipVisuals.vipFrameUrl || null,
+      vipCardUrl: vipVisuals.vipCardUrl || null,
+      profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
+      chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
+      nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+      voiceWaveUrl: flat.voiceWaveUrl,
+      nameStyle: vipVisuals.nameStyle && typeof vipVisuals.nameStyle === 'object' ? vipVisuals.nameStyle : null,
+    };
+    return this.withWearMeta(
+      await this.withPublicIdStyle(withVipVisuals, userId),
     );
   }
 
@@ -305,9 +540,11 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
+    await this.cleanupExpiredMedalShowcase(id, user.profile);
     const now = new Date();
     const vip = await this.userVipsRepo.findOne({
       where: { userId: id, isActive: true },
+      relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
     const vipLevelRaw =
@@ -326,6 +563,13 @@ export class UsersService {
       isFollowing = !!follow;
     }
     const agency = await this.resolveActiveAgency(id);
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
+    const activeRechargeAgent = await this.rechargeAgentsRepo.findOne({
+      where: { userId: id, status: RechargeAgentStatus.ACTIVE },
+      select: { id: true },
+    });
     const visitorsCount = await this.visitsRepo.count({
       where: { profileUserId: id },
     });
@@ -343,18 +587,40 @@ export class UsersService {
     ) {
       isOnline = false;
     }
-    return this.withWearMeta(
-      this.applyFixedVipWear(
-        {
-          ...this.flatten(user),
-          vipLevel,
-          isFollowing,
-          agency,
-          visitorsCount,
-          isOnline,
-        },
+    const flat = this.applyFixedVipWear(
+      {
+        ...this.flatten(user),
         vipLevel,
-      ),
+        isFollowing,
+        isRechargeAgent: !!activeRechargeAgent,
+        agency,
+        agencyClub,
+        visitorsCount,
+        isOnline,
+      },
+      vipLevel,
+    );
+    const vipVisuals = vip && (!vip.expiresAt || vip.expiresAt > now)
+      ? ((vip.vipPlan?.benefits as any)?.visuals || {})
+      : {};
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
+    const withVipVisuals = {
+      ...flat,
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
+      vipHeadUrl: (vip && (!vip.expiresAt || vip.expiresAt > now) ? vip.vipPlan?.badgeUrl : null) || flat.vipHeadUrl,
+      vipMainIconUrl: vipVisuals.vipMainIconUrl || null,
+      vipHorizontalBadgeUrl: vipVisuals.vipHorizontalBadgeUrl || null,
+      vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
+      vipFrameUrl: vipVisuals.vipFrameUrl || null,
+      vipCardUrl: vipVisuals.vipCardUrl || null,
+      profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
+      chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
+      nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+      nameStyle: vipVisuals.nameStyle && typeof vipVisuals.nameStyle === 'object' ? vipVisuals.nameStyle : null,
+    };
+    return this.withWearMeta(
+      await this.withPublicIdStyle(withVipVisuals, id),
     );
   }
 
@@ -365,12 +631,46 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withWearMeta(this.flatten(user));
+    await this.cleanupExpiredMedalShowcase(user.id, user.profile);
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId: user.id, isActive: true },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    // Legacy agency_club_members is not part of the current agency schema.
+    // Agency staff membership is resolved separately through agency_members.
+    const agencyClub = null;
+    const mysteriousMan = await this.isMysteriousModeAllowed(user, vip);
+    const safeUser = {
+      ...this.flatten(user),
+      agencyClub,
+      mysteriousMode: mysteriousMan,
+      mysteriousMan,
+    };
+    return this.withWearMeta(await this.withPublicIdStyle(safeUser, user.id));
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
+
+    if (dto.mysteriousMode !== undefined) {
+      if (dto.mysteriousMode) {
+        const activeVip = await this.userVipsRepo.findOne({
+          where: { userId, isActive: true },
+          relations: ['vipPlan'],
+          order: { level: 'DESC' },
+        });
+        const eligible = await this.isMysteriousModeEligible(
+          { ...user, mysteriousMode: true } as User,
+          activeVip,
+        );
+        if (!eligible) {
+          throw new BadRequestException('ميزة الرجل الغامض متاحة للحسابات المؤهلة فقط');
+        }
+      }
+      user.mysteriousMode = !!dto.mysteriousMode;
+    }
 
     if (dto.displayName !== undefined) {
       this.moderation.assertNoAgencyImpersonation(dto.displayName, 'الاسم الظاهر');
@@ -397,6 +697,9 @@ export class UsersService {
     }
     if (dto.birthday !== undefined) user.birthday = new Date(dto.birthday);
     await this.usersRepo.save(user);
+    if (dto.mysteriousMode !== undefined) {
+      await this.realtimeGateway.refreshUserProfile(userId, 'mysterious_mode');
+    }
 
     let profile = await this.profilesRepo.findOne({ where: { userId } });
     if (!profile) {
@@ -452,9 +755,60 @@ export class UsersService {
       this.mediaCleanup.replaceUpload(profile.coverUrl, dto.coverUrl);
       profile.coverUrl = dto.coverUrl;
     }
+    if (dto.profileCoverUrls !== undefined) {
+      const nextCovers = [...new Set((dto.profileCoverUrls || []).map(url => String(url || '').trim()).filter(Boolean))].slice(0, 5);
+      const oldCovers = Array.isArray(profile.profileCoverUrls) ? profile.profileCoverUrls : [];
+      for (const oldUrl of oldCovers) if (!nextCovers.includes(oldUrl) && oldUrl !== profile.coverUrl) this.mediaCleanup.deleteUploadUrl(oldUrl);
+      profile.profileCoverUrls = nextCovers;
+      if (nextCovers.length && !profile.coverUrl) profile.coverUrl = nextCovers[0];
+    }
     if (dto.showOnlineStatus !== undefined) profile.showOnlineStatus = dto.showOnlineStatus;
     if (dto.allowDmFromStrangers !== undefined) {
       profile.allowDmFromStrangers = dto.allowDmFromStrangers;
+    }
+    if (dto.dmEnabled !== undefined) profile.dmEnabled = dto.dmEnabled;
+    if (dto.dmAudience !== undefined) {
+      const validAudiences = ['everyone', 'followers', 'friends', 'nobody'];
+      if (!validAudiences.includes(dto.dmAudience)) {
+        throw new BadRequestException('إعداد خصوصية الرسائل غير صالح');
+      }
+      profile.dmAudience = dto.dmAudience;
+    }
+    if (dto.displayedMedalIds !== undefined) {
+      const keys = [...new Set(dto.displayedMedalIds.map((value) => value.trim()).filter(Boolean))];
+      if (keys.length > 5) throw new BadRequestException('يمكن عرض خمس ميداليات كحد أقصى');
+      // Never allow a client to feature a medal that this account has not earned.
+      const badgeKeys = keys.filter((key) => !key.startsWith('vip:'));
+      if (badgeKeys.length) {
+        const ownedBadges: Array<{ id: string }> = await this.dataSource.query(
+          `SELECT b.id
+             FROM user_badges ub
+             JOIN badges b ON b.id = ub."badgeId"
+             WHERE ub."userId" = $1
+               AND b."isActive" = true
+               AND (ub."expiresAt" IS NULL OR ub."expiresAt" > NOW())
+               AND b.id = ANY($2::uuid[])`,
+          [userId, badgeKeys],
+        );
+        const ownedIds = new Set(ownedBadges.map((row) => String(row.id)));
+        if (badgeKeys.some((key) => !ownedIds.has(key))) {
+          throw new BadRequestException('يمكن اختيار الميداليات التي حصلت عليها فقط');
+        }
+      }
+      const vipKeys = keys.filter((key) => key.startsWith('vip:'));
+      if (vipKeys.length) {
+        const activeVip = await this.userVipsRepo.findOne({
+          where: { userId, isActive: true },
+          order: { level: 'DESC' },
+        });
+        const allowedVipKey = activeVip && activeVip.level >= 1 && activeVip.level <= 7
+          ? `vip:${activeVip.level}`
+          : null;
+        if (vipKeys.some((key) => key !== allowedVipKey)) {
+          throw new BadRequestException('يمكن اختيار شارة VIP الفعالة لحسابك فقط');
+        }
+      }
+      profile.displayedMedalIds = keys;
     }
     if (dto.dmGiftGateEnabled !== undefined) {
       profile.dmGiftGateEnabled = !!dto.dmGiftGateEnabled;
@@ -498,7 +852,7 @@ export class UsersService {
       NotificationType.FOLLOW,
       'متابع جديد',
       `${name} بدأ بمتابعتك`,
-      { type: 'follow', userId: followerId },
+      { type: 'follow', userId: followerId, actorUserId: followerId, actorAvatarUrl: follower?.avatarUrl || null },
     );
     return { following: true };
   }
@@ -557,14 +911,17 @@ export class UsersService {
       entryEffectUrl: user.profile?.entryEffectUrl ?? null,
       entryAnimationUrl: user.profile?.entryAnimationUrl ?? null,
       roomCardUrl: user.profile?.roomCardUrl ?? null,
+      profileCardUrl: user.profile?.profileCardUrl ?? null,
+      chatBubbleUrl: user.profile?.chatBubbleUrl ?? null,
+      nameplateUrl: user.profile?.nameplateUrl ?? null,
+      voiceWaveUrl: user.profile?.voiceWaveUrl ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
         : user.profile?.vipBadgeUrl ?? null,
-      vipHeadUrl: fixedVipHeadUrl(vipLevel),
-      vipTouUrl: fixedVipFrameUrl(vipLevel),
       levelBadgeUrl: user.profile?.levelBadgeUrl ?? null,
       hostBadgeUrl: user.profile?.hostBadgeUrl ?? null,
+      displayedMedalIds: user.profile?.displayedMedalIds ?? [],
       country: user.profile?.country ?? null,
       followersCount: user.profile?.followersCount ?? 0,
       followingCount: user.profile?.followingCount ?? 0,
@@ -851,28 +1208,60 @@ export class UsersService {
 
   /** CP hub status for me (partner + intimacy). */
   async myCpStatus(userId: string) {
-    const items = await this.listAcceptedRelations(userId, SocialRequestType.RELATION);
-    const bond = items[0] || null;
-    if (!bond?.user?.id) {
+    // The gift-sheet CP banner must read the same authoritative relationship
+    // and configured level thresholds as the current CP center.
+    const [relationship] = await this.dataSource.query(
+      `SELECT r.id,r.type,r.points::text AS points,r.level,
+         json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",
+           'avatarUrl',p."avatarUrl",'level',p.level) AS partner
+       FROM cp_relationships r
+       JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
+       WHERE (r."userAId"=$1 OR r."userBId"=$1) AND r.status='active'
+       ORDER BY r."startedAt" DESC LIMIT 1`,
+      [userId],
+    );
+    if (!relationship) {
       return {
-        hasCp: false,
-        partner: null,
-        bondScore: 0,
-        level: 0,
-        nextLevelAt: 500,
+        hasCp: false, partner: null, bondScore: 0, level: 0,
+        currentLevelAt: 0, nextLevelAt: 0, progressPercent: 0, relationId: null,
       };
     }
-    const bondScore = await this.cpBondScore(userId, bond.user.id);
-    // 500 coins exchanged between pair = 1 level (soft Mikoo-style ladder).
-    const level = Math.min(99, 1 + Math.floor(bondScore / 500));
-    const nextLevelAt = level * 500;
+
+    const [levelSetting] = await this.dataSource.query(
+      'SELECT value FROM app_settings WHERE key=$1',
+      [`cp.levels.${relationship.type}`],
+    );
+    let levels: Array<{ level: number; pointsRequired: number }> = [];
+    try {
+      const parsed = JSON.parse(String(levelSetting?.value || '[]'));
+      if (Array.isArray(parsed)) levels = parsed
+        .filter(item => item && Number.isInteger(Number(item.level)) && Number(item.level) >= 1
+          && Number.isFinite(Number(item.pointsRequired)) && Number(item.pointsRequired) >= 0)
+        .sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+    } catch { levels = []; }
+
+    const points = BigInt(String(relationship.points || 0));
+    const level = Math.max(1, Number(relationship.level) || 1);
+    const currentLevelAt = levels
+      .filter(item => Number(item.level) <= level)
+      .reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
+    const nextLevel = levels.find(item => Number(item.level) > level);
+    const nextLevelAt = nextLevel ? Math.max(0, Number(nextLevel.pointsRequired) || 0) : 0;
+    const span = nextLevelAt > currentLevelAt ? nextLevelAt - currentLevelAt : 0;
+    const progressed = Math.max(0, Number(points) - currentLevelAt);
+    const progressPercent = span > 0
+      ? Math.max(0, Math.min(100, progressed * 100 / span))
+      : (levels.length > 0 ? 100 : 0);
+
     return {
       hasCp: true,
-      partner: bond.user,
-      bondScore,
+      partner: relationship.partner,
+      bondScore: Number(points),
       level,
+      currentLevelAt,
       nextLevelAt,
-      relationId: bond.id,
+      progressPercent,
+      relationId: relationship.id,
     };
   }
 
@@ -934,7 +1323,14 @@ export class UsersService {
       NotificationType.FOLLOW,
       label,
       `${name} أرسل لك ${label}`,
-      { type: 'social', requestId: saved.id, requestType: type },
+      {
+        type: 'social',
+        requestId: saved.id,
+        requestType: type,
+        userId: fromUserId,
+        actorUserId: fromUserId,
+        actorAvatarUrl: from?.avatarUrl || null,
+      },
     );
     return saved;
   }

@@ -94,11 +94,16 @@ export class Room {
   @Column({ type: 'enum', enum: RoomStatus, default: RoomStatus.OPEN })
   status: RoomStatus;
 
+  /** Independent six-digit public room ID, separate from the host's account ID. */
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 6, nullable: true })
+  publicId: string | null;
+
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   hostId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'hostId' })
   host: User;
 
@@ -140,6 +145,7 @@ export class Room {
   @Column({ type: 'varchar', length: 16, default: RoomKind.STANDARD })
   roomKind: RoomKind;
 
+  /** Personal and agency room identities stay stored until the host or staff explicitly closes them. */
   @Column({ type: 'boolean', default: false })
   isPersistent: boolean;
 
@@ -151,9 +157,8 @@ export class Room {
   liveSessionStartedAt: Date | null;
 
   /**
-   * Personal rooms only: first moment the live room had zero presence
-   * (no seated users, no live sessions, no sockets). Cleared when someone returns.
-   * After ~30 minutes the idle sweeper ends the stream permanently.
+   * Legacy idle marker. Persistent personal rooms do not use this field to end
+   * a live session; disconnects and empty rooms must not close the room.
    */
   @Column({ type: 'timestamptz', nullable: true })
   emptySince: Date | null;
@@ -184,6 +189,10 @@ export class Room {
   /** Mikoo room-more: seat emoji reactions allowed. */
   @Column({ type: 'boolean', default: true })
   micInteractEnabled: boolean;
+
+  /** When enabled, ordinary users must receive host/mod approval before taking an open mic. */
+  @Column({ type: 'boolean', default: false })
+  micRequestEnabled: boolean;
 
   /** Mikoo room-more (effect): entry / VIP ride effects for others. */
   @Column({ type: 'boolean', default: true })

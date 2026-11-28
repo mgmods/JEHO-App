@@ -7,9 +7,11 @@
 
 ## 1) ماذا يُنشر؟
 
+> **تنبيه إنتاجي:** هذا المستند يحتوي خطوات PM2/Nginx القديمة للتشغيل الذاتي. استضافة JEHO-OWN الحالية تُدار كحاوية Cumin؛ لا تنفّذ أوامر PM2/Nginx أو تنشئ قاعدة بيانات جديدة على الاستضافة المدفوعة.
+
 | المكوّن | المسار على السيرفر (مثال) | التشغيل |
 |--------|---------------------------|---------|
-| NestJS API | `/www/wwwroot/api.adnova.bbs.tr` | PM2: `auralive-api` |
+| NestJS API | `/www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev` | PM2: `auralive-api` |
 | لوحة الإدارة | `…/admin/` (مخرجات Vite) | ملفات ثابتة عبر Nginx |
 | أصول عامة | `…/public/` | صور · visual-system · privacy |
 | PostgreSQL | محلي أو مُدار | قاعدة `auralive` (أو اسمك) |
@@ -60,8 +62,8 @@ psql -U auralive -d auralive -f database/schema.sql
 
 ```bash
 # على السيرفر
-mkdir -p /www/wwwroot/api.adnova.bbs.tr
-cd /www/wwwroot/api.adnova.bbs.tr
+mkdir -p /www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev
+cd /www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev
 
 # انسخ محتويات مجلد backend/ هنا (بدون node_modules إن أمكن)
 # ثم:
@@ -90,7 +92,7 @@ REDIS_PORT=6379
 JWT_SECRET=********
 JWT_REFRESH_SECRET=********-different-from-jwt
 
-CORS_ORIGINS=https://api.adnova.bbs.tr,https://your-admin-origin
+CORS_ORIGINS=https://jeho-own-web-910481ae.hosted.cumin.dev,https://your-admin-origin
 
 # ZEGOCLOUD من لوحة ZEGO
 ZEGO_APP_ID=...
@@ -118,7 +120,7 @@ pm2 startup
 
 ```bash
 pm2 status
-curl -s https://api.adnova.bbs.tr/api/v1/health || curl -s http://127.0.0.1:3000/api/v1/health
+curl -s https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1/health || curl -s http://127.0.0.1:3000/api/v1/health
 ```
 
 ---
@@ -136,7 +138,7 @@ npm run build
 ارفع محتويات `backend/dashboard/dist/` إلى:
 
 ```text
-/www/wwwroot/api.adnova.bbs.tr/admin/
+/www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev/admin/
 ```
 
 أو استخدم النشر التدريجي (موصى به):
@@ -147,7 +149,7 @@ python scripts/deploy_incremental.py backend/dashboard/src/views/DashboardView.v
 
 السكربت يبني الداشبورد محلياً ويرفع فقط الملفات المتغيّرة تحت `/admin`.
 
-افتح: `https://api.adnova.bbs.tr/admin/`
+افتح: `https://jeho-own-web-910481ae.hosted.cumin.dev/admin/`
 
 ---
 
@@ -158,12 +160,12 @@ python scripts/deploy_incremental.py backend/dashboard/src/views/DashboardView.v
 ```nginx
 server {
   listen 443 ssl http2;
-  server_name api.adnova.bbs.tr;
+  server_name jeho-own-web-910481ae.hosted.cumin.dev;
 
   # ssl_certificate …;
   # ssl_certificate_key …;
 
-  root /www/wwwroot/api.adnova.bbs.tr;
+  root /www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev;
   index index.html;
 
   location /admin/ {
@@ -208,7 +210,7 @@ copy deploy.local.env.example deploy.local.env
 # JEHO_DEPLOY_HOST=...
 # JEHO_DEPLOY_USER=root
 # JEHO_DEPLOY_PASSWORD=...
-# JEHO_DEPLOY_DIR=/www/wwwroot/api.adnova.bbs.tr
+# JEHO_DEPLOY_DIR=/www/wwwroot/jeho-own-web-910481ae.hosted.cumin.dev
 ```
 
 `deploy.local.env` **لا يُرفع على Git**.
@@ -243,7 +245,7 @@ python scripts/deploy_incremental.py --apk
 في إعدادات الشبكة / BuildConfig للتطبيق، ضع Base URL للإنتاج:
 
 ```text
-https://api.adnova.bbs.tr/api/v1
+https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1
 ```
 
 وتأكد أن مفاتيح ZEGO في التطبيق تطابق حساب السيرفر.
@@ -290,9 +292,9 @@ cd android
 
 | الخدمة | الرابط |
 |--------|--------|
-| API | `https://api.adnova.bbs.tr/api/v1` |
-| Admin | `https://api.adnova.bbs.tr/admin/` |
-| Privacy | `https://api.adnova.bbs.tr/privacy.html` |
+| API | `https://jeho-own-web-910481ae.hosted.cumin.dev/api/v1` |
+| Admin | `https://jeho-own-web-910481ae.hosted.cumin.dev/admin/` |
+| Privacy | `https://jeho-own-web-910481ae.hosted.cumin.dev/privacy.html` |
 | README الرئيسي | [../README.md](../README.md) |
 | قالب النشر | [../scripts/deploy.local.env.example](../scripts/deploy.local.env.example) |
 

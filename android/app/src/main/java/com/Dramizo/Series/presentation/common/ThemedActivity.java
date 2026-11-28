@@ -4,24 +4,112 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.widget.Toast;
+import com.Dramizo.Series.presentation.admin.preview.AdminPreviewActivity;
+import com.Dramizo.Series.util.StaffRoleHelper;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.util.LocaleHelper;
+import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.RemoteTheme;
+import com.Dramizo.Series.util.GlobalCelebrationToast;
 
 /**
  * Base activity: clean white theme with light system bars.
  * Back from a cold-start (notification / deep link) returns to Main instead of leaving the app.
  */
 public abstract class ThemedActivity extends AppCompatActivity {
+
+    // Dashboard-controlled visuals are shared across activities. Avoid refetching the same
+    // flags/theme/toast config on every screen resume and creating avoidable API bursts.
+    private static final java.util.concurrent.atomic.AtomicLong LAST_VISUAL_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final java.util.concurrent.atomic.AtomicBoolean VISUAL_REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final long VISUAL_REFRESH_INTERVAL_MS = 60_000L;
+
+    private final Handler dashboardVisualHandler = new Handler(Looper.getMainLooper());
+    private final Runnable dashboardThemeListener = () -> {
+        if (isFinishing() || isDestroyed() || !wantsRemoteThemeChrome()) return;
+        RemoteTheme.applyActivityBackground(this, inferScreenKey());
+        View content = findViewById(android.R.id.content);
+        RemoteTheme.applyMappedAssets(content != null ? content : getWindow().getDecorView());
+    };
+    private final Runnable dashboardVisualRefresh = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed()) return;
+            refreshDashboardVisuals();
+            dashboardVisualHandler.postDelayed(this, 60_000L);
+        }
+    };
+
+    private void refreshDashboardVisuals() {
+        // Claim the single-flight gate before checking the throttle. A competing resume
+        // must not advance the timestamp and suppress the request that is already running.
+        if (!VISUAL_REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = SystemClock.elapsedRealtime();
+        long previous = LAST_VISUAL_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < VISUAL_REFRESH_INTERVAL_MS) {
+            VISUAL_REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        try {
+            AppContainer container = ContainerProvider.from(this);
+            container.getIoExecutor().execute(() -> {
+                boolean completed = false;
+                try {
+                    if (wantsRemoteThemeChrome()) {
+                        RemoteTheme.refreshFromApi(getApplicationContext(), container.getConfigApi());
+                    }
+                    AppFeatures.refresh(container);
+                    completed = true;
+                } finally {
+                    // Failed/saturated requests remain eligible for a prompt retry.
+                    if (completed) LAST_VISUAL_REFRESH_AT.set(SystemClock.elapsedRealtime());
+                    VISUAL_REFRESH_IN_FLIGHT.set(false);
+                }
+            });
+            // The toast helper applies its own one-minute throttle; do not force a fetch per screen.
+            GlobalCelebrationToast.refreshStyleNow(this);
+        } catch (Throwable ignored) {
+            VISUAL_REFRESH_IN_FLIGHT.set(false);
+            // Visual configuration must never prevent navigation or room entry.
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (wantsRemoteThemeChrome()) RemoteTheme.addRefreshListener(dashboardThemeListener);
+        refreshDashboardVisuals();
+        dashboardVisualHandler.removeCallbacks(dashboardVisualRefresh);
+        dashboardVisualHandler.postDelayed(dashboardVisualRefresh, 60_000L);
+    }
+
+    @Override
+    protected void onPause() {
+        dashboardVisualHandler.removeCallbacks(dashboardVisualRefresh);
+        RemoteTheme.removeRefreshListener(dashboardThemeListener);
+        super.onPause();
+    }
 
     @Override
     protected void attachBaseContext(Context newBase) {
@@ -76,6 +164,59 @@ public abstract class ThemedActivity extends AppCompatActivity {
                 }
             });
         }
+
+        // Staff can open the native admin hub from anywhere in the app.
+        // Voice rooms have their own contextual moderation controls and keep their room chrome untouched.
+        addStaffQuickAccess();
+    }
+
+    private void addStaffQuickAccess() {
+        String screen = getClass().getSimpleName();
+        if (containsAny(screen, "VoiceRoom", "AdminPreview", "AdminConsole", "Splash", "Login",
+                "Register", "Otp", "Guest", "ProfileSetup")) return;
+        try {
+            if (!StaffRoleHelper.isStaff(ContainerProvider.from(this).getSessionManager().getUser())) return;
+            View content = findViewById(android.R.id.content);
+            if (!(content instanceof FrameLayout)) return;
+            FrameLayout host = (FrameLayout) content;
+            if (host.findViewWithTag("jeho_staff_quick_access") != null) return;
+
+            TextView shortcut = new TextView(this);
+            shortcut.setTag("jeho_staff_quick_access");
+            shortcut.setText("⚙");
+            shortcut.setTextSize(22f);
+            shortcut.setTextColor(Color.WHITE);
+            shortcut.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            shortcut.setGravity(Gravity.CENTER);
+            shortcut.setContentDescription("فتح مركز إدارة JEHO");
+            GradientDrawable surface = new GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    new int[]{0xFF7855D9, 0xFF39266F});
+            surface.setShape(GradientDrawable.OVAL);
+            surface.setStroke(dpQuickAccess(1), 0x88FFFFFF);
+            shortcut.setBackground(surface);
+            shortcut.setElevation(dpQuickAccess(8));
+            shortcut.setOnClickListener(v -> {
+                try {
+                    Intent intent = new Intent(this, AdminPreviewActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(this, "تعذر فتح مركز الإدارة", Toast.LENGTH_SHORT).show();
+                }
+            });
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    dpQuickAccess(46), dpQuickAccess(46), Gravity.TOP | Gravity.END);
+            lp.topMargin = dpQuickAccess(86);
+            lp.setMarginEnd(dpQuickAccess(12));
+            host.addView(shortcut, lp);
+        } catch (Exception ignored) {
+            // Never let an unavailable staff shortcut interfere with normal screen startup.
+        }
+    }
+
+    private int dpQuickAccess(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /**
@@ -210,7 +351,9 @@ public abstract class ThemedActivity extends AppCompatActivity {
         String name = getClass().getSimpleName();
 
         if (name.contains("Splash")) return "splash";
-        if (containsAny(name, "Login", "Guest", "Register", "Otp", "ProfileSetup")) return "auth";
+        if (name.contains("ProfileSetup")) return "register";
+        if (name.contains("Login")) return "login";
+        if (containsAny(name, "Login", "Guest", "Register", "Otp")) return "auth";
         if (containsAny(name, "Profile", "EditProfile", "UserLevel", "Visitors", "Task", "GiftHistory")) {
             return "profile";
         }

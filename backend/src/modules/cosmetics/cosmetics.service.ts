@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -32,6 +32,112 @@ import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { isStaticVipTouUrl } from '../../common/vip-visual';
+import { randomUUID } from 'crypto';
+import { UploadsService } from '../uploads/uploads.service';
+
+
+/** Read ISO-BMFF mvhd duration (MP4/MOV/3GP) without trusting client metadata. */
+function readIsoBmffDurationMs(buffer: Buffer): number | null {
+  const scan = (start: number, end: number, depth: number): number | null => {
+    if (depth > 8) return null;
+    let offset = start;
+    while (offset + 8 <= end) {
+      let size = buffer.readUInt32BE(offset);
+      const type = buffer.toString('ascii', offset + 4, offset + 8);
+      let header = 8;
+      if (size === 1) {
+        if (offset + 16 > end) return null;
+        const large = buffer.readBigUInt64BE(offset + 8);
+        if (large > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+        size = Number(large);
+        header = 16;
+      } else if (size === 0) {
+        size = end - offset;
+      }
+      if (size < header || offset + size > end) return null;
+      const payload = offset + header;
+      if (type === 'mvhd') {
+        const version = buffer[payload];
+        const timescaleOffset = payload + (version === 1 ? 20 : 12);
+        const durationOffset = payload + (version === 1 ? 24 : 16);
+        if (timescaleOffset + 4 > offset + size) return null;
+        const timescale = buffer.readUInt32BE(timescaleOffset);
+        if (!timescale) return null;
+        let duration: number;
+        if (version === 1) {
+          if (durationOffset + 8 > offset + size) return null;
+          const value = buffer.readBigUInt64BE(durationOffset);
+          if (value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+          duration = Number(value);
+        } else {
+          if (durationOffset + 4 > offset + size) return null;
+          duration = buffer.readUInt32BE(durationOffset);
+        }
+        return Math.round((duration / timescale) * 1000);
+      }
+      if (['moov', 'trak', 'mdia', 'minf', 'edts', 'udta'].includes(type)) {
+        const nested = scan(payload, offset + size, depth + 1);
+        if (nested != null) return nested;
+      }
+      offset += size;
+    }
+    return null;
+  };
+  return scan(0, buffer.length, 0);
+}
+
+
+/** Read the WebM EBML Info/Duration element without trusting client metadata. */
+function readWebmDurationMs(buffer: Buffer): number | null {
+  const readVint = (offset: number, identifier: boolean) => {
+    if (offset >= buffer.length) return null;
+    const first = buffer[offset];
+    let marker = 0x80;
+    let length = 1;
+    while (length <= 8 && (first & marker) === 0) {
+      marker >>= 1;
+      length++;
+    }
+    if (length > 8 || offset + length > buffer.length) return null;
+    let value = BigInt(identifier ? first : (first & (marker - 1)));
+    for (let i = 1; i < length; i++) value = (value << 8n) | BigInt(buffer[offset + i]);
+    return { length, value };
+  };
+  const masters = new Set(['1a45dfa3', '18538067', '1549a966', '114d9b74', '1654ae6b']);
+  let durationTicks: number | null = null;
+  let timecodeScaleNs = 1_000_000;
+  const scan = (start: number, end: number, depth: number) => {
+    if (depth > 8) return;
+    let offset = start;
+    while (offset < end) {
+      const id = readVint(offset, true);
+      if (!id) return;
+      const size = readVint(offset + id.length, false);
+      if (!size) return;
+      const payload = offset + id.length + size.length;
+      const unknownSize = size.value === (1n << BigInt(7 * size.length)) - 1n;
+      const sizeNumber = unknownSize ? end - payload : Number(size.value);
+      if (!Number.isSafeInteger(sizeNumber) || sizeNumber < 0 || payload + sizeNumber > end) return;
+      const payloadEnd = payload + sizeNumber;
+      const idHex = id.value.toString(16).padStart(id.length * 2, '0');
+      if (idHex === '2ad7b1' && sizeNumber > 0 && sizeNumber <= 8) {
+        let scale = 0n;
+        for (let i = payload; i < payloadEnd; i++) scale = (scale << 8n) | BigInt(buffer[i]);
+        if (scale > 0n && scale <= BigInt(Number.MAX_SAFE_INTEGER)) timecodeScaleNs = Number(scale);
+      } else if (idHex === '4489' && (sizeNumber === 4 || sizeNumber === 8)) {
+        const value = sizeNumber === 4 ? buffer.readFloatBE(payload) : buffer.readDoubleBE(payload);
+        if (Number.isFinite(value) && value >= 0) durationTicks = value;
+      } else if (masters.has(idHex)) {
+        scan(payload, payloadEnd, depth + 1);
+      }
+      if (payloadEnd <= offset) return;
+      offset = payloadEnd;
+    }
+  };
+  scan(0, buffer.length, 0);
+  if (durationTicks == null) return null;
+  return Math.round((durationTicks * timecodeScaleNs) / 1_000_000);
+}
 
 type MikooCatalogItem = {
   type: CosmeticType | string;
@@ -54,6 +160,7 @@ export class CosmeticsService implements OnModuleInit {
   private mikooCatalogEnsured = false;
   private hostBadgeEnsured = false;
   private readonly logger = new Logger(CosmeticsService.name);
+  private privateEntryExpiryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
@@ -64,10 +171,40 @@ export class CosmeticsService implements OnModuleInit {
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     private readonly mediaCleanup: MediaCleanupService,
+    private readonly uploadsService: UploadsService,
     private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
+    // Safe additive schema guard: no resets and no edits to existing user data.
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'profile_card'`);
+    } catch (err) {
+      this.logger.warn(`profile_card cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'chat_bubble'`);
+    } catch (err) {
+      this.logger.warn(`chat_bubble cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'nameplate'`);
+    } catch (err) {
+      this.logger.warn(`nameplate cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'voice_wave'`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "voiceWaveUrl" varchar(512)`);
+    } catch (err) {
+      this.logger.warn(`voice wave cosmetic schema ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "profileCardUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "chatBubbleUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512)`);
+    } catch (err) {
+      this.logger.warn(`visual cosmetic profile columns ensure: ${(err as Error).message}`);
+    }
     // Always install fixed VIP head frames + re-bind VIP gates (safe on production).
     try {
       await this.ensureFixedVipTouFrames();
@@ -76,7 +213,21 @@ export class CosmeticsService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`VIP frame gate rebind: ${(err as Error).message}`);
     }
+    if (!this.privateEntryExpiryTimer) {
+      this.privateEntryExpiryTimer = setInterval(() => {
+        void this.expirePrivateEntryCosmetics().catch((err) =>
+          this.logger.warn(`Private-entry expiry cleanup failed: ${(err as Error).message}`),
+        );
+      }, 60_000);
+      this.privateEntryExpiryTimer.unref?.();
+    }
+    void this.expirePrivateEntryCosmetics().catch(() => undefined);
     // Live DB is the catalog. Boot mutators only when BOOT_SEED_CATALOGS=1.
+    // Repair already-equipped voice waves from older records. This is idempotent:
+    // it only updates profiles whose equipped cosmetic is the authoritative source.
+    await this.refreshEquippedVoiceWaveUrls().catch((err) =>
+      this.logger.warn(`voice wave wear refresh: ${(err as Error).message}`),
+    );
     if (!bootCatalogSeedEnabled()) {
       this.logger.log('Cosmetics catalog: DB authoritative (no boot seed)');
       return;
@@ -98,17 +249,89 @@ export class CosmeticsService implements OnModuleInit {
 
   async catalog(type?: CosmeticType) {
     this.assertSupportedType(type);
-    // Read-only from DB — never re-sync prices on every API hit.
+    // The database remains authoritative: dashboard changes appear without reseeding.
+    // The app's frames tab represents both VIP_BADGE and HOST_BADGE records.
     const where: any = { isActive: true };
-    if (type) where.type = type;
-    return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', coinPrice: 'ASC' } });
+    if (type === CosmeticType.VIP_BADGE) {
+      where.type = In([CosmeticType.VIP_BADGE, CosmeticType.HOST_BADGE]);
+    } else if (type) {
+      where.type = type;
+    }
+    const rows = await this.cosmeticsRepo.find({
+      where,
+      order: { sortOrder: 'ASC', coinPrice: 'ASC' },
+    });
+    // CP Store cosmetics are a separate catalog. They must never leak into
+    // the normal mall/store catalog, even when they are active.
+    // Keep CP Settings and CP Center access on their dedicated CP paths.
+    return rows.filter((row) => {
+      const meta = row.meta as any;
+      return meta?.mallHidden !== true && !this.isCpStoreCosmetic(row) && !this.isPrivateEntryCosmetic(row);
+    });
+  }
+
+  private isPrivateEntryCosmetic(cosmetic: Partial<Cosmetic> | null | undefined): boolean {
+    const meta: any = cosmetic?.meta as any;
+    return meta?.privateEntry === true;
+  }
+
+  private isCpStoreCosmetic(cosmetic: Partial<Cosmetic> | null | undefined): boolean {
+    const meta: any = cosmetic?.meta as any;
+    return meta?.cpStore === true || String(cosmetic?.code || '').startsWith('cp_');
   }
 
   async adminList(type?: CosmeticType) {
     this.assertSupportedType(type);
     const where: any = {};
     if (type) where.type = type;
-    return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    const rows = await this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    return rows.filter(row => !this.isCpStoreCosmetic(row) && !this.isPrivateEntryCosmetic(row));
+  }
+
+  async adminListCpStore() {
+    const rows = await this.cosmeticsRepo.find({ order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    return rows.filter(row => this.isCpStoreCosmetic(row));
+  }
+
+  async cpStoreCatalog() {
+    const rows = await this.cosmeticsRepo.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC', coinPrice: 'ASC', createdAt: 'DESC' },
+    });
+    return rows.filter(row => this.isCpStoreCosmetic(row));
+  }
+
+  async purchaseCpStoreItem(userId: string, cosmeticId: string) {
+    const item = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
+    if (!item || !this.isCpStoreCosmetic(item)) throw new NotFoundException('عنصر متجر CP غير موجود أو غير متاح');
+    // A successful CP-store purchase is immediately worn in its matching slot.
+    // equip() replaces the previously worn item in that slot while preserving
+    // the old item's ownership in the user's inventory.
+    const purchase = await this.purchase(userId, cosmeticId, { allowCpStore: true });
+    const equipped = await this.equipCpStoreItem(userId, cosmeticId);
+    return { ...purchase, equipped: true, cosmetic: equipped.cosmetic };
+  }
+
+  async equipCpStoreItem(userId: string, cosmeticId: string) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned || !this.isCpStoreCosmetic(owned.cosmetic)) {
+      throw new NotFoundException('هذا العنصر ليس من متجر CP أو غير مملوك لك');
+    }
+    return this.equip(userId, cosmeticId, { allowCpStore: true });
+  }
+
+  async unequipCpStoreItem(userId: string, cosmeticId: string) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned || !this.isCpStoreCosmetic(owned.cosmetic)) {
+      throw new NotFoundException('هذا العنصر ليس من متجر CP أو غير مملوك لك');
+    }
+    return this.unequip(userId, cosmeticId);
   }
 
   /** Resolve mall/catalog preview URL from cosmetic code (agency exclusives, admin). */
@@ -119,7 +342,7 @@ export class CosmeticsService implements OnModuleInit {
       const row = await this.cosmeticsRepo.findOne({
         where: { code: trimmed, isActive: true },
       });
-      if (!row) return null;
+      if (!row || this.isPrivateEntryCosmetic(row)) return null;
       const url = String(row.previewUrl || row.animationUrl || '').trim();
       return url || null;
     } catch {
@@ -133,6 +356,17 @@ export class CosmeticsService implements OnModuleInit {
     const name = String(dto.name || '').trim();
     if (!code || !name || !dto.previewUrl) {
       throw new BadRequestException('type, code, name, previewUrl مطلوبة');
+    }
+    if ((dto.meta as any)?.privateEntry === true) {
+      throw new BadRequestException('الدخوليات الخاصة تُنشأ من قسم الدخوليات الخاصة فقط');
+    }
+    if ((dto.meta as any)?.cpStore === true) {
+      if (!Number.isSafeInteger(Number(dto.coinPrice)) || Number(dto.coinPrice) <= 0) {
+        throw new BadRequestException('سعر عنصر متجر CP يجب أن يكون أكبر من صفر كوين.');
+      }
+      if (dto.type === CosmeticType.ROOM_BACKGROUND) {
+        throw new BadRequestException('خلفيات متجر CP تُحفظ كخلفية بطاقة الملف الشخصي حتى تُركّب تلقائياً.');
+      }
     }
     const row = this.cosmeticsRepo.create({
       type: dto.type,
@@ -164,6 +398,12 @@ export class CosmeticsService implements OnModuleInit {
   async adminUpdate(id: string, dto: Partial<Cosmetic>) {
     const row = await this.cosmeticsRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('العنصر غير موجود');
+    if ((dto.meta as any)?.privateEntry === true) {
+      throw new BadRequestException('لا يمكن تحويل عنصر عام إلى دخولية خاصة من مسار التعديل العام');
+    }
+    if (this.isPrivateEntryCosmetic(row)) {
+      throw new BadRequestException('عدّل الدخولية الخاصة من قسم الدخوليات الخاصة فقط');
+    }
     if (dto.type != null) {
       this.assertSupportedType(dto.type);
       row.type = dto.type;
@@ -196,12 +436,23 @@ export class CosmeticsService implements OnModuleInit {
     if (dto.isActive != null) row.isActive = !!dto.isActive;
     if (dto.sortOrder != null) row.sortOrder = Number(dto.sortOrder);
     if (dto.meta !== undefined) row.meta = dto.meta;
+    if ((row.meta as any)?.cpStore === true) {
+      if (!Number.isSafeInteger(Number(row.coinPrice)) || Number(row.coinPrice) <= 0) {
+        throw new BadRequestException('سعر عنصر متجر CP يجب أن يكون أكبر من صفر كوين.');
+      }
+      if (row.type === CosmeticType.ROOM_BACKGROUND) {
+        throw new BadRequestException('خلفيات متجر CP تُحفظ كخلفية بطاقة الملف الشخصي حتى تُركّب تلقائياً.');
+      }
+    }
     return this.cosmeticsRepo.save(row);
   }
 
-  async adminDelete(id: string) {
+  async adminDelete(id: string, opts: { allowPrivateEntry?: boolean } = {}) {
     const row = await this.cosmeticsRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('العنصر غير موجود');
+    if (this.isPrivateEntryCosmetic(row) && opts.allowPrivateEntry !== true) {
+      throw new BadRequestException('احذف الدخولية الخاصة من قسم الدخوليات الخاصة فقط');
+    }
 
     const urls = [...new Set([row.previewUrl, row.animationUrl].filter(Boolean))] as string[];
 
@@ -215,7 +466,10 @@ export class CosmeticsService implements OnModuleInit {
                 "levelBadgeUrl" = CASE WHEN "levelBadgeUrl" LIKE $1 THEN NULL ELSE "levelBadgeUrl" END,
                 "entryEffectUrl" = CASE WHEN "entryEffectUrl" LIKE $1 THEN NULL ELSE "entryEffectUrl" END,
                 "entryAnimationUrl" = CASE WHEN "entryAnimationUrl" LIKE $1 THEN NULL ELSE "entryAnimationUrl" END,
-                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END`,
+                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END,
+                "profileCardUrl" = CASE WHEN "profileCardUrl" LIKE $1 THEN NULL ELSE "profileCardUrl" END,
+                "chatBubbleUrl" = CASE WHEN "chatBubbleUrl" LIKE $1 THEN NULL ELSE "chatBubbleUrl" END,
+                "nameplateUrl" = CASE WHEN "nameplateUrl" LIKE $1 THEN NULL ELSE "nameplateUrl" END`,
         [`${clean}%`],
       ).catch(() => undefined);
       await this.dataSource.query(
@@ -249,15 +503,273 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   async inventory(userId: string) {
-    // Include expired rows so the mall can offer full-price repurchase.
-    return this.userCosmeticsRepo.find({
+    await this.expirePrivateEntryCosmetics();
+    // The normal mall bag must never list CP-exclusive items.
+    const rows = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
       order: { createdAt: 'DESC' },
     });
+    const now = Date.now();
+    return rows.filter(row => {
+      if (this.isCpStoreCosmetic(row.cosmetic)) return false;
+      if (this.isPrivateEntryCosmetic(row.cosmetic)) {
+        return String((row.cosmetic.meta as any)?.privateOwnerUserId || '') === String(userId)
+          && (!row.expiresAt || row.expiresAt.getTime() > now);
+      }
+      return true;
+    });
   }
 
-  private mallLeaseDays() {
+  async grantPrivateEntry(dto: {
+    recipientPublicId: string;
+    name: string;
+    videoUrl: string;
+    durationDays: number;
+    permanent?: boolean;
+    personalMessage?: string;
+    giftedByUserId: string;
+  }) {
+    const recipientId = String(dto.recipientPublicId || '').trim();
+    const name = String(dto.name || '').trim();
+    const videoUrl = String(dto.videoUrl || '').trim();
+    const personalMessage = String(dto.personalMessage || '').trim().slice(0, 500);
+    const permanent = dto.permanent === true;
+    const days = Number(dto.durationDays);
+    if (!recipientId || !name || name.length > 128 || !videoUrl || !personalMessage) {
+      throw new BadRequestException('معرّف المستلم واسم الدخولية والفيديو ورسالة الإدارة مطلوبة');
+    }
+    if (!permanent && ![1, 7, 15, 30].includes(days)) {
+      throw new BadRequestException('مدة الدخولية يجب أن تكون 1 أو 7 أو 15 أو 30 يوماً أو دائمة');
+    }
+    const recipient = await this.usersRepo.findOne({
+      where: [{ publicId: recipientId }, ...(/^[0-9a-f-]{36}$/i.test(recipientId) ? [{ id: recipientId } as any] : [])],
+    });
+    if (!recipient) throw new NotFoundException('لم يتم العثور على المستخدم بهذا ID');
+
+    const uploadMatch = videoUrl.match(/\/uploads\/([^/?#]+)/i);
+    if (!uploadMatch) throw new BadRequestException('يجب رفع فيديو الدخولية إلى تخزين JEHO أولاً');
+    const stored = await this.uploadsService.getStoredFile(uploadMatch[1]);
+    if (!stored) throw new BadRequestException('تعذر قراءة فيديو الدخولية من التخزين');
+    const durationMs = readIsoBmffDurationMs(stored.buffer) ?? readWebmDurationMs(stored.buffer);
+    if (durationMs == null) {
+      throw new BadRequestException('تعذر التحقق من مدة الفيديو. استخدم MP4 أو MOV أو 3GP أو WebM صالحاً.');
+    }
+    if (durationMs < 1000 || durationMs > 10_000) {
+      throw new BadRequestException('مدة فيديو الدخولية يجب أن تكون من ثانية واحدة إلى 10 ثوانٍ فقط');
+    }
+
+    const now = new Date();
+    const expiresAt = permanent ? null : new Date(now.getTime() + days * 86_400_000);
+    const code = `private_entry_${randomUUID().replace(/-/g, '')}`;
+    const cosmetic = await this.cosmeticsRepo.save(this.cosmeticsRepo.create({
+      type: CosmeticType.ENTRY_EFFECT,
+      code,
+      name,
+      description: personalMessage || 'دخولية خاصة مهداة من الإدارة',
+      previewUrl: videoUrl,
+      animationUrl: videoUrl,
+      coinPrice: 0,
+      minVipLevel: 0,
+      minUserLevel: 0,
+      isActive: true,
+      sortOrder: 2147483647,
+      meta: {
+        privateEntry: true,
+        privateOwnerUserId: recipient.id,
+        privateGiftedByUserId: dto.giftedByUserId,
+        privateGiftedAt: now.toISOString(),
+        privateDurationDays: permanent ? null : days,
+        privatePermanent: permanent,
+        privatePersonalMessage: personalMessage,
+        privateVideoDurationMs: durationMs,
+      },
+    }));
+    let ownership: UserCosmetic;
+    try {
+      ownership = await this.userCosmeticsRepo.save(this.userCosmeticsRepo.create({
+        userId: recipient.id,
+        cosmeticId: cosmetic.id,
+        equipped: false,
+        expiresAt,
+      }));
+    } catch (error) {
+      await this.adminDelete(cosmetic.id, { allowPrivateEntry: true }).catch(() => undefined);
+      throw error;
+    }
+    return {
+      granted: true,
+      userId: recipient.id,
+      recipientPublicId: recipient.publicId,
+      recipientName: recipient.displayName || recipient.username,
+      cosmetic,
+      ownership,
+      expiresAt,
+      permanent,
+      durationDays: permanent ? null : days,
+      durationMs,
+    };
+  }
+
+
+  async updatePrivateEntry(id: string, dto: {
+    recipientPublicId?: string;
+    name?: string;
+    durationDays?: number;
+    permanent?: boolean;
+    personalMessage?: string;
+  }) {
+    const cosmetic = await this.cosmeticsRepo.findOne({ where: { id, type: CosmeticType.ENTRY_EFFECT } });
+    if (!cosmetic || !this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new NotFoundException('الدخولية الخاصة غير موجودة');
+    }
+    const meta: any = { ...(cosmetic.meta || {}) };
+    const ownership = await this.userCosmeticsRepo.findOne({ where: { cosmeticId: id } });
+    if (!ownership) throw new NotFoundException('ملكية الدخولية غير موجودة');
+    if (dto.name !== undefined) {
+      const name = String(dto.name || '').trim();
+      if (!name || name.length > 128) throw new BadRequestException('اسم الدخولية غير صحيح');
+      cosmetic.name = name;
+    }
+    if (dto.personalMessage !== undefined) {
+      meta.privatePersonalMessage = String(dto.personalMessage || '').trim().slice(0, 500);
+      cosmetic.description = meta.privatePersonalMessage || 'دخولية خاصة مهداة من الإدارة';
+    }
+    if (dto.recipientPublicId !== undefined) {
+      const targetId = String(dto.recipientPublicId || '').trim();
+      const target = await this.usersRepo.findOne({
+        where: [{ publicId: targetId }, ...(/^[0-9a-f-]{36}$/i.test(targetId) ? [{ id: targetId } as any] : [])],
+      });
+      if (!target) throw new NotFoundException('لم يتم العثور على المستخدم الجديد');
+      if (target.id !== ownership.userId) {
+        if (ownership.equipped) await this.clearExpiredCosmeticWear({ ...ownership, cosmetic } as UserCosmetic);
+        await this.userCosmeticsRepo.delete({ id: ownership.id });
+        ownership.userId = target.id;
+        ownership.equipped = false;
+      }
+      meta.privateOwnerUserId = target.id;
+    }
+    const permanent = dto.permanent === true;
+    if (dto.permanent === true || dto.durationDays !== undefined) {
+      const days = Number(dto.durationDays);
+      if (!permanent && ![1, 7, 15, 30].includes(days)) {
+        throw new BadRequestException('مدة الدخولية يجب أن تكون 1 أو 7 أو 15 أو 30 يوماً أو دائمة');
+      }
+      ownership.expiresAt = permanent ? null : new Date(Date.now() + days * 86_400_000);
+      meta.privatePermanent = permanent;
+      meta.privateDurationDays = permanent ? null : days;
+    }
+    cosmetic.meta = meta;
+    await this.cosmeticsRepo.save(cosmetic);
+    const savedOwnership = await this.userCosmeticsRepo.save(ownership);
+    return { updated: true, cosmetic, ownership: savedOwnership };
+  }
+
+  async deletePrivateEntry(id: string, revokedByUserId?: string) {
+    const cosmetic = await this.cosmeticsRepo.findOne({ where: { id, type: CosmeticType.ENTRY_EFFECT } });
+    if (!cosmetic || !this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new NotFoundException('الدخولية الخاصة غير موجودة');
+    }
+    const ownership = await this.userCosmeticsRepo.findOne({
+      where: { cosmeticId: id },
+      relations: ['cosmetic'],
+    });
+    if (ownership?.equipped) await this.clearExpiredCosmeticWear(ownership);
+    if (ownership) await this.userCosmeticsRepo.delete({ id: ownership.id });
+    const meta: any = { ...(cosmetic.meta || {}) };
+    meta.privateRevokedAt = new Date().toISOString();
+    if (revokedByUserId) meta.privateRevokedByUserId = revokedByUserId;
+    cosmetic.meta = meta;
+    cosmetic.isActive = false;
+    await this.cosmeticsRepo.save(cosmetic);
+    return { deleted: true, revoked: true, id, code: cosmetic.code };
+  }
+
+  async expirePrivateEntryCosmetics() {
+    const rows = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    const now = Date.now();
+    for (const row of rows) {
+      if (!this.isPrivateEntryCosmetic(row.cosmetic) || !row.expiresAt || row.expiresAt.getTime() > now) continue;
+      await this.clearExpiredCosmeticWear(row);
+    }
+  }
+
+  async cpStoreInventory(userId: string) {
+    // CP center owns a separate inventory. Expired leases are removed from wear
+    // before returning the active bag; ownership rows remain so repurchase can renew.
+    const rows = await this.userCosmeticsRepo.find({
+      where: { userId },
+      relations: ['cosmetic'],
+      order: { createdAt: 'DESC' },
+    });
+    const now = Date.now();
+    const cpRows = rows.filter(row => this.isCpStoreCosmetic(row.cosmetic));
+    for (const row of cpRows) {
+      if (row.equipped && row.expiresAt && row.expiresAt.getTime() <= now) {
+        await this.clearExpiredCosmeticWear(row);
+      }
+    }
+    // Keep every owned CP item visible in the bag, including expired leases
+    // and items hidden from the public catalog. Expiry only removes wear; it
+    // must never erase the user's purchase history or hide the bag entry.
+    return cpRows;
+  }
+
+  /** Periodic expiry cleanup for CP-only cosmetics; never deletes ownership or catalog data. */
+  async expireCpStoreCosmetics() {
+    const rows = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    const now = Date.now();
+    for (const row of rows) {
+      if (!this.isCpStoreCosmetic(row.cosmetic) || !row.expiresAt || row.expiresAt.getTime() > now) continue;
+      await this.clearExpiredCosmeticWear(row);
+    }
+  }
+
+  private async clearExpiredCosmeticWear(row: UserCosmetic) {
+    row.equipped = false;
+    await this.userCosmeticsRepo.save(row);
+    const cosmetic = row.cosmetic;
+    if (!cosmetic) return;
+    const profile = await this.profileRepo.findOne({ where: { userId: row.userId } });
+    if (!profile) return;
+    const urls = [cosmetic.previewUrl, this.cosmeticAnimationUrl(cosmetic)].filter(Boolean);
+    const matches = (value: string | null | undefined) => !!value && urls.includes(value);
+    const type = cosmetic.type;
+    if (type === CosmeticType.VIP_BADGE && matches(profile.vipBadgeUrl)) profile.vipBadgeUrl = null;
+    if (type === CosmeticType.HOST_BADGE && matches(profile.hostBadgeUrl)) profile.hostBadgeUrl = null;
+    if (type === CosmeticType.LEVEL_BADGE && matches(profile.levelBadgeUrl)) profile.levelBadgeUrl = null;
+    if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
+      if (matches(profile.entryEffectUrl)) profile.entryEffectUrl = null;
+      if (matches(profile.entryAnimationUrl)) profile.entryAnimationUrl = null;
+    }
+    if (type === CosmeticType.ROOM_CARD && matches(profile.roomCardUrl)) {
+      profile.roomCardUrl = null;
+      await this.dataSource.query(
+        `UPDATE rooms SET "roomCardUrl" = NULL, "roomCardEquippedById" = NULL
+         WHERE "hostId" = $1 AND "roomCardEquippedById" = $1 AND "roomCardUrl" = ANY($2::text[])`,
+        [row.userId, urls],
+      ).catch(() => undefined);
+    }
+    if (type === CosmeticType.PROFILE_CARD && matches(profile.profileCardUrl)) profile.profileCardUrl = null;
+    if (type === CosmeticType.CP_BACKGROUND && matches(profile.cpBackgroundUrl)) profile.cpBackgroundUrl = null;
+    if (type === CosmeticType.CP_LOGO && matches(profile.cpLogoUrl)) profile.cpLogoUrl = null;
+    if (type === CosmeticType.CHAT_BUBBLE && matches(profile.chatBubbleUrl)) profile.chatBubbleUrl = null;
+    if (type === CosmeticType.NAMEPLATE && matches(profile.nameplateUrl)) profile.nameplateUrl = null;
+    await this.profileRepo.save(profile);
+  }
+
+  private mallLeaseDays(cosmetic?: Cosmetic) {
+    // Per-item duration is stored in the existing JSON metadata to avoid a schema migration.
+    const configured = Number((cosmetic?.meta as any)?.leaseDays);
+    if (Number.isFinite(configured) && configured >= 1 && configured <= 3650) {
+      return Math.floor(configured);
+    }
     return 30;
   }
 
@@ -275,7 +787,7 @@ export class CosmeticsService implements OnModuleInit {
     userId: string,
     cosmeticCode: string,
     days: number,
-    opts?: { forceTimed?: boolean },
+    opts?: { forceTimed?: boolean; permanent?: boolean },
   ) {
     const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
     let cosmetic =
@@ -295,7 +807,7 @@ export class CosmeticsService implements OnModuleInit {
             CosmeticType.ROOM_CARD,
           ],
         })
-        .andWhere(`COALESCE(c.meta->>'aristocracy', 'false') != 'true'`)
+        .andWhere(`COALESCE(c.meta, '') NOT LIKE '%"aristocracy":true%'`)
         .andWhere(`c.code NOT ILIKE '%_vip_%'`)
         .andWhere(`c.code NOT ILIKE 'vip%'`)
         .orderBy('c.sortOrder', 'ASC')
@@ -314,8 +826,10 @@ export class CosmeticsService implements OnModuleInit {
         userId,
         cosmeticId: cosmetic.id,
         equipped: false,
-        expiresAt: new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
+        expiresAt: opts?.permanent ? null : new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
       });
+    } else if (opts?.permanent) {
+      owned.expiresAt = null;
     } else if (owned.expiresAt == null && !opts?.forceTimed) {
       // Already permanent — keep permanent, still try equip.
     } else {
@@ -328,7 +842,7 @@ export class CosmeticsService implements OnModuleInit {
     owned = await this.userCosmeticsRepo.save(owned);
 
     try {
-      await this.equip(userId, cosmetic.id, { skipRequirements: true });
+      await this.equip(userId, cosmetic.id, { skipRequirements: true, allowCpStore: true });
     } catch {
       /* equip is best-effort */
     }
@@ -468,9 +982,16 @@ export class CosmeticsService implements OnModuleInit {
     }
   }
 
-  async purchase(userId: string, cosmeticId: string) {
+  async purchase(userId: string, cosmeticId: string, options: { allowCpStore?: boolean } = {}) {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!cosmetic) throw new NotFoundException('Cosmetic not found');
+    const isCpStoreItem = this.isCpStoreCosmetic(cosmetic);
+    if (this.isPrivateEntryCosmetic(cosmetic)) {
+      throw new BadRequestException('هذه الدخولية خاصة ولا يمكن شراؤها من المتجر.');
+    }
+    if (isCpStoreItem && options.allowCpStore !== true) {
+      throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن شراؤه من المتجر العادي.');
+    }
 
     // Agency exclusive frames/cards: admin grant only — never mall purchase.
     const { isAgencyExclusiveCosmetic } = await import('../agencies/agency-perks');
@@ -483,7 +1004,11 @@ export class CosmeticsService implements OnModuleInit {
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    const leaseDays = this.mallLeaseDays();
+    if (isCpStoreItem && fullPrice <= 0) throw new BadRequestException('سعر عنصر متجر CP غير مضبوط.');
+    if (isCpStoreItem && cosmetic.type === CosmeticType.ROOM_BACKGROUND) {
+      throw new BadRequestException('هذا النوع لا يُركّب تلقائياً؛ اختر بطاقة الملف الشخصي لخلفيات CP.');
+    }
+    const leaseDays = this.mallLeaseDays(cosmetic);
     const now = new Date();
 
     const result = await this.cosmeticsRepo.manager.transaction(async (manager) => {
@@ -498,9 +1023,17 @@ export class CosmeticsService implements OnModuleInit {
       const active =
         !!owned &&
         (owned.expiresAt == null || owned.expiresAt.getTime() > now.getTime());
-      // Renew at half price only while the lease is still active.
-      const renew = active;
-      const price = this.chargePrice(fullPrice, renew);
+      // A valid lease is a one-time purchase: do not charge or extend it again
+      // until it expires. Permanent ownership can never be repurchased.
+      if (active) {
+        throw new BadRequestException(
+          owned!.expiresAt
+            ? `هذا العنصر موجود عندك بالفعل، ولا يمكن تجديده قبل انتهاء المدة في ${owned!.expiresAt.toLocaleDateString('ar')}`
+            : 'هذا العنصر مملوك لك بشكل دائم بالفعل',
+        );
+      }
+      const renew = false;
+      const price = fullPrice;
 
       if (price > 0) {
         if (!wallet || wallet.coins < price) {
@@ -533,32 +1066,38 @@ export class CosmeticsService implements OnModuleInit {
           expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
         });
       } else {
-        const base =
-          renew && owned.expiresAt && owned.expiresAt.getTime() > now.getTime()
-            ? owned.expiresAt.getTime()
-            : now.getTime();
-        // Always timed mall lease (max 30 days per purchase/renew).
-        owned.expiresAt = new Date(base + leaseDays * 24 * 60 * 60 * 1000);
+        // An expired lease starts a fresh term from now; never stack days.
+        owned.expiresAt = new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
       }
       owned = await manager.save(UserCosmetic, owned);
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
-    // Auto-equip after purchase/claim so the user wears it immediately.
-    try {
-      await this.equip(userId, cosmeticId, { skipRequirements: true });
-    } catch {
-      /* ownership is enough; equip may fail on rare races */
-    }
+    // Purchase adds ownership only. Wearing is an explicit action from the CP bag.
     return result;
   }
 
-  async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean }) {
+  private cosmeticSlotTypes(type: CosmeticType): CosmeticType[] {
+    // All avatar/head frames are one visual slot, including CP-only frames.
+    if (type === CosmeticType.VIP_BADGE || type === CosmeticType.HOST_BADGE) {
+      return [CosmeticType.VIP_BADGE, CosmeticType.HOST_BADGE];
+    }
+    return [type];
+  }
+
+  async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean; allowCpStore?: boolean }) {
     const owned = await this.userCosmeticsRepo.findOne({
       where: { userId, cosmeticId },
       relations: ['cosmetic'],
     });
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (this.isPrivateEntryCosmetic(owned.cosmetic) &&
+        String((owned.cosmetic.meta as any)?.privateOwnerUserId || '') !== String(userId)) {
+      throw new NotFoundException('هذه الدخولية خاصة بمستخدم آخر');
+    }
+    if (this.isCpStoreCosmetic(owned.cosmetic) && opts?.allowCpStore !== true) {
+      throw new BadRequestException('هذا العنصر خاص بمتجر CP ولا يمكن تركيبه من المتجر العادي.');
+    }
     if (owned.expiresAt && owned.expiresAt <= new Date()) {
       throw new BadRequestException('This cosmetic has expired');
     }
@@ -568,12 +1107,13 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     const type = owned.cosmetic.type;
+    const slotTypes = this.cosmeticSlotTypes(type);
     const sameType = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
     });
     for (const row of sameType) {
-      if (row.cosmetic?.type === type) {
+      if (row.cosmetic && slotTypes.includes(row.cosmetic.type)) {
         row.equipped = row.id === owned.id;
         await this.userCosmeticsRepo.save(row);
       }
@@ -583,7 +1123,7 @@ export class CosmeticsService implements OnModuleInit {
     if (profile) {
       if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
         // Prefer playable ride (GIF/WebP/MP4); keep preview as static fallback.
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -596,7 +1136,7 @@ export class CosmeticsService implements OnModuleInit {
           : owned.cosmetic.previewUrl || null;
       }
       if (type === CosmeticType.ROOM_CARD) {
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -615,10 +1155,31 @@ export class CosmeticsService implements OnModuleInit {
           [cardUrl, userId],
         ).catch(() => undefined);
       }
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CP_BACKGROUND) profile.cpBackgroundUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.VOICE_WAVE) {
+        // The preview is only the catalog thumbnail. The equipped voice wave must
+        // use the real animation/media URL when one exists; otherwise old preview
+        // art gets written into the profile and the room keeps showing the legacy wave.
+        const waveMedia = this.cosmeticAnimationUrl(owned.cosmetic);
+        const waveLower = String(waveMedia || '').toLowerCase();
+        const wavePlayable =
+          !!waveMedia &&
+          !waveLower.includes('runtime.html') &&
+          !waveLower.endsWith('.html') &&
+          !waveLower.endsWith('.json');
+        profile.voiceWaveUrl = wavePlayable
+          ? waveMedia
+          : owned.cosmetic.previewUrl || null;
+      }
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
-        // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
-        const anim = owned.cosmetic.animationUrl || '';
+        // VIP and host frames share one avatar-frame slot; never layer them.
+        profile.vipBadgeUrl = null;
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -630,7 +1191,8 @@ export class CosmeticsService implements OnModuleInit {
           : owned.cosmetic.previewUrl || null;
       }
       if (type === CosmeticType.VIP_BADGE) {
-        const anim = owned.cosmetic.animationUrl || '';
+        profile.hostBadgeUrl = null;
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -659,6 +1221,17 @@ export class CosmeticsService implements OnModuleInit {
     return { equipped: true, cosmetic: owned.cosmetic, profile };
   }
 
+  /**
+   * Imported Mikoo frames can store SVGA bytes at an extensionless CDN URL.
+   * Prefer that explicit URL only when the importer marks the record as SVGA.
+   */
+  private cosmeticAnimationUrl(cosmetic: Cosmetic): string {
+    const meta = (cosmetic.meta || {}) as Record<string, unknown>;
+    const cdnSvga = typeof meta.cdnSvga === 'string' ? meta.cdnSvga.trim() : '';
+    if (meta.hasSvga === true && cdnSvga.startsWith('https://')) return cdnSvga;
+    return String(cosmetic.animationUrl || '').trim();
+  }
+
   /** Clear wear for this cosmetic type (frame / entry / badge / room card). */
   async unequip(userId: string, cosmeticId: string) {
     const owned = await this.userCosmeticsRepo.findOne({
@@ -666,14 +1239,22 @@ export class CosmeticsService implements OnModuleInit {
       relations: ['cosmetic'],
     });
     if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (this.isPrivateEntryCosmetic(owned.cosmetic) &&
+        String((owned.cosmetic.meta as any)?.privateOwnerUserId || '') !== String(userId)) {
+      throw new NotFoundException('هذه الدخولية خاصة بمستخدم آخر');
+    }
+    if (owned.expiresAt && owned.expiresAt <= new Date()) {
+      throw new BadRequestException('انتهت صلاحية هذه الدخولية');
+    }
 
     const type = owned.cosmetic.type;
+    const slotTypes = this.cosmeticSlotTypes(type);
     const sameType = await this.userCosmeticsRepo.find({
       where: { userId },
       relations: ['cosmetic'],
     });
     for (const row of sameType) {
-      if (row.cosmetic?.type === type && row.equipped) {
+      if (row.cosmetic && slotTypes.includes(row.cosmetic.type) && row.equipped) {
         row.equipped = false;
         await this.userCosmeticsRepo.save(row);
       }
@@ -695,10 +1276,15 @@ export class CosmeticsService implements OnModuleInit {
           [userId],
         ).catch(() => undefined);
       }
-      if (type === CosmeticType.HOST_BADGE) {
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = null;
+      if (type === CosmeticType.CP_BACKGROUND) profile.cpBackgroundUrl = null;
+      if (type === CosmeticType.CP_LOGO) profile.cpLogoUrl = null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
+      if (type === CosmeticType.VOICE_WAVE) profile.voiceWaveUrl = null;
+      if (type === CosmeticType.HOST_BADGE || type === CosmeticType.VIP_BADGE) {
+        // Both cosmetic types represent the same avatar-frame slot.
         profile.hostBadgeUrl = null;
-      }
-      if (type === CosmeticType.VIP_BADGE) {
         profile.vipBadgeUrl = null;
       }
       if (type === CosmeticType.LEVEL_BADGE) {
@@ -1077,7 +1663,7 @@ export class CosmeticsService implements OnModuleInit {
           AND (
             c.code LIKE 'vip_tou_fixed_%'
             OR COALESCE(c."previewUrl", '') LIKE '%ud_vip_tou_%'
-            OR COALESCE(c.meta->>'fixedVipFrame', '') = 'true'
+            OR COALESCE(c.meta, '') LIKE '%"fixedVipFrame":true%'
           )`,
     );
     // 3) Re-attach wear from any other equipped vip_badge (mall/SVGA).
@@ -1095,7 +1681,7 @@ export class CosmeticsService implements OnModuleInit {
               AND c."isActive" = true
               AND (uc."expiresAt" IS NULL OR uc."expiresAt" > NOW())
               AND COALESCE(c."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
-              AND COALESCE(c.meta->>'fixedVipFrame', '') <> 'true'
+              AND COALESCE(c.meta, '') NOT LIKE '%"fixedVipFrame":true%'
               AND c.code NOT LIKE 'vip_tou_fixed_%'
             ORDER BY uc."userId", uc."updatedAt" DESC NULLS LAST
          ) sub
@@ -1558,6 +2144,37 @@ export class CosmeticsService implements OnModuleInit {
     }
   }
 
+  /**
+   * Rebind equipped voice-wave wear from the owned cosmetic itself.
+   * This repairs profiles created before animationUrl became authoritative.
+   */
+  private async refreshEquippedVoiceWaveUrls() {
+    const equipped = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    let updated = 0;
+    for (const row of equipped) {
+      const c = row.cosmetic;
+      if (!c || c.type !== CosmeticType.VOICE_WAVE || !row.userId) continue;
+      const media = this.cosmeticAnimationUrl(c);
+      const lower = String(media || '').toLowerCase();
+      const playable =
+        !!media &&
+        !lower.includes('runtime.html') &&
+        !lower.endsWith('.html') &&
+        !lower.endsWith('.json');
+      const next = playable ? media : c.previewUrl || null;
+      if (!next) continue;
+      const profile = await this.profileRepo.findOne({ where: { userId: row.userId } });
+      if (!profile || profile.voiceWaveUrl === next) continue;
+      profile.voiceWaveUrl = next;
+      await this.profileRepo.save(profile);
+      updated += 1;
+    }
+    if (updated > 0) this.logger.log(`Refreshed equipped voice-wave URLs (${updated} profiles)`);
+  }
+
   /** After catalog SVGA/MP4 URLs change, push new animationUrl onto equipped profiles. */
   private async refreshEquippedMikooWearUrls() {
     const equipped = await this.userCosmeticsRepo.find({
@@ -1569,7 +2186,7 @@ export class CosmeticsService implements OnModuleInit {
       const c = row.cosmetic;
       if (!c || !row.userId) continue;
       if (c.type !== CosmeticType.VIP_BADGE && c.type !== CosmeticType.HOST_BADGE) continue;
-      const anim = c.animationUrl || '';
+      const anim = this.cosmeticAnimationUrl(c);
       const lower = String(anim).toLowerCase();
       const playable =
         !!anim &&

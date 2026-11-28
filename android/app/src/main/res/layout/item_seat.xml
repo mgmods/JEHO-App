@@ -13,20 +13,42 @@
     android:paddingHorizontal="2dp">
 
     <FrameLayout
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="76dp"
+        android:layout_height="76dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
         <!-- Speak waves: larger than avatar so rings expand around the seat -->
         <com.Dramizo.Series.widget.SeatSpeakLightningView
             android:id="@+id/seatSpeakAura"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:layout_gravity="center"
             android:clickable="false"
             android:focusable="false"
             android:visibility="invisible" />
+
+        <!-- One voice-wave layer only; follows the mic/avatar boundary. -->
+        <ImageView
+            android:id="@+id/imgVoiceWaveOuter"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:elevation="1dp"
+            android:scaleType="fitCenter"
+            android:alpha="0.62"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgVoiceWave"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:elevation="2dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
 
         <View
             android:id="@+id/seatRing"
@@ -79,11 +101,21 @@
 
         <ImageView
             android:id="@+id/imgFrame"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <com.Dramizo.Series.widget.SeatVoiceWaveBarsView
+            android:id="@+id/seatVoiceWaveBars"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:layout_gravity="center"
+            android:elevation="5dp"
+            android:clickable="false"
+            android:focusable="false"
             android:visibility="gone" />
 
         <ImageView
@@ -92,6 +124,27 @@
             android:layout_height="76dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/superAdminSeatFrame"
+            android:layout_width="62dp"
+            android:layout_height="62dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:visibility="gone" />
+
+        <!-- Room-support medal: upper corner of the occupied seat/avatar, like a crown. -->
+        <ImageView
+            android:id="@+id/imgRoomSupportMedal"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="-4dp"
+            android:layout_marginStart="-4dp"
+            android:contentDescription="@null"
+            android:elevation="20dp"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
@@ -105,8 +158,8 @@
         <!-- Reaction ABOVE frame/badge so stickers are never hidden by wear. -->
         <ImageView
             android:id="@+id/imgSeatReaction"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:elevation="8dp"
@@ -115,8 +168,8 @@
 
         <com.airbnb.lottie.LottieAnimationView
             android:id="@+id/lottieSeatReaction"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
             android:layout_gravity="center"
             android:elevation="8dp"
             android:scaleType="centerInside"
@@ -159,10 +212,11 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- Name row: optional mic badge + nickname (Mikoo white 50%) -->
+    <!-- Name is deliberately below the avatar/frame, with a visible gap. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="0dp"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingHorizontal="2dp">
@@ -171,21 +225,122 @@
             android:id="@+id/imgSeatHostMark"
             android:layout_width="12dp"
             android:layout_height="12dp"
-            android:layout_marginEnd="2dp"
+            android:layout_marginEnd="1dp"
             android:contentDescription="@null"
             android:src="@drawable/mic_fz"
             android:visibility="gone" />
 
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:minWidth="38dp"
+            android:clipChildren="true"
+            android:clipToPadding="true">
+
+            <ImageView
+                android:id="@+id/imgVipNameplate"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitXY"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:ellipsize="marquee"
+                android:singleLine="true"
+                android:gravity="center"
+                android:maxWidth="72dp"
+                android:maxLines="1"
+                android:paddingHorizontal="6dp"
+                android:textColor="#80FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvAgencyClub"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agency_affiliation_badge"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="104dp"
+        android:maxLines="1"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FFFFE4A6"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvAgencyRoleBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="0dp"
+        android:background="@drawable/bg_agency_affiliation_badge"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxWidth="104dp"
+        android:maxLines="1"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FFFFE4A6"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvGiftCount"
+        android:layout_width="wrap_content"
+        android:layout_height="14dp"
+        android:layout_marginTop="1dp"
+        android:background="@drawable/bg_mikoo_mic_charm"
+        android:drawablePadding="2dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:id="@+id/rowCustomDisplayRank">
+
+        <ImageView
+            android:id="@+id/imgCustomRankBadge"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="2dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
         <TextView
-            android:id="@+id/tvName"
+            android:id="@+id/tvCustomRankBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:gravity="center"
-            android:maxWidth="72dp"
+            android:includeFontPadding="false"
+            android:maxWidth="84dp"
             android:maxLines="1"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp" />
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="1dp"
+            android:textColor="#FFFFD580"
+            android:textSize="8sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Platform staff (super / manager) under seat name -->
@@ -205,18 +360,7 @@
         android:visibility="gone" />
 
     <!-- Charm / gift count — Mikoo grey pill -->
-    <TextView
-        android:id="@+id/tvGiftCount"
-        android:layout_width="wrap_content"
-        android:layout_height="13dp"
-        android:layout_marginTop="3dp"
-        android:background="@drawable/bg_mikoo_mic_charm"
-        android:drawablePadding="2dp"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="4dp"
-        android:textColor="#FFFFFF"
-        android:textSize="10sp"
-        android:visibility="gone" />
+
 
     <TextView
         android:id="@+id/tvStatus"

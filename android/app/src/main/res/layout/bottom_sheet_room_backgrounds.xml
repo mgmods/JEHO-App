@@ -34,6 +34,19 @@
         android:textColor="@color/text_hint"
         android:textSize="12sp" />
 
+    <TextView
+        android:id="@+id/btnChooseRoomBackgroundFromPhone"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_room_dialog_item"
+        android:gravity="center"
+        android:text="اختيار خلفية من الجوال"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <ProgressBar
         android:id="@+id/progressBgPicker"
         android:layout_width="36dp"

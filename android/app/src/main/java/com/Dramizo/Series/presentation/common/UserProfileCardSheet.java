@@ -1,11 +1,18 @@
 package com.Dramizo.Series.presentation.common;
 
+import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,12 +35,18 @@ import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
+import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.VipStyle;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Same Mikoo-style user card as the in-room profile sheet, for use anywhere
@@ -93,11 +106,15 @@ public final class UserProfileCardSheet {
         TextView tvPropSupporters = sheet.findViewById(R.id.tvPropSupportersCount);
         TextView tvPropFriends = sheet.findViewById(R.id.tvPropFriendsCount);
         View propFamily = sheet.findViewById(R.id.propFamily);
+        View propSupporters = sheet.findViewById(R.id.propSupporters);
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
         ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
+        View superAdminFrame = sheet.findViewById(R.id.superAdminAvatarFrame);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
         ImageView vipHead = sheet.findViewById(R.id.imgVipHead);
+        ImageView vipMainIcon = sheet.findViewById(R.id.imgVipMainIcon);
+        ImageView vipHorizontalBadge = sheet.findViewById(R.id.imgVipHorizontalBadge);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         View rowAgency = sheet.findViewById(R.id.rowAgency);
         ImageView imgAgencyLogo = sheet.findViewById(R.id.imgAgencyLogo);
@@ -109,31 +126,158 @@ public final class UserProfileCardSheet {
         TextView chipMember = sheet.findViewById(R.id.chipMember);
         TextView chipCharm = sheet.findViewById(R.id.chipCharm);
         TextView chipWealth = sheet.findViewById(R.id.chipWealth);
+        LinearLayout earnedMedalsRow = sheet.findViewById(R.id.userCardEarnedMedals);
+        View earnedMedalsScroll = sheet.findViewById(R.id.userCardEarnedMedalsScroll);
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        View actCpRequest = sheet.findViewById(R.id.actCpRequest);
+        View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
+        View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
+        ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        ImageView imgCpPartnerTopFrame = sheet.findViewById(R.id.imgCpPartnerTopFrame);
+        TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
 
         final String[] publicIdHold = {""};
         final String[] displayNameHold = {name != null ? name : ""};
         final String[] avatarHold = {avatarUrl != null ? avatarUrl : ""};
         final String[] vipFrameHold = {VipStyle.profileNobilityFrameUrl(vipLevel, null)};
+        HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
 
         if (tvName != null) {
             tvName.setText(displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0]);
         }
+        if (chipVip != null) chipVip.setVisibility(View.GONE);
+        if (imgVipMedal != null) imgVipMedal.setVisibility(View.GONE);
+        if (vipMainIcon != null) vipMainIcon.setVisibility(View.GONE);
+        if (vipHorizontalBadge != null) vipHorizontalBadge.setVisibility(View.GONE);
         AvatarCosmetics.styleUserCardBadges(
-                chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
+                chipVip, chipMember, chipCharm, chipWealth, 0, userLevel, 0L, 0L);
         if (chipMember != null) chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         styleStatChips(chipCharm, chipWealth);
         AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipMedal(imgVipMedal, vipLevel, null);
-        bindVipHead(vipHead, vipLevel, null);
-        AvatarCosmetics.bindStacked(img, frame, avatarHold[0], vipFrameHold[0]);
-        AvatarCosmetics.applyHostWear(frame, hostBadge, img, vipFrameHold[0], null, null, null);
+        if (vipHead != null) { vipHead.setImageDrawable(null); vipHead.setVisibility(View.GONE); }
+        AvatarCosmetics.bindProfileWear(
+                userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
+                null, null, Math.max(1, vipLevel));
         if (rowAgency != null) rowAgency.setVisibility(View.GONE);
         if (rowHostTasks != null) rowHostTasks.setVisibility(View.GONE);
         if (btnHi != null) btnHi.setVisibility(View.GONE);
         if (chipFirstDay != null) chipFirstDay.setVisibility(View.GONE);
+
+        // Public CP badge: fetched from the public profile endpoint, so every viewer sees the same active bond.
+        if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
+        if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
+        // CP relationships are started only by sending a configured CP gift.
+        // Hide the legacy profile action for every profile (including older layouts).
+        if (actCpRequest != null) {
+            actCpRequest.setVisibility(View.GONE);
+            actCpRequest.setOnClickListener(null);
+            actCpRequest.setClickable(false);
+        }
+        if (uid != null && !uid.trim().isEmpty()) {
+            container.getIoExecutor().execute(() -> {
+                Result<List<Map<String, Object>>> cp = ApiCall.execute(container.getUserApi().cpProfileRelationships(uid));
+                if (!cp.success || cp.data == null || cp.data.isEmpty()) return;
+                Map<String, Object> relation = cp.data.get(0);
+                String relationStatus = relation.get("status") == null ? ""
+                        : String.valueOf(relation.get("status")).trim().toLowerCase(java.util.Locale.ROOT);
+                if (Boolean.FALSE.equals(relation.get("isActive")) || Boolean.FALSE.equals(relation.get("active"))
+                        || relation.get("endedAt") != null || relationStatus.contains("ended")
+                        || relationStatus.contains("reject") || relationStatus.contains("expired")
+                        || relationStatus.contains("pending") || relationStatus.contains("inactive")) return;
+                Object partnerObj = relation.get("partner");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("partnerUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("linkedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("relatedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("otherUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
+                Map<?, ?> cpPartner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
+                String partnerNameValue = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("displayName") == null ? null : String.valueOf(cpPartner.get("displayName")),
+                        cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")));
+                final String partnerName = partnerNameValue == null ? "" : partnerNameValue;
+                String partnerAvatar = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("avatarUrl") == null ? null : String.valueOf(cpPartner.get("avatarUrl")),
+                        cpPartner.get("avatar") == null ? null : String.valueOf(cpPartner.get("avatar")),
+                        cpPartner.get("profileImageUrl") == null ? null : String.valueOf(cpPartner.get("profileImageUrl")),
+                        cpPartner.get("photoUrl") == null ? null : String.valueOf(cpPartner.get("photoUrl")),
+                        cpPartner.get("picture") == null ? null : String.valueOf(cpPartner.get("picture")),
+                        cpPartner.get("imageUrl") == null ? null : String.valueOf(cpPartner.get("imageUrl")),
+                        cpPartner.get("profilePicture") == null ? null : String.valueOf(cpPartner.get("profilePicture")),
+                        cpPartner.get("photo") == null ? null : String.valueOf(cpPartner.get("photo")),
+                        cpPartner.get("avatar_url") == null ? null : String.valueOf(cpPartner.get("avatar_url")), "");
+                String partnerFrame = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("vipBadgeUrl") == null ? null : String.valueOf(cpPartner.get("vipBadgeUrl")),
+                        cpPartner.get("profileFrameUrl") == null ? null : String.valueOf(cpPartner.get("profileFrameUrl")),
+                        cpPartner.get("frameUrl") == null ? null : String.valueOf(cpPartner.get("frameUrl")),
+                        cpPartner.get("avatarFrameUrl") == null ? null : String.valueOf(cpPartner.get("avatarFrameUrl")),
+                        cpPartner.get("vipTouUrl") == null ? null : String.valueOf(cpPartner.get("vipTouUrl")), "");
+                int partnerVipLevel = 0;
+                String partnerVipTou = cpPartner == null || cpPartner.get("vipTouUrl") == null
+                        ? "" : String.valueOf(cpPartner.get("vipTouUrl"));
+                try {
+                    Object level = cpPartner == null ? null : cpPartner.get("vipLevel");
+                    partnerVipLevel = level == null ? 0 : Integer.parseInt(String.valueOf(level));
+                } catch (Exception ignored) { }
+                if (partnerFrame == null || partnerFrame.trim().isEmpty()) {
+                    String fallbackFrame = VipStyle.profileNobilityFrameUrl(partnerVipLevel, partnerVipTou);
+                    partnerFrame = fallbackFrame == null ? "" : fallbackFrame;
+                }
+                final String partnerFrameUrl = partnerFrame == null ? "" : partnerFrame.trim();
+                activity.runOnUiThread(() -> {
+                    if (activity.isFinishing() || rowCpRelationship == null) return;
+                    rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
+                    String resolvedPartnerAvatar = partnerAvatar == null || partnerAvatar.trim().isEmpty()
+                            ? null : AssetCatalog.absoluteUrl(partnerAvatar.trim());
+                    if (imgCpPartnerAvatar != null) {
+                        com.Dramizo.Series.util.AvatarImageLoader.load(imgCpPartnerAvatar, partnerAvatar);
+                    }
+                    // Same paired-avatar header used in the room card: large account photo,
+                    // smaller real linked partner photo, and the relationship symbol between them.
+                    if (cpTopPartnerWrap != null && cpPartner != null) {
+                        cpTopPartnerWrap.setVisibility(View.VISIBLE);
+                        if (imgCpPartnerTop != null) {
+                            com.Dramizo.Series.util.AvatarImageLoader.load(imgCpPartnerTop, partnerAvatar);
+                        }
+                        if (imgCpPartnerTopFrame != null) {
+                            if (partnerFrameUrl.isEmpty()) {
+                                imgCpPartnerTopFrame.setImageDrawable(null);
+                                imgCpPartnerTopFrame.setVisibility(View.GONE);
+                            } else {
+                                imgCpPartnerTopFrame.setVisibility(View.VISIBLE);
+                                Glide.with(activity).load(AssetCatalog.absoluteUrl(partnerFrameUrl))
+                                        .into(imgCpPartnerTopFrame);
+                            }
+                        }
+                        if (tvCpTopHeart != null) {
+                            tvCpTopHeart.setText(cpTypeSymbol(type));
+                            tvCpTopHeart.setVisibility(View.VISIBLE);
+                            tvCpTopHeart.setTextColor(android.graphics.Color.parseColor("#FFFF6FA9"));
+                            tvCpTopHeart.setShadowLayer(8f, 0f, 0f, android.graphics.Color.parseColor("#FFFF8DB9"));
+                            android.animation.ObjectAnimator sx = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_X, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator sy = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_Y, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator alpha = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.ALPHA, 0.78f, 1f, 0.78f);
+                            android.animation.AnimatorSet motion = new android.animation.AnimatorSet();
+                            motion.playTogether(sx, sy, alpha); motion.setDuration(900L);
+                            motion.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+                            sx.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            sy.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            alpha.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            motion.start();
+                            dialog.setOnDismissListener(d -> motion.cancel());
+                        }
+                    }
+                    if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
+                });
+            });
+        }
 
         UserSocialNav.wireUserCard(activity, sheet, uid, myId, dialog::dismiss);
 
@@ -183,27 +327,210 @@ public final class UserProfileCardSheet {
                     ApiCall.execute(container.getUserApi().getUser(uid));
             if (!r.success || r.data == null) return;
             AuthDtos.UserDto u = r.data;
+            List<com.Dramizo.Series.data.remote.dto.BadgeDto> earnedMedals = java.util.Collections.emptyList();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> badgeResponse = container.getUserApi().earnedBadges(uid).execute();
+                if (badgeResponse.isSuccessful() && badgeResponse.body() != null && badgeResponse.body().data != null) earnedMedals = badgeResponse.body().data;
+            } catch (Exception ignored) { }
+            final List<com.Dramizo.Series.data.remote.dto.BadgeDto> profileMedals = earnedMedals;
             activity.runOnUiThread(() -> {
                 if (!dialog.isShowing()) return;
                 int liveVip = Math.max(0, u.vipLevel);
-                vipFrameHold[0] = VipStyle.profileNobilityFrameUrl(liveVip, u.vipTouUrl);
+                // Use the same single equipped/VIP-tier frame as seats, profile and chat.
+                vipFrameHold[0] = AvatarCosmetics.avatarFrameUrl(u);
                 if (u.avatarUrl != null && !u.avatarUrl.isEmpty()) avatarHold[0] = u.avatarUrl;
                 if (u.displayName != null && !u.displayName.isEmpty()) {
                     displayNameHold[0] = u.displayName;
                 }
-                AvatarCosmetics.bindAvatar(img, avatarHold[0]);
-                AvatarCosmetics.applyHostWear(
-                        frame, hostBadge, img, vipFrameHold[0], null, null, null);
-                bindVipHead(vipHead, liveVip,
-                        u.vipHeadUrl != null ? u.vipHeadUrl : VipStyle.fixedHeadPath(liveVip));
+                AvatarCosmetics.bindProfileWear(
+                        userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
+                        null, null, Math.max(1, liveVip));
+                // Remove the old VIP head banner as well; only the dashboard main icon and horizontal badge remain.
+                if (vipHead != null) { vipHead.setImageDrawable(null); vipHead.setVisibility(View.GONE); }
                 // Head owns: ride entry + VIP medal (Mikoo property head).
                 bindEntryRide(imgEntryRide, firstNonEmpty(u.entryAnimationUrl, u.entryEffectUrl));
-                bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
+                // The legacy VIP badge/medal is intentionally absent from the popup.
+                if (imgVipMedal != null) { imgVipMedal.setImageDrawable(null); imgVipMedal.setVisibility(View.GONE); }
+                if (chipVip != null) { chipVip.setText(null); chipVip.setVisibility(View.GONE); }
+                if (vipMainIcon != null) {
+                    String mainIconUrl = liveVip > 0 ? firstNonEmpty(u.vipMainIconUrl, "") : "";
+                    if (mainIconUrl == null || mainIconUrl.trim().isEmpty()) { vipMainIcon.setImageDrawable(null); vipMainIcon.setVisibility(View.GONE); }
+                    else { vipMainIcon.setVisibility(View.VISIBLE); Glide.with(activity).load(AssetCatalog.absoluteUrl(mainIconUrl.trim())).into(vipMainIcon); }
+                }
+                if (vipHorizontalBadge != null) {
+                    String horizontalUrl = liveVip > 0 ? firstNonEmpty(u.vipHorizontalBadgeUrl, "") : "";
+                    if (horizontalUrl == null || horizontalUrl.trim().isEmpty()) { vipHorizontalBadge.setImageDrawable(null); vipHorizontalBadge.setVisibility(View.GONE); }
+                    else { vipHorizontalBadge.setVisibility(View.VISIBLE); Glide.with(activity).load(AssetCatalog.absoluteUrl(horizontalUrl.trim())).into(vipHorizontalBadge); }
+                }
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
+                boolean isAgencyOwner = u.agency != null && ("owner".equalsIgnoreCase(u.agency.role)
+                        || "leader".equalsIgnoreCase(u.agency.role));
+                if (isAgencyOwner) {
+                    if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                    if (tvAgencyName != null) {
+                        tvAgencyName.setText(StaffRoleHelper.genderizeLabel("♛  قائد الوكالة", u.gender));
+                    }
+                    if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                    if (imgAgencyLogo != null) {
+                        String ownerAgencyLogo = u.agency.logoUrl;
+                        if (ownerAgencyLogo != null && !ownerAgencyLogo.trim().isEmpty()) {
+                            Glide.with(activity).load(AssetCatalog.absoluteUrl(ownerAgencyLogo))
+                                    .placeholder(R.drawable.icon_agency)
+                                    .error(R.drawable.icon_agency)
+                                    .centerCrop().into(imgAgencyLogo);
+                        } else {
+                            imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                        }
+                    }
+                    if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                        if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
+                    });
+                } else if (u.agency != null && "host".equalsIgnoreCase(u.agency.role)) {
+                    if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                    if (tvAgencyName != null) {
+                        tvAgencyName.setText(StaffRoleHelper.genderizeLabel("مضيف", u.gender));
+                    }
+                    if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                    if (imgAgencyLogo != null) {
+                        String hostAgencyLogo = u.agency.logoUrl;
+                        if (hostAgencyLogo != null && !hostAgencyLogo.trim().isEmpty()) {
+                            Glide.with(activity).load(AssetCatalog.absoluteUrl(hostAgencyLogo))
+                                    .placeholder(R.drawable.icon_agency)
+                                    .error(R.drawable.icon_agency)
+                                    .centerCrop().into(imgAgencyLogo);
+                        } else {
+                            imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                        }
+                    }
+                    if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                        if (u.agency.id != null) AgencyFamilyInfoSheet.show(activity, u.agency.id);
+                    });
+                } else if (u.agencyClub != null && u.agencyClub.role != null && !u.agencyClub.role.trim().isEmpty()) {
+                    String clubRole = u.agencyClub.role.trim().toLowerCase(java.util.Locale.ROOT);
+                    String clubRoleLabel = "owner".equals(clubRole) || "leader".equals(clubRole)
+                            ? "♛  قائد الوكالة"
+                            : ("host".equals(clubRole) ? "مضيف"
+                                : (("manager".equals(clubRole) || "admin".equals(clubRole)
+                                    || "agency_admin".equals(clubRole)) ? "أدمن وكالة" : ""));
+                    if (clubRoleLabel.isEmpty()) {
+                        if (rowAgency != null) rowAgency.setVisibility(View.GONE);
+                    } else {
+                        if (rowAgency != null) rowAgency.setVisibility(View.VISIBLE);
+                        if (tvAgencyName != null) tvAgencyName.setText(StaffRoleHelper.genderizeLabel(clubRoleLabel, u.gender));
+                        if (tvAgencyGid != null) tvAgencyGid.setVisibility(View.GONE);
+                        if (imgAgencyLogo != null) {
+                            String clubLogo = u.agencyClub.agencyLogoUrl;
+                            if (clubLogo != null && !clubLogo.trim().isEmpty()) {
+                                Glide.with(activity).load(AssetCatalog.absoluteUrl(clubLogo))
+                                        .placeholder(R.drawable.icon_agency)
+                                        .error(R.drawable.icon_agency)
+                                        .centerCrop().into(imgAgencyLogo);
+                            } else {
+                                imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                            }
+                        }
+                        if (rowAgency != null) rowAgency.setOnClickListener(v -> {
+                            if (u.agencyClub.agencyId != null) AgencyFamilyInfoSheet.show(activity, u.agencyClub.agencyId);
+                        });
+                    }
+                }
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
+                // Dashboard-uploaded profile-card art and nameplate are applied from equipped cosmetics.
+                String vipProfileCard = firstNonEmpty(u.profileCardUrl, u.vipCardUrl);
+                if (vipProfileCard != null && !vipProfileCard.trim().isEmpty() && userCardBg != null) {
+                    try {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(vipProfileCard)).into(new CustomTarget<Drawable>() {
+                            @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                if (dialog.isShowing()) userCardBg.setBackground(resource);
+                            }
+                            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                        });
+                    } catch (Exception ignored) { }
+                }
+                if (tvName != null && u.nameplateUrl != null && !u.nameplateUrl.trim().isEmpty()) {
+                    try {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(u.nameplateUrl)).into(new CustomTarget<Drawable>() {
+                            @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                if (dialog.isShowing()) tvName.setBackground(resource);
+                            }
+                            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                        });
+                    } catch (Exception ignored) { }
+                }
                 if (tvName != null) {
-                    tvName.setText(
-                            displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0]);
+                    String displayName = displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0];
+                    if (superAdminFrame != null) {
+                        boolean isSuperAdmin = StaffRoleHelper.isSuper(u);
+                        superAdminFrame.setVisibility(isSuperAdmin ? View.VISIBLE : View.GONE);
+                        if (isSuperAdmin) {
+                            GradientDrawable ring = new GradientDrawable();
+                            ring.setShape(GradientDrawable.OVAL);
+                            ring.setColor(Color.TRANSPARENT);
+                            ring.setStroke(Math.max(2, Math.round(activity.getResources().getDisplayMetrics().density * 3)),
+                                    Color.rgb(255, 194, 64));
+                            superAdminFrame.setBackground(ring);
+                        }
+                    }
+                    String staffBadge = StaffRoleHelper.badgeAr(u);
+                    String staffRole = StaffRoleHelper.normalize(u);
+                    if (!staffBadge.isEmpty()) {
+                        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
+                        String roleLabel = StaffRoleHelper.genderizeLabel(
+                                identity.label.isEmpty() ? staffBadge : identity.label, u.gender);
+                        tvName.setTag("staff:" + staffRole);
+                        tvName.setText(displayName + "\n" + roleLabel);
+                        StaffIdentityConfigCache.load(activity, () -> {
+                            if (!dialog.isShowing() || !("staff:" + staffRole).equals(tvName.getTag())) return;
+                            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
+                            tvName.setText(displayName + "\n" + StaffRoleHelper.genderizeLabel(
+                                    latest.label.isEmpty() ? staffBadge : latest.label, u.gender));
+                            // Staff role frames are assigned by role, not by mall ownership.
+                            // Keep normal user wear when no dedicated staff frame is configured.
+                            if (!latest.frameUrl.isEmpty() && frame != null) {
+                                try {
+                                    frame.setVisibility(View.VISIBLE);
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.frameUrl)).into(frame);
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.nameplateUrl.isEmpty()) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.nameplateUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) tvName.setBackground(resource);
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.badgeUrl.isEmpty()) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.badgeUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) {
+                                                resource.setBounds(0, 0, Math.round(18 * activity.getResources().getDisplayMetrics().density), Math.round(18 * activity.getResources().getDisplayMetrics().density));
+                                                tvName.setCompoundDrawables(null, null, resource, null);
+                                            }
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                            if (!latest.messageCardUrl.isEmpty() && userCardBg != null) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.messageCardUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) userCardBg.setBackground(resource);
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                        });
+                    } else {
+                        tvName.setTag(null);
+                        tvName.setText(displayName);
+                    }
+                    VipNameStyle.bind(tvName, u);
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
                 }
                 bindGenderIcon(imgGender, u.gender);
@@ -222,7 +549,15 @@ public final class UserProfileCardSheet {
                     tvPropFriends.setText(String.valueOf(Math.max(0, u.friendsCount)));
                 }
                 if (tvPropSupporters != null) {
-                    tvPropSupporters.setText(String.valueOf(Math.max(0, u.followersCount)));
+                    tvPropSupporters.setText("…");
+                    container.getIoExecutor().execute(() -> {
+                        Result<List<com.Dramizo.Series.data.remote.dto.GiftDtos.GiftSupporterDto>> supportersResult =
+                                ApiCall.execute(container.getGiftApi().supporters(u.id));
+                        activity.runOnUiThread(() -> {
+                            if (tvPropSupporters != null && supportersResult.success && supportersResult.data != null)
+                                tvPropSupporters.setText(String.valueOf(supportersResult.data.size()));
+                        });
+                    });
                 }
                 if (tvPropFamily != null) {
                     if (u.agency != null && u.agency.name != null && !u.agency.name.isEmpty()) {
@@ -241,7 +576,9 @@ public final class UserProfileCardSheet {
                     publicIdHold[0] = pid;
                     if (!pid.isEmpty()) {
                         tvUserId.setVisibility(View.VISIBLE);
-                        tvUserId.setText("ID:" + pid);
+                        tvUserId.setText(pid);
+                        com.Dramizo.Series.util.VanityIdStyle.bind(tvUserId,
+                                container.getVanityApi(), pid, u.vipLevel);
                         if (btnCopyId != null) btnCopyId.setVisibility(View.VISIBLE);
                     } else {
                         tvUserId.setVisibility(View.GONE);
@@ -254,9 +591,10 @@ public final class UserProfileCardSheet {
                 long popularity = Math.max(
                         Math.max(0, u.popularityLevel),
                         Math.max(0, Math.max(u.charmScore, u.popularityScore)));
+                if (chipVip != null) { chipVip.setText(null); chipVip.setVisibility(View.GONE); }
                 AvatarCosmetics.styleUserCardBadges(
                         chipVip, chipMember, chipCharm, chipWealth,
-                        liveVip, Math.max(1, u.level),
+                        0, Math.max(1, u.level),
                         popularity, Math.max(0, u.wealthScore));
                 if (chipMember != null) {
                     chipMember.setText(String.valueOf(Math.max(1, u.level)));
@@ -270,6 +608,31 @@ public final class UserProfileCardSheet {
                     chipWealth.setText(String.valueOf(Math.max(0, wl)));
                 }
                 styleStatChips(chipCharm, chipWealth);
+                if (earnedMedalsRow != null) {
+                    earnedMedalsRow.removeAllViews();
+                    int medalCount = 0;
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : profileMedals) {
+                        if (badge == null || !badge.earned || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                        if (medalCount++ >= 8) break;
+                        ImageView medal = new ImageView(activity);
+                        int medalSize = Math.round(34 * activity.getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams medalLp = new LinearLayout.LayoutParams(medalSize, medalSize);
+                        medalLp.setMargins(0, 0, Math.round(6 * activity.getResources().getDisplayMetrics().density), 0);
+                        medal.setLayoutParams(medalLp);
+                        medal.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        medal.setContentDescription(badge.name == null ? "شارة" : badge.name);
+                        earnedMedalsRow.addView(medal);
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(badge.imageUrl)).placeholder(R.drawable.ic_medal_default).error(R.drawable.ic_medal_default).into(medal);
+                    }
+                    boolean hasEarnedMedals = earnedMedalsRow.getChildCount() > 0;
+                    earnedMedalsRow.setVisibility(hasEarnedMedals ? View.VISIBLE : View.GONE);
+                    // The inner row was populated but its parent HorizontalScrollView stayed GONE,
+                    // which made medals disappear in room/chat profile popups.
+                    if (earnedMedalsScroll != null) {
+                        earnedMedalsScroll.setVisibility(hasEarnedMedals ? View.VISIBLE : View.GONE);
+                        if (hasEarnedMedals) earnedMedalsScroll.bringToFront();
+                    }
+                }
                 boolean showHi = u.showHiBadge || u.isFirstDay;
                 if (chipFirstDay != null) {
                     chipFirstDay.setVisibility(showHi ? View.VISIBLE : View.GONE);
@@ -283,6 +646,15 @@ public final class UserProfileCardSheet {
                 }
             });
         });
+
+        if (propSupporters != null) {
+            propSupporters.setOnClickListener(v -> {
+                dialog.dismiss();
+                Intent intent = new Intent(activity, com.Dramizo.Series.presentation.profile.SupportersActivity.class);
+                intent.putExtra(ProfileActivity.EXTRA_USER_ID, uid);
+                activity.startActivity(intent);
+            });
+        }
 
         View actProfile = sheet.findViewById(R.id.actProfile);
         if (actProfile != null) {
@@ -487,6 +859,51 @@ public final class UserProfileCardSheet {
         }
 
         dialog.show();
+    }
+
+    private static void showCpRequestDialog(@NonNull FragmentActivity activity, @NonNull AppContainer container,
+                                             @NonNull String recipientId, @NonNull BottomSheetDialog parent) {
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(activity)
+                .setTitle("إرسال طلب علاقة")
+                .setItems(labels, (dialog, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", UUID.randomUUID().toString());
+                    container.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createProfileCpRequest(body));
+                        activity.runOnUiThread(() -> Toast.makeText(activity,
+                                result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                        : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                Toast.LENGTH_LONG).show());
+                    });
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+    }
+
+    private static String cpTypeSymbol(String type) {
+        String value = type == null ? "" : type.trim().toLowerCase(java.util.Locale.ROOT);
+        switch (value) {
+            case "marriage": return "💞";
+            case "engagement": return "💍";
+            case "brotherhood": return "✦";
+            case "friendship": return "♡";
+            default: return "♥";
+        }
+    }
+
+    private static String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
     }
 
     @Nullable

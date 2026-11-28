@@ -1,0 +1,1 @@
+Trigger a fresh Android release workflow from the current MG-JEHO branch head. The Kotlin accessor at AdminConsoleActivity.kt:149 was corrected on the branch after the previous run's checkout SHA; this build must check out current HEAD and validate compileReleaseKotlin, APK signature, and artifact upload.

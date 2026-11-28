@@ -29,8 +29,9 @@ public class AgencyRepositoryImpl implements AgencyRepository {
         return ApiCall.execute(api.pricing());
     }
 
-    @Override public Result<Object> joinByCode(String code) {
+    @Override public Result<Object> joinByCode(String publicId, String code) {
         java.util.Map<String, String> body = new java.util.HashMap<>();
+        body.put("publicId", publicId);
         body.put("code", code);
         return ApiCall.execute(api.joinByCode(body));
     }

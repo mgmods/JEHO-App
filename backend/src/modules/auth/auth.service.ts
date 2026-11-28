@@ -5,10 +5,11 @@ import {
   BadRequestException,
   Logger,
   OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
+import { DataSource, Repository } from 'typeorm';
+import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomInt } from 'crypto';
@@ -18,6 +19,7 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { OtpCode, OtpPurpose } from '../../database/entities/otp-code.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import {
   RegisterDto,
   LoginDto,
@@ -28,9 +30,12 @@ import {
   ChangePasswordDto,
 } from './dto/auth.dto';
 import { normalizeStaffRole } from '../../common/staff-role';
+import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 @Injectable()
-export class AuthService implements OnModuleInit {
+export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
+  private publicIdSchemaRetryTimer: ReturnType<typeof setInterval> | null = null;
+  private publicIdBackfillRunning = false;
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -38,20 +43,80 @@ export class AuthService implements OnModuleInit {
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(OtpCode) private readonly otpRepo: Repository<OtpCode>,
     @InjectRepository(UserVip) private readonly userVipsRepo: Repository<UserVip>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.ensurePublicIdSchema();
+  }
+
+  private async ensurePublicIdSchema(): Promise<void> {
     try {
-      await this.usersRepo.query(
-        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`,
-      );
-      await this.usersRepo.query(
-        `CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`,
-      );
+      // Avoid taking the cluster-wide DDL lock on every normal restart. The
+      // previous path attempted the lock even when both the column and index
+      // already existed, creating harmless but noisy contention with the other
+      // idempotent JEHO startup bootstraps.
+      const [schemaState] = await this.dataSource.query(`
+        SELECT
+          EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'users'
+              AND column_name = 'publicId'
+          ) AS has_public_id,
+          EXISTS (
+            SELECT 1 FROM pg_indexes
+            WHERE schemaname = current_schema()
+              AND indexname = 'idx_users_public_id'
+          ) AS has_public_id_index
+      `);
+      const schemaReady =
+        schemaState?.has_public_id === true &&
+        schemaState?.has_public_id_index === true;
+
+      if (!schemaReady) {
+        await this.dataSource.transaction(async (manager) => {
+          await manager.query("SET LOCAL lock_timeout = '250ms'");
+          await manager.query("SET LOCAL statement_timeout = '8s'");
+          const lockRows = await manager.query(
+            'SELECT pg_try_advisory_xact_lock($1, $2) AS locked',
+            [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID],
+          );
+          if (lockRows?.[0]?.locked !== true) {
+            throw new Error('JEHO schema migration lock is busy; retrying without waiting on PostgreSQL.');
+          }
+          await manager.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16)`);
+          await manager.query(`CREATE UNIQUE INDEX IF NOT EXISTS "idx_users_public_id" ON users("publicId")`);
+        });
+      }
+
+      // Backfill only when there are actually legacy/missing IDs. This keeps
+      // healthy restarts entirely outside the migration lock path.
+      const [backfillState] = await this.dataSource.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM users
+          WHERE "publicId" IS NULL
+             OR "publicId" = ''
+             OR "publicId" !~ '^[0-9]{3,12}$'
+        ) AS needs_backfill
+      `);
+      if (backfillState?.needs_backfill !== true) {
+        if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+        this.publicIdSchemaRetryTimer = null;
+        return;
+      }
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
     } catch (err) {
-      this.logger.warn(`publicId column ensure failed: ${(err as Error).message}`);
+      this.logger.warn(`publicId schema ensure deferred; will retry safely: ${(err as Error).message}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return;
     }
     try {
       await this.ensureAllPublicIds();
@@ -61,8 +126,19 @@ export class AuthService implements OnModuleInit {
   }
 
   async register(dto: RegisterDto) {
+    const baseUsername = (dto.username || dto.email.split('@')[0] || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 24) || 'user';
+    let generatedUsername = baseUsername;
+    let suffix = 0;
+    while (await this.usersRepo.findOne({ where: { username: generatedUsername } })) {
+      suffix += 1;
+      generatedUsername = `${baseUsername.slice(0, 20)}${suffix}`.slice(0, 24);
+    }
+
     const existing = await this.usersRepo.findOne({
-      where: [{ email: dto.email }, { username: dto.username }],
+      where: [{ email: dto.email }],
     });
     if (existing) {
       throw new ConflictException('Email or username already registered');
@@ -71,10 +147,10 @@ export class AuthService implements OnModuleInit {
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = this.usersRepo.create({
       email: dto.email.toLowerCase(),
-      username: dto.username.toLowerCase(),
+      username: generatedUsername,
       publicId: await this.allocatePublicId(),
       passwordHash,
-      displayName: dto.displayName || dto.username,
+      displayName: dto.displayName || "",
       emailVerified: false,
     });
     await this.usersRepo.save(user);
@@ -133,14 +209,66 @@ export class AuthService implements OnModuleInit {
     return { ok: true };
   }
 
+  private async settingValue(key: string, fallback = ''): Promise<string> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    return row?.value == null ? fallback : String(row.value);
+  }
+
+  private async twilioOtpEnabled(): Promise<boolean> {
+    const enabled = (await this.settingValue('twilio.verify.enabled', 'false')).trim().toLowerCase();
+    const otp = (await this.settingValue('twilio.otp.enabled', 'false')).trim().toLowerCase();
+    return ['true', '1', 'yes', 'on'].includes(enabled) && ['true', '1', 'yes', 'on'].includes(otp);
+  }
+
+  private async normalizeOtpPhone(phone: string): Promise<string> {
+    const raw = String(phone || '').trim();
+    if (raw.startsWith('+')) return raw.replace(/[^+\\d]/g, '');
+    const country = String(this.configService.get('app.defaultCountryCode') || '').trim().replace(/[^\\d]/g, '');
+    return country ? `+${country}${raw.replace(/\\D/g, '')}` : raw.replace(/[^\\d]/g, '');
+  }
+
+  private async twilioRequest(path: string, params: Record<string, string>) {
+    const accountSid = (await this.settingValue('twilio.account_sid')).trim();
+    const authToken = await this.settingValue('twilio.auth_token');
+    const serviceSid = (await this.settingValue('twilio.verify_service_sid')).trim();
+    if (!accountSid || !authToken || !serviceSid) {
+      throw new BadRequestException('إعدادات Twilio Verify غير مكتملة في لوحة التحكم');
+    }
+    const body = new URLSearchParams(params);
+    const response = await fetch(
+      `https://verify.twilio.com/v2/Services/${encodeURIComponent(serviceSid)}${path}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = String((data as any)?.message || 'Twilio Verify request failed');
+      this.logger.error(`Twilio Verify error ${response.status}: ${message}`);
+      throw new BadRequestException('تعذر إرسال/تحقق رمز الهاتف عبر Twilio');
+    }
+    return data as any;
+  }
+
   async sendOtp(dto: SendOtpDto) {
+    const phone = await this.normalizeOtpPhone(dto.phone);
+    if (await this.twilioOtpEnabled()) {
+      await this.twilioRequest('/Verifications', { To: phone, Channel: 'sms' });
+      return { sent: true, expiresIn: 600, provider: 'twilio' };
+    }
+
     const code = String(randomInt(100000, 999999));
     const codeHash = this.hashOtp(code);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await this.otpRepo.save(
       this.otpRepo.create({
-        target: dto.phone,
+        target: phone,
         channel: 'sms',
         purpose: OtpPurpose.LOGIN,
         codeHash,
@@ -148,8 +276,8 @@ export class AuthService implements OnModuleInit {
       }),
     );
 
-    // In production integrate SMS provider. Dev/log for visibility.
-    this.logger.log(`OTP for ${dto.phone}: ${code}`);
+    // Local/dev fallback when Twilio Verify is disabled.
+    this.logger.log(`OTP for ${phone}: ${code}`);
 
     return {
       sent: true,
@@ -159,34 +287,45 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const otp = await this.otpRepo.findOne({
-      where: { target: dto.phone, used: false, purpose: OtpPurpose.LOGIN },
-      order: { createdAt: 'DESC' },
-    });
-    if (!otp || otp.expiresAt < new Date()) {
-      throw new BadRequestException('OTP expired or not found');
-    }
-    if (otp.attempts >= 5) {
-      throw new BadRequestException('Too many OTP attempts');
-    }
+    const phone = await this.normalizeOtpPhone(dto.phone);
+    if (await this.twilioOtpEnabled()) {
+      const result = await this.twilioRequest('/VerificationCheck', {
+        To: phone,
+        Code: String(dto.code).trim(),
+      });
+      if (String(result?.status || '').toLowerCase() !== 'approved') {
+        throw new BadRequestException('رمز التحقق غير صحيح أو منتهي');
+      }
+    } else {
+      const otp = await this.otpRepo.findOne({
+        where: { target: phone, used: false, purpose: OtpPurpose.LOGIN },
+        order: { createdAt: 'DESC' },
+      });
+      if (!otp || otp.expiresAt < new Date()) {
+        throw new BadRequestException('OTP expired or not found');
+      }
+      if (otp.attempts >= 5) {
+        throw new BadRequestException('Too many OTP attempts');
+      }
 
-    otp.attempts += 1;
-    const valid = this.hashOtp(dto.code) === otp.codeHash;
-    if (!valid) {
+      otp.attempts += 1;
+      const valid = this.hashOtp(dto.code) === otp.codeHash;
+      if (!valid) {
+        await this.otpRepo.save(otp);
+        throw new BadRequestException('Invalid OTP');
+      }
+
+      otp.used = true;
       await this.otpRepo.save(otp);
-      throw new BadRequestException('Invalid OTP');
     }
 
-    otp.used = true;
-    await this.otpRepo.save(otp);
-
-    let user = await this.usersRepo.findOne({ where: { phone: dto.phone } });
+    let user = await this.usersRepo.findOne({ where: { phone } });
     if (!user) {
       const username =
         dto.username?.toLowerCase() ||
-        `user_${dto.phone.replace(/\D/g, '').slice(-8)}_${randomInt(100, 999)}`;
+        `user_${phone.replace(/\\D/g, '').slice(-8)}_${randomInt(100, 999)}`;
       user = this.usersRepo.create({
-        phone: dto.phone,
+        phone,
         username,
         publicId: await this.allocatePublicId(),
         displayName: username,
@@ -381,35 +520,86 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  /** 8-digit numeric ID, unique & permanent (app-facing). */
+  /** Six-digit numeric account ID, unique within the account namespace. */
   async allocatePublicId(): Promise<string> {
     for (let i = 0; i < 64; i++) {
-      const id = String(randomInt(10_000_000, 99_999_999));
+      const id = String(randomInt(100_000, 1_000_000));
       const exists = await this.usersRepo.exist({ where: { publicId: id } });
-      if (!exists) return id;
+      if (exists) continue;
+      // Keep new account IDs distinct from IDs reserved in the vanity-ID catalog.
+      const vanityConflict = await this.usersRepo.manager.query(
+        'SELECT 1 FROM vanity_ids WHERE "publicId" = $1 LIMIT 1',
+        [id],
+      );
+      if (!vanityConflict.length) return id;
     }
-    // Extremely unlikely fallback
-    return String(Date.now()).slice(-8);
+    throw new ConflictException('تعذر إنشاء آيدي حساب فريد من ستة أرقام، حاول مرة أخرى');
   }
 
   /** Backfill numeric publicId for users who still use login/store name as ID. */
   async ensureAllPublicIds(): Promise<{ updated: number }> {
-    const missing = await this.usersRepo
-      .createQueryBuilder('u')
-      .where(`u.publicId IS NULL OR u.publicId = ''`)
-      .getMany();
+    if (this.publicIdBackfillRunning) return { updated: 0 };
+    this.publicIdBackfillRunning = true;
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     let updated = 0;
-    for (const u of missing) {
-      u.publicId = await this.allocatePublicId();
-      await this.usersRepo.save(u);
-      updated += 1;
+    try {
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '30s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) {
+        // Another replica is handling the shared backfill. Retry later so a
+        // failed/terminated owner cannot leave missing IDs indefinitely.
+        if (!this.publicIdSchemaRetryTimer) {
+          this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+          this.publicIdSchemaRetryTimer.unref?.();
+        }
+        return { updated: 0 };
+      }
+      // Page through missing IDs instead of loading the entire users table into memory.
+      while (true) {
+        const missing = await this.usersRepo.createQueryBuilder('u')
+          .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ :pattern", { pattern: '^[0-9]{3,12}($)' })
+          .orderBy('u.id', 'ASC').take(250).getMany();
+        if (!missing.length) break;
+        for (const user of missing) {
+          const publicId = await this.allocatePublicId();
+          const result = await this.usersRepo.createQueryBuilder()
+            .update(User)
+            .set({ publicId })
+            .where('id = :id', { id: user.id })
+            .andWhere('("publicId" IS NULL OR "publicId" = :empty OR "publicId" !~ :pattern)', {
+              empty: '',
+              pattern: '^[0-9]{3,12}($)',
+            })
+            .execute();
+          updated += Number(result.affected || 0);
+        }
+      }
+      if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+      this.publicIdSchemaRetryTimer = null;
+      if (updated > 0) this.logger.log(`Allocated numeric public IDs for ${updated} existing user(s)`);
+      return { updated };
+    } catch (error) {
+      this.logger.warn(`Public ID backfill deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.publicIdSchemaRetryTimer) {
+        this.publicIdSchemaRetryTimer = setInterval(() => void this.ensurePublicIdSchema(), 30_000);
+        this.publicIdSchemaRetryTimer.unref?.();
+      }
+      return { updated };
+    } finally {
+      if (lockAcquired) await releaseJehoSchemaLock(runner).catch((unlockError) => this.logger.error(`Public-ID lock release failed; connection discarded: ${(unlockError as Error).message}`));
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
+      this.publicIdBackfillRunning = false;
     }
-    if (updated > 0) {
-      this.logger.log(`Allocated publicId for ${updated} existing user(s)`);
-    }
-    return { updated };
   }
-
+  onModuleDestroy(): void {
+    if (this.publicIdSchemaRetryTimer) clearInterval(this.publicIdSchemaRetryTimer);
+    this.publicIdSchemaRetryTimer = null;
+  }
   private async issueTokens(user: User) {
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Account is restricted');
@@ -423,22 +613,22 @@ export class AuthService implements OnModuleInit {
       sub: user.id,
       username: user.username,
       publicId: user.publicId,
-      isAdmin: user.isAdmin || staffRole === 'super',
+      isAdmin: staffRole === 'super',
       staffRole,
-      role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
+      role: staffRole === 'super' ? 'admin' : 'user',
       isGuest: user.isGuest,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('app.jwt.secret'),
-      expiresIn: this.configService.get<string>('app.jwt.expiresIn'),
+      expiresIn: this.configService.get<string>('app.jwt.expiresIn') as JwtSignOptions['expiresIn'],
     });
 
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id },
       {
         secret: this.configService.get<string>('app.jwt.refreshSecret'),
-        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn'),
+        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn') as JwtSignOptions['expiresIn'],
       },
     );
 
@@ -446,6 +636,15 @@ export class AuthService implements OnModuleInit {
     await this.usersRepo.update(user.id, { refreshTokenHash });
 
     const now = new Date();
+    // Include the persisted profile snapshot in the login response. The app must
+    // not mistake a returning account for a new account when /users/me is briefly
+    // unavailable immediately after authentication.
+    let profile = await this.profilesRepo.findOne({ where: { userId: user.id } });
+    if (!profile) {
+      profile = await this.profilesRepo.save(
+        this.profilesRepo.create({ userId: user.id }),
+      );
+    }
     const vip = await this.userVipsRepo.findOne({
       where: { userId: user.id, isActive: true },
       order: { level: 'DESC' },
@@ -465,11 +664,27 @@ export class AuthService implements OnModuleInit {
         publicId: user.publicId,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        coverUrl: profile.coverUrl,
+        voiceWaveUrl: profile.voiceWaveUrl ?? null,
+        bio: profile.bio,
+        gender: user.gender,
+        birthday: user.birthday,
+        country: profile.country,
+        countryChangedAt: profile.countryChangedAt,
+        city: profile.city,
+        language: profile.language,
+        interests: profile.interests || [],
+        albumUrls: profile.albumUrls || [],
+        showOnlineStatus: profile.showOnlineStatus,
+        allowDmFromStrangers: profile.allowDmFromStrangers,
+        dmGiftGateEnabled: profile.dmGiftGateEnabled,
+        dmRequiredGiftId: profile.dmRequiredGiftId,
         level: user.level,
         vipLevel,
         isGuest: user.isGuest,
         isAdmin: user.isAdmin || staffRole === 'super',
         staffRole,
+        dashboardPermissions: user.dashboardPermissions || null,
       },
     };
   }

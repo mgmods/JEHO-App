@@ -20,6 +20,7 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.ApiCall;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
@@ -39,8 +40,23 @@ public class ContestsActivity extends ThemedActivity {
             new RealtimeClient.UserListener() {
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
-                    if ("contest:score".equals(event)) runOnUiThread(() -> load());
+                    if ("contest:score".equals(event) || "contest:pk-status".equals(event)) {
+                        runOnUiThread(() -> load());
+                    }
                 }
+            };
+    private final RealtimeClient.RoomListener teamChallengeListener =
+            new RealtimeClient.RoomListener() {
+                @Override
+                public void onRoomEvent(String eventRoomId, String event, JsonObject payload,
+                                        String fromUserId, String fromUsername) {
+                    if (!"contest:team-score".equals(event) && !"contest:team-ended".equals(event)) return;
+                    if (roomId != null && !roomId.equals(eventRoomId)) return;
+                    if (payload == null) return;
+                    runOnUiThread(() -> applyTeamChallengeUpdate(event, payload));
+                }
+                @Override public void onUserJoined(String eventRoomId, String userId, String username) {}
+                @Override public void onUserLeft(String eventRoomId, String userId) {}
             };
 
     @Override
@@ -64,12 +80,39 @@ public class ContestsActivity extends ThemedActivity {
     protected void onStart() {
         super.onStart();
         RealtimeClient.getInstance().addUserListener(realtimeListener);
+        RealtimeClient.getInstance().addRoomListener(teamChallengeListener);
     }
 
     @Override
     protected void onStop() {
         RealtimeClient.getInstance().removeUserListener(realtimeListener);
+        RealtimeClient.getInstance().removeRoomListener(teamChallengeListener);
         super.onStop();
+    }
+
+    private void applyTeamChallengeUpdate(String event, JsonObject payload) {
+        String contestId = payload.has("contestId") && !payload.get("contestId").isJsonNull()
+                ? payload.get("contestId").getAsString() : null;
+        if (contestId == null) return;
+        Gson gson = new Gson();
+        for (ContestDtos.ContestDto item : items) {
+            if (!contestId.equals(item.id)) continue;
+            if (payload.has("sideA") && payload.get("sideA").isJsonObject()) {
+                item.sideA = gson.fromJson(payload.getAsJsonObject("sideA"), ContestDtos.SideDto.class);
+            }
+            if (payload.has("sideB") && payload.get("sideB").isJsonObject()) {
+                item.sideB = gson.fromJson(payload.getAsJsonObject("sideB"), ContestDtos.SideDto.class);
+            }
+            adapter.notifyDataSetChanged();
+            if ("contest:team-ended".equals(event)) {
+                String winner = payload.has("winner") ? payload.get("winner").getAsString() : "draw";
+                String message = "sideA".equals(winner) ? "انتهى تحدي PK بفوز الفريق الأول"
+                        : "sideB".equals(winner) ? "انتهى تحدي PK بفوز الفريق الثاني"
+                        : "انتهى تحدي PK بالتعادل";
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
     }
 
     private void load() {
@@ -155,7 +198,25 @@ public class ContestsActivity extends ThemedActivity {
                     : "مجانية";
             String prize = c.prizeLabel != null ? c.prizeLabel
                     : String.format(Locale.US, "جائزة %,d", c.prizeCoins);
-            h.b.tvMeta.setText(fee + " · " + prize + " · " + c.entrantsCount + " مشارك");
+            String kind = "celebration".equals(c.kind) ? "احتفالية"
+                    : "event".equals(c.kind) ? "فعالية"
+                    : "challenge".equals(c.kind) ? "تحدّي" : "مسابقة";
+            String scoring = "diamonds".equals(c.scoringMode) ? "ألماسات"
+                    : "gifts".equals(c.scoringMode) ? "هدايا"
+                    : "points".equals(c.scoringMode) ? "نقاط" : "كوينز";
+            String goal = c.goalDiamonds > 0
+                    ? String.format(Locale.US, " · الهدف %,d %s", c.goalDiamonds, scoring) : "";
+            String teamScore = "";
+            if ("room_vs_room".equals(c.challengeType) || "agency_vs_agency".equals(c.challengeType)) {
+                String a = c.sideA != null ? (c.sideA.name != null ? c.sideA.name : "الفريق الأول") : "الفريق الأول";
+                String b = c.sideB != null ? (c.sideB.name != null ? c.sideB.name : "الفريق الثاني") : "الفريق الثاني";
+                long sa = c.sideA != null ? c.sideA.score : 0;
+                long sb = c.sideB != null ? c.sideB.score : 0;
+                teamScore = String.format(Locale.US, " · %s %,d - %,d %s", a, sa, sb, b);
+            }
+            String interactive = c.isInteractive ? " · تفاعلية داخل الروم" : "";
+            h.b.tvMeta.setText(kind + goal + teamScore + " · " + fee + " · " + prize
+                    + " · " + c.entrantsCount + " مشارك" + interactive);
             if (h.b.tvCountdown != null) {
                 h.b.tvCountdown.setText(formatCountdown(c));
             }

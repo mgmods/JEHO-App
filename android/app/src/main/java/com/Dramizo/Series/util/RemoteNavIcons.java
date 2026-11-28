@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
+import com.google.android.material.button.MaterialButton;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
@@ -32,12 +33,17 @@ import java.util.concurrent.Executors;
  */
 public final class RemoteNavIcons {
     public static final String TAB_PARTY = "party";
-    public static final String TAB_DRAMA = "drama";
+    public static final String TAB_DRAMA = "stories";
     public static final String TAB_GAMES = "games";
     public static final String TAB_CHAT = "chat";
     public static final String TAB_ME = "me";
 
     private static volatile MiscDtos.NavIconsDto cached;
+    private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicLong LAST_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final long REFRESH_INTERVAL_MS = 60_000L;
     private static final ConcurrentHashMap<String, Drawable> SVG_CACHE = new ConcurrentHashMap<>();
     private static final ExecutorService SVG_IO = Executors.newFixedThreadPool(2);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -48,6 +54,16 @@ public final class RemoteNavIcons {
     public static void invalidateCaches() {
         SVG_CACHE.clear();
         // Keep encrypted config; fresh paint uses MediaAssetSync.bust on load.
+    }
+
+    /** Include the dashboard config version so replacing an asset at the same URL is visible. */
+    @Nullable
+    private static String versionedIconUrl(@Nullable String pathOrUrl) {
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(pathOrUrl));
+        if (url == null || url.isEmpty()) return url;
+        MiscDtos.NavIconsDto config = cached;
+        int version = config != null ? Math.max(1, config.version) : 1;
+        return url + (url.contains("?") ? "&" : "?") + "nav_v=" + version;
     }
 
     @Nullable
@@ -71,17 +87,159 @@ public final class RemoteNavIcons {
 
     /** Network refresh + encrypted write. Call from a background thread. */
     public static void refreshBlocking(AppContainer c) {
-        if (c == null) return;
+        if (c == null || !REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        long previous = LAST_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) {
+            REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        boolean completed = false;
         try {
-            Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons());
-            if (!r.success || r.data == null) return;
+            Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons(System.currentTimeMillis()));
+            if (r == null || !r.success || r.data == null) return;
+            MiscDtos.NavIconsDto previousConfig = cached;
+            if (previousConfig == null || previousConfig.version != r.data.version) SVG_CACHE.clear();
             cached = r.data;
             c.getFeatureCache().putJson(
                     EncryptedFeatureCache.UID_APP,
                     EncryptedFeatureCache.NS_NAV_ICONS,
                     r.data);
+            completed = true;
         } catch (Exception ignored) {
+        } finally {
+            if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
+            REFRESH_IN_FLIGHT.set(false);
         }
+    }
+
+    /** Bind a dashboard-managed home shortcut icon. */
+    public static void bindHomeShortcut(@Nullable ImageView view, @Nullable String key) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.homeShortcuts != null && key != null ? cfg.homeShortcuts.get(key) : null;
+        final boolean roomShortcut = "room".equals(key);
+        final int fallbackRes = roomShortcut ? R.drawable.ic_tab_create_room : R.drawable.ic_search_home;
+        if (raw == null || raw.trim().isEmpty()) {
+            view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_frame_url, null);
+            if (roomShortcut) {
+                view.setVisibility(android.view.View.VISIBLE);
+                view.setImageResource(fallbackRes);
+            }
+            return;
+        }
+        view.setVisibility(android.view.View.VISIBLE);
+        String url = versionedIconUrl(raw.trim());
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) { view.setImageResource(fallbackRes); loadRemoteSvg(view, url, null, null, false); return; }
+        Object prev = view.getTag(R.id.tag_image_url);
+        if (prev instanceof String && url.equals(prev) && view.getDrawable() != null) return;
+        view.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(view).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                    .error(fallbackRes).into(view);
+        } catch (Exception ignored) {
+            view.setImageResource(fallbackRes);
+        }
+    }
+
+    /** Bind an icon uploaded for one of the profile action tiles. */
+    public static void bindProfileAction(@Nullable ImageView view, @Nullable String actionKey, int fallbackRes) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.profileActions != null && actionKey != null
+                ? cfg.profileActions.get(actionKey) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            view.setImageResource(fallbackRes);
+            return;
+        }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) {
+            loadRemoteSvg(view, url, null, null, false);
+        } else {
+            Object prev = view.getTag(R.id.tag_image_url);
+            if (prev instanceof String && url.equals(prev) && view.getDrawable() != null) return;
+            view.setTag(R.id.tag_image_url, url);
+            try {
+                Glide.with(view).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                        .error(fallbackRes).into(view);
+            } catch (Exception ignored) {
+                view.setImageResource(fallbackRes);
+            }
+        }
+    }
+
+    /** Bind a dashboard-uploaded icon to a sticky profile action button. */
+    public static void bindProfileAction(@Nullable MaterialButton button, @Nullable String actionKey, int fallbackRes) {
+        if (button == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.profileActions != null && actionKey != null ? cfg.profileActions.get(actionKey) : null;
+        if (raw == null || raw.trim().isEmpty()) { button.setIconResource(fallbackRes); return; }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        button.setIconTint(null);
+        if (isSvgUrl(url)) {
+            button.setTag(R.id.tag_image_url, url);
+            SVG_IO.execute(() -> {
+                Drawable drawable = decodeRemoteSvg(url);
+                MAIN.post(() -> {
+                    if (!url.equals(button.getTag(R.id.tag_image_url))) return;
+                    if (drawable != null) button.setIcon(drawable); else button.setIconResource(fallbackRes);
+                });
+            });
+            return;
+        }
+        Object previous = button.getTag(R.id.tag_image_url);
+        if (previous instanceof String && url.equals(previous) && button.getIcon() != null) return;
+        button.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(button).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                    .into(new com.bumptech.glide.request.target.CustomTarget<Drawable>() {
+                        @Override public void onResourceReady(Drawable resource, @Nullable com.bumptech.glide.request.transition.Transition<? super Drawable> transition) {
+                            if (url.equals(button.getTag(R.id.tag_image_url))) button.setIcon(resource);
+                        }
+                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                    });
+        } catch (Exception ignored) { button.setIconResource(fallbackRes); }
+    }
+
+    /** Bind a dashboard-managed icon for one of the chat inbox channels. */
+    public static void bindChannelIcon(@Nullable ImageView view, @Nullable String key, int fallbackRes) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.channelIcons != null && key != null
+                ? cfg.channelIcons.get(key) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            view.setImageResource(fallbackRes);
+            return;
+        }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) {
+            loadRemoteSvg(view, url, null, null, false);
+            return;
+        }
+        Object previous = view.getTag(R.id.tag_image_url);
+        if (previous instanceof String && url.equals(previous) && view.getDrawable() != null) return;
+        view.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(view).load(url).apply(MediaAssetSync.requestOptions())
+                    .dontAnimate().fitCenter().error(fallbackRes).into(view);
+        } catch (Exception ignored) {
+            view.setImageResource(fallbackRes);
+        }
+    }
+
+    public static boolean isChannelVerified(@Nullable String key) {
+        MiscDtos.NavIconsDto cfg = cached;
+        if (cfg == null) return true;
+        if ("officialNews".equals(key)) return cfg.officialNewsVerified == null || cfg.officialNewsVerified;
+        if ("adminMessages".equals(key)) return cfg.adminMessagesVerified == null || cfg.adminMessagesVerified;
+        return false;
     }
 
     public static void bind(
@@ -220,7 +378,7 @@ public final class RemoteNavIcons {
                 ? first(pair.selected, pair.normal, pair.icon)
                 : first(pair.normal, pair.icon, pair.selected);
         if (primary == null || primary.isEmpty()) return null;
-        return MediaAssetSync.bust(AssetCatalog.absoluteUrl(primary));
+        return versionedIconUrl(primary);
     }
 
     @Nullable

@@ -17,13 +17,73 @@ public final class RoomAudioSession {
     private static WeakReference<Context> appContext = new WeakReference<>(null);
     private static AudioFocusRequest focusRequest;
     private static boolean focusHeld;
+    // True only while an external app (for example WhatsApp voice recording) owns capture.
+    private static volatile boolean externalCaptureSuspended;
+
+    public static void setExternalCaptureSuspended(boolean suspended) {
+        externalCaptureSuspended = suspended;
+    }
+
+    public static boolean isExternalCaptureSuspended() {
+        return externalCaptureSuspended;
+    }
 
     private RoomAudioSession() {}
 
-    public static void acquire(@Nullable Context context) {
-        if (context == null) return;
-        Context app = context.getApplicationContext();
+    /** Re-acquire VoIP routing after an external recorder has been confirmed stopped. */
+    public static void acquireForExternalRestore(@Nullable Context context) {
+        Context app = context != null ? context.getApplicationContext() : appContext.get();
+        if (app == null) return;
         appContext = new WeakReference<>(app);
+        // External capture may finish while JEHO is still minimized. Restore the
+        // RTC mic/playback state, but never reclaim Android call mode or focus
+        // until a JEHO screen is foreground again; otherwise the next WhatsApp
+        // voice note can be blocked by a stale communication session.
+        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) return;
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld && am.getMode() == AudioManager.MODE_IN_COMMUNICATION) {
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build();
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(attrs)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setWillPauseWhenDucked(false)
+                        .build();
+                focusHeld = am.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            } else {
+                focusHeld = am.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL,
+                        AudioManager.AUDIOFOCUS_GAIN) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            }
+            if (focusHeld) am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void acquire(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        appContext = new WeakReference<>(app);
+
+        // Keep the existing room route while the room foreground service is active.
+        // Background callbacks must not clear the speaker route or request focus again.
+        // If an external recorder (for example WhatsApp) takes capture, release fully.
+        if (externalCaptureSuspended) {
+            release(app);
+            return;
+        }
+        if (!com.Dramizo.Series.AuraLiveApp.isAppInForeground()) {
+            return;
+        }
+
         AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) return;
         try {
@@ -46,6 +106,69 @@ public final class RoomAudioSession {
             }
             focusHeld = true;
             am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * Background the room without clearing its selected communication device.
+     * Audio focus is yielded to other apps, but the active room route remains
+     * selected until an external recorder is actually detected.
+     */
+    public static void releaseFocusKeepRoute(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    am.abandonAudioFocusRequest(focusRequest);
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            focusHeld = false;
+            focusRequest = null;
+        }
+        // Intentionally do not change MODE_IN_COMMUNICATION or clear the
+        // communication device here. The recording monitor performs a full
+        // release immediately when another app starts capturing audio.
+    }
+
+    /**
+     * Yield Android call mode/focus to other apps while keeping the RTC engine's
+     * selected output route intact. A full release clears the speaker/communication
+     * device and can make background room audio disappear on some devices.
+     */
+    public static void releaseForBackground(@Nullable Context context) {
+        Context app = context != null
+                ? context.getApplicationContext()
+                : appContext.get();
+        if (app == null) return;
+        AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            if (focusHeld) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    am.abandonAudioFocusRequest(focusRequest);
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            focusHeld = false;
+            focusRequest = null;
+        }
+        try {
+            // MODE_NORMAL releases VoIP ownership so WhatsApp can record.
+            // Do not clear the SDK/device speaker route: RTC playback is still live.
+            am.setMode(AudioManager.MODE_NORMAL);
         } catch (Throwable ignored) {
         }
     }

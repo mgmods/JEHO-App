@@ -8,6 +8,7 @@ import { Room } from '../../database/entities/room.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Follow } from '../../database/entities/follow.entity';
       GiftSend,
       User,
       Follow,
+      AppSetting,
     ]),
   ],
   controllers: [RankingController],

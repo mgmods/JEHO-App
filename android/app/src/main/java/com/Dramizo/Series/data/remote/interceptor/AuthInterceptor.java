@@ -18,6 +18,14 @@ public class AuthInterceptor implements Interceptor {
     @Override
     public Response intercept(@NonNull Chain chain) throws IOException {
         Request original = chain.request();
+        String path = original.url().encodedPath();
+        // Public authentication endpoints must not inherit a stale token from
+        // the previous account/session.
+        if (path.contains("/auth/login") || path.contains("/auth/register")
+                || path.contains("/auth/otp/") || path.contains("/auth/guest")
+                || path.contains("/auth/social") || path.contains("/auth/refresh")) {
+            return chain.proceed(original);
+        }
         String token = sessionManager.getAccessToken();
         if (token == null || token.isEmpty()) {
             return chain.proceed(original);

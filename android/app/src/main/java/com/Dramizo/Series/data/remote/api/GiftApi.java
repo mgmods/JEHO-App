@@ -15,11 +15,26 @@ public interface GiftApi {
     @GET("gifts/categories")
     Call<ApiResponse<GiftDtos.GiftCategoryList>> categories();
 
+    @GET("gifts/custom/mine")
+    Call<ApiResponse<GiftDtos.GiftList>> customMine();
+
+    @GET("gifts/policy")
+    Call<ApiResponse<java.util.Map<String, Object>>> selfGiftPolicy();
+
     @POST("gifts/send")
     Call<ApiResponse<GiftDtos.SendGiftResult>> send(@Body GiftDtos.SendGiftRequest body);
 
     @POST("gifts/send-all-mic")
     Call<ApiResponse<GiftDtos.SendGiftResult>> sendAllMic(@Body GiftDtos.SendAllMicRequest body);
+
+    @GET("gifts/support-chest")
+    Call<ApiResponse<java.util.Map<String, Object>>> supportChest(@retrofit2.http.Query("roomId") String roomId);
+
+    @GET("gifts/supporters")
+    Call<ApiResponse<java.util.List<GiftDtos.GiftSupporterDto>>> supporters(@retrofit2.http.Query("userId") String userId);
+
+    @GET("gifts/history/received")
+    Call<ApiResponse<java.util.List<GiftDtos.GiftReceivedSummaryDto>>> receivedHistory(@retrofit2.http.Query("userId") String userId);
 
     @GET("gifts/history")
     Call<ApiResponse<MiscDtos.ListResult<GiftDtos.GiftHistoryDto>>> history(@retrofit2.http.Query("page") int page);

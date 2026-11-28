@@ -126,19 +126,22 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
         String thumb = gift.iconUrl;
         if (thumb == null || thumb.isEmpty()) thumb = gift.animationUrl;
         String abs = AssetCatalog.absoluteUrl(thumb);
+        boolean dashboardCpGift = "cp".equalsIgnoreCase(gift.category);
         com.Dramizo.Series.util.CosmeticMedia.Kind kind =
                 com.Dramizo.Series.util.CosmeticMedia.kind(abs);
         if (abs == null || abs.isEmpty()) {
             holder.b.giftImage.setImageResource(ImagePlaceholder.gift());
         } else if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.GIF
                 || (abs.toLowerCase(Locale.US).contains(".gif"))
-                || (abs.toLowerCase(Locale.US).contains(".webp"))) {
+                ) {
             try {
                 Glide.with(holder.b.giftImage)
                         .asGif()
                         .load(abs)
                         .placeholder(ImagePlaceholder.gift())
                         .error(ImagePlaceholder.gift())
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                        .skipMemoryCache(false)
                         .centerInside()
                         .into(holder.b.giftImage);
             } catch (Exception e) {
@@ -157,6 +160,8 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
                     .load(still)
                     .placeholder(ImagePlaceholder.gift())
                     .error(ImagePlaceholder.gift())
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                        .skipMemoryCache(false)
                     .dontAnimate()
                     .centerInside()
                     .into(holder.b.giftImage);
@@ -165,6 +170,8 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
                     .load(abs)
                     .placeholder(ImagePlaceholder.gift())
                     .error(ImagePlaceholder.gift())
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                        .skipMemoryCache(false)
                     .dontAnimate()
                     .centerInside()
                     .into(holder.b.giftImage);

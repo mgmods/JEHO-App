@@ -5,17 +5,18 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF0F0F0"
+    android:background="#FFFFFFFF"
     android:orientation="vertical">
 
     <LinearLayout
         android:id="@+id/settingsToolbar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="58dp"
         android:background="@color/white"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="4dp">
+        android:paddingHorizontal="8dp"
+        android:elevation="2dp">
 
         <ImageView
             android:id="@+id/btnBack"
@@ -26,24 +27,77 @@
             android:src="@drawable/ic_arrow_back"
             app:tint="#FF333333" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:text="@string/settings"
-            android:textColor="#FF333333"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:orientation="vertical"
+            android:gravity="center">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings"
+                android:textColor="#FF182230"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="خصّص تجربتك في JEHO"
+                android:textColor="#FF8D99A8"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <View
             android:layout_width="44dp"
             android:layout_height="44dp" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="14dp"
+        android:orientation="vertical"
+        android:padding="18dp"
+        android:background="@drawable/bg_settings_row">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مساحتك الخاصة"
+            android:textColor="#FF182230"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="تحكّم بتفضيلاتك وخصوصيتك وإشعاراتك بكل سهولة."
+            android:textColor="#FF667085"
+            android:textSize="13sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="#FFEAF7F2"
+            android:paddingStart="10dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="5dp"
+            android:text="JEHO  •  الإعدادات"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingTop="10dp"
         android:fillViewport="true"
         android:overScrollMode="never">
 
@@ -51,103 +105,195 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="33dp">
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="30dp">
 
-            <View
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="10dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="9dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="#FFE7F7F1"
+                    android:gravity="center"
+                    android:text="✦"
+                    android:textColor="#FF0AA77F"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="9dp"
+                    android:text="التفضيلات العامة"
+                    android:textColor="#FF263445"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <include
                 android:id="@+id/rowTheme"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowLanguage"
                 layout="@layout/include_setting_row_value"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowNotifications"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
+
+            <include
+                android:id="@+id/rowTrackingPrivacy"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowMessages"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
-            <View
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="10dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="9dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="#FFEAF0FF"
+                    android:gravity="center"
+                    android:text="◆"
+                    android:textColor="#FF5577D8"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="9dp"
+                    android:text="الحساب والأمان"
+                    android:textColor="#FF344054"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <include
                 android:id="@+id/rowBindAccount"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowPassword"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
-            <View
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="10dp" />
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="9dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="#FFFFF2DF"
+                    android:gravity="center"
+                    android:text="?"
+                    android:textColor="#FFCE8A24"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="9dp"
+                    android:text="الدعم والمعلومات"
+                    android:textColor="#FF344054"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <include
                 android:id="@+id/rowFeedback"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowChildSafety"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowAbout"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowNetwork"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowUserAgreement"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowChildPolicy"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <include
                 android:id="@+id/rowShare"
                 layout="@layout/include_setting_row"
                 android:layout_width="match_parent"
-                android:layout_height="55dp" />
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp" />
 
             <RelativeLayout
                 android:id="@+id/rowVersion"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@color/white"
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bg_settings_row"
                 android:foreground="?attr/selectableItemBackground">
 
                 <TextView
@@ -155,7 +301,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_centerVertical="true"
-                    android:layout_marginStart="28dp"
+                    android:layout_marginStart="20dp"
                     android:text="@string/settings_version"
                     android:textColor="#FF333333"
                     android:textSize="16sp" />
@@ -166,17 +312,18 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:paddingEnd="28dp"
-                    android:textColor="#FF999999"
+                    android:paddingEnd="20dp"
+                    android:textColor="#FF8D99A8"
                     android:textSize="13sp" />
             </RelativeLayout>
 
             <TextView
                 android:id="@+id/rowSwitchAccount"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:layout_marginTop="25dp"
-                android:background="@color/white"
+                android:layout_height="58dp"
+                android:layout_marginTop="22dp"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bg_settings_row"
                 android:foreground="?attr/selectableItemBackground"
                 android:gravity="center"
                 android:text="@string/switch_account"
@@ -186,8 +333,9 @@
             <TextView
                 android:id="@+id/btnLogout"
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@color/white"
+                android:layout_height="58dp"
+                android:layout_marginBottom="5dp"
+                android:background="@drawable/bg_settings_row"
                 android:foreground="?attr/selectableItemBackground"
                 android:gravity="center"
                 android:text="@string/logout"

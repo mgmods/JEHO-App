@@ -10,7 +10,7 @@
 [![Android](https://img.shields.io/badge/Android-API%2024%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](android/)
 [![Version](https://img.shields.io/badge/Version-2.0.43%20(35)-0F7A4D?style=for-the-badge)](android/app/build.gradle)
 [![Package](https://img.shields.io/badge/Package-com.Dramizo.Series-1FA86A?style=for-the-badge)](android/)
-[![API](https://img.shields.io/badge/API-api.adnova.bbs.tr-4169E1?style=for-the-badge)](https://api.adnova.bbs.tr)
+[![API](https://img.shields.io/badge/API-jeho-own-web-910481ae.hosted.cumin.dev-4169E1?style=for-the-badge)](https://jeho-own-web-910481ae.hosted.cumin.dev)
 [![License](https://img.shields.io/badge/License-Private-EF4444?style=for-the-badge)](#-license--الرخصة)
 
 **تطبيق اجتماعي جاهز للإنتاج** — أندرويد + NestJS + PostgreSQL + Redis + لوحة إدارة Vue.  
@@ -197,10 +197,10 @@ python scripts/deploy_incremental.py backend/dashboard/src/views/SomeView.vue
 | Application ID | `com.Dramizo.Series` |
 | الإصدار | `2.0.43` (versionCode **35**) |
 | Min / Target SDK | **24** / **36** |
-| API | `https://api.adnova.bbs.tr` |
-| الأدمن | `https://api.adnova.bbs.tr/admin/` |
+| API | `https://jeho-own-web-910481ae.hosted.cumin.dev` |
+| الأدمن | `https://jeho-own-web-910481ae.hosted.cumin.dev/admin/` |
 | الدعم | `sf213777@gmail.com` |
-| الخصوصية | https://api.adnova.bbs.tr/privacy.html |
+| الخصوصية | https://jeho-own-web-910481ae.hosted.cumin.dev/privacy.html |
 
 ---
 

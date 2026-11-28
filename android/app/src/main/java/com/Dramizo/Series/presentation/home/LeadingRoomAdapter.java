@@ -50,6 +50,9 @@ public class LeadingRoomAdapter extends RecyclerView.Adapter<LeadingRoomAdapter.
                 return a.viewerCount == b.viewerCount
                         && Objects.equals(a.coverUrl, b.coverUrl)
                         && Objects.equals(a.roomCardUrl, b.roomCardUrl)
+                        && Objects.equals(a.roomTopRank, b.roomTopRank)
+                        && Objects.equals(a.roomTopFrameUrl, b.roomTopFrameUrl)
+                        && Objects.equals(a.roomTopPeriod, b.roomTopPeriod)
                         && Objects.equals(a.title, b.title);
             }
 
@@ -61,6 +64,9 @@ public class LeadingRoomAdapter extends RecyclerView.Adapter<LeadingRoomAdapter.
                 if (a == null || b == null) return null;
                 boolean heavy = !Objects.equals(a.coverUrl, b.coverUrl)
                         || !Objects.equals(a.roomCardUrl, b.roomCardUrl)
+                        || !Objects.equals(a.roomTopRank, b.roomTopRank)
+                        || !Objects.equals(a.roomTopFrameUrl, b.roomTopFrameUrl)
+                        || !Objects.equals(a.roomTopPeriod, b.roomTopPeriod)
                         || !Objects.equals(a.title, b.title);
                 if (heavy) return null;
                 if (a.viewerCount != b.viewerCount) return "patch";

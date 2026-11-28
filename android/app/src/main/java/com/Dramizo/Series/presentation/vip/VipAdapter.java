@@ -98,19 +98,31 @@ public class VipAdapter {
         TextView tvBubble = root.findViewById(R.id.tvIncludeBubble);
         TextView tvMallLabel = root.findViewById(R.id.tvIncludeMallLabel);
         LinearLayout layoutPrivileges = root.findViewById(R.id.layoutPrivileges);
+        TextView tvTogglePrivileges = root.findViewById(R.id.tvTogglePrivileges);
+        layoutPrivileges.setVisibility(View.GONE);
+        tvTogglePrivileges.setText("عرض جميع المزايا  ↓");
+        tvTogglePrivileges.setOnClickListener(v -> {
+            boolean expanded = layoutPrivileges.getVisibility() != View.VISIBLE;
+            layoutPrivileges.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            tvTogglePrivileges.setText(expanded ? "إخفاء المزايا  ↑" : "عرض جميع المزايا  ↓");
+        });
         MaterialButton btnBuy = root.findViewById(R.id.btnBuy);
 
         tvName.setText(VipCatalog.headlineAr(level));
-        tvName.setTextColor(darkenForLightBg(VipCatalog.accent(level)));
+        tvName.setTextColor(0xFFFFE7B0);
         tvPrice.setText(String.format(Locale.US, "%,d عملة / شهر · إيجار فقط",
                 Math.max(0, plan.coinPriceMonthly)));
-        tvPlanTag.setText("باقة شاملة: هوية بصرية · مزايا الغرف · بطاقات الوكالات · فتح المول");
+        tvPlanTag.setText("إطار حصري · دخول مميز · هوية VIP · امتيازات");
 
+        // The level-specific primary icon replaces the legacy medal in the VIP catalog.
+        String primaryIcon = plan.vipMainIconUrl;
+        if (primaryIcon == null || primaryIcon.trim().isEmpty()) primaryIcon = VipCatalog.headUrl(level);
         imgMedal.setImageResource(VipCatalog.medalDrawable(level));
-        ServerAssets.load(imgMedal, VipCatalog.medalUrl(level));
+        ServerAssets.load(imgMedal, primaryIcon);
 
-        imgIncludeMedal.setImageResource(VipCatalog.medalDrawable(level));
-        ServerAssets.load(imgIncludeMedal, VipCatalog.medalUrl(level));
+        if (imgIncludeMedal != null) {
+            imgIncludeMedal.setVisibility(View.GONE);
+        }
         ServerAssets.load(imgIncludeFrame, VipCatalog.frameUrl(level));
         ServerAssets.load(imgIncludeHead, VipCatalog.headUrl(level));
 

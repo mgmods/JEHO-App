@@ -6,6 +6,8 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private readonly enabled = Boolean(process.env.REDIS_HOST);
+
   constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
 
   getClient(): Redis {
@@ -13,31 +15,62 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
-    return this.client.get(key);
+    if (!this.enabled) return null;
+    try { return await this.client.get(key); } catch { return null; }
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    if (ttlSeconds) {
-      await this.client.set(key, value, 'EX', ttlSeconds);
-    } else {
-      await this.client.set(key, value);
+    if (!this.enabled) return;
+    try {
+      if (ttlSeconds) await this.client.set(key, value, 'EX', ttlSeconds);
+      else await this.client.set(key, value);
+    } catch {}
+  }
+
+  /** Atomically create an expiring key only when no value exists. */
+  async setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.enabled || !Number.isFinite(ttlSeconds) || ttlSeconds < 1) return false;
+    try {
+      const result = await this.client.set(key, value, 'EX', Math.floor(ttlSeconds), 'NX');
+      return result === 'OK';
+    } catch {
+      return false;
     }
   }
 
   async del(key: string): Promise<void> {
-    await this.client.del(key);
+    if (!this.enabled) return;
+    try { await this.client.del(key); } catch {}
+  }
+
+  /** Delete a key only if its current value still matches the value inspected. */
+  async deleteIfValueMatches(key: string, expectedValue: string): Promise<boolean> {
+    if (!this.enabled) return false;
+    try {
+      const result = await this.client.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        key,
+        expectedValue,
+      );
+      return Number(result) === 1;
+    } catch {
+      return false;
+    }
   }
 
   async incr(key: string): Promise<number> {
-    return this.client.incr(key);
+    if (!this.enabled) return 1;
+    try { return await this.client.incr(key); } catch { return 1; }
   }
 
   async expire(key: string, ttlSeconds: number): Promise<void> {
-    await this.client.expire(key, ttlSeconds);
+    if (!this.enabled) return;
+    try { await this.client.expire(key, ttlSeconds); } catch {}
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
+    try { await this.client.quit(); } catch {}
   }
 }
 
@@ -48,14 +81,27 @@ export class RedisService implements OnModuleDestroy {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        return new Redis({
+        const client = new Redis({
           host: config.get<string>('app.redis.host') || 'localhost',
           port: config.get<number>('app.redis.port') || 6379,
           password: config.get<string>('app.redis.password') || undefined,
           lazyConnect: true,
           maxRetriesPerRequest: 1,
           enableOfflineQueue: false,
+          retryStrategy: () => null,
         });
+        // Redis is optional on single-instance deployments. Always consume
+        // connection errors so an unavailable optional Redis never becomes an
+        // unhandled ioredis error in the Nest process.
+        client.on('error', (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          if (!message.includes('ECONNREFUSED')) {
+            // Keep non-connection Redis errors visible without crashing the app.
+            // eslint-disable-next-line no-console
+            console.warn(`[Redis] ${message}`);
+          }
+        });
+        return client;
       },
     },
     RedisService,

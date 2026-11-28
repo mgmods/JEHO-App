@@ -3,7 +3,10 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.adnova.bbs.tr/api/v1',
+  // Dashboard is hosted by the JEHO-OWN backend at /admin/, so use the
+  // Always use the API served by this exact JEHO-OWN host. Never allow a
+  // stale VITE_API_URL to redirect the admin panel to another deployment.
+  baseURL: '/api/v1',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
@@ -16,6 +19,14 @@ api.interceptors.request.use((config) => {
   if (auth.token) {
     config.headers.Authorization = `Bearer ${auth.token}`
   }
+
+  // Browser FormData must set its own multipart boundary. The global
+  // application/json header prevents Multer from seeing the uploaded file.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+    delete config.headers['content-type']
+  }
+
   return config
 })
 
@@ -40,7 +51,7 @@ export function normalizeError(error) {
     error.response?.data?.message ||
     error.response?.data?.error ||
     (Array.isArray(error.response?.data?.errors) ? error.response.data.errors.join(', ') : null) ||
-    (error.code === 'ERR_NETWORK' ? 'Unable to reach API server. Is it running on localhost:3000?' : null) ||
+    (error.code === 'ERR_NETWORK' ? 'Unable to reach the configured API server.' : null) ||
     error.message ||
     'Request failed'
 

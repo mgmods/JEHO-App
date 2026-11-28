@@ -1,6 +1,13 @@
 package com.Dramizo.Series.presentation.voiceroom;
 
+import android.app.Activity;
 import android.app.Dialog;
+import android.app.AlertDialog;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.text.InputFilter;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -18,7 +25,6 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,9 +40,17 @@ import androidx.viewpager.widget.ViewPager;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.util.InviteReferralHelper;
+import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * Mikoo {@code RoomMoreOperatorDialog}: tabs غرفة / أداة / تأثير + grid icons.
@@ -56,6 +70,7 @@ final class RoomMoreOperatorSheet {
         boolean charmOn();
         boolean chatZoneOn();
         boolean micInteractOn();
+        boolean micRequestOn();
         boolean roomSpeakerMuted();
         boolean canControlMusic();
         /** Host/manager: adjust number of guest mics (was header home button). */
@@ -124,12 +139,28 @@ final class RoomMoreOperatorSheet {
         ImageView ivTool = sheet.findViewById(R.id.iv_tool);
         ImageView ivEffect = sheet.findViewById(R.id.iv_effect);
         ViewPager pager = sheet.findViewById(R.id.viewPager);
+        TextView advertisementAction = sheet.findViewById(R.id.btnRoomAdvertisement);
+        advertisementAction.setVisibility(View.GONE);
+        final RoomAdvertisementComposerView advertisementComposer;
+        if (ctx instanceof Activity) {
+            View contentRoot = ((Activity) ctx).findViewById(android.R.id.content);
+            advertisementComposer = findAdvertisementComposer(contentRoot);
+        } else {
+            advertisementComposer = null;
+        }
+        if (advertisementComposer != null && RoomAdvertisementTickerView.SEND_BUTTON_ENABLED) {
+            advertisementComposer.bindSettingsButton(advertisementAction);
+            advertisementAction.setOnClickListener(v -> {
+                dialog.dismiss();
+                advertisementComposer.showComposer();
+            });
+        }
 
         boolean staff = host.isStaff();
         List<List<Item>> pages = new ArrayList<>();
         if (staff) pages.add(buildRoomItems(host));
         pages.add(buildToolItems(host));
-        if (staff) pages.add(buildEffectItems(host));
+        if (staff) pages.add(buildChallengeItems(host));
 
         // Guest: only Tool tab visible (Mikoo behavior).
         if (!staff) {
@@ -159,10 +190,10 @@ final class RoomMoreOperatorSheet {
             int page = pager.getCurrentItem();
             int roomPage = staff ? 0 : -1;
             int toolPage = staff ? 1 : 0;
-            int effectPage = staff ? 2 : -1;
+            int challengePage = staff ? 2 : -1;
             selectTab(tvRoom, ivRoom, page == roomPage);
             selectTab(tvTool, ivTool, page == toolPage);
-            selectTab(tvEffect, ivEffect, page == effectPage);
+            selectTab(tvEffect, ivEffect, page == challengePage);
         };
         pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override public void onPageSelected(int position) { syncTabs.run(); }
@@ -203,7 +234,7 @@ final class RoomMoreOperatorSheet {
                 withState(host, R.string.lock, locked),
                 "lock"));
         list.add(item(R.drawable.more_btn_mic, R.string.room_more_mic_mode, "mic_mode"));
-        list.add(item(R.drawable.more_btn_theme, R.string.room_more_theme, "theme"));
+        // Room theme action is intentionally removed from this sheet; use the dedicated room background entry.
         list.add(item(
                 host.chatZoneOn()
                         ? R.drawable.icon_room_opera_public_screen_open
@@ -239,7 +270,13 @@ final class RoomMoreOperatorSheet {
                         : R.drawable.icon_room_seat_interaction_close,
                 withStateNl(host, R.string.room_more_mic_interact, host.micInteractOn()),
                 "mic_interact"));
-        list.add(item(R.drawable.icon_room_send_photo, R.string.room_more_photo, "photo"));
+        if (host.isOwner()) {
+            list.add(item(
+                    host.micRequestOn() ? R.drawable.icon_room_seat_interaction_open : R.drawable.icon_room_seat_interaction_close,
+                    withStateNl(host, R.string.room_more_mic_request, host.micRequestOn()),
+                    "mic_request"));
+        }
+        list.add(item(R.drawable.icon_room_send_photo, "خلفية الغرفة", "photo"));
         return list;
     }
 
@@ -257,11 +294,7 @@ final class RoomMoreOperatorSheet {
                 R.string.room_more_invite_friends, "invite"));
         list.add(item(R.mipmap.icon_room_tool_link, R.string.room_more_copy_link, "copy_link"));
         list.add(item(R.mipmap.icon_room_tool_whatsapp, R.string.room_more_whatsapp, "whatsapp"));
-        return list;
-    }
-
-    private static List<Item> buildEffectItems(Host host) {
-        List<Item> list = new ArrayList<>();
+        // The former Effect-tab controls now live in Tools; keep their existing actions intact.
         boolean entryOn = host.entryEffectsOn();
         list.add(item(
                 entryOn
@@ -273,6 +306,149 @@ final class RoomMoreOperatorSheet {
                 host.lowGiftEffectsOn() ? R.drawable.low_open : R.drawable.low_close,
                 R.string.room_more_low_gift,
                 "low_gift"));
+        return list;
+    }
+
+    /**
+     * Finds the composer by its view type instead of a resource ID. The composer
+     * intentionally has no ID so ViewBinding does not make it a required field.
+     */
+    @Nullable
+    private static RoomAdvertisementComposerView findAdvertisementComposer(@Nullable View root) {
+        if (root instanceof RoomAdvertisementComposerView) {
+            return (RoomAdvertisementComposerView) root;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                RoomAdvertisementComposerView found =
+                        findAdvertisementComposer(group.getChildAt(i));
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static void showAdvertisementDialog(@NonNull Host host) {
+        Context ctx = host.context();
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * ctx.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 2, pad, 0);
+
+        TextView remaining = new TextView(ctx);
+        remaining.setTextColor(Color.LTGRAY);
+        remaining.setTextSize(12);
+        remaining.setPadding(0, 0, 0, pad / 3);
+        box.addView(remaining);
+
+        EditText input = new EditText(ctx);
+        input.setHint("اكتب نص الإعلان");
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(0x88FFFFFF);
+        input.setMinLines(3);
+        input.setMaxLines(6);
+        input.setGravity(Gravity.TOP | Gravity.RIGHT);
+        box.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView counter = new TextView(ctx);
+        counter.setTextColor(0xFFB9C4D0);
+        counter.setTextSize(11);
+        counter.setGravity(Gravity.RIGHT);
+        box.addView(counter);
+
+        final int[] maxTextLength = {180};
+        final String[] idempotencyKey = {UUID.randomUUID().toString()};
+        final boolean[] requestAttempted = {false};
+        final boolean[] requestInFlight = {false};
+        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
+
+        AlertDialog dialog = new AlertDialog.Builder(ctx)
+                .setTitle("إعلان جديد")
+                .setView(box)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("إرسال", null)
+                .create();
+
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            @Override public void onTextChanged(CharSequence text, int st, int before, int count) {
+                counter.setText("المتبقي: " + Math.max(0, maxTextLength[0] - text.length()) + " حرف");
+                if (requestAttempted[0] && !requestInFlight[0]) idempotencyKey[0] = UUID.randomUUID().toString();
+            }
+            @Override public void afterTextChanged(Editable e) {}
+        });
+        counter.setText("المتبقي: 180 حرف");
+
+        dialog.setOnShowListener(v -> {
+            final android.widget.Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            send.setEnabled(false);
+            ContainerProvider.from(ctx).getRoomApi().advertisementConfig().enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>>() {
+                @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> response) {
+                    AdvertisementDtos.Config cfg = response.body() != null ? response.body().data : null;
+                    if (cfg != null && cfg.maxTextLength > 0) {
+                        maxTextLength[0] = Math.max(1, Math.min(500, cfg.maxTextLength));
+                        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxTextLength[0])});
+                        if (input.length() > maxTextLength[0]) input.getText().delete(maxTextLength[0], input.length());
+                        counter.setText("المتبقي: " + Math.max(0, maxTextLength[0] - input.length()) + " حرف");
+                        send.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
+                    }
+                }
+                @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Config>> call, Throwable t) {}
+            });
+            ContainerProvider.from(ctx).getRoomApi().advertisementRemaining().enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>>() {
+                @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> response) {
+                    AdvertisementDtos.Remaining r = response.body() != null ? response.body().data : null;
+                    if (r != null) remaining.setText("المتبقي اليوم: " + r.remaining + " من " + r.limit);
+                    else remaining.setText("تعذر قراءة الحد اليومي");
+                }
+                @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.Remaining>> call, Throwable t) {
+                    remaining.setText("تعذر قراءة الحد اليومي");
+                }
+            });
+            input.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+                @Override public void onTextChanged(CharSequence s, int st, int before, int count) {
+                    send.setEnabled(s != null && s.toString().trim().length() > 0 && s.length() <= maxTextLength[0]);
+                }
+                @Override public void afterTextChanged(Editable e) {}
+            });
+            send.setOnClickListener(btn -> {
+                btn.setEnabled(false);
+                input.setEnabled(false);
+                requestAttempted[0] = true;
+                requestInFlight[0] = true;
+                Map<String,String> body = new HashMap<>();
+                body.put("text", input.getText().toString().trim());
+                body.put("idempotencyKey", idempotencyKey[0]);
+                ContainerProvider.from(ctx).getRoomApi().createAdvertisement(body).enqueue(new Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>>() {
+                    @Override public void onResponse(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Response<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().success) {
+                            dialog.dismiss();
+                            Toast.makeText(ctx, "تم إرسال الإعلان إلى الطابور", Toast.LENGTH_SHORT).show();
+                        } else {
+                            requestInFlight[0] = false;
+                            input.setEnabled(true);
+                            btn.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
+                            Toast.makeText(ctx, "تعذر إرسال الإعلان", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                    @Override public void onFailure(Call<com.Dramizo.Series.data.remote.dto.ApiResponse<AdvertisementDtos.CreateResponse>> call, Throwable t) {
+                        requestInFlight[0] = false;
+                        input.setEnabled(true);
+                        btn.setEnabled(input.getText().toString().trim().length() > 0 && input.length() <= maxTextLength[0]);
+                        Toast.makeText(ctx, "تعذر الاتصال بالخادم", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+        dialog.show();
+    }
+
+    private static List<Item> buildChallengeItems(Host host) {
+        List<Item> list = new ArrayList<>();
+        list.add(item(R.drawable.ic_hub_wheel, "عجلة التحديات", "challenge_wheel"));
+        list.add(item(R.drawable.ic_hub_contest, "تحديات PK", "pk_challenge"));
         return list;
     }
 

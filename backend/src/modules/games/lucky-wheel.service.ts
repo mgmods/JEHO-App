@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from './secure-game-rng';
 import { DataSource, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -16,7 +17,8 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { LuckyWheelSpinDto } from './dto/lucky-wheel.dto';
 import { RoomGameAccessService } from './room-game-access.service';
-import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from './game-payout-guard';
+import { getGameBetSettings, getGameWinRate, isGameBettingEnabled, isGameEnabled } from './game-odds-runtime';
 
 export type LuckyWheelSector = 'red' | 'orange' | 'seven' | 'lose';
 
@@ -59,10 +61,15 @@ export class LuckyWheelService {
       const n = Number(map.get(k));
       return Number.isFinite(n) ? n : fallback;
     };
+    const adminBet = getGameBetSettings('lucky-wheel');
     return {
-      enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false',
-      minBet: Math.max(1, num('games.lucky_wheel.min_bet', 100)),
-      maxBet: Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), GAME_PAYOUT.maxBet),
+      enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false' && isGameBettingEnabled('lucky-wheel'),
+      // The unified dashboard is the source of truth for per-game stake limits.
+      // Keep the legacy enabled flag only as an additional emergency kill switch;
+      // legacy min/max values must not silently override the administrator's values.
+      maxBet: Math.min(adminBet.maxBet, gamePayoutLimits().maxBet),
+      minBet: adminBet.minBet,
+      chips: adminBet.chips.filter((chip) => chip >= adminBet.minBet && chip <= Math.min(adminBet.maxBet, gamePayoutLimits().maxBet)),
       /** Very low win rate by default. */
       loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 72)),
       x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 24)),
@@ -71,6 +78,7 @@ export class LuckyWheelService {
   }
 
   async getState(userId: string) {
+    if (!isGameEnabled('lucky-wheel')) throw new BadRequestException('عجلة الحظ متوقفة حالياً من الإدارة');
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
     let wallet = await this.walletRepo.findOne({ where: { userId } });
@@ -84,7 +92,7 @@ export class LuckyWheelService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
+        chips: cfg.chips.filter((c) => c >= cfg.minBet && c <= cfg.maxBet),
         multipliers: { red: 2, orange: 2, seven: 6, lose: 0 },
         sectors: WHEEL_SECTORS,
       },
@@ -92,11 +100,12 @@ export class LuckyWheelService {
   }
 
   async spin(userId: string, dto: LuckyWheelSpinDto, roomId?: string) {
+    if (!isGameEnabled('lucky-wheel')) throw new BadRequestException('عجلة الحظ متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
     const amount = Math.floor(Number(dto.amount));
-    if (amount < cfg.minBet || amount > cfg.maxBet) {
+    if (amount < cfg.minBet || amount > cfg.maxBet || !cfg.chips.includes(amount)) {
       throw new BadRequestException(`Bet must be between ${cfg.minBet} and ${cfg.maxBet}`);
     }
 
@@ -129,7 +138,12 @@ export class LuckyWheelService {
         }),
       );
 
-      const outcome = this.pickOutcome(cfg);
+      const configuredWinRate = getGameWinRate('lucky-wheel');
+      const outcome = configuredWinRate === undefined
+        ? this.pickOutcome(cfg)
+        : secureGameRandom() * 100 < configuredWinRate
+          ? (secureGameRandom() < 0.1 ? 'x8' : 'x2')
+          : 'lose';
       const sectorIndex = this.pickSectorIndex(outcome);
       const sector = WHEEL_SECTORS[sectorIndex];
       const multiplier = sector.multiplier;
@@ -204,7 +218,7 @@ export class LuckyWheelService {
     x8Weight: number;
   }): 'lose' | 'x2' | 'x8' {
     const total = cfg.loseWeight + cfg.x2Weight + cfg.x8Weight;
-    let r = Math.random() * total;
+    let r = secureGameRandom() * total;
     if (r < cfg.loseWeight) return 'lose';
     r -= cfg.loseWeight;
     if (r < cfg.x2Weight) return 'x2';
@@ -217,7 +231,7 @@ export class LuckyWheelService {
       if (outcome === 'x8') return s.id === 'seven';
       return s.multiplier === 2;
     });
-    return idxs[Math.floor(Math.random() * idxs.length)]?.i ?? 2;
+    return idxs[Math.floor(secureGameRandom() * idxs.length)]?.i ?? 2;
   }
 
   private todayKey() {

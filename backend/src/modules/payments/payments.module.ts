@@ -9,6 +9,7 @@ import { PaymentWebhookEvent } from '../../database/entities/payment-webhook-eve
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User } from '../../database/entities/user.entity';
 import { WalletModule } from '../wallet/wallet.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { WalletModule } from '../wallet/wallet.module';
       User,
     ]),
     WalletModule,
+    NotificationsModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, PaymentSettingsService, BinanceWalletReconcileTask],

@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.gifts;
 
 import android.app.Activity;
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -9,6 +10,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -33,6 +36,7 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
+import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.AvatarImageLoader;
@@ -62,25 +66,36 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private static final String STATE_GIFT = "sel_gift";
     private static final String STATE_QTY = "qty";
     private static final String STATE_ALL_MIC = "all_mic";
+    private static final String STATE_GIFT_REQUEST_ID = "gift_request_id";
+    private static final String STATE_GIFT_REQUEST_FINGERPRINT = "gift_request_fingerprint";
 
     @Nullable private GiftDtos.GiftDto selected;
     @Nullable private String receiverId;
     @Nullable private String pendingGiftId;
     @Nullable private GiftRecipient selectedRecipient;
     private boolean sending;
+    @Nullable private String pendingSendRequestId;
+    @Nullable private String pendingSendFingerprint;
     private boolean sendToAllMic;
     private boolean chatMode;
     private int giftQty = 1;
 
     private final List<GiftRecipient> micRecipients = new ArrayList<>();
+    private final LinkedHashSet<String> selectedRecipientIds = new LinkedHashSet<>();
     private final List<String> lastTargets = new ArrayList<>();
     private final List<GiftDtos.GiftDto> allGifts = new ArrayList<>();
+    private final Map<String, String> cpGiftTypes = new LinkedHashMap<>();
+    private final Map<String, Integer> cpGiftPrices = new LinkedHashMap<>();
+    private volatile boolean cpGiftTabEnabled = true;
     @Nullable private String giftTypeFilter;
 
     private DialogRoomGiftBinding binding;
     private GiftViewModel vm;
     @Nullable private GiftCategoryPagerAdapter giftPageAdapter;
     @Nullable private TabLayoutMediator tabMediator;
+    @Nullable private ViewPager2.OnPageChangeCallback giftPageChangeCallback;
+    @Nullable private TabLayout.OnTabSelectedListener giftTabListener;
+    @Nullable private RealtimeClient.UserListener cpConfigListener;
     private boolean syncingTabs;
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
@@ -98,6 +113,11 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private android.widget.ImageView wealthLevelFrame;
     @Nullable private View noCpLayout;
     @Nullable private View hascpLayout;
+    // CP level strip is hosted as a sibling overlay above the bottom-sheet surface.
+    @Nullable private FrameLayout cpOverlayHost;
+    @Nullable private PopupWindow cpProgressPopup;
+    @Nullable private android.view.ViewTreeObserver.OnGlobalLayoutListener cpOverlayPositionListener;
+    @Nullable private View cpOverlayAnchor;
 
     // ─── Factory ──────────────────────────────────────────────────────────────
 
@@ -144,6 +164,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             FrameLayout sheet =
                     dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (sheet == null) return;
+            attachCpProgressOverlay(dialog, sheet);
 
             // Same as room settings: hug content — no forced tall empty sheet.
             sheet.setBackgroundColor(
@@ -231,6 +252,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             pendingGiftId = savedState.getString(STATE_GIFT);
             giftQty = Math.max(1, savedState.getInt(STATE_QTY, 1));
             sendToAllMic = savedState.getBoolean(STATE_ALL_MIC, false);
+            pendingSendRequestId = savedState.getString(STATE_GIFT_REQUEST_ID);
+            pendingSendFingerprint = savedState.getString(STATE_GIFT_REQUEST_FINGERPRINT);
             if (receiverId == null || receiverId.isEmpty()) {
                 receiverId = savedState.getString(ARG_RECEIVER);
             }
@@ -260,18 +283,24 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (binding == null || giftPageAdapter == null) return;
             allGifts.clear();
             if (gifts != null) allGifts.addAll(dedupeGiftsForBoard(gifts));
+            applyCpGiftPrices();
             applyFilter();
             setLoading(false);
-            // Room only: warm gift MP4s. DM chat must not buffer dozens of videos (OOM / process kill).
+            // Room only: warm a tiny priority window. The selected gift is loaded on demand.
+            // Large catalog preloads compete with live audio/video and can kill the process.
             if (!chatMode && !allGifts.isEmpty() && getContext() != null) {
                 java.util.ArrayList<String> warm = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : allGifts) {
-                    if (g == null) continue;
-                    String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
-                            g.name, g.iconUrl, g.animationUrl);
-                    if (resolved != null) warm.add(resolved);
-                    else if (g.animationUrl != null) warm.add(g.animationUrl);
-                    if (warm.size() > 40) break;
+                    if (g == null || g.iconUrl == null || g.iconUrl.trim().isEmpty()) continue;
+                    String icon = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(g.iconUrl);
+                    com.Dramizo.Series.util.CosmeticMedia.Kind kind =
+                            com.Dramizo.Series.util.CosmeticMedia.kind(icon);
+                    // Warm only a few still thumbnails. Preloading MP4/SVGA/GIF gift
+                    // effects while a live room is active competes with voice and video.
+                    if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.IMAGE) {
+                        warm.add(icon);
+                    }
+                    if (warm.size() >= 3) break;
                 }
                 com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
                         requireContext().getApplicationContext(), warm);
@@ -282,10 +311,32 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         vm.getCoinsBalance().observe(getViewLifecycleOwner(), this::bindCoins);
 
+        cpConfigListener = new RealtimeClient.UserListener() {
+            @Override public void onUserEvent(String event, com.google.gson.JsonObject payload) {
+                if (!"cp:config-updated".equals(event)) return;
+                android.app.Activity host = getActivity();
+                if (host == null || host.isFinishing()) return;
+                host.runOnUiThread(() -> {
+                    if (binding == null || !isAdded() || getActivity() != host) return;
+                    loadCpGiftMappings();
+                });
+            }
+        };
+        RealtimeClient.getInstance().addUserListener(cpConfigListener);
+
         // Clear sticky so observe does not immediately re-run last room/DM send.
         vm.clearSent();
-        vm.getSent().observe(getViewLifecycleOwner(),
-                result -> onGiftSent(result, roomId));
+        vm.getSent().observe(getViewLifecycleOwner(), result -> {
+            try {
+                onGiftSent(result, roomId);
+            } catch (RuntimeException failure) {
+                // The server has already committed the gift at this point. A rendering,
+                // toast, or seat-animation failure must not crash the whole room activity.
+                android.util.Log.e(TAG, "Post-send gift presentation failed", failure);
+                sending = false;
+                try { dismissAllowingStateLoss(); } catch (RuntimeException ignored) {}
+            }
+        });
 
         vm.getError().observe(getViewLifecycleOwner(), e -> {
             sending = false;
@@ -312,6 +363,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (warm != null) {
                 allGifts.clear();
                 allGifts.addAll(dedupeGiftsForBoard(warm));
+                applyCpGiftPrices();
                 applyFilter();
             }
             List<GiftDtos.GiftCategoryDto> warmCats = vm.getCategories().getValue();
@@ -319,6 +371,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
         vm.load();
         vm.loadWallet();
+        loadCpGiftMappings();
 
         return binding.getRoot();
     }
@@ -332,7 +385,93 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         wealthLevelAvatar = root.findViewById(R.id.iv_level);
         wealthLevelFrame = root.findViewById(R.id.iv_level_frame);
         noCpLayout = root.findViewById(R.id.no_cp_layout);
-        hascpLayout = root.findViewById(R.id.hascp_layout);
+        // Inflate separately; it must not be a child of the gift sheet content.
+        hascpLayout = LayoutInflater.from(requireContext()).inflate(
+                R.layout.room_gift_hascp_layout, (ViewGroup) root, false);
+    }
+
+    /**
+     * Show CP progress in a separate PopupWindow attached to the dialog window token.
+     * This is deliberately NOT added to the BottomSheet decor/content hierarchy.
+     */
+    private void attachCpProgressOverlay(BottomSheetDialog dialog, FrameLayout sheet) {
+        if (hascpLayout == null || dialog.getWindow() == null) return;
+        View decorView = dialog.getWindow().getDecorView();
+        cpOverlayHost = new FrameLayout(requireContext());
+        cpOverlayHost.setClipChildren(false);
+        cpOverlayHost.setClipToPadding(false);
+        cpOverlayHost.setClickable(false);
+        cpOverlayHost.setFocusable(false);
+        cpOverlayHost.addView(hascpLayout, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        hascpLayout.setVisibility(View.GONE);
+
+        cpProgressPopup = new PopupWindow(
+                cpOverlayHost,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                false);
+        cpProgressPopup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        cpProgressPopup.setOutsideTouchable(false);
+        cpProgressPopup.setTouchable(false);
+        cpProgressPopup.setFocusable(false);
+        cpProgressPopup.setClippingEnabled(false);
+        if (android.os.Build.VERSION.SDK_INT >= 21) cpProgressPopup.setElevation(dp(24));
+
+        cpOverlayPositionListener = () -> {
+            if (cpProgressPopup == null || cpOverlayHost == null
+                    || hascpLayout == null || sheet.getWindowToken() == null
+                    || hascpLayout.getVisibility() != View.VISIBLE) {
+                if (cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
+                return;
+            }
+            int[] sheetLocation = new int[2];
+            int[] decorLocation = new int[2];
+            sheet.getLocationOnScreen(sheetLocation);
+            decorView.getLocationOnScreen(decorLocation);
+            int width = sheet.getWidth();
+            if (width <= 0) return;
+            hascpLayout.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            int height = hascpLayout.getMeasuredHeight();
+            if (height <= 0) return;
+            int x = sheetLocation[0] - decorLocation[0];
+            int y = sheetLocation[1] - decorLocation[1] - height - dp(6);
+            // PopupWindow content is hosted by a FrameLayout; its parent measures children
+            // with margins, so a generic ViewGroup.LayoutParams causes a ClassCastException.
+            cpOverlayHost.setLayoutParams(new FrameLayout.LayoutParams(width, height));
+            if (cpProgressPopup.isShowing()) {
+                cpProgressPopup.update(x, y, width, height);
+            } else {
+                cpProgressPopup.setWidth(width);
+                cpProgressPopup.setHeight(height);
+                cpProgressPopup.showAtLocation(sheet, android.view.Gravity.TOP | android.view.Gravity.START, x, y);
+            }
+        };
+        cpOverlayAnchor = sheet;
+        sheet.getViewTreeObserver().addOnGlobalLayoutListener(cpOverlayPositionListener);
+        cpOverlayHost.post(() -> {
+            if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
+        });
+        if ("cp".equalsIgnoreCase(String.valueOf(giftTypeFilter))) refreshCpBanner();
+    }
+
+    private void removeCpProgressOverlay() {
+        if (cpOverlayPositionListener != null && cpOverlayAnchor != null) {
+            try {
+                if (cpOverlayAnchor.getViewTreeObserver().isAlive()) {
+                    cpOverlayAnchor.getViewTreeObserver().removeOnGlobalLayoutListener(cpOverlayPositionListener);
+                }
+            } catch (Exception ignored) {}
+        }
+        cpOverlayPositionListener = null;
+        cpOverlayAnchor = null;
+        if (cpProgressPopup != null) {
+            try { cpProgressPopup.dismiss(); } catch (Exception ignored) {}
+        }
+        cpProgressPopup = null;
+        cpOverlayHost = null;
     }
 
     private void hideUnusedMikooPanels() {
@@ -345,34 +484,41 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void refreshCpBanner() {
-        if (binding == null) return;
+        if (binding == null || !isAdded()) return;
         boolean isCpTab = giftTypeFilter != null
                 && "cp".equalsIgnoreCase(giftTypeFilter.trim());
         if (!isCpTab) {
             if (noCpLayout != null) noCpLayout.setVisibility(View.GONE);
             if (hascpLayout != null) hascpLayout.setVisibility(View.GONE);
+            if (cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
             if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
             return;
         }
-        if (binding.flTop != null) binding.flTop.setVisibility(View.VISIBLE);
-        AppContainer c = ContainerProvider.from(requireActivity());
+        if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
+        final android.app.Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
+        final AppContainer c;
+        try { c = ContainerProvider.from(host); } catch (Exception ignored) { return; }
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.CpStatusDto> r = ApiCall.execute(c.getUserApi().myCp());
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null || !isAdded()) return;
+            if (host.isFinishing()) return;
+            host.runOnUiThread(() -> {
+                if (binding == null || !isAdded() || getActivity() != host) return;
                 boolean has = r.success && r.data != null && r.data.hasCp && r.data.partner != null;
                 if (noCpLayout != null) noCpLayout.setVisibility(has ? View.GONE : View.VISIBLE);
                 if (hascpLayout != null) hascpLayout.setVisibility(has ? View.VISIBLE : View.GONE);
+                if (!has && cpProgressPopup != null && cpProgressPopup.isShowing()) cpProgressPopup.dismiss();
+                if (has && cpOverlayHost != null) cpOverlayHost.post(() -> {
+                    if (cpOverlayPositionListener != null) cpOverlayPositionListener.onGlobalLayout();
+                });
                 if (!has && noCpLayout != null) {
-                    noCpLayout.setOnClickListener(v ->
-                            startActivity(new android.content.Intent(
-                                    requireContext(),
-                                    com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+                    // CP relationship requests are only created by sending a CP gift in-room.
+                    noCpLayout.setOnClickListener(null);
+                    noCpLayout.setClickable(false);
                     View marquee = noCpLayout.findViewById(R.id.marquee_view);
                     if (marquee instanceof android.widget.TextView) {
                         ((android.widget.TextView) marquee).setText(
-                                "لا يوجد CP — اضغط هنا لإرسال طلب CP");
+                                "لا توجد علاقة CP — أرسل هدية ارتباط من تبويب CP داخل الروم لطلب الارتباط");
                     }
                 }
                 if (has) {
@@ -389,15 +535,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             hascpLayout != null ? hascpLayout.findViewById(R.id.has_cp_right) : null;
                     if (lv != null) lv.setText("LV." + Math.max(0, st.level));
                     if (desc != null) {
-                        long next = Math.max(st.nextLevelAt, st.level * 500L);
-                        desc.setText(String.format(java.util.Locale.US,
-                                "ألفة %,d · الهدف %,d", st.bondScore, next));
+                        if (st.nextLevelAt > 0) {
+                            desc.setText(String.format(java.util.Locale.US,
+                                    "ألفة %,d · الهدف %,d", st.bondScore, st.nextLevelAt));
+                        } else {
+                            desc.setText(String.format(java.util.Locale.US,
+                                    "ألفة %,d", st.bondScore));
+                        }
                     }
                     if (bar != null) {
                         bar.setMax(100);
-                        long span = 500;
-                        long into = st.bondScore % span;
-                        bar.setProgress((int) Math.min(100, (into * 100) / span));
+                        int progress = (int) Math.round(Math.max(0d, Math.min(100d, st.progressPercent)));
+                        bar.setProgress(progress);
                     }
                     String myAvatar = null;
                     try {
@@ -484,7 +633,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         styleGiftTab(tabs.getTabAt(0), true);
 
         // Do NOT clearOnTabSelectedListeners — that kills TabLayoutMediator sync.
-        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+        giftTabListener = new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 styleGiftTab(tab, true);
@@ -500,21 +649,22 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 styleGiftTab(tab, false);
             }
             @Override public void onTabReselected(TabLayout.Tab tab) {}
-        });
+        };
+        tabs.addOnTabSelectedListener(giftTabListener);
 
-        binding.vpGiftListContainer.registerOnPageChangeCallback(
-                new ViewPager2.OnPageChangeCallback() {
-                    @Override
-                    public void onPageSelected(int position) {
-                        giftTypeFilter = typeForTab(position);
-                        styleGiftTab(tabs.getTabAt(position), true);
-                        if (giftPageAdapter != null) {
-                            giftPageAdapter.setSelectedId(
-                                    selected != null ? selected.id : null);
-                        }
-                        refreshCpBanner();
-                    }
-                });
+        giftPageChangeCallback = new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                if (binding == null || position < 0 || position >= tabKeys.length) return;
+                giftTypeFilter = typeForTab(position);
+                styleGiftTab(tabs.getTabAt(position), true);
+                if (giftPageAdapter != null) {
+                    giftPageAdapter.setSelectedId(selected != null ? selected.id : null);
+                }
+                refreshCpBanner();
+            }
+        };
+        binding.vpGiftListContainer.registerOnPageChangeCallback(giftPageChangeCallback);
     }
 
     private void styleGiftTab(@Nullable TabLayout.Tab tab, boolean selected) {
@@ -536,6 +686,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 if (c.isActive == false) continue;
                 active.add(c);
             }
+        }
+        // The CP tab is controlled by the dashboard setting returned by /cp/catalog.
+        // Remove any stale category entry when the administrator switches it off.
+        for (int i = active.size() - 1; i >= 0; i--) {
+            if ("cp".equalsIgnoreCase(active.get(i).key)) active.remove(i);
+        }
+        if (cpGiftTabEnabled) {
+            GiftDtos.GiftCategoryDto cpTab = new GiftDtos.GiftCategoryDto();
+            cpTab.key = "cp";
+            cpTab.labelAr = "هدايا CP";
+            cpTab.labelEn = "CP Gifts";
+            cpTab.sortOrder = Integer.MAX_VALUE;
+            cpTab.isActive = true;
+            active.add(cpTab);
         }
         Collections.sort(active, (a, b) -> {
             int sa = a != null ? a.sortOrder : 0;
@@ -591,19 +755,22 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 if (byId.containsKey(g.id)) continue;
                 byId.put(g.id, g);
             }
+            String bucket = giftBucket(g);
             String nameKey = g.name != null
-                    ? g.name.trim().toLowerCase(Locale.US).replaceAll("\\s+", " ")
+                    ? bucket + ":" + g.name.trim().toLowerCase(Locale.US).replaceAll("\\s+", " ")
                     : "";
             String stem = giftArtStem(g.iconUrl);
             if (stem.isEmpty()) stem = giftArtStem(g.animationUrl);
-            String key = !stem.isEmpty() ? "s:" + stem
+            String key = "cp".equals(bucket) && g.id != null
+                    ? "cp:" + g.id
+                    : (!stem.isEmpty() ? "s:" + bucket + ":" + stem
                     : (!nameKey.isEmpty() ? "n:" + nameKey
-                    : (g.id != null ? "id:" + g.id : null));
+                    : (g.id != null ? "id:" + g.id : null)));
             if (key == null) continue;
             if (byStem.containsKey(key)) continue;
-            if (!nameKey.isEmpty() && byName.containsKey(nameKey)) continue;
+            if (!"cp".equals(bucket) && !nameKey.isEmpty() && byName.containsKey(nameKey)) continue;
             byStem.put(key, g);
-            if (!nameKey.isEmpty()) byName.put(nameKey, g);
+            if (!"cp".equals(bucket) && !nameKey.isEmpty()) byName.put(nameKey, g);
             // Cap diamonds on board display/send path (server also enforces).
             if (g.diamondValue > 1000) g.diamondValue = 1000;
             // Keep dashboard category if set; only fill empty.
@@ -704,6 +871,23 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
+            boolean isCpGift = "cp".equals(giftBucket(g))
+                    || (g.id != null && cpGiftTypes.containsKey(g.id));
+            if ("custom".equals(want)) {
+                // Custom gifts are fetched only from /gifts/custom/mine for this signed-in
+                // account; never mix them into public catalog tabs.
+                if ("custom".equalsIgnoreCase(g.category)) out.add(g);
+                continue;
+            }
+            if ("custom".equalsIgnoreCase(g.category)) continue;
+            if ("cp".equals(want)) {
+                // Show CP-category gifts and the exact gift selected in the live dashboard
+                // configuration, even when that gift's general catalog category differs.
+                if (isCpGift) out.add(g);
+                continue;
+            }
+            // CP category gifts must never be duplicated in ordinary tabs.
+            if (isCpGift) continue;
             if (want.equals(giftBucket(g))) out.add(g);
         }
         return out;
@@ -727,6 +911,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
+        LinkedHashSet<String> preservedSelection = new LinkedHashSet<>(selectedRecipientIds);
         List<GiftRecipient> all = source.getGiftRecipients();
         micRecipients.clear();
         if (all != null) micRecipients.addAll(all);
@@ -780,15 +965,25 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
-        GiftRecipient initial = findRecipient(receiverId);
-        if (initial != null) {
-            selectedRecipient = initial;
-            receiverId = initial.userId;
-        } else if (!micRecipients.isEmpty()) {
-            selectedRecipient = micRecipients.get(0);
-            receiverId = selectedRecipient.userId;
+        if (!preservedSelection.isEmpty()) {
+            selectedRecipientIds.clear();
+            selectedRecipientIds.addAll(preservedSelection);
+            if (receiverId == null || receiverId.isEmpty()) receiverId = preservedSelection.iterator().next();
+            selectedRecipient = findRecipient(receiverId);
+        } else {
+            GiftRecipient initial = findRecipient(receiverId);
+            if (initial != null) {
+                selectedRecipient = initial;
+                receiverId = initial.userId;
+            } else if (!micRecipients.isEmpty()) {
+                selectedRecipient = micRecipients.get(0);
+                receiverId = selectedRecipient.userId;
+            }
+            selectedRecipientIds.clear();
+            if (receiverId != null && !receiverId.isEmpty()) selectedRecipientIds.add(receiverId);
         }
-        binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
+        binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false,
+                new ArrayList<>(selectedRecipientIds));
         refreshSendBtn();
         updateDockText();
         publishSeatGiftSelection();
@@ -798,9 +993,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         sendToAllMic = false;
         selectedRecipient = r;
         receiverId = r.userId;
+        selectedRecipientIds.clear();
         if (binding != null) {
+            for (GiftRecipient target : binding.guavGiftUserAvatar.getSelectMicAccounts()) {
+                if (target != null && target.userId != null && !target.userId.isEmpty()) {
+                    selectedRecipientIds.add(target.userId);
+                }
+            }
+            // Defensive fallback if the strip has not finished updating yet.
+            if (selectedRecipientIds.isEmpty() && receiverId != null && !receiverId.isEmpty()) {
+                selectedRecipientIds.add(receiverId);
+            }
             binding.guavGiftUserAvatar.setPersonalAvatar(true);
-            binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
         }
         refreshSendBtn();
         updateDockText();
@@ -815,6 +1019,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             for (GiftRecipient r : micRecipients) {
                 if (r != null && r.userId != null && !r.userId.isEmpty()) ids.add(r.userId);
             }
+        } else if (!selectedRecipientIds.isEmpty()) {
+            ids.addAll(selectedRecipientIds);
         } else if (receiverId != null && !receiverId.isEmpty()) {
             ids.add(receiverId);
         }
@@ -859,8 +1065,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 content.findViewById(R.id.popupQty1),
                 content.findViewById(R.id.popupQty7),
                 content.findViewById(R.id.popupQty17),
-                content.findViewById(R.id.popupQty27),
-                content.findViewById(R.id.popupQty77)
+                content.findViewById(R.id.popupQty77),
+                content.findViewById(R.id.popupQty177)
         };
         boolean known = false;
         for (int v : values) if (giftQty == v) { known = true; break; }
@@ -938,10 +1144,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private int previewTargetCount() {
-        if (sendToAllMic) {
-            int n = uniqueMicCount();
-            return Math.max(1, n);
-        }
+        if (sendToAllMic) return Math.max(1, uniqueMicCount());
+        if (!selectedRecipientIds.isEmpty()) return selectedRecipientIds.size();
         return 1;
     }
 
@@ -986,7 +1190,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (binding == null) return;
         boolean ok = selected != null && (sendToAllMic
                 ? !micRecipients.isEmpty()
-                : receiverId != null && !receiverId.isEmpty());
+                : !selectedRecipientIds.isEmpty()
+                || (receiverId != null && !receiverId.isEmpty()));
         boolean enabled = ok && !sending;
         binding.bltvSendGift.setEnabled(enabled);
         binding.bltvSendGift.setAlpha(enabled ? 1f : 0.45f);
@@ -1030,13 +1235,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         List<String> targets = new ArrayList<>();
         if (sendToAllMic) {
-            if (!chatMode) setupRecipientStrip(false);
             LinkedHashSet<String> unique = new LinkedHashSet<>();
             for (GiftRecipient r : micRecipients) {
                 if (r != null && r.userId != null && !r.userId.isEmpty())
                     unique.add(r.userId);
             }
             targets.addAll(unique);
+        } else if (!selectedRecipientIds.isEmpty()) {
+            targets.addAll(selectedRecipientIds);
         } else if (receiverId != null && !receiverId.isEmpty()) {
             targets.add(receiverId);
         } else if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
@@ -1044,23 +1250,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
-        // Never allow self-support (room owner/host gifting themselves).
-        String myId = null;
-        try {
-            myId = ContainerProvider.from(requireActivity()).getSessionManager().getUserId();
-        } catch (Exception ignored) {
-        }
-        if (myId != null && !myId.isEmpty()) {
-            final String me = myId;
-            boolean removedSelf = targets.removeIf(id -> me.equals(id));
-            if (removedSelf && targets.isEmpty()) {
-                Toast.makeText(requireContext(),
-                        "لا يمكنك دعم نفسك — اختر مستلم آخر",
-                        Toast.LENGTH_LONG).show();
-                return;
-            }
-        }
+        // Self-gifting is controlled by the live dashboard policy and enforced by the server.
+        // Keep selected recipients intact; stripping the sender here made the dashboard toggle ineffective.
 
+        if (targets.isEmpty() && sendToAllMic && !chatMode
+                && getActivity() instanceof GiftRecipientSource src) {
+            String hostId = src.getDefaultGiftReceiverId();
+            if (hostId != null && !hostId.trim().isEmpty()) targets.add(hostId.trim());
+        }
         if (targets.isEmpty()) {
             Toast.makeText(requireContext(),
                     R.string.choose_recipient_first, Toast.LENGTH_LONG).show();
@@ -1073,6 +1270,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
 
         int qty = effectiveQty();
+        // CP gifts use the exact same committed gift pipeline as every other gift.
+        // The backend decides whether this gift opens a relationship request:
+        // unlinked users trigger a request; users already linked simply gift normally.
         long need = (long) selected.coinPrice * qty * targets.size();
         Long coins = vm.getCoinsBalance().getValue();
         if (coins != null && selected.coinPrice > 0 && coins < need) {
@@ -1088,9 +1288,136 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.bltvSendGift.setText("جارٍ الإرسال ×" + qty
                 + (targets.size() > 1 ? " · " + targets.size() : "") + "...");
 
+        String fingerprint = selected.id + "|" + (chatMode ? "" : String.valueOf(roomId))
+                + "|" + qty + "|" + sendToAllMic + "|"
+                + (sendToAllMic ? "ALL_CURRENT_ROOM_MICS" : targets.toString());
+        if (pendingSendRequestId == null || !fingerprint.equals(pendingSendFingerprint)) {
+            pendingSendRequestId = java.util.UUID.randomUUID().toString();
+            pendingSendFingerprint = fingerprint;
+        }
         lastTargets.clear();
         lastTargets.addAll(targets);
-        vm.sendMany(selected.id, targets, qty, chatMode ? null : roomId);
+        vm.sendMany(selected.id, targets, qty, chatMode ? null : roomId,
+                sendToAllMic, pendingSendRequestId);
+    }
+
+    private void loadCpGiftMappings() {
+        AppContainer container;
+        try {
+            if (!isAdded()) return;
+            container = ContainerProvider.from(requireActivity());
+        } catch (Exception ignored) {
+            return;
+        }
+        final android.app.Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
+        container.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().cpCatalog());
+            Map<String, String> mappings = new LinkedHashMap<>();
+            Map<String, Integer> prices = new LinkedHashMap<>();
+            // CP catalog carries the dashboard-selected gift row as well as its id.
+            // Keep that uploaded artwork available even if the general gift cache is stale.
+            Map<String, GiftDtos.GiftDto> cpGiftCatalog = new LinkedHashMap<>();
+            boolean configuredGiftTabEnabled = true;
+            if (result.success && result.data != null) {
+                for (Map<String, Object> row : result.data) {
+                    if (row == null) continue;
+                    if ("_settings".equals(String.valueOf(row.get("type")))) {
+                        configuredGiftTabEnabled = !Boolean.FALSE.equals(row.get("giftTabEnabled"))
+                                && !"false".equalsIgnoreCase(String.valueOf(row.get("giftTabEnabled")));
+                        continue;
+                    }
+                    if (!Boolean.TRUE.equals(row.get("enabled"))) continue;
+                    Object type = row.get("type");
+                    Object giftObj = row.get("gift");
+                    if (!(type instanceof String) || !(giftObj instanceof Map)) continue;
+                    Object id = ((Map<?, ?>) giftObj).get("id");
+                    Object priceValue = row.get("priceCoins");
+                    if (priceValue == null) priceValue = ((Map<?, ?>) giftObj).get("coinPrice");
+                    int price = 0;
+                    try { price = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(Double.parseDouble(String.valueOf(priceValue))))); }
+                    catch (Exception ignored) { }
+                    // The selected CP gift belongs in the CP room tab even when its
+                    // dashboard price is zero (free/admin-configured). Visibility must not
+                    // depend on a positive price; the send endpoint remains authoritative.
+                    if (id instanceof String && !((String) id).isEmpty()) {
+                        String giftId = (String) id;
+                        mappings.put(giftId, (String) type);
+                        if (priceValue != null) prices.put(giftId, price);
+                        Map<?, ?> giftRow = (Map<?, ?>) giftObj;
+                        GiftDtos.GiftDto configuredGift = new GiftDtos.GiftDto();
+                        configuredGift.id = giftId;
+                        Object nameValue = giftRow.get("name");
+                        if (nameValue != null) configuredGift.name = String.valueOf(nameValue);
+                        Object iconValue = giftRow.get("iconUrl");
+                        if (iconValue != null) configuredGift.iconUrl = String.valueOf(iconValue);
+                        Object animationValue = giftRow.get("animationUrl");
+                        if (animationValue != null) configuredGift.animationUrl = String.valueOf(animationValue);
+                        configuredGift.type = "premium";
+                        configuredGift.category = "cp";
+                        configuredGift.coinPrice = price;
+                        try { configuredGift.diamondValue = Math.max(0, Integer.parseInt(String.valueOf(giftRow.get("diamondValue")))); }
+                        catch (Exception ignored) { }
+                        try { configuredGift.sortOrder = Integer.parseInt(String.valueOf(giftRow.get("sortOrder"))); }
+                        catch (Exception ignored) { }
+                        cpGiftCatalog.put(giftId, configuredGift);
+                    }
+                }
+            }
+            if (result.success && !host.isFinishing()) {
+                final boolean resolvedGiftTabEnabled = configuredGiftTabEnabled;
+                host.runOnUiThread(() -> {
+                    if (!isAdded() || getActivity() != host || binding == null) return;
+                    cpGiftTabEnabled = resolvedGiftTabEnabled;
+                    cpGiftTypes.clear();
+                    cpGiftTypes.putAll(mappings);
+                    cpGiftPrices.clear();
+                    cpGiftPrices.putAll(prices);
+                    for (Map.Entry<String, GiftDtos.GiftDto> entry : cpGiftCatalog.entrySet()) {
+                        GiftDtos.GiftDto configured = entry.getValue();
+                        GiftDtos.GiftDto current = null;
+                        for (GiftDtos.GiftDto candidate : allGifts) {
+                            if (candidate != null && entry.getKey().equals(candidate.id)) {
+                                current = candidate;
+                                break;
+                            }
+                        }
+                        if (current == null) {
+                            allGifts.add(configured);
+                        } else {
+                            // Dashboard-uploaded icon/animation is authoritative for CP.
+                            if (configured.iconUrl != null && !configured.iconUrl.trim().isEmpty()) {
+                                current.iconUrl = configured.iconUrl;
+                            }
+                            if (configured.animationUrl != null && !configured.animationUrl.trim().isEmpty()) {
+                                current.animationUrl = configured.animationUrl;
+                            }
+                            if (configured.name != null && !configured.name.trim().isEmpty()) {
+                                current.name = configured.name;
+                            }
+                            current.category = "cp";
+                        }
+                    }
+                    applyCpGiftPrices();
+                    // Rebuild the tabs from the live dashboard CP gift data without
+                    // issuing a second full catalog request while the sheet is opening.
+                    applyCategories(new ArrayList<>(tabCategories));
+                    applyFilter();
+                    refreshSendBtn();
+                    updateDockText();
+                });
+            }
+        });
+    }
+
+    /** CP gift prices are controlled by the dashboard and override the normal gift-card price in this sheet. */
+    private void applyCpGiftPrices() {
+        if (allGifts == null || allGifts.isEmpty() || cpGiftPrices.isEmpty()) return;
+        for (GiftDtos.GiftDto gift : allGifts) {
+            if (gift == null || gift.id == null) continue;
+            Integer configured = cpGiftPrices.get(gift.id);
+            if (configured != null && configured > 0) gift.coinPrice = configured;
+        }
     }
 
     // ─── Gift sent ────────────────────────────────────────────────────────────
@@ -1099,6 +1426,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             @Nullable String roomId) {
         sending = false;
         if (result == null) return;
+        pendingSendRequestId = null;
+        pendingSendFingerprint = null;
         // Consume sticky result first so re-observe never double-fires this payload.
         try {
             vm.clearSent();
@@ -1165,13 +1494,31 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         android.app.Activity hostAct = getActivity();
         if (hostAct instanceof VoiceRoomActivity room) {
             SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
+            // UI-only feedback: display the actual selected quantity after the send succeeds.
+            com.Dramizo.Series.util.GlobalCelebrationToast.showGiftCount(
+                    hostAct, session.getDisplayName(), name, session.getAvatarUrl(), icon,
+                    Math.max(1, result.quantity > 0 ? result.quantity : qty));
             List<String> tgts = !lastTargets.isEmpty()
                     ? new ArrayList<>(lastTargets)
                     : (receiverId != null
                     ? java.util.Collections.singletonList(receiverId)
                     : java.util.Collections.emptyList());
-            boolean allMic = sendToAllMic && tgts.size() > 1;
+            // Any multi-recipient send uses one synchronized group animation, whether recipients
+            // were selected individually or via the all-mic shortcut.
+            boolean allMic = tgts.size() > 1;
             if (luckyGift) {
+                room.armLuckyGiftCannon(
+                        gift != null ? gift.id : (selected != null ? selected.id : null),
+                        icon, name,
+                        gift != null ? gift.coinPrice : (selected != null ? selected.coinPrice : 0),
+                        qty, tgts);
+            }
+            if (luckyGift) {
+                // Show the selected send quantity, not the lucky multiplier (which is unrelated).
+                // Keep comboCount at 1 so X7/X17/X77/X177 does not masquerade as a normal combo streak.
+                room.showGiftSendToastCountUp(
+                        session.getDisplayName(), name, session.getAvatarUrl(), icon,
+                        Math.max(1, result.quantity > 0 ? result.quantity : qty));
                 // Center hero + simultaneous clones to selected/all mic seats.
                 try {
                     GiftAudioFx.playLuckyCoins(requireContext(), 1);
@@ -1192,14 +1539,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         }
                     }
                     room.announceLuckyGiftChat(
-                            name, icon, session.getDisplayName(), 1,
+                                name, icon, session.getDisplayName(), Math.max(1, qty),
                             session.getUserId(), Math.max(0, session.getVipLevel()),
                             session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
                             session.getHostBadgeUrl());
                 } catch (OutOfMemoryError | Exception e) {
                     try {
                         room.announceLuckyGiftChat(
-                                name, icon, session.getDisplayName(), 1,
+                                name, icon, session.getDisplayName(), Math.max(1, qty),
                                 session.getUserId(), Math.max(0, session.getVipLevel()),
                                 session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
                                 session.getHostBadgeUrl());
@@ -1264,6 +1611,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             }
             final long wonCoins = wonCoinsResolved;
             final int mulFinal = mul;
+            final int sentQty = Math.max(1, result.quantity > 0 ? result.quantity : qty);
             final boolean softFinal = softReturn;
             final boolean didWin = wonCoins > 0;
             final Context sfxCtx = hostAct != null
@@ -1273,40 +1621,42 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             dismissAllowingStateLoss();
             if (hostAct instanceof VoiceRoomActivity room) {
                 SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
-                Runnable showSmallToast = () -> {
-                    if (hostAct == null || hostAct.isFinishing() || !didWin) return;
-                    String msg = softFinal
-                            ? ("مردود +" + wonCoins)
-                            : ("ضرب حظه ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
-                    room.showLuckyResultToast(
-                            session.getDisplayName(),
-                            session.getAvatarUrl(),
-                            Math.max(1, session.getUserLevel()),
-                            Math.max(0, session.getVipLevel()),
-                            msg);
-                };
                 if (didWin) {
                     String who = session.getDisplayName();
                     if (who == null || who.isEmpty()) who = "مستخدم";
                     String chat = softFinal
-                            ? ("ضرب حظه · مردود +" + wonCoins)
-                            : ("ضرب حظه وربح ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                            ? ("أرسل هدية ×" + sentQty + " · مردود +" + wonCoins)
+                            : ("أرسل هدية ×" + sentQty + " · حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
                     try {
                         room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
                         String meId = session.getUserId();
                         if (meId != null && !meId.isEmpty()) {
-                            room.showLuckyReturnOnMics(
-                                    java.util.Collections.singletonList(meId), wonCoins);
-                            // One light rain only — not a second full particle storm.
-                            room.playCoinRainToUsers(
-                                    java.util.Collections.singletonList(meId), 8);
+                            // Lucky return is now text/toast only. Do not spawn the old
+                            // center-screen lucky coin return or coin rain effect.
                         }
                         if (sfxCtx != null) {
                             GiftAudioFx.playLuckyCoins(sfxCtx, 1);
                         }
                     } catch (OutOfMemoryError | Exception ignored) {
                     }
-                    hostAct.getWindow().getDecorView().postDelayed(showSmallToast, 200L);
+                    // Use the same configurable compact top toast as the dashboard design.
+                    // Do not show the legacy mid-screen room result toast.
+                    String luckyToastBody = softFinal
+                            ? ("مردود +" + wonCoins)
+                            : ("حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                    com.Dramizo.Series.util.GlobalCelebrationToast.show(
+                            room,
+                            who,
+                            luckyToastBody,
+                            session.getAvatarUrl(),
+                            icon,
+                            "lucky-room:" + System.currentTimeMillis(),
+                            28,
+                            softFinal ? 0 : Math.max(1, mulFinal),
+                            wonCoins,
+                            who,
+                            "lucky_hit",
+                            null);
                 }
                 // Empty roll: silent.
             } else if (didWin) {
@@ -1510,6 +1860,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (id != null) out.putString(STATE_GIFT, id);
         out.putInt(STATE_QTY, giftQty);
         out.putBoolean(STATE_ALL_MIC, sendToAllMic);
+        if (pendingSendRequestId != null) out.putString(STATE_GIFT_REQUEST_ID, pendingSendRequestId);
+        if (pendingSendFingerprint != null) out.putString(STATE_GIFT_REQUEST_FINGERPRINT, pendingSendFingerprint);
         if (receiverId != null) out.putString(ARG_RECEIVER, receiverId);
     }
 
@@ -1523,6 +1875,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     public void onDestroyView() {
         dismissQtyPopup();
         clearSeatGiftSelection();
+        if (cpConfigListener != null) {
+            RealtimeClient.getInstance().removeUserListener(cpConfigListener);
+            cpConfigListener = null;
+        }
+        if (binding != null && giftPageChangeCallback != null) {
+            try { binding.vpGiftListContainer.unregisterOnPageChangeCallback(giftPageChangeCallback); } catch (Exception ignored) {}
+        }
+        giftPageChangeCallback = null;
+        if (binding != null && giftTabListener != null) {
+            try { binding.miGiftCategory.removeOnTabSelectedListener(giftTabListener); } catch (Exception ignored) {}
+        }
+        giftTabListener = null;
         if (tabMediator != null) {
             try { tabMediator.detach(); } catch (Exception ignored) {}
             tabMediator = null;
@@ -1536,6 +1900,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         wealthLevelAvatar = null;
         wealthLevelFrame = null;
         noCpLayout = null;
+        removeCpProgressOverlay();
         hascpLayout = null;
         super.onDestroyView();
     }

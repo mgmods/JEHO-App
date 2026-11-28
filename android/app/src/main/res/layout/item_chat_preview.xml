@@ -5,9 +5,13 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/bg_light"
+    android:layout_marginStart="10dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginBottom="4dp"
+    android:background="@drawable/bg_chat_preview_card"
     android:foreground="?attr/selectableItemBackground"
-    android:minHeight="72dp">
+    android:minHeight="84dp">
 
     <LinearLayout
         android:id="@+id/chatRowBody"
@@ -17,19 +21,19 @@
         android:layoutDirection="locale"
         android:minHeight="72dp"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="10dp">
+        android:paddingStart="13dp"
+        android:paddingTop="11dp"
+        android:paddingEnd="52dp"
+        android:paddingBottom="11dp">
 
         <FrameLayout
-            android:layout_width="56dp"
-            android:layout_height="56dp">
+            android:layout_width="64dp"
+            android:layout_height="64dp">
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/imgAvatar"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
                 android:layout_gravity="center"
                 android:contentDescription="@string/chat"
                 android:scaleType="centerCrop"
@@ -49,6 +53,16 @@
                 android:id="@+id/imgHostBadge"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgCustomRankBadge"
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:layout_gravity="top|end"
+                android:contentDescription="@null"
+                android:elevation="8dp"
+                android:scaleType="fitCenter"
                 android:visibility="gone" />
 
             <View
@@ -186,10 +200,24 @@
         </LinearLayout>
     </LinearLayout>
 
+    <ImageButton
+        android:id="@+id/btnConversationMore"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="خيارات المحادثة"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_chat_menu_more"
+        android:tint="#737B8C" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
         android:layout_gravity="bottom"
+        android:visibility="gone"
         android:layout_marginStart="84dp"
         android:background="@color/divider_color" />
 </FrameLayout>

@@ -3,8 +3,8 @@
     <title>icon/tab/me-h</title>
     <defs>
         <linearGradient x1="50%" y1="50%" x2="50%" y2="100%" id="linearGradient-1">
-            <stop stop-color="#FFFFFF" offset="0%"></stop>
-            <stop stop-color="#86BA9D" offset="100%"></stop>
+            <stop stop-color="#FFE8A3" offset="0%"></stop>
+            <stop stop-color="#E99B35" offset="100%"></stop>
         </linearGradient>
     </defs>
     <g id="探索-黑" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">

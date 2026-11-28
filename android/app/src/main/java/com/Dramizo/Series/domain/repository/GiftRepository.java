@@ -20,7 +20,15 @@ public interface GiftRepository {
 
     Result<GiftDtos.SendGiftResult> sendGift(
             String giftId, String receiverId, int qty, String roomId, int comboCount);
-
+    default Result<GiftDtos.SendGiftResult> sendGift(String giftId, String receiverId, int qty,
+            String roomId, int comboCount, String requestId) {
+        return sendGift(giftId, receiverId, qty, roomId, comboCount);
+    }
     Result<GiftDtos.SendGiftResult> sendAllMic(
             String giftId, java.util.List<String> receiverIds, int qty, String roomId, int comboCount);
+    default Result<GiftDtos.SendGiftResult> sendAllMic(String giftId,
+            java.util.List<String> receiverIds, int qty, String roomId, int comboCount,
+            boolean includeHost, String requestId) {
+        return sendAllMic(giftId, receiverIds, qty, roomId, comboCount);
+    }
 }

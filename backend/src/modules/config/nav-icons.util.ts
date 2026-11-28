@@ -4,6 +4,11 @@
  */
 
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
+export const PROFILE_ACTION_KEYS = ['vip', 'level', 'store', 'room', 'agencyCenter', 'events', 'agency', 'tasks', 'recharge', 'tools', 'settings', 'support'] as const;
+export type ProfileActionKey = typeof PROFILE_ACTION_KEYS[number];
+export const CHANNEL_ICON_KEYS = ['officialNews', 'adminMessages', 'notifications'] as const;
+export type ChannelIconKey = typeof CHANNEL_ICON_KEYS[number];
+export type HomeShortcutKey = 'search' | 'room';
 
 export type NavIconPair = {
   /** Default / unselected icon URL (png/jpg). */
@@ -22,18 +27,51 @@ export type NavIconsConfig = {
   games?: NavIconPair;
   chat?: NavIconPair;
   me?: NavIconPair;
+  /** Single uploaded icon for each shortcut in the profile (أنا) grid. */
+  profileActions?: Partial<Record<ProfileActionKey, string>>;
+  /** Shared icons and global verification state for chat inbox channels. */
+  channelIcons?: Partial<Record<ChannelIconKey, string>>;
+  homeShortcuts?: Partial<Record<HomeShortcutKey, string>>;
+  officialNewsVerified?: boolean;
+  adminMessagesVerified?: boolean;
 };
 
 export const NAV_TAB_KEYS: NavTabKey[] = ['party', 'drama', 'games', 'chat', 'me'];
 
 const IMG_RE = /\.(png|jpe?g|webp|svg)(\?|$)/i;
+const CURRENT_JEHO_API_ORIGIN = 'https://jeho-own-web-910481ae.hosted.cumin.dev';
+
+/** Public media is served at host root, not below Nest's /api/v1 prefix. */
+function publicOrigin(raw?: string): string {
+  const configured = String(raw || '').trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
+  if (
+    !configured
+    || /jeho-own-backend\.mgs\.(?:blitz|prod)\.page/i.test(configured)
+    || /jeho-own-backend\.mgs\.blitz\.cloud/i.test(configured)
+  ) {
+    return CURRENT_JEHO_API_ORIGIN;
+  }
+  return configured;
+}
 
 function cleanUrl(raw: unknown): string {
   if (raw == null) return '';
   const s = String(raw).trim();
   if (!s) return '';
-  // Allow absolute or site-relative uploads paths.
-  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('/')) return s;
+  // Uploads belong to the active JEHO-OWN deployment. If older dashboard
+  // versions saved an absolute URL from the legacy host, retain only its
+  // /uploads path so clients resolve it against the current API origin.
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    try {
+      const parsed = new URL(s);
+      if (parsed.pathname.startsWith('/uploads/')) return parsed.pathname + parsed.search;
+    } catch {
+      // Preserve an unparseable absolute URL; the client can fall back safely.
+    }
+    return s;
+  }
+  // Allow site-relative uploads paths and other absolute URLs.
+  if (s.startsWith('/')) return s;
   if (s.startsWith('uploads/') || s.startsWith('banners/')) return `/${s}`;
   return s;
 }
@@ -57,9 +95,9 @@ export function emptyNavIconsConfig(): NavIconsConfig {
 
 /** Shipped JEHO tab SVGs under /assets/nav-icons (same art as APK assets/icons). */
 export function defaultNavIconsConfig(
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || CURRENT_JEHO_API_ORIGIN,
 ): NavIconsConfig {
-  const base = `${String(origin).replace(/\/$/, '')}/assets/nav-icons`;
+  const base = `${publicOrigin(origin)}/assets/nav-icons`;
   const pair = (name: string): NavIconPair => ({
     normal: `${base}/ic_home_tab_${name}_normal.svg`,
     selected: `${base}/ic_home_tab_${name}_selected.svg`,
@@ -71,6 +109,11 @@ export function defaultNavIconsConfig(
     games: pair('game'),
     chat: pair('chat'),
     me: pair('me'),
+    profileActions: {},
+    channelIcons: {},
+    homeShortcuts: {},
+    officialNewsVerified: true,
+    adminMessagesVerified: true,
   };
 }
 
@@ -100,6 +143,26 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
       (out as any)[key] = (defaults as any)[key] || {};
     }
   }
+  const rawActions = src.profileActions && typeof src.profileActions === 'object' ? src.profileActions : {};
+  const profileActions: Partial<Record<ProfileActionKey, string>> = {};
+  for (const key of PROFILE_ACTION_KEYS) {
+    const url = cleanUrl(rawActions[key]);
+    if (url) profileActions[key] = url;
+  }
+  out.profileActions = profileActions;
+  const rawChannelIcons = src.channelIcons && typeof src.channelIcons === 'object' ? src.channelIcons : {};
+  const channelIcons: Partial<Record<ChannelIconKey, string>> = {};
+  for (const key of CHANNEL_ICON_KEYS) {
+    const url = cleanUrl(rawChannelIcons[key]);
+    if (url) channelIcons[key] = url;
+  }
+  out.channelIcons = channelIcons;
+  const rawHome = src.homeShortcuts && typeof src.homeShortcuts === 'object' ? src.homeShortcuts : {};
+  const homeShortcuts: Partial<Record<HomeShortcutKey, string>> = {};
+  for (const key of ['search', 'room'] as HomeShortcutKey[]) { const url = cleanUrl(rawHome[key]); if (url) homeShortcuts[key] = url; }
+  out.homeShortcuts = homeShortcuts;
+  out.officialNewsVerified = obj.officialNewsVerified !== false;
+  out.adminMessagesVerified = obj.adminMessagesVerified !== false;
   return out;
 }
 
@@ -107,7 +170,7 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
 export function resolveNavIconUrl(
   pair: NavIconPair | undefined | null,
   selected: boolean,
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ): string {
   if (!pair) return '';
   const base = selected
@@ -115,13 +178,13 @@ export function resolveNavIconUrl(
     : pair.normal || pair.icon || pair.selected || '';
   if (!base) return '';
   if (/^https?:\/\//i.test(base)) return base;
-  const o = origin.replace(/\/$/, '');
+  const o = publicOrigin(origin);
   return `${o}${base.startsWith('/') ? '' : '/'}${base}`;
 }
 
 export function navIconsClientPayload(
   cfg: NavIconsConfig,
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ) {
   const map = (pair?: NavIconPair) => {
     const normal = resolveNavIconUrl(pair, false, origin);
@@ -139,6 +202,15 @@ export function navIconsClientPayload(
     games: map(cfg.games),
     chat: map(cfg.chat),
     me: map(cfg.me),
+    profileActions: Object.fromEntries(
+      PROFILE_ACTION_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.profileActions?.[key] }, false, origin) || '']),
+    ),
+    channelIcons: Object.fromEntries(
+      CHANNEL_ICON_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.channelIcons?.[key] }, false, origin) || '']),
+    ),
+    homeShortcuts: Object.fromEntries((['search', 'room'] as HomeShortcutKey[]).map((key) => [key, resolveNavIconUrl({ icon: cfg.homeShortcuts?.[key] }, false, origin) || ''])),
+    officialNewsVerified: cfg.officialNewsVerified !== false,
+    adminMessagesVerified: cfg.adminMessagesVerified !== false,
     /** Hint for clients / docs. */
     formats: ['png', 'jpg', 'jpeg', 'webp', 'svg'],
   };

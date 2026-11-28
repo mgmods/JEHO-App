@@ -133,7 +133,42 @@ public final class RewardBurstOverlay {
     }
 
     public static void showCheckIn(@NonNull Context context) {
-        show(context, Kind.CHEST, "تم تسجيل الحضور!", "استلم المكافأة من قائمة المهام");
+        if (context instanceof Activity) {
+            Activity activity = (Activity) context;
+            if (activity.isFinishing() || activity.isDestroyed()) return;
+        }
+        Dialog dialog = new Dialog(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        View root = LayoutInflater.from(context).inflate(R.layout.dialog_reward_burst, null, false);
+        dialog.setContentView(root);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setDimAmount(0.45f);
+        }
+        ImageView hero = root.findViewById(R.id.imgHero);
+        TextView title = root.findViewById(R.id.tvHeroTitle);
+        TextView subtitle = root.findViewById(R.id.tvHeroSubtitle);
+        MaterialButton ok = root.findViewById(R.id.btnHeroOk);
+        FrameLayout particles = root.findViewById(R.id.particleLayer);
+        View card = root.findViewById(R.id.heroCard);
+        hero.setImageResource(R.drawable.ic_asset_gift);
+        title.setText("تم استلام الهدية بنجاح!");
+        subtitle.setText("مكافأة تسجيل الدخول اليومية أصبحت في رصيدك");
+        if (particles != null) particles.setVisibility(View.GONE);
+        if (card != null) {
+            card.setScaleX(0.82f);
+            card.setScaleY(0.82f);
+            card.setAlpha(0f);
+            card.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(360).setInterpolator(new OvershootInterpolator(1.12f)).start();
+        }
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        ok.setText("حسنًا");
+        ok.setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
     }
 
     public static void showCoins(@NonNull Context context, @NonNull String title, @NonNull String subtitle) {

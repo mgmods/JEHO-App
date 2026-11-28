@@ -2,6 +2,6 @@
 <!-- Solid grouped list container — opaque white like Mikoo cards. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#FFFFFFFF" />
+    <solid android:color="#FFFFF0D1" />
     <corners android:radius="12dp" />
 </shape>

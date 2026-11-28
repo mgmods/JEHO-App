@@ -1,0 +1,39 @@
+name: JEHO Games Integrity
+
+on:
+  pull_request:
+    branches:
+      - MG-JEHO
+    paths:
+      - "backend/**"
+      - ".github/workflows/jeho-games-integrity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  games-integrity:
+    name: Mikoo RTP tests and backend validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install locked backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Test Mikoo RTP calibration
+        run: npm --prefix backend run test:games
+
+      - name: Backend TypeScript check
+        run: npm --prefix backend run lint
+
+      - name: Build backend
+        run: npm --prefix backend run build

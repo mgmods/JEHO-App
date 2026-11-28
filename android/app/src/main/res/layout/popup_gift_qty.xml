@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Vertical dropdown — Mikoo RoomGiftDialog: 1 / 7 / 17 / 77 / 177 -->
+<!-- Original gift quantity choices: 1 / 7 / 17 / 77 / 177 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
@@ -49,7 +49,7 @@
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/popupQty27"
+        android:id="@+id/popupQty77"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="40dp"
@@ -62,7 +62,7 @@
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/popupQty77"
+        android:id="@+id/popupQty177"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="40dp"

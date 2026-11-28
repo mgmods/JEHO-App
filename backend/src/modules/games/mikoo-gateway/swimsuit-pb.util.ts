@@ -1,3 +1,4 @@
+import { secureGameRandom } from '../secure-game-rng';
 /**
  * Minimal protobuf encode/decode for swimsuit-party BaiShun Packer routes.
  * Field numbers taken from the game's embedded protobufjs definitions.
@@ -151,7 +152,7 @@ export function encodeEmptyBoard(cols = 5, rows = 4): Buffer[] {
     const col: number[] = [];
     for (let r = 0; r < rows; r++) {
       // Prefer low face symbols (1..8) — avoid 0 UNKNOWN.
-      col.push(1 + Math.floor(Math.random() * 8));
+      col.push(1 + Math.floor(secureGameRandom() * 8));
     }
     board.push(pbBytes(2, encodeCow(col))); // PlayerSpinRes.Board field 2
   }
@@ -162,7 +163,7 @@ export function encodeLastSpinBoard(cols = 5, rows = 4): Buffer {
   const parts: Buffer[] = [];
   for (let c = 0; c < cols; c++) {
     const col: number[] = [];
-    for (let r = 0; r < rows; r++) col.push(1 + Math.floor(Math.random() * 8));
+    for (let r = 0; r < rows; r++) col.push(1 + Math.floor(secureGameRandom() * 8));
     parts.push(pbBytes(1, encodeCow(col))); // LastSpinResultInfo.Board field 1
   }
   parts.push(pbDouble(3, 0));

@@ -11,18 +11,57 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 import { MikooGatewayService } from './modules/games/mikoo-gateway/mikoo-gateway.service';
+import { UploadsService } from './modules/uploads/uploads.service';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
+  // Plain diagnostics survive even when Nest logging is not ready yet.
+  console.log('[JEHO-OWN boot] Starting Nest application initialization...');
+  console.log('[JEHO-OWN boot STEP] NestFactory.create: start');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  console.log('[JEHO-OWN boot STEP] NestFactory.create: complete');
+  console.log('[JEHO-OWN boot] Nest application initialized; configuring HTTP and realtime services.');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
-  const apiPrefix = configService.get<string>('app.apiPrefix') || 'api/v1';
+  // Android and the same-origin admin dashboard both use /api/v1.
+  // Do not let a stale host-level API_PREFIX silently move every controller
+  // away from the paths shipped in the APK and dashboard bundle.
+  const configuredApiPrefix = String(configService.get<string>('app.apiPrefix') || 'api/v1')
+    .replace(/^\/+|\/+$/g, '');
+  const apiPrefix = 'api/v1';
+  if (configuredApiPrefix !== apiPrefix) {
+    console.warn(`[JEHO-OWN boot] Ignoring mismatched API_PREFIX="${configuredApiPrefix}"; clients require /api/v1.`);
+  }
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || ['*'];
   const redisIoAdapter = new RedisIoAdapter(app, configService);
-  await redisIoAdapter.connect();
+  // Redis is optional for a single backend instance. Never let Redis DNS/network
+  // issues prevent the HTTP API, profile, gifts, or dashboard from starting.
+  console.log('[JEHO-OWN boot STEP] Redis adapter connection: start');
+  try {
+    await new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn('[JEHO-OWN boot] Redis connection exceeded 7s; continuing with local Socket.IO adapter.');
+        resolve(false);
+      }, 7000);
+      redisIoAdapter.connect().then(
+        (connected) => {
+          clearTimeout(timeout);
+          resolve(connected);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      );
+    });
+  } catch (error) {
+    console.warn('[JEHO-OWN boot] Redis setup failed; continuing without Redis adapter:',
+      error instanceof Error ? error.message : String(error));
+  }
+  console.log('[JEHO-OWN boot STEP] Redis adapter setup: complete');
   app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(
@@ -85,34 +124,80 @@ async function bootstrap() {
     setHeaders: noStoreHeaders,
   });
 
-  // BaiShun HTML: inject JEHO host rewrite before static serve (no jieyou/sruner/zkruner).
   const expressAppEarly = app.getHttpAdapter().getInstance();
+
+  // Backward-compatible public upload URL. New uploads are stored in Supabase and the
+  // upload service removes the ephemeral local copy, so /uploads/:filename must fall
+  // through to Storage instead of returning the local static 404. This also keeps old
+  // profile/room/splash URLs working without requiring an APK update.
+  console.log('[JEHO-OWN boot STEP] UploadsService resolution: start');
+  const uploadsService = app.get(UploadsService);
+  console.log('[JEHO-OWN boot STEP] UploadsService resolution: complete');
+  expressAppEarly.get('/uploads/:filename', async (req: { params: { filename?: string } }, res: {
+    setHeader: (k: string, v: string) => void;
+    status: (n: number) => { send: (body: string | Buffer) => void };
+  }) => {
+    try {
+      const filename = String(req.params?.filename || '');
+      const stored = await uploadsService.getStoredFile(filename);
+      if (!stored) return res.status(404).send('File not found');
+      res.setHeader('Content-Type', stored.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(stored.buffer);
+    } catch {
+      return res.status(502).send('Storage unavailable');
+    }
+  });
+
+  // Inject the JEHO host bridge into every Mikoo game document before any game
+  // scripts execute. Several packaged HTML files had a broken relative path
+  // (../jeho-force-local.js), which silently left games connecting to retired hosts.
   const forceLocalTag =
-    '<script src="/games/mikoo/_jeho/jeho-force-local.js"></script>';
+    '<script src="/games/mikoo/jeho-force-local.js"></script>';
   expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
     setHeader: (k: string, v: string) => void;
     status: (n: number) => { end: (b: string) => void };
-    sendFile: (p: string, opts: { root?: string }, cb?: (err?: Error) => void) => void;
+  }, next: () => void) => {
+    const pathName = String(req.path || req.url || '').split('?')[0];
+    const gamePage = /^\/games\/mikoo\/([a-z0-9_-]+)\/?(?:index\.html)?$/i.exec(pathName);
+    if (req.method === 'GET' && gamePage) {
+      const slug = gamePage[1];
+      const htmlPath = join(process.cwd(), 'public', 'games', 'mikoo', slug, 'index.html');
+      readFile(htmlPath, 'utf8', (err, html) => {
+        if (err || !html) return next();
+        // Remove any stale or incorrectly-relative copy and inject the absolute
+        // same-origin path first in <head>, before Cocos bootstraps networking.
+        let out = html.replace(
+          /<script\b[^>]*jeho-force-local\.js[^>]*>\s*<\/script>/gi,
+          '',
+        );
+        out = out.replace(/<head([^>]*)>/i, '<head$1>\n    ' + forceLocalTag);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        noStoreHeaders(res);
+        res.status(200).end(out);
+      });
+      return;
+    }
+    next();
+  });
+
+  // Serve the Vue admin dashboard from the same origin as the API.
+  // Static files (including /admin/assets/*) continue through to static middleware below.
+  expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
+    setHeader: (k: string, v: string) => void;
+    status: (n: number) => { send: (body: string) => void };
   }, next: () => void) => {
     const pathName = String(req.path || req.url || '').split('?')[0];
     if (
       req.method === 'GET' &&
-      /^\/games\/mikoo\/(slot777|cleopatra-slot|football-plinko|fishing|hilo|royal-battle|swimsuit-party|greedy-lion)\/?(index\.html)?$/i.test(
-        pathName,
-      )
+      (pathName === '/admin' || pathName.startsWith('/admin/')) &&
+      !/\.[^/]+$/.test(pathName)
     ) {
-      const parts = pathName.replace(/\/+/g, '/').split('/');
-      const slug = parts[3];
-      const htmlPath = join(process.cwd(), 'public', 'games', 'mikoo', slug, 'index.html');
-      readFile(htmlPath, 'utf8', (err, html) => {
+      readFile(join(process.cwd(), 'public', 'admin', 'index.html'), 'utf8', (err, html) => {
         if (err || !html) return next();
-        let out = html;
-        if (!out.includes('jeho-force-local.js')) {
-          out = out.replace(/<head([^>]*)>/i, `<head$1>\n    ${forceLocalTag}`);
-        }
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         noStoreHeaders(res);
-        res.status(200).end(out);
+        res.status(200).send(html);
       });
       return;
     }
@@ -126,7 +211,14 @@ async function bootstrap() {
     // Required so Google can fetch /.well-known/assetlinks.json
     dotfiles: 'allow',
     setHeaders: (res, filePath) => {
-      noStoreHeaders(res);
+      // Vite production assets are content-hashed. Cache them aggressively so
+      // repeat dashboard opens do not re-download the JS/CSS bundle. The HTML
+      // entry point remains no-store and always points at the current build.
+      if (/[/\\\\]admin[/\\\\]assets[/\\\\]/.test(String(filePath))) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        noStoreHeaders(res);
+      }
       if (String(filePath).endsWith('assetlinks.json') || String(filePath).endsWith('jeho-force-local.js')) {
         if (String(filePath).endsWith('assetlinks.json')) {
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -135,6 +227,7 @@ async function bootstrap() {
     },
   });
 
+  console.log('[JEHO-OWN boot STEP] Swagger document generation: start');
   const swaggerConfig = new DocumentBuilder()
     .setTitle('JEHO CHAT API')
     .setDescription('JEHO CHAT voice-room platform backend')
@@ -143,11 +236,12 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
+  console.log('[JEHO-OWN boot STEP] Swagger document generation: complete');
 
   // Invite deep links: if the app is not installed, send user to Play with referrer.
   // When installed, Android App Links open SplashActivity instead of hitting this.
   const expressApp = app.getHttpAdapter().getInstance();
-  const playPackage = 'com.Dramizo.Series';
+  const playPackage = 'com.mgwa.chat';
   const inviteToPlay = (code: string) => {
     const clean = String(code || '')
       .trim()
@@ -211,14 +305,38 @@ const baishunModuleMap: Record<string, string> = {
     '1098': 'slot777',
     '1183': 'swimsuit-party',
   };
-  const apiOrigin = (process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '');
-  const wsOrigin = apiOrigin.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
-  const baishunGetAddr = (req: { query: Record<string, string | undefined> }, res: {
+  // The request host is authoritative for game HTTP and WebSocket endpoints.
+  const baishunGetAddr = (req: {
+    query: Record<string, string | undefined>;
+    protocol?: string;
+    headers?: Record<string, string | string[] | undefined>;
+  }, res: {
     setHeader: (k: string, v: string) => void;
     json: (body: unknown) => void;
+    status: (n: number) => { json: (body: unknown) => void };
   }) => {
     const rawId = String(req.query?.game_id || '1107').trim().toLowerCase();
     const slug = baishunModuleMap[rawId] || rawId;
+    const hostHeader = req.headers?.['x-forwarded-host'] || req.headers?.host || '';
+    const host = String(Array.isArray(hostHeader) ? hostHeader[0] : hostHeader)
+      .split(',')[0]
+      .trim();
+    const protoHeader = req.headers?.['x-forwarded-proto'] || req.protocol || 'https';
+    const protocol = String(Array.isArray(protoHeader) ? protoHeader[0] : protoHeader)
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const requestOrigin =
+      host && /^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host) && ['http', 'https'].includes(protocol)
+        ? `${protocol}://${host}`
+        : '';
+    const apiOrigin = requestOrigin;
+    if (!apiOrigin) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(503).json({ code: 503, message: 'Public API origin is not configured' });
+      return;
+    }
+    const wsOrigin = apiOrigin.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       code: 200,
@@ -251,7 +369,55 @@ const baishunModuleMap: Record<string, string> = {
     }
   }
 
-  await app.listen(port);
+  // Liveness only: confirms that the Node process and HTTP listener are alive.
+  // Deployment readiness is checked separately and must not be inferred from this.
+  expressApp.get('/healthz', (_req: unknown, res: {
+    status: (n: number) => { json: (body: unknown) => void };
+  }) => {
+    res.status(200).json({ ok: true, service: 'jeho-own-api', apiPrefix });
+  });
+
+  // Readiness verifies the database and the minimum schema required by the app
+  // and CP feature before a platform sends user traffic to this instance.
+  expressApp.get('/readyz', async (_req: unknown, res: {
+    status: (n: number) => { json: (body: unknown) => void };
+  }) => {
+    try {
+      const dataSource = app.get(DataSource);
+      const rows = await dataSource.query(`
+        SELECT
+          to_regclass('"jeho_own"."users"') IS NOT NULL AS users,
+          to_regclass('"jeho_own"."user_profiles"') IS NOT NULL AS user_profiles,
+          to_regclass('"jeho_own"."gifts"') IS NOT NULL AS gifts,
+          to_regclass('"jeho_own"."app_settings"') IS NOT NULL AS app_settings,
+          to_regclass('"jeho_own"."cosmetics"') IS NOT NULL AS cosmetics,
+          to_regclass('"jeho_own"."cp_relationships"') IS NOT NULL AS cp_relationships,
+          to_regclass('"jeho_own"."cp_requests"') IS NOT NULL AS cp_requests,
+          to_regclass('"jeho_own"."cp_level_reward_claims"') IS NOT NULL AS cp_level_reward_claims,
+          to_regclass('"jeho_own"."cp_level_gift_reward_claims"') IS NOT NULL AS cp_level_gift_reward_claims
+      `);
+      const state = rows?.[0] || {};
+      const missing = Object.entries(state).filter(([, ready]) => ready !== true).map(([name]) => name);
+      if (missing.length) {
+        res.status(503).json({ ok: false, service: 'jeho-own-api', ready: false, missing });
+        return;
+      }
+      res.status(200).json({ ok: true, service: 'jeho-own-api', ready: true });
+    } catch (error) {
+      res.status(503).json({
+        ok: false,
+        service: 'jeho-own-api',
+        ready: false,
+        message: error instanceof Error ? error.message : 'Database readiness check failed',
+      });
+    }
+  });
+
+  console.log('[JEHO-OWN boot STEP] HTTP listener: start');
+  console.log(`[JEHO-OWN boot] Opening HTTP listener on port ${port}...`);
+  await app.listen(port, '0.0.0.0');
+  console.log('[JEHO-OWN boot STEP] HTTP listener: complete');
+  console.log('[JEHO-OWN boot] HTTP listener is accepting requests.');
   const gateway = app.get(MikooGatewayService);
   gateway.attach(app.getHttpServer());
   // eslint-disable-next-line no-console
@@ -260,4 +426,8 @@ const baishunModuleMap: Record<string, string> = {
   console.log(`Swagger docs at http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('[JEHO-OWN boot] Fatal API startup error:',
+    error instanceof Error ? (error.stack || error.message) : String(error));
+  process.exitCode = 1;
+});

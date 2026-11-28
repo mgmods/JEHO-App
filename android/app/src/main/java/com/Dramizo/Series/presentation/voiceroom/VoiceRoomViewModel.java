@@ -10,6 +10,10 @@ import com.Dramizo.Series.domain.model.Result;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import com.Dramizo.Series.util.RoomJoinPrefetch;
 
 public class VoiceRoomViewModel extends ViewModel {
     private final AppContainer c;
@@ -19,8 +23,20 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<Boolean> handRaised = new MutableLiveData<>(false);
     private final MutableLiveData<List<RoomDtos.SeatRequestDto>> seatRequests =
             new MutableLiveData<>(new ArrayList<>());
+    private final MutableLiveData<Boolean> seatRequestsLoading = new MutableLiveData<>();
     private final MutableLiveData<RoomDtos.SupportersResult> supporters = new MutableLiveData<>();
     private final MutableLiveData<String> info = new MutableLiveData<>();
+    private final AtomicInteger joinGeneration = new AtomicInteger();
+    private final AtomicInteger refreshGeneration = new AtomicInteger();
+    // A room snapshot started before a seat/mic mutation must never overwrite its result.
+    private final AtomicInteger roomMutationGeneration = new AtomicInteger();
+    private final AtomicInteger pendingRoomMutations = new AtomicInteger();
+    // Pooled IO can reorder rapid seat taps; serialize seat mutations in tap order.
+    private final ExecutorService seatMutationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "jeho-seat-mutations");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public VoiceRoomViewModel(AppContainer c) { this.c = c; }
 
@@ -29,6 +45,7 @@ public class VoiceRoomViewModel extends ViewModel {
     public LiveData<String> getError() { return error; }
     public LiveData<Boolean> getHandRaised() { return handRaised; }
     public LiveData<List<RoomDtos.SeatRequestDto>> getSeatRequests() { return seatRequests; }
+    public LiveData<Boolean> getSeatRequestsLoading() { return seatRequestsLoading; }
     public LiveData<RoomDtos.SupportersResult> getSupporters() { return supporters; }
     public LiveData<String> getInfo() { return info; }
 
@@ -37,28 +54,63 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void join(String roomId, String password) {
-        c.getIoExecutor().execute(() -> {
-            Result<RoomDtos.JoinRoomResult> r = c.joinRoomUseCase.execute(roomId, password);
-            if (r.success) {
+        final String requestedRoomId = roomId;
+        final int generation = joinGeneration.incrementAndGet();
+        // A join result supersedes any older room refresh; stale network responses
+        // must never paint the previous room after a quick room switch.
+        refreshGeneration.incrementAndGet();
+        RoomJoinPrefetch.executeJoin(() -> {
+            Result<RoomDtos.JoinRoomResult> r;
+            try {
+                r = c.joinRoomUseCase.execute(requestedRoomId, password);
+            } catch (Exception e) {
+                r = Result.err(e.getMessage() != null ? e.getMessage() : "join failed");
+            }
+            if (generation != joinGeneration.get()) return;
+            if (r != null && r.success && r.data != null) {
                 session.postValue(r.data);
-                if (r.data != null && r.data.room != null) room.postValue(r.data.room);
-            } else error.postValue(r.error);
+                if (r.data.room != null
+                        && (requestedRoomId == null || requestedRoomId.equals(r.data.room.id))) {
+                    room.postValue(r.data.room);
+                }
+            } else {
+                error.postValue(r != null && r.error != null ? r.error : "تعذر دخول الغرفة");
+            }
         });
     }
 
     /** Restore UI from an in-process minimized session — no network join. */
     public void restoreLocalSession(RoomDtos.JoinRoomResult join, RoomDtos.RoomDto latest) {
         if (join == null) return;
+        joinGeneration.incrementAndGet();
+        refreshGeneration.incrementAndGet();
         session.setValue(join);
         if (latest != null) room.setValue(latest);
         else if (join.room != null) room.setValue(join.room);
     }
 
     public void refresh(String roomId) {
+        // A refresh during a pending mutation can only return an obsolete seat map.
+        if (pendingRoomMutations.get() > 0) return;
+        final String requestedRoomId = roomId;
+        final int generation = refreshGeneration.incrementAndGet();
+        final int mutationGeneration = roomMutationGeneration.get();
         c.getIoExecutor().execute(() -> {
-            Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(roomId);
-            if (r.success) room.postValue(r.data);
-            else error.postValue(r.error);
+            Result<RoomDtos.RoomDto> r;
+            try {
+                r = c.getRoomUseCase.execute(requestedRoomId);
+            } catch (Exception e) {
+                r = Result.err(e.getMessage() != null ? e.getMessage() : "refresh failed");
+            }
+            if (generation != refreshGeneration.get()
+                    || mutationGeneration != roomMutationGeneration.get()
+                    || pendingRoomMutations.get() > 0) return;
+            if (r != null && r.success && r.data != null
+                    && (requestedRoomId == null || requestedRoomId.equals(r.data.id))) {
+                room.postValue(r.data);
+            } else if (r != null && !r.success) {
+                error.postValue(r.error);
+            }
         });
     }
 
@@ -109,6 +161,7 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void loadSeatRequests(String roomId) {
+        seatRequestsLoading.postValue(true);
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.SeatRequestsResult> r = c.getRoomRepository().seatRequests(roomId);
             if (r.success && r.data != null && r.data.items != null) {
@@ -116,6 +169,8 @@ public class VoiceRoomViewModel extends ViewModel {
             } else if (r.success) {
                 seatRequests.postValue(new ArrayList<>());
             }
+            // Always release the dialog's loading state, including API failures.
+            seatRequestsLoading.postValue(false);
         });
     }
 
@@ -130,6 +185,19 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
+    public void assignSeat(String roomId, String userId, Integer seatIndex) {
+        c.getIoExecutor().execute(() -> {
+            Result<RoomDtos.RoomDto> r = c.getRoomRepository().assignSeat(roomId, userId, seatIndex);
+            if (r.success) {
+                room.postValue(r.data);
+                loadSeatRequests(roomId);
+                info.postValue("تم رفع المستخدم إلى المايك مباشرة");
+            } else {
+                error.postValue(r.error != null ? r.error : "تعذر رفع المستخدم إلى المايك");
+            }
+        });
+    }
+
     public void rejectSeat(String roomId, String userId) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().rejectSeat(roomId, userId);
@@ -141,8 +209,12 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void inviteSeat(String roomId, String userId) {
+        inviteSeat(roomId, userId, null);
+    }
+
+    public void inviteSeat(String roomId, String userId, Integer seatIndex) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getRoomRepository().inviteSeat(roomId, userId, null);
+            Result<Object> r = c.getRoomRepository().inviteSeat(roomId, userId, seatIndex);
             if (r.success) info.postValue("تم إرسال دعوة المايك");
             else error.postValue(r.error != null ? r.error : "تعذر إرسال الدعوة");
         });
@@ -215,7 +287,38 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void setMic(String roomId, boolean muted) {
-        c.getIoExecutor().execute(() -> c.getRoomRepository().setMic(roomId, muted));
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
+        seatMutationExecutor.execute(() -> {
+            try {
+                Result<Object> result = c.getRoomRepository().setMic(roomId, muted);
+                if (result == null || !result.success) {
+                    if (mutation == roomMutationGeneration.get()) {
+                        error.postValue(result != null && result.error != null
+                                ? result.error : "تعذر تغيير حالة المايك");
+                    }
+                    return;
+                }
+                // Read back the authoritative seat + mute flags after the write.
+                Result<RoomDtos.RoomDto> snapshot = c.getRoomUseCase.execute(roomId);
+                if (mutation == roomMutationGeneration.get()
+                        && snapshot != null && snapshot.success && snapshot.data != null) {
+                    room.postValue(snapshot.data);
+                } else if (mutation == roomMutationGeneration.get()
+                        && (snapshot == null || !snapshot.success)) {
+                    error.postValue(snapshot != null && snapshot.error != null
+                            ? snapshot.error : "تم تغيير المايك لكن تعذر مزامنة حالة المقعد");
+                }
+            } catch (Exception e) {
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر تغيير حالة المايك");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
+            }
+        });
     }
 
     public void setMic(String roomId, boolean muted, String targetUserId) {
@@ -231,37 +334,87 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void takeSeat(String roomId, int seatIndex) {
-        c.getIoExecutor().execute(() -> {
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
+        seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().takeSeat(roomId, seatIndex);
-                if (r.success) room.postValue(r.data);
-                else error.postValue(r.error != null ? r.error : "تعذر الصعود على المايك");
+                if (mutation == roomMutationGeneration.get()) {
+                    if (r != null && r.success && r.data != null) room.postValue(r.data);
+                    else error.postValue(r != null && r.error != null
+                            ? r.error : "تعذر الصعود على المايك");
+                }
             } catch (Exception e) {
-                error.postValue(e.getMessage() != null ? e.getMessage() : "تعذر الصعود على المايك");
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر الصعود على المايك");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
             }
         });
     }
 
     public void leaveSeat(String roomId) {
-        c.getIoExecutor().execute(() -> {
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
+        seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().leaveSeat(roomId);
-                if (r.success) room.postValue(r.data);
-                else error.postValue(r.error);
+                if (mutation == roomMutationGeneration.get()) {
+                    if (r != null && r.success && r.data != null) room.postValue(r.data);
+                    else error.postValue(r != null && r.error != null
+                            ? r.error : "تعذر مغادرة المقعد");
+                }
             } catch (Exception e) {
-                error.postValue(e.getMessage() != null ? e.getMessage() : "تعذر مغادرة المقعد");
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر مغادرة المقعد");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
             }
         });
     }
 
-    public void forceLeaveSeat(String roomId, String userId) {
+    @Override protected void onCleared() {
+        seatMutationExecutor.shutdownNow();
+        super.onCleared();
+    }
+
+    public void removeMemberFromMic(String roomId, String userId) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getRoomRepository().forceLeaveSeat(roomId, userId, "moderator");
-            if (r.success) {
-                info.postValue("تم إنزال المستخدم من المايك");
-                refresh(roomId);
+            Result<Object> action = c.getRoomRepository().removeMemberFromMic(roomId, userId, "moderator_remove_mic");
+            if (!action.success) {
+                error.postValue(action.error != null ? action.error : "تعذر إنزال المستخدم من المايك");
+                return;
+            }
+
+            // Verify the authoritative room snapshot before reporting success. This
+            // avoids telling staff the user was removed while the seat still appears
+            // occupied in the refreshed room state.
+            Result<RoomDtos.RoomDto> snapshot = c.getRoomUseCase.execute(roomId);
+            if (!snapshot.success || snapshot.data == null) {
+                error.postValue(snapshot.error != null
+                        ? snapshot.error : "تم إرسال الطلب لكن تعذر التحقق من المقعد");
+                return;
+            }
+            room.postValue(snapshot.data);
+            boolean stillSeated = false;
+            if (snapshot.data.seats != null) {
+                for (RoomDtos.SeatDto seat : snapshot.data.seats) {
+                    if (seat != null && userId.equals(seat.userId)) {
+                        stillSeated = true;
+                        break;
+                    }
+                }
+            }
+            if (stillSeated) {
+                error.postValue("الخادم لم يؤكد إنزال المستخدم من المايك؛ حاول مرة أخرى");
             } else {
-                error.postValue(r.error != null ? r.error : "تعذر إنزال المستخدم من المايك");
+                info.postValue("تم إنزال المستخدم من المايك");
             }
         });
     }
@@ -296,16 +449,20 @@ public class VoiceRoomViewModel extends ViewModel {
     public void kickUser(String roomId, String userId, String reason) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().kick(roomId, userId, reason);
-            if (r.success) info.postValue("تم إخراج المستخدم من الغرفة");
-            else error.postValue(r.error != null ? r.error : "تعذر الإخراج");
+            if (r.success) {
+                info.postValue("تم إخراج المستخدم من الغرفة");
+                refresh(roomId);
+            } else error.postValue(r.error != null ? r.error : "تعذر الإخراج");
         });
     }
 
     public void banUser(String roomId, String userId, String reason, Integer durationMinutes) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().ban(roomId, userId, reason, durationMinutes);
-            if (r.success) info.postValue("تم تطبيق الطرد المؤقت");
-            else error.postValue(r.error != null ? r.error : "تعذر الحظر");
+            if (r.success) {
+                info.postValue("تم تطبيق الطرد المؤقت");
+                refresh(roomId);
+            } else error.postValue(r.error != null ? r.error : "تعذر الحظر");
         });
     }
 
@@ -386,9 +543,19 @@ public class VoiceRoomViewModel extends ViewModel {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().setBackground(roomId, backgroundUrl);
             if (r.success) {
+                // The server has confirmed persistence; update the visible room immediately
+                // instead of waiting for a second GET /rooms/:id to finish.
+                RoomDtos.RoomDto current = room.getValue();
+                if (current != null) {
+                    current.backgroundUrl = backgroundUrl;
+                    room.postValue(current);
+                } else {
+                    refresh(roomId);
+                }
                 info.postValue("تم تغيير خلفية الغرفة");
-                refresh(roomId);
-            } else error.postValue(r.error);
+            } else {
+                error.postValue(r.error != null ? r.error : "تعذر تطبيق خلفية الغرفة");
+            }
         });
     }
 

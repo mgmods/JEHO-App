@@ -1,5 +1,6 @@
 package com.Dramizo.Series.fcm;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.util.Log;
 
@@ -10,6 +11,7 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.util.ActiveChatTracker;
+import com.Dramizo.Series.util.InAppNotificationBanner;
 import com.Dramizo.Series.util.AuraNotificationHelper;
 import com.Dramizo.Series.util.NotificationRouter;
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -28,9 +30,9 @@ public class AuraMessagingService extends FirebaseMessagingService {
         AuraLiveApp app = (AuraLiveApp) getApplication();
         AppContainer container = app.getContainer();
         container.getSessionManager().saveFcmToken(token);
-        container.getIoExecutor().execute(() ->
-                container.getNotificationRepository().registerDevice(token, "android")
-        );
+        // Token refresh can happen before login; the app retries registration after auth
+        // becomes available instead of sending an unauthenticated device-registration call.
+        app.registerFcmDeviceIfReady();
     }
 
     @Override
@@ -53,7 +55,55 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
 
         String type = data.containsKey("type") && data.get("type") != null ? data.get("type") : "system";
+        Log.i(TAG, "FCM message received type=" + type + " dataKeys=" + data.keySet());
+        if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            Log.w(TAG, "FCM received but app notifications are disabled by system settings");
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "FCM received but POST_NOTIFICATIONS permission is not granted");
+        }
+        // Defensive client-side guard for older backend versions or queued FCM messages:
+        // lucky-win celebrations are room/in-app only and must never become Android push alerts.
+        if (isRoomRewardWinMessage(type, title, body, data)) return;
         showNotification(title, body, type, data);
+    }
+
+    private static boolean isRoomRewardWinMessage(String type, String title, String body,
+                                                    Map<String, String> data) {
+        StringBuilder markers = new StringBuilder();
+        if (type != null) markers.append(type).append(' ');
+        if (title != null) markers.append(title).append(' ');
+        if (body != null) markers.append(body).append(' ');
+        boolean luckyPayout = false;
+        if (data != null) {
+            for (Map.Entry<String, String> entry : data.entrySet()) {
+                if (entry.getKey() != null) {
+                    markers.append(entry.getKey()).append(' ');
+                    String key = entry.getKey().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+                    String raw = entry.getValue();
+                    if (("luckymultiplier".equals(key) || "luckycoinswon".equals(key)
+                            || "luckyreturn".equals(key) || "luckypayout".equals(key))
+                            && raw != null) {
+                        try { luckyPayout |= Double.parseDouble(raw) > 0d; }
+                        catch (NumberFormatException ignored) { /* non-numeric metadata */ }
+                    }
+                    if (("luckywin".equals(key) || "isluckywin".equals(key))
+                            && "true".equalsIgnoreCase(raw)) {
+                        luckyPayout = true;
+                    }
+                }
+                if (entry.getValue() != null) markers.append(entry.getValue()).append(' ');
+            }
+        }
+        if (luckyPayout) return true;
+        String value = markers.toString().toLowerCase(java.util.Locale.ROOT);
+        boolean roomGameGiftContext = value.matches("(?s).*(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|room:|غرفة|روم|هدية|محظوظ|الحظ|لعبة|كوين|عملة).*");
+        boolean winSignal = value.matches("(?s).*(win|won|winner|winning|game_win|slot_win|lucky_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|فازت|فازوا|ربح|ربحت|ربحوا|مردود|مكسب).*");
+        boolean explicitWinCopy = value.matches("(?s).*(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب|winner|winning|\bwon\b|payout|profit).*");
+        boolean arabicWinCopy = value.matches("(?s).*(فوز|فاز|ربح|ربحت|مكسب|مردود|مبروك).{0,35}(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين)|(هدية|لعبة|الحظ|محظوظ|غرفة|روم|عملة|كوين).{0,35}(فوز|فاز|ربح|ربحت|مكسب|مردود).*");
+        return winSignal && (roomGameGiftContext || explicitWinCopy || arabicWinCopy);
     }
 
     private void showNotification(String title, String body, String type, Map<String, String> data) {
@@ -80,7 +130,10 @@ public class AuraMessagingService extends FirebaseMessagingService {
             intent.putExtra(ChatConversationActivity.EXTRA_TITLE, peerName);
         }
         String avatar = firstNonEmpty(data,
-                "avatarUrl", "senderAvatarUrl", "imageUrl", "senderAvatar", "avatar");
+                "avatarUrl", "senderAvatarUrl", "actorAvatarUrl", "fromAvatarUrl",
+                "fromUserAvatarUrl", "userAvatarUrl", "profileAvatarUrl", "avatar_url",
+                "sender_avatar_url", "actor_avatar_url", "imageUrl", "senderAvatar",
+                "profileImageUrl", "avatar");
         if (avatar != null) {
             intent.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
         }
@@ -90,10 +143,31 @@ public class AuraMessagingService extends FirebaseMessagingService {
         }
 
         int notificationId = stableNotificationId(type, conversationId, data);
-        // Always use custom system notification when outside that chat —
-        // chat list, party room, background, and other destinations.
+
+        // Foreground FCM callbacks do not display Android's system notification banner
+        // automatically. Show an in-app banner too, using the same routed Intent so a
+        // tap opens the exact conversation instead of merely opening the inbox.
+        Activity active = AuraLiveApp.getForegroundActivity();
+        if (active != null && !active.isFinishing() && !active.isDestroyed()) {
+            if (ActiveChatTracker.isChatType(type)) {
+                // In foreground, show a persistent unread dot instead of a floating alert.
+                // The inbox API is the source of truth, so opening a conversation clears it.
+                com.Dramizo.Series.util.UnreadMessageBadge.refresh(this);
+                return;
+            }
+            String dedupeKey = conversationId != null && !conversationId.isEmpty()
+                    ? "chat:" + conversationId + ":" + firstNonEmpty(data, "messageId", "message_id", "notificationId")
+                    : (data != null ? firstNonEmpty(data, "notificationId", "messageId", "message_id") : null);
+            InAppNotificationBanner.show(active, title, body, type, intent, dedupeKey, avatar);
+        }
+
+        // Background/terminated delivery keeps the Android system notification.
+        // Foreground direct messages were already handled by the in-app queue above.
+        String notificationChannel = ActiveChatTracker.isChatType(type)
+                && conversationId != null && !conversationId.isEmpty()
+                ? AuraNotificationHelper.CHANNEL_MESSAGES : CHANNEL_ID;
         AuraNotificationHelper.show(
-                this, CHANNEL_ID, title, body, type, intent, notificationId, avatar);
+                this, notificationChannel, title, body, type, intent, notificationId, avatar);
         // Refresh Official News badge on Messages tab when a general notice arrives.
         try {
             android.content.Intent refresh =

@@ -17,7 +17,6 @@ import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
 
 /**
@@ -32,6 +31,11 @@ public class ComboGiftView extends FrameLayout {
     private TextView recvDesc;
     private TextView comboNum;
     private boolean showing;
+    private int lastDisplayedCount = 1;
+    // Keep the first valid avatar for the same live cannon sender when later X
+    // updates omit the avatar URL; otherwise the profile image can blink away.
+    @Nullable private String lastCannonSenderName;
+    @Nullable private String lastCannonAvatarUrl;
     @Nullable private Runnable hideRunnable;
     @Nullable private Runnable crawlRunnable;
 
@@ -68,6 +72,32 @@ public class ComboGiftView extends FrameLayout {
         setClipToPadding(false);
     }
 
+    private void bindSenderAvatar(@Nullable String avatarUrl) {
+        if (avatar == null) return;
+        final int fallback = com.Dramizo.Series.util.ImagePlaceholder.avatar();
+        String raw = avatarUrl != null ? avatarUrl.trim() : "";
+        if (raw.isEmpty()) {
+            try { Glide.with(avatar).clear(avatar); } catch (Exception ignored) {}
+            avatar.setImageResource(fallback);
+            return;
+        }
+        String resolved = AssetCatalog.absoluteUrl(raw);
+        if (resolved == null || resolved.trim().isEmpty()) resolved = raw;
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.setImageResource(fallback);
+        try {
+            Glide.with(avatar)
+                    .load(resolved)
+                    .placeholder(fallback)
+                    .error(fallback)
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .dontTransform()
+                    .into(avatar);
+        } catch (Exception ignored) {
+            avatar.setImageResource(fallback);
+        }
+    }
+
     public void show(@Nullable String senderName,
                      @Nullable String receiverLabel,
                      @Nullable String senderAvatarUrl,
@@ -85,9 +115,10 @@ public class ComboGiftView extends FrameLayout {
             recvDesc.setSelected(true);
         }
         int combo = Math.max(1, comboCount);
+        lastDisplayedCount = combo;
         if (comboNum != null) {
             // Mikoo: "x" + count to the right of gift strip digits.
-            comboNum.setText(combo >= 2 ? ("x" + combo) : String.valueOf(combo));
+            comboNum.setText("X" + combo);
             comboNum.setTextSize(combo >= 10 ? 20f : 22f);
             comboNum.setVisibility(VISIBLE);
             comboNum.animate().cancel();
@@ -106,11 +137,119 @@ public class ComboGiftView extends FrameLayout {
             bg.setImageResource(comboBgForCombo(combo, totalCoins));
         }
         if (avatar != null) {
-            AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
+            bindSenderAvatar(senderAvatarUrl);
             avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
         playCrawl();
+    }
+
+
+    /**
+     * Lucky-cannon toast: fixed horizontally at the room center. Unlike ordinary gift
+     * combo strips it never crawls in from the edge; the live X value is updated in place.
+     */
+    public void showCannonLive(@Nullable String senderName,
+                               @Nullable String giftName,
+                               @Nullable String senderAvatarUrl,
+                               @Nullable String giftIconUrl,
+                               int comboCount,
+                               long totalCoins) {
+        if (sender != null) sender.setText(senderName != null && !senderName.isEmpty()
+                ? senderName : "مستخدم");
+        if (recvDesc != null) {
+            recvDesc.setText(giftName != null && !giftName.isEmpty()
+                    ? ("أرسل " + giftName) : "أرسل هدية حظ");
+            recvDesc.setSelected(true);
+        }
+        int combo = Math.max(1, comboCount);
+        lastDisplayedCount = combo;
+        if (comboNum != null) {
+            comboNum.setText("X" + combo);
+            comboNum.setTextSize(combo >= 10 ? 20f : 22f);
+            comboNum.setVisibility(VISIBLE);
+            comboNum.animate().cancel();
+            comboNum.setScaleX(0.88f);
+            comboNum.setScaleY(0.88f);
+            comboNum.animate().scaleX(1f).scaleY(1f).setDuration(110L).start();
+        }
+        View xMark = findViewById(R.id.vComboX);
+        if (xMark != null) xMark.setVisibility(GONE);
+        if (bg != null) bg.setImageResource(comboBgForCombo(combo, totalCoins));
+        if (avatar != null) {
+            String currentSender = senderName != null ? senderName.trim() : "";
+            if (senderAvatarUrl != null && !senderAvatarUrl.trim().isEmpty()) {
+                lastCannonAvatarUrl = senderAvatarUrl;
+            } else if (lastCannonSenderName == null
+                    || !lastCannonSenderName.equals(currentSender)) {
+                lastCannonAvatarUrl = null;
+            }
+            lastCannonSenderName = currentSender;
+            bindSenderAvatar(lastCannonAvatarUrl);
+            avatar.setVisibility(VISIBLE);
+        }
+        bindGiftIcon(giftIconUrl);
+        if (hideRunnable != null) {
+            removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
+        if (crawlRunnable != null) {
+            removeCallbacks(crawlRunnable);
+            crawlRunnable = null;
+        }
+        animate().setListener(null);
+        animate().cancel();
+        setVisibility(VISIBLE);
+        setAlpha(1f);
+        setTranslationX(0f);
+        setTranslationY(0f);
+        // Compact the live X toast and keep it visually secondary to the gift.
+        setScaleX(0.90f);
+        setScaleY(0.90f);
+        bringToFront();
+        showing = true;
+        hideRunnable = null;
+    }
+
+    /** Keep the centered cannon toast readable briefly after the finger is released. */
+    public void finishCannonLive(long delayMs) {
+        if (!showing) return;
+        if (hideRunnable != null) removeCallbacks(hideRunnable);
+        hideRunnable = () -> {
+            showing = false;
+            setVisibility(GONE);
+            setTranslationX(0f);
+            hideRunnable = null;
+        };
+        postDelayed(hideRunnable, Math.max(300L, delayMs));
+    }
+
+    /**
+     * Update the quantity number without restarting the toast's entrance/hold/exit animation.
+     */
+    public void updateCountUp(int count) {
+        if (comboNum == null) return;
+        int value = Math.max(1, count);
+        if (value != lastDisplayedCount) {
+            lastDisplayedCount = value;
+            comboNum.animate().cancel();
+            comboNum.setScaleX(0.88f);
+            comboNum.setScaleY(0.88f);
+            comboNum.animate().scaleX(1f).scaleY(1f).setDuration(110L).start();
+        }
+        comboNum.setText("X" + value);
+        comboNum.setTextSize(value >= 10 ? 20f : 22f);
+        comboNum.setVisibility(VISIBLE);
+        // A live count-up must never be cut off by the original toast timeout.
+        // Restart the parked hold from the latest counter update.
+        if (showing && hideRunnable != null) {
+            // A new X update during the exit phase must bring the toast back to
+            // its centered resting position and restart the full readable hold.
+            removeCallbacks(hideRunnable);
+            animate().cancel();
+            setTranslationX(0f);
+            postDelayed(hideRunnable, 4400L);
+        }
     }
 
     private void bindGiftIcon(@Nullable String giftIconUrl) {
@@ -167,7 +306,10 @@ public class ComboGiftView extends FrameLayout {
 
             // Arabic/LTR rooms: enter from left, exit to the right (crawl across chat).
             final float enterFrom = -w - dp(28);
-            final float park = dp(10);
+            // This view is already constrained to both horizontal edges by
+            // activity_voice_room.xml, so its un-translated origin is screen center.
+            // Applying another half-width offset pushes the toast toward the edge.
+            final float park = 0f;
             final float exitTo = parentW + dp(24);
 
             setTranslationX(enterFrom);
@@ -201,7 +343,8 @@ public class ComboGiftView extends FrameLayout {
                                     })
                                     .start();
                         };
-                        postDelayed(hideRunnable, 2600L);
+                        // Keep the strip parked until the X1→Xn count-up has fully completed.
+                        postDelayed(hideRunnable, 4400L);
                     })
                     .start();
         };
@@ -228,7 +371,7 @@ public class ComboGiftView extends FrameLayout {
     }
 
     @DrawableRes
-    private static int comboBgForCombo(int combo, int coins) {
+    private static int comboBgForCombo(int combo, long coins) {
         // Styling follows gift COMBO streak only — never total coins (that confused users
         // into thinking price/mardood was combo).
         int score = Math.max(1, combo);

@@ -5,10 +5,12 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  OnModuleDestroy,
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import {
   AgentLedgerType,
   AgentRecharge,
@@ -115,7 +117,8 @@ export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
 };
 
 @Injectable()
-export class RechargeAgentsService implements OnModuleInit {
+export class RechargeAgentsService implements OnModuleInit, OnModuleDestroy {
+  private schemaRetryTimer: ReturnType<typeof setInterval> | null = null;
   constructor(
     @InjectRepository(RechargeAgent)
     private readonly agentsRepo: Repository<RechargeAgent>,
@@ -138,19 +141,58 @@ export class RechargeAgentsService implements OnModuleInit {
     @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit(): void {
+    void this.initializeSchemaAndConfig();
+  }
+
+  onModuleDestroy(): void {
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
+  }
+
+  private async initializeSchemaAndConfig(): Promise<void> {
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     try {
-      await this.dataSource.query(
-        `ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`,
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '120s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) throw new Error('JEHO schema migration lock is busy; retrying later');
+
+      // Commit each additive DDL independently. The index is concurrent so an
+      // ALTER TABLE lock is never retained while the index is built.
+      await runner.query(`ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`);
+      await runner.query(`ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`);
+      const indexRows = await runner.query(
+        `SELECT i.indisvalid
+         FROM pg_index i
+         JOIN pg_class idx ON idx.oid = i.indexrelid
+         JOIN pg_namespace n ON n.oid = idx.relnamespace
+         WHERE n.nspname = current_schema() AND idx.relname = $1
+         LIMIT 1`,
+        ['idx_withdraw_requests_agent'],
       );
-      await this.dataSource.query(
-        `ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`,
-      );
-      await this.dataSource.query(
-        `CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`,
-      );
-    } catch {
-      /* column may already exist */
+      if (indexRows.length && indexRows[0].indisvalid !== true) {
+        await runner.query('DROP INDEX CONCURRENTLY IF EXISTS "jeho_own"."idx_withdraw_requests_agent"');
+      }
+      await runner.query('CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")');
+    } catch (error) {
+      console.warn(`[RechargeAgentsSchema] Migration deferred: ${error instanceof Error ? error.message : String(error)}`);
+      if (!this.schemaRetryTimer) {
+        this.schemaRetryTimer = setInterval(() => void this.initializeSchemaAndConfig(), 30_000);
+        this.schemaRetryTimer.unref?.();
+      }
+      return;
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((error) =>
+          console.error(`[RechargeAgentsSchema] Schema lock release failed; connection discarded: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
     try {
       // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
@@ -178,6 +220,8 @@ export class RechargeAgentsService implements OnModuleInit {
     } catch {
       /* ignore seed race */
     }
+    if (this.schemaRetryTimer) clearInterval(this.schemaRetryTimer);
+    this.schemaRetryTimer = null;
   }
 
   /**

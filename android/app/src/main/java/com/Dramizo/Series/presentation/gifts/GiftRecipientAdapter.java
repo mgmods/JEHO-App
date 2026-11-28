@@ -12,7 +12,9 @@ import com.Dramizo.Series.databinding.ItemRvGiftTopAvatarBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Gift dial recipient strip — frame, seat chip, support coins under each avatar.
@@ -28,6 +30,7 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
     private final List<GiftRecipient> items = new ArrayList<>();
     private final Listener listener;
     @Nullable private String selectedUserId;
+    private final Set<String> selectedUserIds = new LinkedHashSet<>();
     private boolean selectAll;
     private boolean agencyRoom;
 
@@ -42,22 +45,52 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
     }
 
     public void submit(List<GiftRecipient> data, @Nullable String selectedId, boolean allSelected) {
+        submit(data, selectedId, allSelected, null);
+    }
+
+    public void submit(List<GiftRecipient> data, @Nullable String selectedId, boolean allSelected,
+                       @Nullable List<String> selectedIds) {
         items.clear();
         if (data != null) items.addAll(data);
         selectedUserId = selectedId;
+        selectedUserIds.clear();
+        if (selectedIds != null) {
+            for (String id : selectedIds) {
+                if (id != null && !id.isEmpty() && !GiftRecipient.ALL_MIC_ID.equals(id)) selectedUserIds.add(id);
+            }
+        } else if (selectedId != null && !selectedId.isEmpty()
+                && !GiftRecipient.ALL_MIC_ID.equals(selectedId)) selectedUserIds.add(selectedId);
         selectAll = allSelected;
+        if (allSelected) {
+            selectedUserIds.clear();
+            for (GiftRecipient r : items) {
+                if (r != null && r.userId != null && !r.userId.isEmpty()) selectedUserIds.add(r.userId);
+            }
+        }
         notifyDataSetChanged();
     }
 
     public void setSelectedUserId(@Nullable String userId) {
         selectedUserId = userId;
+        selectedUserIds.clear();
+        if (userId != null && !userId.isEmpty()) selectedUserIds.add(userId);
         selectAll = false;
         notifyDataSetChanged();
     }
 
     public void setSelectAll(boolean all) {
         selectAll = all;
-        if (all) selectedUserId = GiftRecipient.ALL_MIC_ID;
+        if (all) {
+            selectedUserId = GiftRecipient.ALL_MIC_ID;
+            selectedUserIds.clear();
+            for (GiftRecipient r : items) {
+                if (r != null && r.userId != null && !r.userId.isEmpty()) selectedUserIds.add(r.userId);
+            }
+        } else {
+            selectedUserIds.clear();
+            if (selectedUserId != null && !selectedUserId.isEmpty()
+                    && !GiftRecipient.ALL_MIC_ID.equals(selectedUserId)) selectedUserIds.add(selectedUserId);
+        }
         notifyDataSetChanged();
     }
 
@@ -71,6 +104,11 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
     }
 
     @NonNull
+    public List<String> getSelectedUserIds() {
+        return new ArrayList<>(selectedUserIds);
+    }
+
+    @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new VH(ItemRvGiftTopAvatarBinding.inflate(
@@ -81,7 +119,7 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
     public void onBindViewHolder(@NonNull VH holder, int position) {
         GiftRecipient r = items.get(position);
         boolean selected = selectAll
-                || (r.userId != null && r.userId.equals(selectedUserId));
+                || (r.userId != null && selectedUserIds.contains(r.userId));
 
         // Prefer room-type wear, then fall back so a worn frame always shows.
         String primary = agencyRoom ? r.hostBadgeUrl : r.vipBadgeUrl;
@@ -127,7 +165,18 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
         float alpha = selected ? 1f : 0.92f;
         holder.itemView.setAlpha(alpha);
         holder.itemView.setOnClickListener(v -> {
-            selectAll = false;
+            // Tapping a person while «الكل» is active switches to that person first.
+            if (selectAll) {
+                selectAll = false;
+                selectedUserIds.clear();
+                if (r.userId != null && !r.userId.isEmpty()) selectedUserIds.add(r.userId);
+            } else if (r.userId != null && !r.userId.isEmpty()) {
+                if (!selectedUserIds.add(r.userId)) {
+                    selectedUserIds.remove(r.userId);
+                }
+                // Keep at least one explicit recipient selected for a valid send target.
+                if (selectedUserIds.isEmpty()) selectedUserIds.add(r.userId);
+            }
             selectedUserId = r.userId;
             notifyDataSetChanged();
             if (listener != null) listener.onRecipientSelected(r);

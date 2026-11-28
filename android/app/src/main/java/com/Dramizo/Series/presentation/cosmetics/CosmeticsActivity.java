@@ -1,305 +1,352 @@
 package com.Dramizo.Series.presentation.cosmetics;
 
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
-import androidx.viewpager2.widget.ViewPager2;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
-import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
-import com.Dramizo.Series.databinding.ActivityCosmeticsBinding;
+import com.Dramizo.Series.data.remote.dto.WalletDtos;
+import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.GenderVerifiedBadge;
+import com.Dramizo.Series.util.BalanceRedirect;
+import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.HostSignalView;
-import com.Dramizo.Series.util.ImagePlaceholder;
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.Dramizo.Series.util.VanityIdStyle;
+import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Appearance mall — fully native (no WebView).
- * قطاع الراس uses {@link HostSignalView} SVGA — same engine as the live room.
+ * Native Android appearance store. The catalogue, ownership, purchase and equipment
+ * continue to use the existing repository/API; no WebView or hosted HTML is required.
  */
 public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
-
     static final String[] TYPES = {
-            "vip_badge", "entry_effect",
-            "level_badge", "room_card", "room_background"
+            "vip_badge", "entry_effect", "room_card", "room_background",
+            "profile_card", "chat_bubble", "nameplate", "voice_wave"
+    };
+    private static final String[] TITLES = {
+            "الإطارات", "تأثيرات الدخول", "بطاقات الغرف", "خلفيات الغرف",
+            "إطارات الملف", "فقاعات الدردشة", "بطاقات الأسماء", "الموجات الصوتية"
     };
 
-    private ActivityCosmeticsBinding binding;
     private CosmeticsViewModel vm;
     private SessionManager session;
+    private TabLayout tabs;
+    private androidx.viewpager2.widget.ViewPager2 pager;
+    private TextView title, bagButton, rechargeButton, balanceView, heroName, heroHint, heroDays, storeTagline;
+    private HostSignalView heroFrame;
+    private HostSignalView storeUserFrame;
+    private TextView storeUserName, storeUserPublicId;
+    private ImageView heroMedia;
+    private FrameLayout heroMediaHolder;
+    private VideoView heroVideo;
+    private String roomId;
     private boolean bagMode;
     private String initialType = "vip_badge";
-    @Nullable private String roomId;
-    @Nullable private String lastWearUrl;
+    private TabLayoutMediator mediator;
+    private final List<CosmeticsCategoryFragment> pages = new ArrayList<>();
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        binding = ActivityCosmeticsBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        setContentView(R.layout.activity_cosmetics);
         session = ContainerProvider.from(this).getSessionManager();
-        vm = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
-                .get(CosmeticsViewModel.class);
-
-        binding.btnBack.setOnClickListener(v -> navigateUp());
-        binding.btnRecharge.setOnClickListener(v ->
-                com.Dramizo.Series.util.BalanceRedirect.openRecharge(this));
-        binding.btnBag.setOnClickListener(v -> toggleBagMode());
-
-        initialType = normalizeType(getIntent().getStringExtra(CosmeticsViewModel.EXTRA_TYPE));
-        bagMode = getIntent().getBooleanExtra("bag_mode", false);
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
-        if (roomId == null || roomId.isEmpty()) {
-            roomId = getIntent().getStringExtra("roomId");
-        }
-        vm.setBagMode(bagMode);
-        refreshBagButton();
-        setupTabs();
-        observeVm();
-        // Show self + wear immediately (profile-style)
-        previewItem(null);
-    }
+        if (roomId == null || roomId.isEmpty()) roomId = getIntent().getStringExtra("roomId");
+        bagMode = getIntent().getBooleanExtra("bag_mode", false);
 
-    private void setupTabs() {
-        binding.pager.setAdapter(new Pager(this));
-        binding.pager.setOffscreenPageLimit(1);
-        new TabLayoutMediator(binding.tabs, binding.pager, (tab, position) ->
-                tab.setText(tabLabel(position))).attach();
-        int start = tabForType(initialType);
-        binding.pager.setCurrentItem(start, false);
-        vm.setFilterType(TYPES[start]);
-        binding.pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                if (position < 0 || position >= TYPES.length) return;
-                vm.setFilterType(TYPES[position]);
-                vm.clearSelection();
-                lastWearUrl = null;
-                if (binding != null) {
-                    binding.nativeHeroFrame.clearSignal();
-                    binding.heroMedia.setVisibility(View.GONE);
-                    Glide.with(binding.heroMedia).clear(binding.heroMedia);
-                    binding.tvHeroName.setText(R.string.mall_preview);
-                    binding.tvHeroDays.setVisibility(View.GONE);
+        String type = getIntent().getStringExtra(CosmeticsViewModel.EXTRA_TYPE);
+        if (type == null || type.isEmpty()) type = getIntent().getStringExtra("type");
+        String section = getIntent().getStringExtra("store_section");
+        // These legacy store entry points already have native flows backed by their
+        // dedicated APIs. Preserve them instead of silently mapping them to cosmetics.
+        if ("id".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.VanityIdsActivity.class));
+            finish();
+            return;
+        }
+        if ("level".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.UserLevelActivity.class));
+            finish();
+            return;
+        }
+        if ("badges".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.profile.BadgeActivity.class));
+            finish();
+            return;
+        }
+        if ("vip".equals(section)) {
+            startActivity(new android.content.Intent(this,
+                    com.Dramizo.Series.presentation.vip.VipActivity.class));
+            finish();
+            return;
+        }
+        initialType = normalizeType(type);
+
+        title = findViewById(R.id.tvTitle);
+        bagButton = findViewById(R.id.btnBag);
+        rechargeButton = findViewById(R.id.btnRecharge);
+        balanceView = findViewById(R.id.tvStoreBalance);
+        storeTagline = findViewById(R.id.tvStoreTagline);
+        tabs = findViewById(R.id.tabs);
+        pager = findViewById(R.id.pager);
+        heroName = findViewById(R.id.tvHeroName);
+        heroHint = findViewById(R.id.tvHeroHint);
+        heroDays = findViewById(R.id.tvHeroDays);
+        heroFrame = findViewById(R.id.nativeHeroFrame);
+        heroMedia = findViewById(R.id.heroMedia);
+        heroMediaHolder = (FrameLayout) heroMedia.getParent();
+        storeUserFrame = findViewById(R.id.storeUserFrame);
+        storeUserName = findViewById(R.id.tvStoreUserName);
+        storeUserPublicId = findViewById(R.id.tvStoreUserPublicId);
+        bindStoreUserHeader();
+
+        findViewById(R.id.btnBack).setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+        bagButton.setOnClickListener(v -> {
+            if (!bagMode) {
+                android.content.Intent intent = getIntent();
+                intent.putExtra("bag_mode", true);
+                recreate();
+            } else {
+                getIntent().putExtra("bag_mode", false);
+                recreate();
+            }
+        });
+        bagButton.setText(bagMode ? "‹ المتجر" : "👜  حقيبتي");
+        bagButton.setBackgroundResource(bagMode
+                ? R.drawable.bg_mall_action_outline
+                : R.drawable.bg_mall_action_primary);
+        bagButton.setTextColor(bagMode ? 0xFF5B35B5 : 0xFFFFFFFF);
+        bagButton.setElevation(bagMode ? 0f : dp(4));
+        rechargeButton.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        balanceView.setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        findViewById(R.id.tvStoreBalanceLabel).setOnClickListener(v -> BalanceRedirect.openRecharge(this));
+        title.setText(bagMode ? "حقيبتي" : "متجر JEHO");
+        // Inventory mode prioritizes the owned-item grid instead of reserving space
+        // for the promotional preview. The store keeps the hero when browsing.
+        findViewById(R.id.nativeHeroWrap).setVisibility(bagMode ? View.GONE : View.VISIBLE);
+        if (storeTagline != null) {
+            storeTagline.setText(bagMode ? "عناصرك المملوكة وتجهيزها" : "اكتشف إطلالتك الجديدة  ✦");
+        }
+
+        vm = new ViewModelProvider(this,
+                new ViewModelFactory(ContainerProvider.from(this))).get(CosmeticsViewModel.class);
+        vm.setBagMode(bagMode);
+        vm.setCurrentRoomId(roomId);
+        pager.setOffscreenPageLimit(1);
+        pager.setAdapter(new FragmentStateAdapter(this) {
+            @Override public int getItemCount() { return TYPES.length; }
+            @Override public Fragment createFragment(int position) {
+                CosmeticsCategoryFragment f = CosmeticsCategoryFragment.newInstance(
+                        TYPES[position], bagMode ? "العناصر التي تملكها في هذا القسم" : "");
+                pages.add(f);
+                return f;
+            }
+        });
+        mediator = new TabLayoutMediator(tabs, pager,
+                (tab, position) -> tab.setText(TITLES[position]));
+        mediator.attach();
+        int start = indexForType(initialType);
+        pager.setCurrentItem(start, false);
+        vm.setFilterType(initialType);
+
+        vm.getSelectedItem().observe(this, this::showPreview);
+        vm.getMessage().observe(this, msg -> {
+            if (msg != null && !msg.isEmpty()) {
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                rechargeButton.postInvalidate();
+            }
+        });
+        vm.getError().observe(this, msg -> {
+            if (msg != null && !msg.trim().isEmpty()) {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                String normalized = msg.toLowerCase(java.util.Locale.ROOT);
+                if (msg.contains("رصيد") || normalized.contains("balance")
+                        || normalized.contains("insufficient coins")
+                        || normalized.contains("not enough coins")) {
+                    BalanceRedirect.handleForced(this, msg);
                 }
             }
         });
+        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override public void onTabSelected(TabLayout.Tab tab) {
+                if (tab.getPosition() >= 0 && tab.getPosition() < TYPES.length) {
+                    vm.setFilterType(TYPES[tab.getPosition()]);
+                    vm.clearSelection();
+                }
+            }
+            @Override public void onTabUnselected(TabLayout.Tab tab) { }
+            @Override public void onTabReselected(TabLayout.Tab tab) { }
+        });
+        pager.registerOnPageChangeCallback(new androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            @Override public void onPageSelected(int position) {
+                if (position >= 0 && position < TYPES.length) vm.setFilterType(TYPES[position]);
+            }
+        });
     }
 
-    private void observeVm() {
-        vm.getSelectedItem().observe(this, this::previewItem);
-        vm.getMessage().observe(this, m -> {
-            if (m != null && !m.isEmpty()) Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
-        });
-        vm.getError().observe(this, e -> {
-            if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
+    private void bindStoreUserHeader() {
+        if (session == null || storeUserName == null || storeUserPublicId == null) return;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto me = session.getUser();
+        if (me == null) return;
+        String name = me.displayName != null && !me.displayName.trim().isEmpty()
+                ? me.displayName : me.username;
+        storeUserName.setText(name == null || name.trim().isEmpty() ? "مستخدم JEHO" : name);
+        String publicId = me.displayPublicId();
+        storeUserPublicId.setText(publicId == null || publicId.isEmpty() ? "—" : publicId);
+        VanityIdStyle.bind(storeUserPublicId, ContainerProvider.from(this).getVanityApi(),
+                publicId, me.vipLevel);
+        if (storeUserFrame != null) {
+            String equippedFrame = me.vipFrameUrl;
+            storeUserFrame.bind(equippedFrame, me.avatarUrl, null, 1);
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void refreshWalletBalance() {
+        if (balanceView == null) return;
+        balanceView.setText("…");
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<WalletDtos.WalletDto> result =
+                    ContainerProvider.from(this).getWalletRepository().getWallet();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || balanceView == null) return;
+                if (result != null && result.success && result.data != null) {
+                    balanceView.setText(String.format(java.util.Locale.US, "%,d", result.data.coins));
+                } else {
+                    balanceView.setText("عرض الرصيد");
+                }
+            });
         });
     }
 
-    private void previewItem(@Nullable CosmeticDtos.CosmeticDto item) {
-        if (binding == null) return;
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshWalletBalance();
+    }
+
+    private void showPreview(@Nullable CosmeticDtos.CosmeticDto item) {
         if (item == null) {
-            AuthDtos.UserDto me = session.getUser();
-            if (me != null) {
-                String n = me.displayName != null && !me.displayName.isEmpty()
-                        ? me.displayName
-                        : (me.username != null ? me.username : getString(R.string.mall_preview));
-                binding.tvHeroName.setText(n);
-                GenderVerifiedBadge.bind(binding.tvHeroName, null, me);
-            } else {
-                binding.tvHeroName.setText(R.string.mall_preview);
-            }
-            binding.tvHeroHint.setText(R.string.mall_preview_hint);
-            binding.tvHeroDays.setVisibility(View.GONE);
-            // Keep frame wear on avatar when no catalog selection.
-            if (me != null) {
-                lastWearUrl = null;
-                binding.heroMedia.setVisibility(View.GONE);
-                binding.nativeHeroFrame.setVisibility(View.VISIBLE);
-                binding.nativeHeroFrame.bind(me.vipBadgeUrl, me.avatarUrl, null, 1);
-            } else {
-                binding.nativeHeroFrame.clearSignal();
-                binding.heroMedia.setVisibility(View.GONE);
-            }
-            lastWearUrl = me != null ? me.vipBadgeUrl : null;
+            heroName.setText("اختر قطعة لمعاينتها");
+            heroHint.setText("معاينة قبل الشراء أو الارتداء");
+            heroDays.setVisibility(View.GONE);
+            stopVideo();
+            heroMedia.setVisibility(View.GONE);
+            heroFrame.clearSignal();
             return;
         }
-        binding.tvHeroName.setText(item.name != null && !item.name.isEmpty()
-                ? item.name : (item.code != null ? item.code : "—"));
-        binding.tvHeroHint.setText(hintForType(item.type != null ? item.type : vm.getFilterType()));
+        heroName.setText(item.name == null ? "عنصر JEHO" : item.name);
+        heroHint.setText(item.coinPrice > 0 ? item.coinPrice + " عملة • صلاحية " +
+                vm.leaseDays(item) + " يوم" : "عنصر مميز في متجر JEHO • صلاحية " + vm.leaseDays(item) + " يوم");
         Integer days = vm.daysLeft(item.id);
         if (days != null && days > 0) {
-            binding.tvHeroDays.setVisibility(View.VISIBLE);
-            binding.tvHeroDays.setText(getString(R.string.mall_days_left, days));
-        } else if (vm.isOwned(item.id) && days == null) {
-            binding.tvHeroDays.setVisibility(View.VISIBLE);
-            binding.tvHeroDays.setText(R.string.mall_permanent);
+            heroDays.setText("متبقي " + days + " يوم");
+            heroDays.setVisibility(View.VISIBLE);
         } else {
-            binding.tvHeroDays.setVisibility(View.GONE);
+            heroDays.setVisibility(View.GONE);
         }
 
-        String type = normalizeType(item.type != null ? item.type : vm.getFilterType());
-        String wear = firstNonEmpty(item.animationUrl, item.previewUrl);
-        String avatar = session.getAvatarUrl();
-
-        if ("vip_badge".equals(type) || "host_badge".equals(type)) {
-            binding.heroMedia.setVisibility(View.GONE);
-            Glide.with(binding.heroMedia).clear(binding.heroMedia);
-            String abs = wear;
-            if (abs != null && abs.equals(lastWearUrl) && binding.nativeHeroFrame.getVisibility() == View.VISIBLE) {
-                return;
-            }
-            lastWearUrl = abs;
-            binding.nativeHeroFrame.setVisibility(View.VISIBLE);
-            binding.nativeHeroFrame.bind(abs, avatar, item.meta, 1);
+        String media = item.animationUrl;
+        if (media == null || media.trim().isEmpty()) media = item.previewUrl;
+        String playable = CosmeticMedia.playableUrl(media);
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(playable);
+        stopVideo();
+        if ("vip_badge".equals(item.type) || "host_badge".equals(item.type)) {
+            heroMedia.setVisibility(View.GONE);
+            heroFrame.setVisibility(View.VISIBLE);
+            String avatar = session == null ? null : session.getAvatarUrl();
+            // Only the selected hero runs the full frame renderer, so GIF/SVGA/video
+            // can animate here without creating heavy renderers in every grid cell.
+            heroFrame.bind(playable, avatar, item.meta, 1);
+        } else if (kind == CosmeticMedia.Kind.VIDEO && playable != null) {
+            heroFrame.clearSignal();
+            heroFrame.setVisibility(View.GONE);
+            heroMedia.setVisibility(View.GONE);
+            heroVideo = new VideoView(this);
+            heroVideo.setBackgroundColor(Color.TRANSPARENT);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+            heroMediaHolder.addView(heroVideo, lp);
+            String url = AssetCatalog.absoluteUrl(playable);
+            heroVideo.setVideoURI(Uri.parse(url == null ? playable : url));
+            heroVideo.setOnPreparedListener(mp -> {
+                mp.setLooping(true);
+                mp.setVolume(0f, 0f);
+                mp.start();
+            });
+            heroVideo.setOnErrorListener((mp, what, extra) -> {
+                Toast.makeText(this, "تعذرت معاينة الفيديو لهذا العنصر", Toast.LENGTH_SHORT).show();
+                return true;
+            });
         } else {
-            lastWearUrl = null;
-            binding.nativeHeroFrame.clearSignal();
-            binding.heroMedia.setVisibility(View.VISIBLE);
-            String still = stillPngUrl(item.previewUrl, item.animationUrl);
-            String abs = AssetCatalog.absoluteUrl(still);
-            if (abs == null || abs.isEmpty()) {
-                binding.heroMedia.setImageResource(ImagePlaceholder.cover());
-            } else {
-                Glide.with(binding.heroMedia)
-                        .load(abs)
-                        .fitCenter()
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .placeholder(ImagePlaceholder.cover())
-                        .error(ImagePlaceholder.cover())
-                        .into(binding.heroMedia);
-            }
+            heroFrame.clearSignal();
+            heroFrame.setVisibility(View.GONE);
+            heroMedia.setVisibility(View.VISIBLE);
+            String url = AssetCatalog.absoluteUrl(playable);
+            Glide.with(this).load(url == null ? playable : url)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.jeho_logo)
+                    .error(R.drawable.jeho_logo)
+                    .fitCenter().into(heroMedia);
         }
     }
 
-    private void toggleBagMode() {
-        bagMode = !bagMode;
-        vm.setBagMode(bagMode);
-        refreshBagButton();
-        Toast.makeText(this,
-                bagMode ? getString(R.string.my_bag_mall) : getString(R.string.appearance_store),
-                Toast.LENGTH_SHORT).show();
-        vm.clearSelection();
-        // Reload active fragment page.
-        int page = binding.pager.getCurrentItem();
-        for (Fragment f : getSupportFragmentManager().getFragments()) {
-            if (f instanceof CosmeticsCategoryFragment) {
-                ((CosmeticsCategoryFragment) f).reload();
-            }
-        }
-        if (page >= 0 && page < TYPES.length) {
-            vm.loadForType(TYPES[page]);
+    private void stopVideo() {
+        if (heroVideo != null) {
+            try { heroVideo.stopPlayback(); } catch (Exception ignored) { }
+            if (heroMediaHolder != null) heroMediaHolder.removeView(heroVideo);
+            heroVideo = null;
         }
     }
 
-    private void refreshBagButton() {
-        if (binding.btnBag == null) return;
-        binding.btnBag.setAlpha(bagMode ? 1f : 0.75f);
-        binding.btnBag.setTextColor(bagMode ? 0xFFE8A317 : 0xFFB8860B);
-        if (binding.tvTitle != null) {
-            binding.tvTitle.setText(bagMode
-                    ? getString(R.string.my_bag_mall)
-                    : getString(R.string.appearance_store));
-        }
-    }
-
-    static String normalizeType(String type) {
-        if (type == null || type.isEmpty()) return "vip_badge";
-        if ("badges".equals(type) || "level_badge".equals(type)) return "level_badge";
-        if ("frames".equals(type) || "vip_badge".equals(type) || "host_badge".equals(type)) {
-            return "vip_badge";
-        }
-        if ("join_toast".equals(type) || "entry_effect".equals(type)) return "entry_effect";
-        if ("room_card".equals(type)) return "room_card";
-        if ("room_background".equals(type)) return "room_background";
-        for (String t : TYPES) {
-            if (t.equals(type)) return t;
-        }
-        return "vip_badge";
-    }
-
-    static int tabForType(String type) {
-        String n = normalizeType(type);
-        for (int i = 0; i < TYPES.length; i++) {
-            if (TYPES[i].equals(n)) return i;
-        }
+    private static int indexForType(String type) {
+        for (int i = 0; i < TYPES.length; i++) if (TYPES[i].equals(type)) return i;
         return 0;
     }
 
-    private String tabLabel(int position) {
-        switch (position) {
-            case 0: return getString(R.string.mall_tab_frames);
-            case 1: return getString(R.string.mall_tab_entry);
-            case 2: return getString(R.string.mall_tab_level);
-            case 3: return getString(R.string.mall_tab_room_card);
-            case 4: return getString(R.string.mall_tab_room_bg);
-            default: return "";
-        }
-    }
+    static String normalizeType(@Nullable String type) {
+        if (type == null || type.isEmpty()) return "vip_badge";
+        if ("frames".equals(type) || "host_badge".equals(type) || "vip_badge".equals(type)) return "vip_badge";
+        if ("join_toast".equals(type) || "entry_effect".equals(type)) return "entry_effect";
 
-    private String hintForType(String type) {
-        String n = normalizeType(type);
-        switch (n) {
-            case "vip_badge": return getString(R.string.mall_hint_frames);
-            case "entry_effect": return getString(R.string.mall_hint_entry);
-            case "level_badge": return getString(R.string.mall_hint_level);
-            case "room_card": return getString(R.string.mall_hint_room_card);
-            case "room_background": return getString(R.string.mall_hint_room_bg);
-            default: return getString(R.string.mall_preview_hint);
-        }
+        for (String candidate : TYPES) if (candidate.equals(type)) return type;
+        return "vip_badge";
     }
 
     @Override
     protected void onDestroy() {
-        if (binding != null) {
-            try {
-                binding.nativeHeroFrame.destroy();
-            } catch (Exception ignored) {
-            }
-        }
+        stopVideo();
+        if (mediator != null) mediator.detach();
+        if (storeUserFrame != null) storeUserFrame.destroy();
         super.onDestroy();
-    }
-
-    private static String firstNonEmpty(String a, String b) {
-        if (a != null && !a.isEmpty()) return a;
-        if (b != null && !b.isEmpty()) return b;
-        return null;
-    }
-
-    private static String stillPngUrl(String preview, String anim) {
-        // Same rules as grid — so hero & cells both load room backgrounds/WebP.
-        return CosmeticsAdapter.stillPreviewUrl(preview, anim);
-    }
-
-    private static final class Pager extends FragmentStateAdapter {
-        Pager(@NonNull FragmentActivity activity) { super(activity); }
-
-        @NonNull
-        @Override
-        public Fragment createFragment(int position) {
-            String type = TYPES[Math.max(0, Math.min(position, TYPES.length - 1))];
-            return CosmeticsCategoryFragment.newInstance(type, "");
-        }
-
-        @Override
-        public int getItemCount() { return TYPES.length; }
     }
 }

@@ -1,8 +1,10 @@
 package com.Dramizo.Series.presentation.home;
 
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.ApiCall;
 
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -16,6 +18,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
+import android.widget.TextView;
 import android.widget.ViewFlipper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -63,6 +66,7 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 public class HomeFragment extends Fragment {
@@ -75,7 +79,8 @@ public class HomeFragment extends Fragment {
     private static final int TAB_HOT = 1;
     private static final int TAB_LOCATION = 2;
     private static final int TAB_ACTIVITIES = 3;
-    private static final int TAB_COUNT = 4;
+    private static final int TAB_MOMENTS = 4;
+    private static final int TAB_COUNT = 5;
     private static final String FLOATING_PREFS = "home_floating_widgets";
     private static final String OFFERS_DISMISSED_COUNT = "offers_dismissed_count";
     private int activeTab = TAB_HOT;
@@ -88,6 +93,13 @@ public class HomeFragment extends Fragment {
     private String browseCountry;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private RealtimeClient.RoomListener roomListListener;
+    private final Runnable roomPkRefreshRunnable = new Runnable() {
+        @Override public void run() {
+            if (binding == null || !isAdded()) return;
+            refreshRoomPkStatuses();
+            handler.postDelayed(this, 30000);
+        }
+    };
     private final Runnable roomRefreshRunnable = new Runnable() {
         @Override public void run() {
             if (binding != null && (activeTab == TAB_HOT || activeTab == TAB_LOCATION) && viewModel != null) {
@@ -174,23 +186,39 @@ public class HomeFragment extends Fragment {
             }
         });
 
+        binding.tvTabHot.setText("حفلة");
+        binding.tvTabMe.setText("ملكي");
         binding.tvTabMe.setOnClickListener(v -> selectLogicalTab(TAB_ME));
         binding.tvTabHot.setOnClickListener(v -> selectLogicalTab(TAB_HOT));
         binding.tvTabLocation.setOnClickListener(v -> selectLogicalTab(TAB_LOCATION));
         binding.tvTabActivities.setOnClickListener(v -> selectLogicalTab(TAB_ACTIVITIES));
+        binding.tvTabMoments.setOnClickListener(v -> selectLogicalTab(TAB_MOMENTS));
         binding.tabMeWrap.setOnClickListener(v -> selectLogicalTab(TAB_ME));
         binding.tabHotWrap.setOnClickListener(v -> selectLogicalTab(TAB_HOT));
         binding.tabLocationWrap.setOnClickListener(v -> selectLogicalTab(TAB_LOCATION));
         binding.tabActivitiesWrap.setOnClickListener(v -> selectLogicalTab(TAB_ACTIVITIES));
+        binding.tabMomentsWrap.setOnClickListener(v -> selectLogicalTab(TAB_MOMENTS));
         setupFeedPager();
         refreshLocationTabChrome();
         onLogicalTabSelected(activeTab);
-        // Home header icons from assets/icons by original file name.
-        AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
-        AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
+        refreshHeaderShortcutIcons();
+        binding.btnMyRoomShortcut.setOnClickListener(v ->
+                com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
-        binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
+        binding.hotAllButton.setOnClickListener(v -> {
+            hotCountryFilter = null;
+            renderHotCountryChips();
+            selectLogicalTab(TAB_HOT);
+            reapplyFeedPages();
+        });
+        binding.hotCountryDropdown.setOnClickListener(v ->
+                showCountryPicker(false, () -> {
+                    renderHotCountryChips();
+                    selectLogicalTab(TAB_HOT);
+                    reapplyFeedPages();
+                }));
+        renderHotCountryChips();
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
         View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
@@ -215,6 +243,11 @@ public class HomeFragment extends Fragment {
                     }
                 }
                 binding.swipe.setRefreshing(false);
+            } else if (activeTab == TAB_MOMENTS) {
+                for (Fragment f : getChildFragmentManager().getFragments()) {
+                    if (f instanceof HomeMomentsFragment) ((HomeMomentsFragment) f).reloadFromHost();
+                }
+                binding.swipe.setRefreshing(false);
             } else {
                 reapplyFeedPages();
                 binding.swipe.setRefreshing(false);
@@ -229,6 +262,8 @@ public class HomeFragment extends Fragment {
         binding.tileBillion.setOnClickListener(v -> openRanking("gifts"));
         binding.tileRich.setOnClickListener(v -> openRanking("rich"));
         setupHomeActBanners();
+        // Re-apply the selected page after initializing promo cards; Me/Activities stay clean.
+        updateHeaderForTab(activeTab);
         // Explore strip removed — Mikoo Hot is a single recycled grid (item_home_live_list).
         binding.tileActivity.setOnClickListener(v -> {
             if (!isTasksEnabled()) return;
@@ -401,19 +436,25 @@ public class HomeFragment extends Fragment {
                     .setText(R.string.ranking_wealth);
             wealth.setOnClickListener(v -> openRanking("rich"));
             act.rankBannerFlip.addView(wealth);
-
-            View charm = inflater.inflate(R.layout.item_home_rank_flip, act.rankBannerFlip, false);
-            ((ImageView) charm.findViewById(R.id.imgRankCover)).setImageResource(R.drawable.home_bg_charm);
-            ((android.widget.TextView) charm.findViewById(R.id.tvRankTitle))
-                    .setText(R.string.ranking_charm);
-            charm.setOnClickListener(v -> openRanking("popular"));
-            act.rankBannerFlip.addView(charm);
-            act.rankBannerFlip.startFlipping();
         }
-        act.cpBannerCard.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+        // The CP promo under the home banners opens the native CP center directly.
+        act.cpBannerCard.setOnClickListener(v -> openCpCenter("home"));
         applyTasksFeatureVisibility();
+    }
+
+    private void openCpCenter(String view) {
+        if (!isAdded()) return;
+        Intent cp = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.cp.CpCenterActivity.class);
+        cp.putExtra(com.Dramizo.Series.presentation.cp.CpCenterActivity.EXTRA_VIEW, view);
+        startActivity(cp);
+    }
+
+    private void openInsights(String mode) {
+        Intent intent = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, mode);
+        startActivity(intent);
     }
 
     private boolean isTasksEnabled() {
@@ -429,23 +470,10 @@ public class HomeFragment extends Fragment {
         var act = binding.homeActBanners;
         // Keep the third banner filled — tasks when enabled, store otherwise (no empty gap).
         act.activityBannerCard.setVisibility(View.VISIBLE);
-        if (act.tvActivityBannerTitle != null) {
-            act.tvActivityBannerTitle.setText(on ? R.string.task_center : R.string.store_title);
-        }
-        if (act.tvActivityBannerHint != null) {
-            act.tvActivityBannerHint.setText(on
-                    ? "مهام يومية · مكافآت"
-                    : "إطارات · دخوليات · خلفيات");
-        }
-        act.activityBannerCard.setOnClickListener(v -> {
-            if (on) {
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
-            } else {
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.profile.StoreHubActivity.class));
-            }
-        });
+        if (act.tvActivityBannerTitle != null) act.tvActivityBannerTitle.setVisibility(View.GONE);
+        if (act.tvActivityBannerHint != null) act.tvActivityBannerHint.setVisibility(View.GONE);
+        // Reference home design: the third promo tile is the Charm ranking card.
+        act.activityBannerCard.setOnClickListener(v -> openRanking("popular"));
     }
 
     private void bindRankFlipPage(int pageIndex, List<MiscDtos.RankingEntryDto> list) {
@@ -466,25 +494,85 @@ public class HomeFragment extends Fragment {
             }
             AvatarImageLoader.load(avatars[i], url);
         }
-        // CP pair uses top rich #1 and #2 as decorative placeholders.
-        if (pageIndex == 0 && binding.homeActBanners.imgCpLeft != null) {
-            String left = null;
-            String right = null;
-            if (list != null && !list.isEmpty() && list.get(0) != null && list.get(0).user != null) {
-                left = list.get(0).user.avatarUrl;
-            }
-            if (list != null && list.size() > 1 && list.get(1) != null && list.get(1).user != null) {
-                right = list.get(1).user.avatarUrl;
-            }
-            AvatarImageLoader.load(binding.homeActBanners.imgCpLeft, left);
-            AvatarImageLoader.load(binding.homeActBanners.imgCpRight, right);
+        // Never present unrelated wealth leaders as a CP couple.
+        if (binding.homeActBanners.imgCpLeft != null) {
+            binding.homeActBanners.imgCpLeft.setImageResource(R.drawable.ic_tab_me);
+            binding.homeActBanners.imgCpRight.setImageResource(R.drawable.ic_tab_me);
         }
     }
 
     private void openRanking(String category) {
-        Intent intent = new Intent(requireContext(), RankingActivity.class);
-        intent.putExtra(RankingActivity.EXTRA_CATEGORY, category);
+        Intent intent = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_CATEGORY,
+                category == null ? "rich" : category);
+        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_PERIOD, "weekly");
         startActivity(intent);
+    }
+
+    /** Render a compact country strip; the Popular button always means worldwide. */
+    private void renderHotCountryChips() {
+        if (binding == null || binding.hotCountryChips == null) return;
+        LinearLayout container = binding.hotCountryChips;
+        container.removeAllViews();
+
+        CountryCatalog.Entry selected = CountryCatalog.resolve(hotCountryFilter);
+        CountryCatalog.Entry account = CountryCatalog.resolve(getMyCountryCode());
+        if (selected == null) selected = account;
+        if (selected == null) selected = CountryCatalog.resolve("SY");
+
+        java.util.LinkedHashSet<String> codes = new java.util.LinkedHashSet<>();
+        if (selected != null) codes.add(selected.code);
+        for (String code : new String[]{"SA", "SY", "MA", "AE"}) codes.add(code);
+
+        android.graphics.drawable.GradientDrawable allBg = new android.graphics.drawable.GradientDrawable();
+        allBg.setColor(hotCountryFilter == null ? 0xFFFF477E : 0xFFF7F7FA);
+        allBg.setCornerRadius(getResources().getDisplayMetrics().density * 22f);
+        binding.hotAllButton.setBackground(allBg);
+        binding.hotAllButton.setTextColor(hotCountryFilter == null ? 0xFFFFFFFF : 0xFF34343A);
+        binding.hotAllButton.setElevation(getResources().getDisplayMetrics().density * 2f);
+
+        for (String code : codes) {
+            CountryCatalog.Entry entry = CountryCatalog.resolve(code);
+            if (entry == null) continue;
+            final String countryCode = entry.code;
+            boolean active = countryCode.equalsIgnoreCase(hotCountryFilter == null ? "" : hotCountryFilter);
+            TextView chip = new TextView(requireContext());
+            if ("SY".equalsIgnoreCase(entry.code)) {
+                chip.setText(entry.displayName());
+                chip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        com.Dramizo.Series.R.drawable.ic_flag_syria, 0, 0, 0);
+                chip.setCompoundDrawablePadding(dp(4));
+            } else {
+                chip.setText(entry.flag + " " + entry.displayName());
+            }
+            chip.setTextSize(12.5f);
+            chip.setSingleLine(true);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setPadding(dp(9), 0, dp(9), 0);
+            chip.setMinHeight(dp(34));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(active ? 0xFFFFE4EC : 0xFFF7F7FA);
+            bg.setCornerRadius(dp(22));
+            bg.setStroke(dp(1), active ? 0xFFFF477E : 0xFFE6E6EC);
+            chip.setBackground(bg);
+            chip.setTextColor(active ? 0xFFB9164B : 0xFF34343A);
+            chip.setElevation(dp(1));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+            lp.setMargins(0, 0, dp(6), 0);
+            container.addView(chip, lp);
+            chip.setOnClickListener(v -> {
+                hotCountryFilter = countryCode;
+                renderHotCountryChips();
+                selectLogicalTab(TAB_HOT);
+                reapplyFeedPages();
+            });
+        }
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /** Optional Hot-tab country filter (null = worldwide). */
@@ -530,13 +618,13 @@ public class HomeFragment extends Fragment {
     private boolean shouldShowEmptyState(int tab, boolean gridEmpty) {
         if (!gridEmpty) return false;
         if (tab == TAB_ME) return false;
-        if (tab == TAB_ACTIVITIES) return false;
+        if (tab == TAB_ACTIVITIES || tab == TAB_MOMENTS) return false;
         return true;
     }
 
     private void refreshEmptyStateForActiveTab() {
         if (binding == null) return;
-        if (activeTab == TAB_ME || activeTab == TAB_ACTIVITIES) {
+        if (activeTab == TAB_ME || activeTab == TAB_ACTIVITIES || activeTab == TAB_MOMENTS) {
             updateEmptyState(false);
             return;
         }
@@ -582,33 +670,49 @@ public class HomeFragment extends Fragment {
             if (activeTab == TAB_ACTIVITIES && f instanceof HomeActivitiesFragment && f.isResumed()) {
                 return ((HomeActivitiesFragment) f).canScrollListUp();
             }
+            if (activeTab == TAB_MOMENTS && f instanceof HomeMomentsFragment && f.isResumed()) {
+                return false;
+            }
         }
         return false;
     }
 
+    // The country filter is a picker, not a swipe page. Keep the four visible tabs
+    // adjacent so horizontal swipes never land on a hidden tab.
+    private static final int[] VISIBLE_PAGER_TABS = {
+            TAB_HOT, TAB_ME, TAB_ACTIVITIES, TAB_MOMENTS
+    };
+
     private int logicalTabFromPager(int pagerPos) {
-        return pagerPos;
+        if (pagerPos < 0 || pagerPos >= VISIBLE_PAGER_TABS.length) return TAB_HOT;
+        return VISIBLE_PAGER_TABS[pagerPos];
     }
 
     private int pagerPosFromLogicalTab(int tab) {
-        return tab;
+        for (int i = 0; i < VISIBLE_PAGER_TABS.length; i++) {
+            if (VISIBLE_PAGER_TABS[i] == tab) return i;
+        }
+        return 0;
     }
 
     private void setupFeedPager() {
         feedPagerAdapter = new FragmentStateAdapter(this) {
             @NonNull @Override
             public Fragment createFragment(int position) {
-                if (position == TAB_ME) return HomeMeFragment.newInstance();
-                if (position == TAB_ACTIVITIES) return HomeActivitiesFragment.newInstance();
-                return HomeFeedPageFragment.newInstance(position);
+                int tab = logicalTabFromPager(position);
+                if (tab == TAB_ME) return HomeMeFragment.newInstance();
+                if (tab == TAB_ACTIVITIES) return HomeActivitiesFragment.newInstance();
+                if (tab == TAB_MOMENTS) return HomeMomentsFragment.newInstance();
+                return HomeFeedPageFragment.newInstance(tab);
             }
-            @Override public int getItemCount() { return TAB_COUNT; }
+            @Override public int getItemCount() { return VISIBLE_PAGER_TABS.length; }
         };
         binding.pagerFeed.setAdapter(feedPagerAdapter);
-        binding.pagerFeed.setUserInputEnabled(false);
+        // ViewPager2 handles horizontal gestures while child lists keep vertical scrolling.
+        binding.pagerFeed.setUserInputEnabled(true);
         binding.pagerFeed.setOffscreenPageLimit(3);
-        if (binding.pagerFeed.getCurrentItem() != TAB_HOT) {
-            binding.pagerFeed.setCurrentItem(TAB_HOT, false);
+        if (binding.pagerFeed.getCurrentItem() != pagerPosFromLogicalTab(TAB_HOT)) {
+            binding.pagerFeed.setCurrentItem(pagerPosFromLogicalTab(TAB_HOT), false);
         }
         if (browseCountry == null) {
             browseCountry = loadBrowseCountryCode();
@@ -616,21 +720,18 @@ public class HomeFragment extends Fragment {
     }
 
     private void selectLogicalTab(int tab) {
-        if (tab < TAB_ME || tab > TAB_ACTIVITIES) return;
+        if (tab < TAB_ME || tab > TAB_MOMENTS) return;
         if (binding == null || binding.pagerFeed == null) return;
        
         if (tab == TAB_LOCATION) {
-            showCountryPicker(true, () -> {
-                onLogicalTabSelected(TAB_LOCATION);
-                if (binding != null && binding.pagerFeed.getCurrentItem() != TAB_LOCATION) {
-                    binding.pagerFeed.setCurrentItem(TAB_LOCATION, true);
-                }
-            });
+            // Legacy hidden country tab: choosing a country keeps the user on the Hot feed.
+            showCountryPicker(true, () -> selectLogicalTab(TAB_HOT));
             return;
         }
         onLogicalTabSelected(tab);
-        if (binding.pagerFeed.getCurrentItem() != tab) {
-            binding.pagerFeed.setCurrentItem(tab, true);
+        int pagerPosition = pagerPosFromLogicalTab(tab);
+        if (binding.pagerFeed.getCurrentItem() != pagerPosition) {
+            binding.pagerFeed.setCurrentItem(pagerPosition, true);
         }
     }
 
@@ -661,17 +762,24 @@ public class HomeFragment extends Fragment {
         if (binding == null) return;
         View exploreRoot = binding.getRoot().findViewById(R.id.homeExplore);
         if (exploreRoot != null) exploreRoot.setVisibility(View.GONE);
+
+        // Keep the upper discovery controls scoped to the Popular/Country feed.
+        // Me and Activities are independent pages and must not inherit these banners or shortcuts.
+        boolean showDiscoveryChrome = tab == TAB_HOT || tab == TAB_LOCATION;
         if (binding.homeActBanners != null) {
             binding.homeActBanners.getRoot().setVisibility(
-                    tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
+                    showDiscoveryChrome ? View.VISIBLE : View.GONE);
         }
-        // Country filter: always available as Hot filter; long-press or filter icon.
-        // Country tab itself opens the picker (see selectLogicalTab).
-        if (binding.btnFilter != null) {
-            binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
+        View hotCountryBar = binding.getRoot().findViewById(R.id.hotCountryBar);
+        if (hotCountryBar != null) {
+            hotCountryBar.setVisibility(showDiscoveryChrome ? View.VISIBLE : View.GONE);
         }
-        if (binding.imgFilterIcon != null) {
-            AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
+        if (binding.pagerBanners != null) {
+            View carousel = (View) binding.pagerBanners.getParent();
+            if (carousel != null) {
+                boolean hasBanners = homeBannerAdapter != null && homeBannerAdapter.count() > 0;
+                carousel.setVisibility(showDiscoveryChrome && hasBanners ? View.VISIBLE : View.GONE);
+            }
         }
         refreshLocationTabChrome();
     }
@@ -726,6 +834,8 @@ public class HomeFragment extends Fragment {
         }
         styleOneTab(binding.tvTabActivities, binding.dotActivities, selected == TAB_ACTIVITIES,
                 activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
+        styleOneTab(binding.tvTabMoments, binding.dotMoments, selected == TAB_MOMENTS,
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
     }
 
     private static void styleOneTab(android.widget.TextView tv, View dot, boolean selected,
@@ -739,8 +849,9 @@ public class HomeFragment extends Fragment {
         tv.setTypeface(null, selected ? android.graphics.Typeface.BOLD
                 : android.graphics.Typeface.NORMAL);
         if (dot != null) {
-            // Mikoo uses size/weight/color, not a under-dot — keep dots subtle & hidden.
-            dot.setVisibility(View.GONE);
+            // Reference UI uses a short rounded gold underline under the selected tab.
+            dot.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            dot.setAlpha(selected ? 1f : 0f);
         }
     }
 
@@ -872,6 +983,12 @@ public class HomeFragment extends Fragment {
         com.Dramizo.Series.util.RoomJoinPrefetch.begin(requireContext(), room.id, pwd);
         Intent i = new Intent(requireContext(), VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+        // Paint the room's public ID immediately; don't wait for the join response to return it.
+        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, room.displayRoomId.trim());
+        }
+        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room));
         if (pwd != null && !pwd.isEmpty()) {
             i.putExtra(VoiceRoomActivity.EXTRA_PASSWORD, pwd);
         }
@@ -950,48 +1067,12 @@ public class HomeFragment extends Fragment {
 
     private void bindServerBanners(List<MiscDtos.BannerDto> all) {
         if (binding == null || homeBannerAdapter == null) return;
+        // Do not make banner visibility depend on a separate Glide preload pass.
+        // The old preload gate hid the entire carousel when the preload callback
+        // failed or was delayed, even though the adapter could load the same image.
+        // Bind the server list immediately; each slide loads independently in the adapter.
         List<MiscDtos.BannerDto> filtered = filterBannersForLocale(all);
-        if (filtered.isEmpty()) {
-            hideBannerSlider();
-            return;
-        }
-
-        final int[] pending = {filtered.size()};
-        final List<MiscDtos.BannerDto> ready = new ArrayList<>();
-
-        for (MiscDtos.BannerDto b : filtered) {
-            String url = AssetCatalog.absoluteUrl(b.imageUrl);
-            if (url == null || url.trim().isEmpty()) {
-                if (--pending[0] == 0) applyLoadedBanners(ready);
-                continue;
-            }
-            Glide.with(this)
-                    .load(url)
-                    .listener(new RequestListener<Drawable>() {
-                        @Override
-                        public boolean onLoadFailed(
-                                @Nullable GlideException e,
-                                Object model,
-                                @NonNull Target<Drawable> target,
-                                boolean isFirstResource) {
-                            if (--pending[0] == 0) applyLoadedBanners(ready);
-                            return false;
-                        }
-
-                        @Override
-                        public boolean onResourceReady(
-                                @NonNull Drawable resource,
-                                Object model,
-                                Target<Drawable> target,
-                                @NonNull DataSource dataSource,
-                                boolean isFirstResource) {
-                            ready.add(b);
-                            if (--pending[0] == 0) applyLoadedBanners(ready);
-                            return false;
-                        }
-                    })
-                    .preload();
-        }
+        applyLoadedBanners(filtered);
     }
 
     /** Hide carousel when dashboard has zero live banners — no local/default art. */
@@ -1019,7 +1100,7 @@ public class HomeFragment extends Fragment {
             hideBannerSlider();
             return;
         }
-        List<MiscDtos.BannerDto> slides = ready.size() > 3 ? new ArrayList<>(ready.subList(0, 3)) : ready;
+        List<MiscDtos.BannerDto> slides = ready.size() > 10 ? new ArrayList<>(ready.subList(0, 10)) : ready;
         applyBannerSlider(slides);
     }
 
@@ -1028,9 +1109,12 @@ public class HomeFragment extends Fragment {
             hideBannerSlider();
             return;
         }
-        View carousel = (View) binding.pagerBanners.getParent();
-        if (carousel != null) carousel.setVisibility(View.VISIBLE);
         homeBannerAdapter.submit(slides);
+        View carousel = (View) binding.pagerBanners.getParent();
+        boolean showDiscoveryChrome = activeTab == TAB_HOT || activeTab == TAB_LOCATION;
+        if (carousel != null) {
+            carousel.setVisibility(showDiscoveryChrome ? View.VISIBLE : View.GONE);
+        }
         binding.bannerRow.setVisibility(View.GONE);
         binding.pagerBanners.setVisibility(View.VISIBLE);
         binding.bannerDots.setVisibility(View.VISIBLE);
@@ -1066,7 +1150,7 @@ public class HomeFragment extends Fragment {
                 if (b != null && b.imageUrl != null && !b.imageUrl.trim().isEmpty()) out.add(b);
             }
         }
-        return out.size() > 6 ? out.subList(0, 6) : out;
+        return out.size() > 10 ? out.subList(0, 10) : out;
     }
 
     private void bindBannerDots(int count) {
@@ -1108,7 +1192,7 @@ public class HomeFragment extends Fragment {
         }
         if (link.isEmpty()) return;
         if ("party".equals(link) || link.contains("room")) {
-            binding.pagerFeed.setCurrentItem(TAB_HOT, true);
+            binding.pagerFeed.setCurrentItem(pagerPosFromLogicalTab(TAB_HOT), true);
             return;
         }
         if ("wallet".equals(link) || link.contains("bag") || link.contains("recharge")) {
@@ -1134,7 +1218,7 @@ public class HomeFragment extends Fragment {
             return;
         }
         if ("ranking".equals(link) || link.contains("rank")) {
-            startActivity(new Intent(requireContext(), RankingActivity.class));
+            openRanking("rich");
             return;
         }
         String title = banner.title != null ? banner.title : "";
@@ -1160,6 +1244,9 @@ public class HomeFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocationTabChrome();
+        // Dashboard banner uploads/settings are remote config; reload them whenever
+        // the Home screen returns to the foreground instead of waiting for a reinstall.
+        if (viewModel != null) viewModel.loadBanners();
         AppContainer c = ContainerProvider.from(requireActivity());
             c.getIoExecutor().execute(() -> {
             AppFeatures.refresh(c);
@@ -1178,6 +1265,9 @@ public class HomeFragment extends Fragment {
             handler.postDelayed(bannerAutoScroll, 4500);
         }
         loadWalletBalance();
+        handler.removeCallbacks(roomPkRefreshRunnable);
+        refreshRoomPkStatuses();
+        handler.postDelayed(roomPkRefreshRunnable, 30000);
         if (viewModel == null) return;
         // Resume / return from Games/etc → silent background refresh (no top spinner).
         // Pull-to-refresh still uses loadRooms() / loadFollowingRooms() with visible indicator.
@@ -1189,8 +1279,8 @@ public class HomeFragment extends Fragment {
                 viewModel.loadFollowingRooms();
             }
             reapplyFeedPages();
-        } else if (activeTab == TAB_ACTIVITIES) {
-            /* activities fragment manages itself */
+        } else if (activeTab == TAB_ACTIVITIES || activeTab == TAB_MOMENTS) {
+            /* Activities and Moments fragments manage their own content. */
         } else {
             java.util.List<?> cur = viewModel.getRooms().getValue();
             if (cur != null && !cur.isEmpty()) {
@@ -1202,6 +1292,52 @@ public class HomeFragment extends Fragment {
             attachRoomListRealtime();
             handler.removeCallbacks(roomRefreshRunnable);
             handler.postDelayed(roomRefreshRunnable, 12000);
+        }
+    }
+
+    /** Fetch the authoritative active PK set so every visible room card can show its badge. */
+    private void refreshRoomPkStatuses() {
+        if (!isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response =
+                        c.getContestsApi().list().execute();
+                if (!response.isSuccessful() || response.body() == null
+                        || !response.body().success || response.body().data == null
+                        || response.body().data.items == null) return;
+                java.util.Set<String> activeRooms = new java.util.HashSet<>();
+                for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                    if (contest == null || !"room_vs_room".equals(contest.challengeType)
+                            || !"active".equalsIgnoreCase(contest.status)
+                            || contest.sideA == null || contest.sideB == null) continue;
+                    if (contest.sideA.roomIds != null) activeRooms.addAll(contest.sideA.roomIds);
+                    if (contest.sideB.roomIds != null) activeRooms.addAll(contest.sideB.roomIds);
+                }
+                java.util.Set<String> before = com.Dramizo.Series.util.RoomPkState.snapshot();
+                if (before.equals(activeRooms)) return;
+                com.Dramizo.Series.util.RoomPkState.replaceActiveRooms(activeRooms);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (binding == null) return;
+                    notifyRoomCardLists(binding.getRoot());
+                });
+            } catch (Exception ignored) {
+                // PK badges are optional UI and must never block home or voice features.
+            }
+        });
+    }
+
+    private void notifyRoomCardLists(@NonNull View root) {
+        if (root instanceof RecyclerView) {
+            RecyclerView recycler = (RecyclerView) root;
+            if (recycler.getAdapter() != null) recycler.getAdapter().notifyDataSetChanged();
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                notifyRoomCardLists(group.getChildAt(i));
+            }
         }
     }
 
@@ -1218,7 +1354,11 @@ public class HomeFragment extends Fragment {
             }
             @Override
             public void onRoomEvent(String roomId, String event, JsonObject payload, String fromUserId, String fromUsername) {
-                if ("room:updated".equals(event) || "room:closed".equals(event)) {
+                if ("room:updated".equals(event)
+                        || "room:closed".equals(event)
+                        || "room:top_cards_changed".equals(event)) {
+                    // TOP 1/2/3 can change after any room gift; reload the feed
+                    // so ranks, ordering and replacement frames move together.
                     viewModel.refreshRoomsQuietly();
                 }
             }
@@ -1230,15 +1370,35 @@ public class HomeFragment extends Fragment {
         if (binding == null || binding.imgHomeBg == null) return;
         String url = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(requireContext(), "home");
         if (url == null || url.isEmpty()) {
-            binding.imgHomeBg.setImageResource(R.drawable.home_page_bg);
+            binding.imgHomeBg.setVisibility(View.GONE);
             return;
         }
+        binding.imgHomeBg.setVisibility(View.VISIBLE);
         com.Dramizo.Series.util.RemoteTheme.loadInto(
                 binding.imgHomeBg, url, R.drawable.home_page_bg);
     }
 
+    /**
+     * Rebind the two existing header shortcuts from the dashboard config.
+     * This updates the existing room icon beside Search only; it never adds a view.
+     */
+    public void refreshHeaderShortcutIcons() {
+        if (binding == null) return;
+        AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.btnSearch, "search");
+        com.Dramizo.Series.util.RemoteNavIcons.bindHomeShortcut(binding.imgMyRoomShortcutIcon, "room");
+    }
+
+    /** Rebind dashboard-managed Home images after the shared visual config refreshes. */
+    public void refreshDashboardVisuals() {
+        if (binding == null) return;
+        applyRemoteHomeBackground();
+        refreshHeaderShortcutIcons();
+        if (viewModel != null) viewModel.loadBanners();
+    }
+
     private void applyRemoteHomeAssets() {
-        // Icons come from fragment_home.xml android:src — do not override in code.
+        // Header shortcut icons are bound explicitly by refreshHeaderShortcutIcons().
     }
 
     private void refreshMyRoomCard() {
@@ -1255,6 +1415,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onPause() {
         handler.removeCallbacks(roomRefreshRunnable);
+        handler.removeCallbacks(roomPkRefreshRunnable);
         handler.removeCallbacks(offersGiftAnimation);
         handler.removeCallbacks(bannerAutoScroll);
         detachRoomListRealtime();
@@ -1264,6 +1425,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         handler.removeCallbacks(roomRefreshRunnable);
+        handler.removeCallbacks(roomPkRefreshRunnable);
         handler.removeCallbacks(offersGiftAnimation);
         handler.removeCallbacks(bannerAutoScroll);
         detachRoomListRealtime();

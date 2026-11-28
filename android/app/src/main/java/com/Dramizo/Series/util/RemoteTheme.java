@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -19,38 +21,119 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.bumptech.glide.Glide;
+import com.google.gson.Gson;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
+import java.util.concurrent.CopyOnWriteArrayList;
+
 /**
- * Applies APK-bundled visuals only. Dashboard remote theme is not used.
+ * Applies dashboard-managed remote visuals with APK-bundled fallbacks.
  */
 public final class RemoteTheme {
     private static volatile MiscDtos.ThemeDto cached;
+    // App startup and SplashActivity both request this config. Coalesce them so
+    // a cold launch performs one network refresh, not two competing requests.
+    private static final java.util.concurrent.atomic.AtomicBoolean REFRESH_IN_FLIGHT =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.concurrent.atomic.AtomicLong LAST_REFRESH_AT =
+            new java.util.concurrent.atomic.AtomicLong(-1L);
+    private static final long REFRESH_INTERVAL_MS = 60_000L;
+    private static final CopyOnWriteArrayList<Runnable> refreshListeners = new CopyOnWriteArrayList<>();
 
     private RemoteTheme() {}
+
+    private static final String PREFS = "remote_theme";
+    private static final String KEY_JSON = "theme_json";
+    private static final Gson GSON = new Gson();
 
     public static MiscDtos.ThemeDto getCached(Context context) {
         MiscDtos.ThemeDto mem = cached;
         if (mem != null) return mem;
-        // App visuals ship only in the APK — never hydrate from dashboard/remote theme.
+        MiscDtos.ThemeDto disk = readDisk(context);
+        if (disk != null) {
+            cached = disk;
+            return disk;
+        }
         MiscDtos.ThemeDto defaults = MiscDtos.ThemeDto.defaults();
         cached = defaults;
         return defaults;
     }
 
-    /** Remote theme download disabled — UI assets live in res/. */
+    /** Registers a lightweight callback for screens that display dashboard-controlled theme assets. */
+    public static void addRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.addIfAbsent(listener);
+    }
+
+    public static void removeRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.remove(listener);
+    }
+
+    private static void notifyRefreshListeners() {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            for (Runnable listener : refreshListeners) {
+                try {
+                    listener.run();
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
+    /** Downloads the dashboard-controlled theme once per app start; failures keep the last cache. */
     public static void refreshFromApi(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
-        // no-op
+        if (context == null || api == null) return;
+        if (!REFRESH_IN_FLIGHT.compareAndSet(false, true)) return;
+        long now = android.os.SystemClock.elapsedRealtime();
+        long previous = LAST_REFRESH_AT.get();
+        if (previous >= 0L && now - previous < REFRESH_INTERVAL_MS) {
+            REFRESH_IN_FLIGHT.set(false);
+            return;
+        }
+        boolean completed = false;
+        try {
+            com.Dramizo.Series.domain.model.Result<MiscDtos.ThemeDto> result =
+                    ApiCall.execute(api.theme());
+            if (result == null || !result.success || result.data == null) return;
+            MiscDtos.ThemeDto previousTheme = cached != null ? cached : readDisk(context);
+            boolean changed = previousTheme == null
+                    || !GSON.toJson(previousTheme).equals(GSON.toJson(result.data));
+            cached = result.data;
+            writeDisk(context, result.data);
+            if (changed) notifyRefreshListeners();
+            completed = true;
+        } catch (Throwable ignored) {
+            // Remote configuration must never prevent the app from opening.
+        } finally {
+            if (completed) LAST_REFRESH_AT.set(android.os.SystemClock.elapsedRealtime());
+            REFRESH_IN_FLIGHT.set(false);
+        }
     }
 
     private static void writeDisk(Context context, MiscDtos.ThemeDto theme) {
-        // no-op — do not persist remote theme
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null || theme == null) return;
+            storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_JSON, GSON.toJson(theme))
+                    .apply();
+        } catch (Throwable ignored) {
+        }
     }
 
     @Nullable
     private static MiscDtos.ThemeDto readDisk(Context context) {
-        return null;
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null) return null;
+            String json = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString(KEY_JSON, "");
+            if (json == null || json.trim().isEmpty()) return null;
+            return GSON.fromJson(json, MiscDtos.ThemeDto.class);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     public static int getCachedVersion(Context context) {
@@ -77,30 +160,103 @@ public final class RemoteTheme {
         return notEmpty(value) ? value : null;
     }
 
-    /** Brand artwork ships in the APK; remote brand URLs are ignored. */
+    /** Returns active server splash items sorted by dashboard order. */
+    public static java.util.List<MiscDtos.SplashItemDto> activeSplashItems(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        java.util.ArrayList<MiscDtos.SplashItemDto> out = new java.util.ArrayList<>();
+        if (theme == null || theme.splash == null || !theme.splash.enabled || theme.splash.items == null) return out;
+        for (MiscDtos.SplashItemDto item : theme.splash.items) {
+            if (item == null || !item.active || !notEmpty(item.url)) continue;
+            out.add(item);
+        }
+        java.util.Collections.sort(out, (x, y) -> Integer.compare(x.sortOrder, y.sortOrder));
+        return out;
+    }
+
+    /** Selects the next configured splash once per launcher process start. */
+    public static MiscDtos.SplashItemDto nextSplash(Context context) {
+        java.util.List<MiscDtos.SplashItemDto> items = activeSplashItems(context);
+        if (!items.isEmpty()) {
+            try {
+                Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+                if (storage == null) return items.get(0);
+                android.content.SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                int index = prefs.getInt("splash_index", 0);
+                int selected = Math.floorMod(index, items.size());
+                prefs.edit().putInt("splash_index", selected + 1).apply();
+                return items.get(selected);
+            } catch (Throwable ignored) {
+                return items.get(0);
+            }
+        }
+
+        // Older dashboard builds save a single uploaded splash in brand.splashUrl
+        // or backgrounds.splash instead of splash.items. Keep those uploads visible
+        // to the Android launcher without requiring the admin to upload them again.
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null || theme.splash == null || !theme.splash.enabled) return null;
+        String legacyUrl = brandSplashUrl(context);
+        if (!notEmpty(legacyUrl)) legacyUrl = backgroundUrl(context, "splash");
+        if (!notEmpty(legacyUrl) && theme.assets != null) legacyUrl = theme.assets.get("splash");
+        if (!notEmpty(legacyUrl)) return null;
+
+        MiscDtos.SplashItemDto fallback = new MiscDtos.SplashItemDto();
+        fallback.id = "dashboard-splash";
+        fallback.url = AssetCatalog.absoluteUrl(legacyUrl.trim());
+        fallback.active = true;
+        fallback.durationSeconds = 5;
+        fallback.sortOrder = 0;
+        fallback.targetType = "home";
+        return fallback;
+    }
+
+    public static long splashDurationMs(@Nullable MiscDtos.SplashItemDto item) {
+        if (item == null) return 5000L;
+        int seconds = Math.max(1, Math.min(5, item.durationSeconds));
+        return seconds * 1000L;
+    }
+
+    /** Returns the dashboard-configured brand logo, when present. */
     @Nullable
     public static String brandLogoUrl(Context context) {
-        return null;
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.logoUrl)
+                ? theme.brand.logoUrl : null;
     }
 
-    /** Splash artwork ships in the APK; remote splash URLs are ignored. */
+    /** Returns the dashboard-configured brand splash, when present. */
     @Nullable
     public static String brandSplashUrl(Context context) {
-        return null;
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.splashUrl)
+                ? theme.brand.splashUrl : null;
     }
 
-  /** Wallpapers ship in the APK; remote theme URLs are ignored. */
-  @Nullable
-  public static String backgroundUrl(Context context, String screenKey) {
-        return null;
-  }
+    /** Returns a dashboard-configured wallpaper, with the bundled layout as fallback. */
+    @Nullable
+    public static String backgroundUrl(Context context, String screenKey) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null) return null;
+        return backgroundField(theme.backgrounds, screenKey);
+    }
 
     @Nullable
     private static String backgroundField(MiscDtos.ThemeBackgrounds bg, String screenKey) {
         if (bg == null || screenKey == null) return null;
+        // The shared dashboard wallpaper is authoritative for all four main tabs.
+        // Keep per-section values as backward-compatible fallback only.
+        if (("home".equals(screenKey) || "profile".equals(screenKey)
+                || "chat".equals(screenKey) || "games".equals(screenKey))
+                && notEmpty(bg.allSections)) return bg.allSections;
+        if ("home".equals(screenKey) && notEmpty(bg.home)) return bg.home;
+        if ("profile".equals(screenKey) && notEmpty(bg.profile)) return bg.profile;
+        if ("chat".equals(screenKey) && notEmpty(bg.chat)) return bg.chat;
+        if ("games".equals(screenKey) && notEmpty(bg.games)) return bg.games;
         switch (screenKey) {
             case "app": return bg.app;
-            case "auth": return bg.auth;
+            case "register": return notEmpty(bg.register) ? bg.register : bg.auth;
+            case "auth":
+            case "login": return bg.auth;
             case "splash": return bg.splash;
             case "home": return bg.home;
             case "profile": return bg.profile;
@@ -291,8 +447,12 @@ public final class RemoteTheme {
         if (root == null) return;
         ImageView target = findBackgroundImageView(root);
         if (target != null) {
-            // Preserve XML artwork when no remote wallpaper URL is configured.
+            // Dashboard wallpaper ImageViews are intentionally GONE in XML until
+            // a URL is configured. Reveal the target before loadInto(), which
+            // deliberately skips GONE views to avoid waking unrelated placeholders.
             if (notEmpty(url)) {
+                target.setVisibility(View.VISIBLE);
+                target.setAlpha(1f);
                 loadInto(target, url, fallbackRes);
             }
             return;
@@ -380,10 +540,17 @@ public final class RemoteTheme {
     }
 
     /**
-     * UI icons and wallpapers ship in the APK. Remote theme URLs are ignored.
+     * Apply only explicitly configured server assets. Existing XML drawables remain
+     * the safe fallback when a dashboard asset is absent or fails to load.
      */
     public static void applyMappedAssets(@Nullable View root) {
-        // no-op: keep layout/local drawables
+        if (root == null) return;
+        String logo = brandLogoUrl(root.getContext());
+        if (notEmpty(logo)) {
+            loadMappedUrl(root, "imgLogo", logo);
+            loadMappedUrl(root, "imgAppLogo", logo);
+            loadMappedUrl(root, "imgBrandLogo", logo);
+        }
     }
 
     private static void loadMappedUrl(View root, String idName, @Nullable String url) {
@@ -489,18 +656,27 @@ public final class RemoteTheme {
     }
 
     /**
-     * Keep {@code android:src} from XML layouts. Do not override icons in code —
-     * change drawables under res/drawable* to update UI art.
+     * Load a named dashboard theme asset when configured; otherwise keep the
+     * existing XML drawable untouched.
      */
     public static void loadAsset(ImageView view, String key, int fallbackRes) {
         if (view == null) return;
         view.setVisibility(View.VISIBLE);
-        // XML src is the source of truth.
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, fallbackRes);
+        } else if (view.getDrawable() == null && fallbackRes != 0) {
+            view.setImageResource(fallbackRes);
+        }
     }
 
-    /** Keep XML icon visible — remote theme icons are disabled. */
+    /** Same as loadAsset, but preserves the existing view visibility. */
     public static void loadAssetOrGone(ImageView view, String key) {
-        if (view != null) view.setVisibility(View.VISIBLE);
+        if (view == null) return;
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, 0);
+        }
     }
 
     private static boolean notEmpty(@Nullable String s) {

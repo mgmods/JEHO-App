@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
+import { secureGameRandom } from '../secure-game-rng';
 import { DataSource } from 'typeorm';
 import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds } from '../game-odds-runtime';
+import { getGameBetSettings, getGameOdds, getGameRtp, getGameWinRate, isGameBettingEnabled, isGameEnabled } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -131,6 +132,10 @@ export class BaishunWsHandler {
   ) {}
 
   handle(ws: WebSocket, gameSlug: string, rawUrl = '') {
+    if (!isGameEnabled(gameSlug)) {
+      ws.close(1013, 'Game disabled by administrator');
+      return;
+    }
     const protocol = this.protocolFor(gameSlug);
     if (protocol === 'packer') {
       this.handlePacker(ws, gameSlug, rawUrl);
@@ -153,7 +158,9 @@ export class BaishunWsHandler {
   private handleJson(ws: WebSocket, gameSlug: string, rawUrl: string) {
     let player: MikooPlayerContext | null = null;
     let authReady: Promise<void> = Promise.resolve();
-    let betAmount = SLOT_CHIP_LIST[0];
+    const betSettings = getGameBetSettings(gameSlug);
+    const slotChips = betSettings.chips;
+    let betAmount = slotChips[0] ?? betSettings.minBet;
     const query = this.parseQuery(rawUrl);
 
     const ensurePlayer = async (
@@ -241,6 +248,10 @@ export class BaishunWsHandler {
     })();
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       void (async () => {
         try {
           await authReady;
@@ -294,22 +305,23 @@ export class BaishunWsHandler {
           if (msgId === 'GameConfig' || msgId === 'GameDetail') {
             const bal = player ? await this.sessions.refreshBalance(player) : 0;
             const coinIcon =
-              'https://api.adnova.bbs.tr/assets/pack/ic_pass_card_coin.png';
+              '/assets/pack/ic_pass_card_coin.png';
             const isPlinko = gameSlug === 'football-plinko';
             const isCleopatra =
               gameSlug === 'cleopatra-slot' || gameSlug === 'cleopatra-slots';
             const puzzle = isCleopatra ? this.cleopatraPuzzle() : undefined;
+            const puzzleInfo = gameSlug === 'slot777' ? this.slot777PuzzleInfo() : undefined;
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
-                min_bet: SLOT_CHIP_LIST[0],
-                max_bet: 100000,
-                bet_list: SLOT_CHIP_LIST,
-                betList: SLOT_CHIP_LIST,
-                betConfig: SLOT_CHIP_LIST,
-                chips: SLOT_CHIP_LIST,
-                defaultBet: SLOT_CHIP_LIST[0],
-                default_bet: SLOT_CHIP_LIST[0],
+                min_bet: betSettings.minBet,
+                max_bet: betSettings.maxBet,
+                bet_list: slotChips,
+                betList: slotChips,
+                betConfig: slotChips,
+                chips: slotChips,
+                defaultBet: slotChips[0] ?? betSettings.minBet,
+                default_bet: slotChips[0] ?? betSettings.minBet,
                 lines: 20,
                 currency: 'coin',
                 currencyIcon: coinIcon,
@@ -326,6 +338,7 @@ export class BaishunWsHandler {
                       NormalResult: puzzle,
                     }
                   : {}),
+                ...(puzzleInfo ? { puzzleInfo } : {}),
                 // Football plinko: routes keyed by `${defaultRows}_${rewardMultipleIndex}`
                 ...(isPlinko
                   ? {
@@ -351,23 +364,10 @@ export class BaishunWsHandler {
               });
               return;
             }
-            betAmount = Math.max(
-              SLOT_CHIP_LIST[0],
-              Math.floor(
-                Number(
-                  data.bet ??
-                    data.bet_amount ??
-                    data.betAmount ??
-                    data.defaultBet ??
-                    data.chip ??
-                    betAmount,
-                ) || SLOT_CHIP_LIST[0],
-              ),
-            );
-            if (!Number.isFinite(betAmount) || betAmount <= 0) {
-              betAmount = SLOT_CHIP_LIST[0];
-            }
-            if (betAmount > gamePayoutLimits().maxBet) {
+            betAmount = Math.floor(Number(
+              data.bet ?? data.bet_amount ?? data.betAmount ?? data.defaultBet ?? data.chip ?? betAmount,
+            ) || 0);
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !slotChips.includes(betAmount)) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : 'Spin', {
                 Code: 1,
                 ErrorTips: 'Bet too high',
@@ -387,16 +387,22 @@ export class BaishunWsHandler {
               this.logger.log(
                 `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${betAmount} user=${player.userId} bal=${player.balance}`,
               );
-              const afterBet = await this.debit(player.userId, betAmount, gameSlug);
-              const { win, mult } = spinPayout(betAmount);
-              let balance = afterBet;
-              if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
+              const suppliedOperationId = data.operationId ?? data.requestId ?? data.idempotencyKey ?? clientTs;
+              const operationId = suppliedOperationId != null && String(suppliedOperationId).trim()
+                ? `baishun:${gameSlug}:${player.sessionId}:${String(suppliedOperationId).slice(0, 120)}`
+                : randomUUID();
+              const { win, mult } = spinPayout(betAmount, { gameId: gameSlug });
+              const { balance } = await this.settleInstantBet(
+                player.userId, betAmount, win, gameSlug, mult, operationId,
+              );
               player.balance = balance;
               const rewardMultipleIndex = Math.max(0, Math.min(10, mult > 0 ? Math.min(10, mult) : 0));
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
               const roundId = randomUUID();
               const puzzle = this.cleopatraPuzzle();
-              const puzzleInfo = this.slot777PuzzleInfo();
+              const puzzleInfo = gameSlug === 'slot777'
+                ? this.slot777PuzzleInfo(win > 0, mult)
+                : this.slot777PuzzleInfo();
               const isPlinko = gameSlug === 'football-plinko';
               const plinkoIdx = isPlinko
                 ? Math.max(0, Math.min(15, win > 0 ? Math.min(15, Math.floor(mult) || 1) : 0))
@@ -526,57 +532,33 @@ export class BaishunWsHandler {
           }
 
           if (msgId === 'ChangeBet') {
-            betAmount = Math.max(
-              SLOT_CHIP_LIST[0],
-              Math.floor(Number(data.bet ?? betAmount)),
-            );
+            const requested = Math.floor(Number(data.bet ?? betAmount));
+            if (!slotChips.includes(requested) || requested < betSettings.minBet || requested > betSettings.maxBet) {
+              this.replyJson(ws, 'ChangeBet', { Code: 1, ErrorTips: 'Invalid bet amount' });
+              return;
+            }
+            betAmount = requested;
             this.replyJson(ws, 'ChangeBet', { Code: 0, Data: { bet: betAmount } });
             return;
           }
 
           if (msgId === 'GameRecord' || msgId === 'GameRecordDetail') {
-            // Bet history rows (bet/reward/time) — not the same as RankList.
-            const now = Math.floor(Date.now() / 1000);
-            const history = Array.from({ length: 8 }, (_, i) => {
-              const bet = SLOT_CHIP_LIST[i % SLOT_CHIP_LIST.length];
-              const reward = i % 3 === 0 ? bet * (2 + (i % 4)) : 0;
-              return {
-                bet,
-                bet_amount: bet,
-                reward,
-                bonus: reward,
-                win: reward,
-                win_amount: reward,
-                time: now - i * 3600,
-                timestamp: now - i * 3600,
-                multiple: reward > 0 ? reward / Math.max(1, bet) : 0,
-                roundId: `r${now - i}`,
-                round_id: `r${now - i}`,
-              };
-            });
+            // Do not fabricate historical rounds. Until round-level records are persisted,
+            // return an honest empty history rather than invented wins and balances.
             this.replyJson(ws, msgId, {
               Code: 0,
               Data: {
-                list: history,
-                records: history,
-                total: history.length,
+                list: [],
+                records: [],
+                total: 0,
               },
             });
             return;
           }
 
           if (msgId === 'RankList') {
-            let ranks = await this.economy.topWinners(gameSlug, 20);
-            if (ranks.length < 5) {
-              const global = await this.economy.topWinners(undefined, 20);
-              const seen = new Set(ranks.map((r) => String(r.userId)));
-              for (const g of global) {
-                if (ranks.length >= 20) break;
-                if (seen.has(String(g.userId))) continue;
-                ranks.push(g);
-                seen.add(String(g.userId));
-              }
-            }
+            // Keep the leaderboard scoped to this game; never mix in global wins.
+            const ranks = await this.economy.topWinners(gameSlug, 20);
             const list = ranks.map((r, idx) => {
               const amount = Math.max(0, Number(r.score) || Number(r.win) || 0);
               return {
@@ -688,14 +670,20 @@ export class BaishunWsHandler {
 
   /** Swimsuit Party — Packer + protobuf routes. */
   private handlePacker(ws: WebSocket, gameSlug: string, rawUrl: string) {
+    const betSettings = getGameBetSettings(gameSlug);
+    const configuredChips = betSettings.chips;
     let player: MikooPlayerContext | null = null;
     let chipIdx = 0;
-    let chipMultiple = CHIP_LIST[0];
+    let chipMultiple = configuredChips[0] ?? betSettings.minBet;
     const query = this.parseQuery(rawUrl);
 
     this.logger.log(`baishun packer attach ${gameSlug}`);
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       void (async () => {
         try {
           const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
@@ -731,7 +719,7 @@ export class BaishunWsHandler {
                       chip: chipMultiple,
                       chipIdx,
                     }),
-                    channelCfg: encodeChannelCfg(),
+                    channelCfg: encodeChannelCfg(configuredChips),
                   }),
                 ),
               );
@@ -742,7 +730,7 @@ export class BaishunWsHandler {
               `baishun connect ${gameSlug} user=${player.userId} bal=${bal} room=${player.roomId || '-'}`,
             );
             chipIdx = 0;
-            chipMultiple = CHIP_LIST[0];
+            chipMultiple = configuredChips[0] ?? betSettings.minBet;
             const playerInfo = encodePlayerInfo({
               playerId: Number(player.publicId) || player.userId.length,
               userName: player.displayName || String(player.publicId),
@@ -799,8 +787,8 @@ export class BaishunWsHandler {
 
           if (route === SwimsuitRoute.PLAYER_CHANGE_CHIP) {
             const req = decodeChangeChipReq(buffer);
-            chipIdx = Math.max(0, Math.min(CHIP_LIST.length - 1, req.chipIdx | 0));
-            chipMultiple = req.chipMultiple > 0 ? req.chipMultiple : CHIP_LIST[chipIdx];
+            chipIdx = Math.max(0, Math.min(configuredChips.length - 1, req.chipIdx | 0));
+            chipMultiple = configuredChips[chipIdx] ?? betSettings.minBet;
             this.sendBin(
               ws,
               packMessage(route, seq, encodeChangeChipRes(0, chipIdx, chipMultiple)),
@@ -827,10 +815,10 @@ export class BaishunWsHandler {
               return;
             }
             const req = decodeSpinReq(buffer);
-            if (req.chipMultiple > 0) chipMultiple = req.chipMultiple;
-            if (req.chipIdx >= 0) chipIdx = req.chipIdx;
-            const betAmount = Math.max(50, Math.floor(chipMultiple || CHIP_LIST[0]));
-            if (betAmount > gamePayoutLimits().maxBet) {
+            if (req.chipIdx >= 0) chipIdx = Math.max(0, Math.min(configuredChips.length - 1, req.chipIdx));
+            chipMultiple = configuredChips[chipIdx] ?? betSettings.minBet;
+            const betAmount = Math.floor(chipMultiple || betSettings.minBet);
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !configuredChips.includes(betAmount) || betAmount > gamePayoutLimits().maxBet) {
               this.sendBin(
                 ws,
                 packMessage(
@@ -853,7 +841,7 @@ export class BaishunWsHandler {
               let win = 0;
               if (!isFree) {
                 balance = await this.debit(player.userId, betAmount, gameSlug);
-                win = spinPayout(betAmount).win;
+                win = spinPayout(betAmount, { gameId: gameSlug }).win;
                 if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               }
               player.balance = balance;
@@ -938,8 +926,10 @@ export class BaishunWsHandler {
 
   /** Hilo / Royal Battle / Greedy Lion — raw ClientMsg protobuf (no Packer). */
   private handleClientMsg(ws: WebSocket, gameSlug: string, rawUrl: string) {
+    const betSettings = getGameBetSettings(gameSlug);
     let player: MikooPlayerContext | null = null;
     const query = this.parseQuery(rawUrl);
+    const configuredChips = betSettings.chips;
     const isRoyal = gameSlug === 'royal-battle';
     const isGreedy = gameSlug === 'greedy-lion';
     // Per-connection Hilo round state
@@ -948,6 +938,8 @@ export class BaishunWsHandler {
     let hiloRounds = 0;
     let royalRoundId = `r${Date.now()}`;
     let royalMyBet = 0;
+    let royalSettlementTimer: ReturnType<typeof setTimeout> | null = null;
+    let royalRoundLocked = false;
     let greedyRoundId = `g${Date.now()}`;
     let greedyMyBet = 0;
     /** areaId -> stake total this round */
@@ -960,7 +952,7 @@ export class BaishunWsHandler {
     let greedyPhase: 'bet' | 'play' | 'over' = 'bet';
     let greedyRoundTimer: ReturnType<typeof setTimeout> | null = null;
     let chain: Promise<void> = Promise.resolve();
-    const greedyChips = CHIP_LIST.length ? CHIP_LIST : [50, 100, 200, 500, 1000];
+    const greedyChips = configuredChips.length ? configuredChips : [betSettings.minBet];
     /** Mesh session publicId — MUST match native bridge userId for chip fly / auto. */
     const queryUserId = String(query.user_id || query.userId || '').trim();
 
@@ -1007,8 +999,8 @@ export class BaishunWsHandler {
     };
 
     const randCard = () => ({
-      id: 1 + Math.floor(Math.random() * 13),
-      flower: Math.floor(Math.random() * 4),
+      id: 1 + Math.floor(secureGameRandom() * 13),
+      flower: Math.floor(secureGameRandom() * 4),
     });
 
     const clearGreedyTimers = () => {
@@ -1043,7 +1035,7 @@ export class BaishunWsHandler {
 
       const p = pIn || (await ensurePlayer());
       // Same house RTP as other multi-area boards (dashboard playerRtp).
-      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameOdds().playerRtp);
+      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameRtp('greedy-lion') ?? getGameOdds().playerRtp);
       const odds = GREEDY_LION_ODDS[winner] || 2;
       const stakeOnWin = greedyAreaBets[winner] || 0;
       let win = Math.floor(stakeOnWin * odds);
@@ -1133,11 +1125,11 @@ export class BaishunWsHandler {
       chipIdx: number,
       count: number,
     ): Promise<{ ok: boolean; bal: number }> => {
-      const chip = Math.max(
-        1,
-        Math.min(gamePayoutLimits().maxBet, Math.floor(Number(greedyChips[chipIdx] ?? 50))),
-      );
+      const chip = Math.floor(Number(greedyChips[chipIdx] ?? betSettings.minBet));
       const stake = chip * Math.max(1, count);
+      if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet || !configuredChips.includes(chip) || stake > gamePayoutLimits().maxBet) {
+        return { ok: false, bal: p.balance || 0 };
+      }
       try {
         const bal = await this.debit(p.userId, stake, gameSlug);
         p.balance = bal;
@@ -1182,6 +1174,10 @@ export class BaishunWsHandler {
     })();
 
     ws.on('message', (raw) => {
+      if (!isGameEnabled(gameSlug)) {
+        ws.close(1013, 'Game disabled by administrator');
+        return;
+      }
       chain = chain.then(async () => {
         try {
           const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
@@ -1221,10 +1217,10 @@ export class BaishunWsHandler {
 
           if (msgId === HILO_MSG.ReqGameConfig) {
             const cfg = isRoyal
-              ? encodeRoyalGetConfigRes()
+              ? encodeRoyalGetConfigRes(configuredChips)
               : isGreedy
                 ? encodeGreedyGetConfigRes(greedyChips)
-                : encodeHiloGetConfigRes();
+                : encodeHiloGetConfigRes(betSettings.maxBet, configuredChips);
             this.sendBin(ws, encodeClientMsg(HILO_MSG.ResGameConfig, cfg));
             if (isRoyal) {
               this.sendBin(
@@ -1334,10 +1330,15 @@ export class BaishunWsHandler {
               return;
             }
             if (isRoyal) {
-              const chip = Math.max(
-                10,
-                Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[2] ?? fields[1] ?? 100))),
-              );
+              const chip = Math.floor(Number(fields[2] ?? fields[1] ?? configuredChips[0] ?? betSettings.minBet));
+              if (!isGameBettingEnabled(gameSlug) || chip < betSettings.minBet || chip > betSettings.maxBet || !configuredChips.includes(chip)) {
+                this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
+                return;
+              }
+              if (royalRoundLocked) {
+                this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeRoyalBetRes(p.balance || 0, royalMyBet)));
+                return;
+              }
               try {
                 const bal = await this.debit(p.userId, chip, gameSlug);
                 p.balance = bal;
@@ -1357,10 +1358,13 @@ export class BaishunWsHandler {
                   winCoins: 0,
                   balanceAfter: bal,
                 });
-                // Auto settle after short delay so UI progresses.
-                setTimeout(() => {
+                // One settlement timer per round. Further chip placements aggregate into
+                // the same stake instead of scheduling duplicate payouts.
+                if (!royalSettlementTimer) royalSettlementTimer = setTimeout(() => {
+                  royalSettlementTimer = null;
+                  royalRoundLocked = true;
                   if (ws.readyState !== WebSocket.OPEN) return;
-                  const winner = 1 + Math.floor(Math.random() * 2);
+                  const winner = 1 + Math.floor(secureGameRandom() * 2);
                   const blue = [1, 5, 9];
                   const red = [2, 6, 10];
                   const rewardAreaIds = [winner];
@@ -1382,12 +1386,13 @@ export class BaishunWsHandler {
                     const odds = areaOdds[winner] || 1.85;
                     const stake = royalMyBet || chip;
                     // Pay gate from dashboard → keeps royal house-positive on ~1.85 sides.
-                    const payGate = getGameOdds().royalBattlePayGate;
+                    const configuredRoyalRate = getGameWinRate('royal-battle');
+                    const payGate = configuredRoyalRate === undefined ? getGameOdds().royalBattlePayGate : configuredRoyalRate / 100;
                     const win = Math.floor(
-                      stake * odds * (Math.random() < payGate ? 1 : 0),
+                      stake * odds * (secureGameRandom() < payGate ? 1 : 0),
                     );
                     let nb = await this.sessions.refreshBalance(p);
-                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
+                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake, `${royalRoundId}:${p.userId}:settle`);
                     p.balance = nb;
                     const uid = String(p.publicId || p.userId);
                     setTimeout(() => {
@@ -1423,6 +1428,7 @@ export class BaishunWsHandler {
                       );
                       royalMyBet = 0;
                       royalRoundId = `r${Date.now()}`;
+                      royalRoundLocked = false;
                       setTimeout(() => {
                         if (ws.readyState !== WebSocket.OPEN) return;
                         this.sendBin(
@@ -1456,10 +1462,13 @@ export class BaishunWsHandler {
             }
 
             // Hilo: field1 = amount
-            const betAmount = Math.max(
-              10,
-              Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[1] ?? 100))),
-            );
+            const betAmount = Math.floor(Number(fields[1] ?? configuredChips[0] ?? betSettings.minBet));
+            if (!isGameBettingEnabled(gameSlug) || betAmount < betSettings.minBet || betAmount > betSettings.maxBet || !configuredChips.includes(betAmount)) {
+              this.sendBin(ws, encodeClientMsg(HILO_MSG.ResBet, encodeHiloBetRes({
+                newBalance: p.balance || 0, cardId: hiloCard.id, flower: hiloCard.flower, showBet: 0, roundState: 0,
+              })));
+              return;
+            }
             try {
               const afterBet = await this.debit(p.userId, betAmount, gameSlug);
               p.balance = afterBet;
@@ -1513,13 +1522,14 @@ export class BaishunWsHandler {
             const fields = decodeFields(body);
             const selectType = Number(fields[1] ?? 0); // 1 lower, 2 higher
             const prev = hiloCard.id;
-            const next = randCard();
-            const won =
-              selectType === 2
-                ? next.id > prev
-                : selectType === 1
-                  ? next.id < prev
-                  : next.id !== prev;
+            const configuredHiloRate = getGameWinRate('hilo');
+            const wantHiloWin = configuredHiloRate === undefined ? null : secureGameRandom() * 100 < configuredHiloRate;
+            const didHiloWin = (card: { id: number }) => selectType === 2 ? card.id > prev : selectType === 1 ? card.id < prev : card.id !== prev;
+            let next = randCard();
+            if (wantHiloWin !== null) {
+              for (let attempt = 0; attempt < 80 && didHiloWin(next) !== wantHiloWin; attempt++) next = randCard();
+            }
+            const won = didHiloWin(next);
             hiloCard = next;
             let showBet = hiloBet;
             let bal = p ? await this.sessions.refreshBalance(p) : 0;
@@ -1730,12 +1740,12 @@ export class BaishunWsHandler {
 
   private swimsuitBoard(forceWinLine = false): number[][] {
     const cols: number[][] = [];
-    const winSym = 1 + Math.floor(Math.random() * 8);
+    const winSym = 1 + Math.floor(secureGameRandom() * 8);
     for (let c = 0; c < 5; c++) {
       const col: number[] = [];
       for (let r = 0; r < 4; r++) {
         if (forceWinLine && r === 1) col.push(winSym);
-        else col.push(1 + Math.floor(Math.random() * 8));
+        else col.push(1 + Math.floor(secureGameRandom() * 8));
       }
       cols.push(col);
     }
@@ -1757,6 +1767,8 @@ export class BaishunWsHandler {
     getPlayer: () => MikooPlayerContext | null,
     setPlayer: (p: MikooPlayerContext | null) => void,
   ) {
+    const betSettings = getGameBetSettings(gameSlug);
+    const configuredChips = betSettings.chips;
     let player = getPlayer();
     if (!player) {
       const uid = Number(data.user_id ?? data.userId ?? query.user_id ?? query.userId ?? 0);
@@ -1797,7 +1809,7 @@ export class BaishunWsHandler {
         }
       }
       if (!player) {
-        this.replyFish(ws, 1002, { fishs: [], players: [], paoBei: CHIP_LIST }, 5);
+        this.replyFish(ws, 1002, { fishs: [], players: [], paoBei: configuredChips }, 5);
         return;
       }
       const bal = await this.sessions.refreshBalance(player);
@@ -1851,7 +1863,7 @@ export class BaishunWsHandler {
         user_id: uid,
         userId: uid,
         players: [self],
-        paoBei: CHIP_LIST.slice(),
+        paoBei: configuredChips,
         allProp: [],
         itemsCfg: [],
         curBank: 0,
@@ -1873,9 +1885,9 @@ export class BaishunWsHandler {
           clearInterval(spawnTimer);
           return;
         }
-        const n = 1 + Math.floor(Math.random() * 3);
+        const n = 1 + Math.floor(secureGameRandom() * 3);
         const fishs = Array.from({ length: n }, (_, i) => {
-          const fid = 2000 + Math.floor(Math.random() * 900000) + i;
+          const fid = 2000 + Math.floor(secureGameRandom() * 900000) + i;
           return makeFish(fid, fid % 7);
         });
         this.replyFish(ws, 1004, { fishs });
@@ -1896,17 +1908,22 @@ export class BaishunWsHandler {
           setPlayer(player);
         }
       }
-      const cost = Math.max(10, Math.floor(Number(data.coin ?? data.bet ?? data.mul ?? 10)));
+      const cost = Math.floor(Number(data.coin ?? data.bet ?? data.mul ?? configuredChips[0] ?? betSettings.minBet));
       if (!player) {
         this.replyFish(ws, 1005, {}, 5);
+        return;
+      }
+      if (!isGameBettingEnabled(gameSlug) || cost < betSettings.minBet || cost > betSettings.maxBet || !configuredChips.includes(cost)) {
+        this.replyFish(ws, 1005, { need_recharge: false, error: 'INVALID_BET' }, 5);
         return;
       }
       const uid = player.publicId || player.userId;
       const fireToken = data.fireToken ?? data.fire ?? data.token ?? Date.now();
       const angle = Number(data.angle ?? 90);
       try {
-        const charged = Math.min(cost, 5000);
-        const bal = await this.debit(player.userId, charged, gameSlug);
+        const charged = cost;
+        const fishOperationId = `baishun:${gameSlug}:${player.sessionId}:fire:${String(fireToken).slice(0, 120)}`;
+        const bal = await this.debit(player.userId, charged, gameSlug, fishOperationId);
         player.balance = bal;
         let stakeMap = this.fishFireStakes.get(ws);
         if (!stakeMap) {
@@ -1979,10 +1996,11 @@ export class BaishunWsHandler {
         return;
       }
       // Fishing hit rate from dashboard (harder than lobby slots by default).
-      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate });
+      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate, gameId: gameSlug });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
-        bal = await this.credit(player.userId, win, gameSlug, stake);
+        const fishOperationId = `baishun:${gameSlug}:${player.sessionId}:fire:${tokenKey.slice(0, 120)}`;
+        bal = await this.credit(player.userId, win, gameSlug, stake, `${fishOperationId}:win`);
         player.balance = bal;
         this.replyFish(ws, 1003, {
           ids: [fishId],
@@ -2072,7 +2090,7 @@ export class BaishunWsHandler {
   }
 
   private fakeSymbols() {
-    return Array.from({ length: 15 }, () => 1 + Math.floor(Math.random() * 8));
+    return Array.from({ length: 15 }, () => 1 + Math.floor(secureGameRandom() * 8));
   }
 
   /** Cleopatra: NormalResult[col][row] — heights [6,7,7,7,6] = 33 cells. */
@@ -2081,19 +2099,32 @@ export class BaishunWsHandler {
     const cols: number[][] = [];
     for (let c = 0; c < heights.length; c++) {
       const col: number[] = [];
-      for (let r = 0; r < heights[c]; r++) col.push(1 + Math.floor(Math.random() * 8));
+      for (let r = 0; r < heights[c]; r++) col.push(1 + Math.floor(secureGameRandom() * 8));
       cols.push(col);
     }
     return cols;
   }
 
-  /** Slot777: puzzleInfo is 3 middle-row symbol ids; client expands to 3×3. */
-  private slot777PuzzleInfo(): number[] {
-    return [
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-      1 + Math.floor(Math.random() * 8),
-    ];
+  /** Slot777: puzzleInfo is the three middle-row symbols; keep the board consistent with settlement. */
+  private slot777PuzzleInfo(won = false, multiplier = 0): number[] {
+    if (won) {
+      // Reserve symbol 7 for the top multiplier so an ordinary win is not shown as 777.
+      const symbol = multiplier >= 25 ? 7
+        : multiplier >= 20 ? 6
+          : multiplier >= 15 ? 5
+            : multiplier >= 10 ? 4
+              : multiplier >= 4 ? 3
+                : multiplier >= 3 ? 2 : 1;
+      return [symbol, symbol, symbol];
+    }
+
+    // A losing spin must not accidentally display a winning three-of-a-kind.
+    const symbols = [1, 2, 3, 4, 5, 6, 7, 8];
+    for (let i = symbols.length - 1; i > 0; i--) {
+      const j = Math.floor(secureGameRandom() * (i + 1));
+      [symbols[i], symbols[j]] = [symbols[j]!, symbols[i]!];
+    }
+    return symbols.slice(0, 3);
   }
 
   private replyJson(ws: WebSocket, msgId: string, data: Record<string, unknown>) {
@@ -2121,7 +2152,65 @@ export class BaishunWsHandler {
     ws.send(buf);
   }
 
-  private async debit(userId: string, amount: number, gameId: string) {
+  private async settleInstantBet(
+    userId: string,
+    betAmount: number,
+    rawWin: number,
+    gameId: string,
+    multiplier: number,
+    operationId: string,
+  ): Promise<{ balance: number; win: number }> {
+    const { win } = clampGamePayout({ bet: betAmount, win: rawWin });
+    return this.dataSource.transaction(async (manager) => {
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existingBet = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_bet', referenceId: operationId },
+      });
+      if (existingBet) {
+        const existingWin = await manager.findOne(WalletTransaction, {
+          where: { userId, referenceType: 'mikoo_baishun_win', referenceId: `${operationId}:win` },
+        });
+        return { balance: Number(wallet.coins || 0), win: Number(existingWin?.amount || 0) };
+      }
+      const balance = Number(wallet.coins || 0);
+      if (balance < betAmount) throw new Error('INSUFFICIENT');
+      const afterDebit = balance - betAmount;
+      const afterSettlement = afterDebit + win;
+      wallet.coins = afterSettlement;
+      await manager.save(wallet);
+      await manager.save(manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.EXCHANGE,
+        currency: CurrencyType.COINS,
+        amount: -betAmount,
+        balanceAfter: afterDebit,
+        referenceType: 'mikoo_baishun_bet',
+        referenceId: operationId,
+        description: `BaiShun ${gameId} spin`,
+        metadata: { gameId, betAmount, operationId, atomicSettlement: true },
+      }));
+      if (win > 0) {
+        await manager.save(manager.create(WalletTransaction, {
+          userId,
+          type: TransactionType.LUCKY_REWARD,
+          currency: CurrencyType.COINS,
+          amount: win,
+          balanceAfter: afterSettlement,
+          referenceType: 'mikoo_baishun_win',
+          referenceId: `${operationId}:win`,
+          description: `BaiShun ${gameId} win`,
+          metadata: { gameId, amount: win, bet: betAmount, multiplier, operationId, atomicSettlement: true },
+        }));
+      }
+      return { balance: afterSettlement, win };
+    });
+  }
+
+  private async debit(userId: string, amount: number, gameId: string, referenceId: string = randomUUID()) {
     amount = clampBetAmount(amount, gamePayoutLimits().maxBet);
     if (amount < 1) throw new Error('INVALID_BET');
     return this.dataSource.transaction(async (manager) => {
@@ -2130,6 +2219,10 @@ export class BaishunWsHandler {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_bet', referenceId },
+      });
+      if (existing) return Number(wallet.coins || 0);
       const balance = Number(wallet.coins || 0);
       if (balance < amount) throw new Error('INSUFFICIENT');
       wallet.coins = balance - amount;
@@ -2142,7 +2235,7 @@ export class BaishunWsHandler {
           amount: -amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_baishun_bet',
-          referenceId: randomUUID(),
+          referenceId,
           description: `BaiShun ${gameId} spin`,
           metadata: { gameId, amount },
         }),
@@ -2151,7 +2244,7 @@ export class BaishunWsHandler {
     });
   }
 
-  private async credit(userId: string, amount: number, gameId: string, bet = 0) {
+  private async credit(userId: string, amount: number, gameId: string, bet = 0, referenceId: string = randomUUID()) {
     const clamped = clampGamePayout({ bet, win: amount });
     if (clamped.capped) {
       this.logger.warn(
@@ -2169,6 +2262,10 @@ export class BaishunWsHandler {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId }));
+      const existing = await manager.findOne(WalletTransaction, {
+        where: { userId, referenceType: 'mikoo_baishun_win', referenceId },
+      });
+      if (existing) return Number(wallet.coins || 0);
       wallet.coins = Number(wallet.coins || 0) + amount;
       await manager.save(wallet);
       await manager.save(
@@ -2179,7 +2276,7 @@ export class BaishunWsHandler {
           amount,
           balanceAfter: Number(wallet.coins),
           referenceType: 'mikoo_baishun_win',
-          referenceId: randomUUID(),
+          referenceId,
           description: `BaiShun ${gameId} win`,
           metadata: {
             gameId,

@@ -40,6 +40,7 @@
           </span>
           <span class="uc__chip">{{ genderLabel }}</span>
           <span v-if="staffRole === 'super'" class="uc__chip uc__chip--gold">{{ t('users.roleSuper') }}</span>
+          <span v-else-if="staffRole === 'admin'" class="uc__chip uc__chip--admin">أدمن</span>
           <span v-else-if="staffRole === 'manager'" class="uc__chip uc__chip--cyan">{{ t('users.roleManager') }}</span>
           <span v-if="user.genderVerified" class="uc__chip uc__chip--ok">موثّقة</span>
         </div>
@@ -146,6 +147,7 @@ const popularityScore = computed(() => props.user.popularityScore ?? 0)
 const staffRole = computed(() => {
   const raw = String(props.user.staffRole || '').toLowerCase()
   if (raw === 'super' || raw === 'super_admin' || props.user.isSuperAdmin) return 'super'
+  if (raw === 'admin') return 'admin'
   if (raw === 'manager' || props.user.isManager) return 'manager'
   if (props.user.isAdmin) return 'super'
   return 'none'
@@ -302,6 +304,7 @@ const initials = computed(() => {
   font-size: 0.7rem;
   font-weight: 600;
 }
+.uc__chip--admin { background: rgba(99, 102, 241, 0.18); color: #c7d2fe; }
 .uc__chip--gold { background: rgba(245, 158, 11, 0.16); color: #fde68a; }
 .uc__chip--cyan { background: rgba(6, 182, 212, 0.16); color: #a5f3fc; }
 .uc__chip--ok { background: rgba(34, 197, 94, 0.16); color: #86efac; }

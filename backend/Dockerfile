@@ -1,3 +1,14 @@
+FROM node:22-alpine AS dashboard-builder
+
+WORKDIR /dashboard
+
+COPY dashboard/package*.json ./
+RUN npm ci
+
+COPY dashboard/ ./
+ENV VITE_BASE=/admin/
+RUN npm run build
+
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -6,7 +17,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+# Never let a copied or cached compilation artifact survive into this build.
+RUN rm -rf dist && npm run build
 
 FROM node:20-alpine AS runner
 
@@ -18,7 +30,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY .env.example ./.env.example
+COPY --from=builder /app/public ./public
+COPY --from=dashboard-builder /dashboard/dist ./public/admin
 
 RUN mkdir -p uploads && chown -R node:node /app
 
@@ -26,4 +39,11 @@ USER node
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# JEHO-OWN keeps its database isolated in the "jeho_own" schema.
+# Seed first so TypeORM creates/updates all tables and default settings
+# before Nest starts serving requests. The compiled seed is in dist/.
+COPY --from=builder /app/scripts ./scripts
+
+CMD ["node", "scripts/start-production.js"]
+
+# Rebuild trigger: publish a fresh immutable Blitz image from MG-JEHO.

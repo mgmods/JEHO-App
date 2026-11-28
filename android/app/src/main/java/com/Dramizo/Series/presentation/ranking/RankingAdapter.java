@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.ranking;
 import com.Dramizo.Series.util.ImagePlaceholder;
 
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -10,6 +11,8 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ItemRankingBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.util.VanityIdStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -53,16 +56,31 @@ public class RankingAdapter extends RecyclerView.Adapter<RankingAdapter.VH> {
         if (entry.user != null) {
             holder.b.tvName.setText(entry.user.displayName != null
                     ? entry.user.displayName : entry.user.username);
+            com.Dramizo.Series.util.VipNameStyle.bind(holder.b.tvName, entry.user);
             AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, entry.user);
-            holder.b.tvSubtitle.setText("Lv." + Math.max(1, entry.user.level)
-                    + (entry.user.displayPublicId().isEmpty() ? "" : " · ID " + entry.user.displayPublicId()));
+            holder.b.tvSubtitle.setText("Lv." + Math.max(1, entry.user.level));
+            String publicId = entry.user.displayPublicId();
+            if (publicId.isEmpty()) {
+                holder.b.tvId.setVisibility(View.GONE);
+                holder.b.tvId.setCompoundDrawablesRelative(null, null, null, null);
+            } else {
+                holder.b.tvId.setVisibility(View.VISIBLE);
+                holder.b.tvId.setText(publicId);
+                VanityIdStyle.bind(holder.b.tvId,
+                        ContainerProvider.from(holder.itemView.getContext()).getVanityApi(),
+                        publicId, entry.user.vipLevel);
+            }
         } else {
             String name = entry.targetName != null ? entry.targetName
                     : (entry.userId != null ? entry.userId : entry.targetId);
             holder.b.tvName.setText(name != null ? name : "—");
+            com.Dramizo.Series.util.VipNameStyle.bind(holder.b.tvName,
+                    (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
             holder.b.imgAvatar.setImageResource(ImagePlaceholder.avatar());
             AvatarCosmetics.applyFrame(holder.b.imgFrame, null);
             holder.b.tvSubtitle.setText(entityLabel(category));
+            holder.b.tvId.setVisibility(View.GONE);
+            holder.b.tvId.setCompoundDrawablesRelative(null, null, null, null);
         }
         String targetId = entry.user != null ? entry.user.id
                 : (entry.userId != null ? entry.userId : entry.targetId);

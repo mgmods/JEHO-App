@@ -48,9 +48,15 @@ public class CosmeticsViewModel extends ViewModel {
     private final Set<String> ownedIds = new HashSet<>();
     private final Set<String> equippedIds = new HashSet<>();
     private final Map<String, String> expiresAtById = new HashMap<>();
+    /** Private entry effects are returned only by the authenticated inventory endpoint, never the public catalog. */
+    private final List<CosmeticDtos.CosmeticDto> privateEntryInventory = new ArrayList<>();
     private final AtomicInteger loadSeq = new AtomicInteger();
+    private final Map<String, List<CosmeticDtos.CosmeticDto>> catalogCache = new HashMap<>();
+    private final Map<String, Long> catalogCacheAtMs = new HashMap<>();
+    private static final long CATALOG_CACHE_MS = 30_000L;
     private volatile String filterType;
     private volatile boolean bagMode;
+    private volatile String currentRoomId;
     private volatile long inventoryLoadedAtMs;
     private static final long INVENTORY_CACHE_MS = 8_000L;
 
@@ -70,7 +76,25 @@ public class CosmeticsViewModel extends ViewModel {
 
     public boolean isBagMode() { return bagMode; }
 
+    public void setCurrentRoomId(@Nullable String roomId) {
+        this.currentRoomId = roomId == null || roomId.trim().isEmpty() ? null : roomId.trim();
+    }
+
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
+
+    /** Per-item validity configured by the dashboard; defaults to the legacy 30 days. */
+    public int leaseDays(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null || item.meta == null) return LEASE_DAYS;
+        Object raw = item.meta.get("leaseDays");
+        try {
+            int days = raw instanceof Number
+                    ? ((Number) raw).intValue()
+                    : Integer.parseInt(String.valueOf(raw));
+            return days >= 1 && days <= 3650 ? days : LEASE_DAYS;
+        } catch (Exception ignored) {
+            return LEASE_DAYS;
+        }
+    }
 
     public boolean isOwned(String cosmeticId) {
         if (cosmeticId == null) return false;
@@ -146,8 +170,14 @@ public class CosmeticsViewModel extends ViewModel {
         container.getIoExecutor().execute(() -> {
             boolean needInventory;
             synchronized (ownedIds) {
-                needInventory = System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
-                        || ownedIds.isEmpty();
+                boolean openingPrivateEntryBag = bagMode
+                        && ("entry_effect".equals(loadType) || "join_toast".equals(loadType));
+                // An empty inventory is a valid cached result too. Treating it as
+                // "not loaded" caused an inventory request on every mall tab reopen
+                // for users who own no cosmetics.
+                needInventory = openingPrivateEntryBag
+                        || inventoryLoadedAtMs == 0L
+                        || System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS;
             }
             if (needInventory) {
                 Result<List<CosmeticDtos.UserCosmeticDto>> inv =
@@ -157,6 +187,7 @@ public class CosmeticsViewModel extends ViewModel {
                         ownedIds.clear();
                         equippedIds.clear();
                         expiresAtById.clear();
+                        privateEntryInventory.clear();
                         for (CosmeticDtos.UserCosmeticDto row : inv.data) {
                             if (row.cosmeticId == null) continue;
                             ownedIds.add(row.cosmeticId);
@@ -164,23 +195,66 @@ public class CosmeticsViewModel extends ViewModel {
                                 expiresAtById.put(row.cosmeticId, row.expiresAt);
                             }
                             if (row.equipped) equippedIds.add(row.cosmeticId);
+                            if (row.cosmetic != null && row.cosmetic.meta != null
+                                    && Boolean.TRUE.equals(row.cosmetic.meta.get("privateEntry"))) {
+                                privateEntryInventory.add(row.cosmetic);
+                            }
                         }
                     }
                     inventoryLoadedAtMs = System.currentTimeMillis();
                 }
             }
-            Result<List<CosmeticDtos.CosmeticDto>> cat =
-                    container.getCosmeticsRepository().catalog(loadType);
+            String cacheKey = loadType != null ? loadType : "";
+            List<CosmeticDtos.CosmeticDto> cachedCatalog = null;
+            synchronized (catalogCache) {
+                Long cachedAt = catalogCacheAtMs.get(cacheKey);
+                List<CosmeticDtos.CosmeticDto> cached = catalogCache.get(cacheKey);
+                if (cached != null && cachedAt != null
+                        && System.currentTimeMillis() - cachedAt < CATALOG_CACHE_MS) {
+                    cachedCatalog = new ArrayList<>(cached);
+                }
+            }
+            Result<List<CosmeticDtos.CosmeticDto>> cat;
+            if (cachedCatalog != null) {
+                cat = Result.ok(cachedCatalog);
+            } else {
+                cat = container.getCosmeticsRepository().catalog(loadType);
+                if (cat.success && cat.data != null) {
+                    synchronized (catalogCache) {
+                        catalogCache.put(cacheKey, new ArrayList<>(cat.data));
+                        catalogCacheAtMs.put(cacheKey, System.currentTimeMillis());
+                    }
+                }
+            }
             // Accept only the latest in-flight request.
             if (seq != loadSeq.get()) return;
             if (cat.success && cat.data != null) {
-                List<CosmeticDtos.CosmeticDto> items = new ArrayList<>(cat.data);
+                // Agency/competition role badges are not mall cosmetics. Keep them out of the store
+                // even if an older backend catalog still returns legacy badge records.
+                List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
+                for (CosmeticDtos.CosmeticDto row : cat.data) {
+                    if (row != null && !isRoleBadge(row)) items.add(row);
+                }
                 if (bagMode) {
                     List<CosmeticDtos.CosmeticDto> ownedOnly = new ArrayList<>();
                     synchronized (ownedIds) {
                         for (CosmeticDtos.CosmeticDto row : items) {
                             if (row != null && row.id != null && isOwned(row.id)) {
                                 ownedOnly.add(row);
+                            }
+                        }
+                    }
+                    if ("entry_effect".equals(loadType) || "join_toast".equals(loadType)) {
+                        synchronized (ownedIds) {
+                            for (CosmeticDtos.CosmeticDto privateEntry : privateEntryInventory) {
+                                if (privateEntry != null && privateEntry.id != null
+                                        && isOwned(privateEntry.id)) {
+                                    boolean alreadyAdded = false;
+                                    for (CosmeticDtos.CosmeticDto existing : ownedOnly) {
+                                        if (privateEntry.id.equals(existing.id)) { alreadyAdded = true; break; }
+                                    }
+                                    if (!alreadyAdded) ownedOnly.add(privateEntry);
+                                }
                             }
                         }
                     }
@@ -232,26 +306,19 @@ public class CosmeticsViewModel extends ViewModel {
                 error.postValue(r.error);
                 return;
             }
-            if (r.data != null && r.data.expiresAt != null) {
-                synchronized (ownedIds) {
-                    ownedIds.add(cosmeticId);
+            // Successful purchase means ownership even for permanent items (expiresAt == null).
+            synchronized (ownedIds) {
+                ownedIds.add(cosmeticId);
+                if (r.data != null && r.data.expiresAt != null && !r.data.expiresAt.isEmpty()) {
                     expiresAtById.put(cosmeticId, r.data.expiresAt);
+                } else {
+                    expiresAtById.remove(cosmeticId);
                 }
             }
-            // Server already auto-equips; call equip again to sync worn URLs into session.
-            Result<CosmeticDtos.EquipResult> eq =
-                    container.getCosmeticsRepository().equip(cosmeticId);
-            if (eq.success && eq.data != null && eq.data.profile != null) {
-                applyEquipProfile(eq.data.profile);
-            } else {
-                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
-                        container.getUserRepository().getMe();
-                if (me.success && me.data != null) {
-                    container.getSessionManager().updateCachedUser(me.data);
-                }
-            }
+            // Purchase only adds the item to the bag. Wearing is a separate explicit action.
+            // Do not call equip here: the card must switch from "شراء" to "ارتداء".
             inventoryLoadedAtMs = 0;
-            message.postValue("تم الشراء والارتداء");
+            message.postValue("تم الشراء بنجاح — يمكنك ارتداء العنصر من الحقيبة");
             loadForType(type);
         });
     }
@@ -274,10 +341,45 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void equip(String cosmeticId) {
         final String type = filterType;
+        final CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        final boolean roomBackground = target != null && "room_background".equals(target.type);
+        final String room = currentRoomId;
+        if (roomBackground && (room == null || room.isEmpty())) {
+            error.postValue("لتطبيق خلفية الغرفة، افتح المتجر من داخل الغرفة أولاً");
+            return;
+        }
         container.getIoExecutor().execute(() -> {
+            // Avatar frames are one exclusive slot across VIP and host/contest frame types.
+            // Remember removed frames so a failed new equip can restore the previous wear.
+            List<String> removedFrameIds = new ArrayList<>();
+            if (isAvatarFrameType(target != null ? target.type : type)) {
+                Result<List<CosmeticDtos.UserCosmeticDto>> inventory =
+                        container.getCosmeticsRepository().inventory();
+                if (!inventory.success || inventory.data == null) {
+                    error.postValue(inventory.error != null ? inventory.error
+                            : "تعذر التحقق من الإطار المرتدى حالياً");
+                    return;
+                }
+                for (CosmeticDtos.UserCosmeticDto worn : inventory.data) {
+                    if (worn == null || !worn.equipped || worn.cosmeticId == null
+                            || cosmeticId.equals(worn.cosmeticId)
+                            || worn.cosmetic == null
+                            || !isAvatarFrameType(worn.cosmetic.type)) continue;
+                    Result<CosmeticDtos.EquipResult> removed =
+                            container.getCosmeticsRepository().unequip(worn.cosmeticId);
+                    if (removed == null || !removed.success) {
+                        error.postValue(removed != null && removed.error != null
+                                ? removed.error : "تعذر خلع الإطار السابق؛ لم يتم تغيير الإطار الحالي");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    removedFrameIds.add(worn.cosmeticId);
+                }
+            }
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().equip(cosmeticId);
-            if (r.success) {
+            if (r != null && r.success) {
                 if (r.data != null && r.data.profile != null) {
                     applyEquipProfile(r.data.profile);
                 }
@@ -286,11 +388,50 @@ public class CosmeticsViewModel extends ViewModel {
                 if (me.success && me.data != null) {
                     container.getSessionManager().updateCachedUser(me.data);
                 }
+                if (roomBackground) {
+                    String backgroundUrl = target.previewUrl;
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        backgroundUrl = target.animationUrl;
+                    }
+                    if (backgroundUrl == null || backgroundUrl.trim().isEmpty()) {
+                        error.postValue("هذا العنصر لا يحتوي على رابط خلفية صالح");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    Result<Object> applied = container.getRoomRepository().setBackground(room, backgroundUrl);
+                    if (applied == null || !applied.success) {
+                        error.postValue(applied != null && applied.error != null
+                                ? applied.error : "تم ارتداء العنصر لكن تعذر تطبيق خلفية الغرفة");
+                        inventoryLoadedAtMs = 0;
+                        loadForType(type);
+                        return;
+                    }
+                    message.postValue("تم تطبيق خلفية الغرفة بنجاح");
+                } else {
+                    message.postValue("تم الارتداء بنجاح");
+                }
                 inventoryLoadedAtMs = 0;
-                message.postValue("تم الارتداء");
                 loadForType(type);
             } else {
-                error.postValue(r.error);
+                // Do not leave the user without a frame if the replacement equip fails.
+                boolean restored = true;
+                for (String previousId : removedFrameIds) {
+                    Result<CosmeticDtos.EquipResult> restore =
+                            container.getCosmeticsRepository().equip(previousId);
+                    if (restore == null || !restore.success) restored = false;
+                }
+                Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> latest =
+                        container.getUserRepository().getMe();
+                if (latest != null && latest.success && latest.data != null) {
+                    container.getSessionManager().updateCachedUser(latest.data);
+                }
+                inventoryLoadedAtMs = 0;
+                loadForType(type);
+                String failure = r != null && r.error != null
+                        ? r.error : "تعذر ارتداء الإطار الجديد";
+                if (!restored) failure += " — وتعذر استعادة الإطار السابق تلقائياً";
+                error.postValue(failure);
             }
         });
     }
@@ -300,7 +441,7 @@ public class CosmeticsViewModel extends ViewModel {
         container.getIoExecutor().execute(() -> {
             Result<CosmeticDtos.EquipResult> r =
                     container.getCosmeticsRepository().unequip(cosmeticId);
-            if (r.success) {
+            if (r != null && r.success) {
                 if (r.data != null && r.data.profile != null) {
                     applyEquipProfile(r.data.profile);
                 } else {
@@ -314,9 +455,37 @@ public class CosmeticsViewModel extends ViewModel {
                 message.postValue("تم الخلع");
                 loadForType(type);
             } else {
-                error.postValue(r.error);
+                error.postValue(r != null && r.error != null
+                        ? r.error : "تعذر خلع الإطار؛ لم يتم تغيير المظهر");
             }
         });
+    }
+
+    /** Agency/competition role marks are not purchasable profile cosmetics. */
+    private static boolean isRoleBadge(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null) return false;
+        String type = item.type == null ? "" : item.type.trim().toLowerCase(Locale.ROOT);
+        String code = item.code == null ? "" : item.code.trim().toLowerCase(Locale.ROOT);
+        String name = item.name == null ? "" : item.name.trim().toLowerCase(Locale.ROOT);
+        String preview = item.previewUrl == null ? "" : item.previewUrl.trim().toLowerCase(Locale.ROOT);
+        String animation = item.animationUrl == null ? "" : item.animationUrl.trim().toLowerCase(Locale.ROOT);
+        String all = type + " " + code + " " + name + " " + preview + " " + animation;
+        return "host_badge".equals(type)
+                || "agency_badge".equals(type)
+                || "contest_badge".equals(type)
+                || "competition_badge".equals(type)
+                || type.contains("contest")
+                || type.contains("competition")
+                || (all.contains("agency") && all.contains("badge"))
+                || (all.contains("contest") && all.contains("badge"))
+                || (all.contains("competition") && all.contains("badge"));
+    }
+
+    private static boolean isAvatarFrameType(@Nullable String type) {
+        if (type == null) return false;
+        String value = type.trim().toLowerCase(Locale.ROOT);
+        return "vip_badge".equals(value) || "host_badge".equals(value)
+                || "frame".equals(value) || "frames".equals(value);
     }
 
     private void applyEquipProfile(CosmeticDtos.EquipProfile profile) {
@@ -326,6 +495,9 @@ public class CosmeticsViewModel extends ViewModel {
         cached.entryEffectUrl = profile.entryEffectUrl;
         cached.entryAnimationUrl = profile.entryAnimationUrl;
         cached.roomCardUrl = profile.roomCardUrl;
+        cached.profileCardUrl = profile.profileCardUrl;
+        cached.chatBubbleUrl = profile.chatBubbleUrl;
+        cached.nameplateUrl = profile.nameplateUrl;
         cached.levelBadgeUrl = profile.levelBadgeUrl;
         cached.vipBadgeUrl = profile.vipBadgeUrl;
         cached.hostBadgeUrl = profile.hostBadgeUrl;

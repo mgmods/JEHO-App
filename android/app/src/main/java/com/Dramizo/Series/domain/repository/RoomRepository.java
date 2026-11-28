@@ -22,6 +22,7 @@ public interface RoomRepository {
     Result<Object> raiseHand(String id, boolean raised, Integer seatIndex);
     Result<RoomDtos.SeatRequestsResult> seatRequests(String id);
     Result<RoomDtos.RoomDto> approveSeat(String id, String userId, Integer seatIndex);
+    Result<RoomDtos.RoomDto> assignSeat(String id, String userId, Integer seatIndex);
     Result<Object> rejectSeat(String id, String userId);
     Result<Object> inviteSeat(String id, String userId, Integer seatIndex);
     Result<java.util.Map<String, Object>> inviteTaskGuest(String id, String userId);
@@ -36,6 +37,7 @@ public interface RoomRepository {
     Result<RoomDtos.RoomDto> takeSeat(String id, int seatIndex);
     Result<RoomDtos.RoomDto> leaveSeat(String id);
     Result<Object> forceLeaveSeat(String id, String userId, String reason);
+    Result<Object> removeMemberFromMic(String id, String userId, String reason);
     Result<RoomDtos.RoomDto> lockSeat(String id, int seatIndex, boolean locked);
     Result<RoomDtos.RoomDto> resizeSeats(String id, int seatCount);
     Result<Object> kick(String id, String userId, String reason);

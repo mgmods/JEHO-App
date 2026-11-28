@@ -47,6 +47,10 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 512, nullable: true })
   coverUrl: string | null;
 
+  /** Up to five static profile cover images owned by this user. */
+  @Column({ type: 'simple-array', nullable: true })
+  profileCoverUrls: string[] | null;
+
   @Column({ type: 'varchar', length: 512, nullable: true })
   entryEffectUrl: string | null;
 
@@ -55,6 +59,26 @@ export class UserProfile {
 
   @Column({ type: 'varchar', length: 512, nullable: true })
   roomCardUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  profileCardUrl: string | null;
+
+  /** User-equipped visuals used only by the CP relationship card. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  cpBackgroundUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  cpLogoUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  chatBubbleUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  nameplateUrl: string | null;
+
+  /** Equipped transparent voice-wave artwork shown around the seat while speaking. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  voiceWaveUrl: string | null;
 
   @Column({ type: 'varchar', length: 512, nullable: true })
   vipBadgeUrl: string | null;
@@ -67,6 +91,10 @@ export class UserProfile {
 
   @Column({ type: 'varchar', length: 64, nullable: true })
   nameColor: string | null;
+
+  /** Stable keys for up to five earned medals displayed publicly below the profile ID. */
+  @Column({ type: 'simple-array', nullable: true })
+  displayedMedalIds: string[] | null;
 
   @Column({ type: 'int', default: 0 })
   followersCount: number;
@@ -88,6 +116,12 @@ export class UserProfile {
 
   @Column({ type: 'boolean', default: true })
   allowDmFromStrangers: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  dmEnabled: boolean;
+
+  @Column({ type: 'varchar', length: 16, default: 'everyone' })
+  dmAudience: 'everyone' | 'followers' | 'friends' | 'nobody';
 
   /** When true (and global setting on), strangers must gift before first DM. */
   @Column({ type: 'boolean', default: false })

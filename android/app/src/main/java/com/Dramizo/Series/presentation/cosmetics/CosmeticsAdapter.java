@@ -43,6 +43,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         int myVipLevel();
         /** Account level (not VIP). Used only for non-frame gates. */
         int myUserLevel();
+        int leaseDays(CosmeticDtos.CosmeticDto item);
     }
 
     private final List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
@@ -96,8 +97,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         } else {
             holder.b.tvPrice.setText(item.coinPrice > 0
                     ? holder.itemView.getContext().getString(
-                            R.string.mall_price_days, item.coinPrice, CosmeticsViewModel.LEASE_DAYS)
-                    : holder.itemView.getContext().getString(R.string.mall_free_days, CosmeticsViewModel.LEASE_DAYS));
+                            R.string.mall_price_days, item.coinPrice, listener.leaseDays(item))
+                    : holder.itemView.getContext().getString(R.string.mall_free_days, listener.leaseDays(item)));
         }
 
         if (holder.b.tvVipLock != null) {
@@ -113,8 +114,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
 
         String sel = listener.selectedId();
         boolean selected = sel != null && sel.equals(item.id);
-        holder.b.getRoot().setStrokeWidth(selected ? 3 : 1);
-        holder.b.getRoot().setStrokeColor(selected ? 0xFFE8A317 : 0x1A000000);
+        holder.b.getRoot().setStrokeWidth(selected ? 2 : 1);
+        holder.b.getRoot().setStrokeColor(selected ? 0xFF8B6BE8 : 0xFFEAE5F7);
         holder.b.getRoot().setAlpha(locked ? 0.72f : 1f);
 
         holder.b.btnPurchase.setVisibility(owned ? View.GONE : View.VISIBLE);
@@ -135,7 +136,9 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                         : holder.itemView.getContext().getString(R.string.mall_requires_level, needLvl));
                 holder.b.btnPurchase.setAlpha(0.85f);
             } else {
-                holder.b.btnPurchase.setText(R.string.purchase);
+                // An expired lease is eligible for a fresh term at the configured full price.
+                holder.b.btnPurchase.setText(days != null && days == 0
+                        ? "تجديد" : holder.itemView.getContext().getString(R.string.purchase));
                 holder.b.btnPurchase.setAlpha(1f);
             }
         }
@@ -154,29 +157,51 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         holder.itemView.setOnClickListener(v -> listener.onSelect(item));
 
         boolean headwear = isFrame;
+        boolean voiceWave = "voice_wave".equalsIgnoreCase(item.type);
         String still = stillPreviewUrl(item.previewUrl, item.animationUrl);
         String abs = AssetCatalog.absoluteUrl(still);
 
         holder.b.imgPreview.setVisibility(View.VISIBLE);
         holder.b.imgPreview.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        ViewGroup.LayoutParams wavePreviewLp = holder.b.imgPreview.getLayoutParams();
+        if (voiceWave) {
+            int waveSize = dp(holder, 76);
+            wavePreviewLp.width = waveSize;
+            wavePreviewLp.height = waveSize;
+            if (wavePreviewLp instanceof ViewGroup.MarginLayoutParams) {
+                ((ViewGroup.MarginLayoutParams) wavePreviewLp).leftMargin = 0;
+                ((ViewGroup.MarginLayoutParams) wavePreviewLp).rightMargin = 0;
+            }
+            holder.b.imgPreview.setLayoutParams(wavePreviewLp);
+        } else {
+            wavePreviewLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            wavePreviewLp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.imgPreview.setLayoutParams(wavePreviewLp);
+        }
         holder.b.imgPreview.setPadding(dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4),
                 dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4));
 
         if (abs == null || abs.isEmpty()) {
             holder.b.imgPreview.setImageResource(ImagePlaceholder.cover());
         } else {
-            Glide.with(holder.b.imgPreview.getContext().getApplicationContext())
+            var request = Glide.with(holder.b.imgPreview.getContext().getApplicationContext())
                     .load(abs)
                     .override(320, 320)
                     .fitCenter()
-                    .dontAnimate()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .placeholder(ImagePlaceholder.cover())
-                    .error(ImagePlaceholder.cover())
-                    .into(holder.b.imgPreview);
+                    .error(ImagePlaceholder.cover());
+            // GIF and animated WebP must stay animated in the store grid.
+            // Only a generated/static PNG thumbnail is intentionally frozen.
+            String lowerStill = still.toLowerCase(java.util.Locale.US).split("\\?", 2)[0];
+            if (lowerStill.endsWith(".png") || lowerStill.endsWith(".jpg")
+                    || lowerStill.endsWith(".jpeg")) {
+                request = request.dontAnimate();
+            }
+            request.into(holder.b.imgPreview);
         }
 
-        if (headwear) {
+        if (headwear || voiceWave) {
             holder.b.imgFace.setVisibility(View.VISIBLE);
             ensureCircle(holder.b.imgFace);
             String avatarUrl = null;
@@ -202,11 +227,28 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
             holder.b.imgFace.setVisibility(View.GONE);
         }
+
+        Object oldAnimator = holder.b.imgPreview.getTag(R.id.imgPreview);
+        if (oldAnimator instanceof android.animation.ValueAnimator) {
+            ((android.animation.ValueAnimator) oldAnimator).cancel();
+        }
+        holder.b.imgPreview.setTag(R.id.imgPreview, null);
+        holder.b.imgPreview.setClipToOutline(false);
+        holder.b.imgPreview.setOutlineProvider(null);
+        holder.b.imgPreview.setScaleX(1f);
+        holder.b.imgPreview.setScaleY(1f);
+        holder.b.imgPreview.setAlpha(1f);
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setBarCount(40);
+            holder.b.seatVoiceWaveBars.setSpeaking(
+                    voiceWave && abs != null && !abs.isEmpty(), 58f);
+        }
     }
 
     @Override
     public void onViewRecycled(@NonNull VH holder) {
         try {
+            if (holder.b.seatVoiceWaveBars != null) holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
             Glide.with(holder.b.imgPreview.getContext().getApplicationContext()).clear(holder.b.imgPreview);
             Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
         } catch (Exception ignored) {
@@ -250,6 +292,13 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
      */
     @Nullable
     static String stillPreviewUrl(@Nullable String preview, @Nullable String anim) {
+        // In the store grid, animate lightweight formats instead of masking them
+        // with a static preview thumbnail. Heavy video/SVGA stays on its native
+        // player in the selected-item preview to avoid decoding every grid cell.
+        if (anim != null) {
+            String lowerAnim = anim.toLowerCase(Locale.US).split("\\?", 2)[0];
+            if (lowerAnim.endsWith(".gif") || lowerAnim.endsWith(".webp")) return anim;
+        }
         String preferPreview = firstNonEmpty(preview, null);
         if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
 
@@ -261,7 +310,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         }
         if (kind == CosmeticMedia.Kind.VIDEO || kind == CosmeticMedia.Kind.SVGA) {
             String png = base.replaceAll(
-                    "(?i)\\.(svga|mp4|webm|mov|html)(\\?.*)?$", ".png$2");
+                    "(?i)\\.(svga|mp4|webm|mov|3gp|3g2|html)(\\?.*)?$", ".png$2");
             if (!png.equals(base) && isStaticStill(png)) return png;
             if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
             return null;
@@ -274,7 +323,8 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         if (url == null || url.isEmpty()) return false;
         String lower = url.toLowerCase(Locale.US);
         if (lower.contains(".svga") || lower.contains(".mp4") || lower.contains(".webm")
-                || lower.contains(".mov") || lower.contains(".html") || lower.endsWith(".json")) {
+                || lower.contains(".mov") || lower.contains(".3gp") || lower.contains(".3g2")
+                || lower.contains(".html") || lower.endsWith(".json")) {
             return false;
         }
         CosmeticMedia.Kind k = CosmeticMedia.kind(url);

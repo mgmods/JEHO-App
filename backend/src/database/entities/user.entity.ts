@@ -82,6 +82,10 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isAdmin: boolean;
 
+  /** User opted into anonymous display inside voice rooms; never affects room chat messages. */
+  @Column({ type: 'boolean', default: false })
+  mysteriousMode: boolean;
+
   /**
    * Platform staff: manager (room/people moderation in-app),
    * operator (limited dashboard modules),

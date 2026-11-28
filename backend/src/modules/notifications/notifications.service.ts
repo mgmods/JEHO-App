@@ -16,12 +16,93 @@ import { Device } from '../../database/entities/device.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Room } from '../../database/entities/room.entity';
+import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { IsString, IsOptional, IsEnum, IsObject, IsUUID, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FirebaseAdminService } from './firebase-admin.service';
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+
+
+/** Direct-message alerts belong to the conversation unread badge, never notification inboxes. */
+function isDirectMessageNotification(notification: Notification): boolean {
+  const data = (notification.data || {}) as Record<string, unknown>;
+  return notification.type === NotificationType.CHAT && data.type === 'chat' && typeof data.conversationId === 'string';
+}
+
+/** Room/game/gift win celebrations are room/app-only, never external FCM alerts. */
+function isRoomRewardWinPayload(data?: Record<string, unknown>, title?: string, body?: string): boolean {
+  const values: string[] = [];
+  const keys: string[] = [];
+  let hasLuckyPayout = false;
+  const collect = (value: unknown, depth = 0) => {
+    if (depth > 6 || value == null) return;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      values.push(String(value).toLowerCase());
+      // Some legacy producers serialize nested event data as JSON strings.
+      if (typeof value === 'string' && depth < 6) {
+        const raw = value.trim();
+        if ((raw.startsWith('{') && raw.endsWith('}')) || (raw.startsWith('[') && raw.endsWith(']'))) {
+          try { collect(JSON.parse(raw), depth + 1); } catch { /* keep the original string only */ }
+        }
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(item => collect(item, depth + 1));
+      return;
+    }
+    if (typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+        keys.push(key.toLowerCase());
+        // A positive multiplier/return is authoritative evidence of a lucky-gift win.
+        // Non-winning sends carry null/zero values, so ordinary lucky gifts stay unaffected.
+        if ((normalizedKey === 'luckymultiplier' || normalizedKey === 'luckycoinswon' ||
+             normalizedKey === 'luckyreturn' || normalizedKey === 'luckypayout') &&
+            Number(item) > 0) {
+          hasLuckyPayout = true;
+        }
+        if ((normalizedKey === 'luckywin' || normalizedKey === 'isluckywin') && item === true) {
+          hasLuckyPayout = true;
+        }
+        collect(item, depth + 1);
+      });
+    }
+  };
+  collect(data);
+  const markers = [...keys, ...values].join(' ');
+  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
+  const winPattern = /(win|won|winner|winning|game_win|slot_win|lucky_win|reward|payout|coinswon|wincoins|profit|hit|فوز|فاز|فازت|فازوا|ربح|ربحت|ربحوا|مردود|مكسب)/i;
+  const winSignal = winPattern.test(markers) || winPattern.test(copy);
+  const gameKeys = /(gameid|game_id|game|slot|lucky|wheel|wincoins|win_coins|payout|profit|rewardamount|reward_amount|winner|roomid|room_id)/i;
+  const roomGameGiftContext = /(room|roomid|game|gameid|slot|gift|giftid|gifttype|lucky|luckygift|wheel|room:|غرفة|روم|هدية|محظوظ|الحظ|لعبة|كوين|عملة)/i.test(markers + ' ' + copy);
+  const explicitGameEvent = gameKeys.test(keys.join(' ')) ||
+    /(game_win|slot_win|lucky_win|game_result|slot_result|winner|payout|wincoins)/i.test(markers);
+  // A short "فلان ربح" / "X won" alert is itself a win announcement even
+  // when an older producer omitted room/game metadata. Keep it in-app only.
+  const explicitWinAnnouncement =
+    /(ربح|ربحت|ربحوا|فاز|فازت|فازوا|مردود|مكسب)/i.test(copy) ||
+    /\b(won|winner|winning|payout|profit)\b/i.test(copy);
+  const luckyWinWords = /(حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ|lucky[_\s-]*(gift|win|box)|luckygift)/i.test(markers + ' ' + copy);
+  const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy + ' ' + markers);
+  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(copy + ' ' + markers);
+  return hasLuckyPayout ||
+    (luckyWinWords && (rewardWords || multiplierText || explicitGameEvent)) ||
+    (winSignal && (roomGameGiftContext || explicitGameEvent || explicitWinAnnouncement));
+}
+
+/** Lucky-win notifications are room-only and must never be persisted or pushed. */
+function isLuckyWinNotification(data?: Record<string, unknown>, title?: string, body?: string): boolean {
+  const serialized = JSON.stringify(data || {}).toLowerCase();
+  const copy = `${String(title || '')} ${String(body || '')}`.toLowerCase();
+  const luckyPayout = /["']?(luckyMultiplier|luckyCoinsWon|luckyReturn|luckyPayout)["']?\s*:\s*["']?(?:[1-9]\d*(?:\.\d+)?|true)/i.test(serialized);
+  const luckyEvent = /(lucky[_\s-]*(gift|win|box)|lucky_hit_(normal|high|return|high_room)|luckygift|luckyMultiplier|luckyCoinsWon|is[_-]?lucky[_-]?win|حظ\s*سعيد|صندوق\s*الحظ|هدية\s*المحظوظ)/i.test(serialized + ' ' + copy);
+  const rewardWords = /(مبروك|حصل\s+على|ربح|ربحت|فاز|فازت|فوز|مردود|مكسب|won|winner|reward|payout|profit)/i.test(copy);
+  const multiplierText = /[×x]\s*[1-9]\d*(?:\.\d+)?/i.test(serialized + ' ' + copy);
+  return luckyPayout || (luckyEvent && (rewardWords || multiplierText));
+}
 
 export class CreateNotificationDto {
   @ApiProperty()
@@ -85,10 +166,10 @@ export class AdminPushDto {
   @IsString()
   url?: string;
 
-  @ApiPropertyOptional({ enum: ['all', 'hosts', 'vip', 'user'] })
+  @ApiPropertyOptional({ enum: ['all', 'hosts', 'agency_leaders', 'staff', 'vip', 'user'] })
   @IsOptional()
   @IsString()
-  audience?: 'all' | 'hosts' | 'vip' | 'user';
+  audience?: 'all' | 'hosts' | 'agency_leaders' | 'staff' | 'vip' | 'user';
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -121,11 +202,18 @@ export class NotificationsService {
     private readonly vipRepo: Repository<UserVip>,
     @InjectRepository(Room)
     private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(AgencyMember)
+    private readonly agencyMembersRepo: Repository<AgencyMember>,
     private readonly firebase: FirebaseAdminService,
     private readonly realtime: RealtimeGateway,
   ) {}
 
   async create(dto: CreateNotificationDto) {
+    // Lucky/game win results are delivered only through the in-room celebration UI.
+    // Do not create inbox rows, realtime notification events, or external FCM alerts
+    // for the winner, friends, followers, or any other account.
+    if (isLuckyWinNotification(dto.data, dto.title, dto.body)) return null;
+
     const notif = await this.notifRepo.save(
       this.notifRepo.create({
         userId: dto.userId,
@@ -135,18 +223,28 @@ export class NotificationsService {
         data: dto.data || null,
       }),
     );
-    this.realtime.emitToUser(dto.userId, 'notification:new', notif);
-    if (dto.sendPush !== false) {
-      const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
-        ...(dto.data || {}),
-        type: dto.type,
-        notificationId: notif.id,
-        title: dto.title,
-        body: dto.body,
-      });
-      if (sent) {
-        notif.fcmSent = true;
-        await this.notifRepo.save(notif);
+    // Persist first. Realtime and push delivery are best-effort and must never
+    // turn a successfully stored in-app notification into a reported failure.
+    try {
+      this.realtime.emitToUser(dto.userId, 'notification:new', notif);
+    } catch (err) {
+      this.logger.warn(`Realtime notification emit failed: ${(err as Error).message}`);
+    }
+    if (dto.sendPush !== false && dto.type !== NotificationType.GIFT && dto.type !== NotificationType.ROOM && !isRoomRewardWinPayload(dto.data, dto.title, dto.body)) {
+      try {
+        const sent = await this.sendFcm(dto.userId, dto.title, dto.body, {
+          ...(dto.data || {}),
+          type: dto.type,
+          notificationId: notif.id,
+          title: dto.title,
+          body: dto.body,
+        });
+        if (sent) {
+          notif.fcmSent = true;
+          await this.notifRepo.save(notif);
+        }
+      } catch (err) {
+        this.logger.warn(`Push notification delivery failed: ${(err as Error).message}`);
       }
     }
     return notif;
@@ -175,37 +273,86 @@ export class NotificationsService {
   }
 
   async list(userId: string, query: PaginationDto) {
-    const [items, total] = await this.notifRepo.findAndCount({
-      where: { userId },
-      skip: query.skip,
-      take: query.limit || 20,
+    // Legacy direct-message alerts are hidden here too; only the conversation thread owns them.
+    const rows = await this.notifRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    const items = rows.filter((notification) => !isDirectMessageNotification(notification) && !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(200, Math.max(1, query.limit || 20));
+    const pageItems = items.slice((page - 1) * limit, page * limit);
+    return paginate(pageItems, items.length, page, limit);
+  }
+
+  /** Super-admin messages are stored separately from dashboard Official News. */
+  async listAdminMessages(userId: string, query: PaginationDto) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT },
       order: { createdAt: 'DESC' },
     });
-    return paginate(items, total, query.page || 1, query.limit || 20);
+    const messages = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    });
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(200, Math.max(1, query.limit || 80));
+    const chronological = messages.slice((page - 1) * limit, page * limit).reverse();
+    return paginate(chronological, messages.length, page, limit);
+  }
+
+  async adminMessagesPreview(userId: string) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT },
+      order: { createdAt: 'DESC' },
+    });
+    const messages = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    });
+    const latest = messages[0];
+    return {
+      unread: messages.filter((n) => !n.isRead).length,
+      lastTitle: latest?.title || null,
+      lastBody: latest?.body || null,
+      lastAt: latest?.createdAt || null,
+    };
+  }
+
+  async markAllAdminMessagesRead(userId: string) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT, isRead: false },
+    });
+    const ids = rows.filter((n) => {
+      const data = (n.data || {}) as any;
+      return data.adminMessage === true || data.source === 'admin';
+    }).map((n) => n.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
+    return { success: true, updated: ids.length };
   }
 
   /** Official News feed (system / agency / wallet / vip) — chat-style inbox. */
   async listOfficial(userId: string, query: PaginationDto) {
     const take = Math.min(query.limit || 80, 200);
-    const [items, total] = await this.notifRepo.findAndCount({
+    const rows = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES) },
-      skip: query.skip,
-      take,
       order: { createdAt: 'DESC' },
     });
+    const filtered = rows.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
+    const items = filtered.slice(query.skip || 0, (query.skip || 0) + take);
+    const total = filtered.length;
     // Chronological for chat bubbles (oldest → newest).
     const chronological = [...items].reverse();
     return paginate(chronological, total, query.page || 1, take);
   }
 
   async officialPreview(userId: string) {
-    const latest = await this.notifRepo.findOne({
+    const rows = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES) },
       order: { createdAt: 'DESC' },
     });
-    const unread = await this.notifRepo.count({
-      where: { userId, type: In(OFFICIAL_NEWS_TYPES), isRead: false },
-    });
+    const visible = rows.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body));
+    const latest = visible[0] || null;
+    const unread = visible.filter((notification) => !notification.isRead).length;
     return {
       unread,
       lastTitle: latest?.title || null,
@@ -228,28 +375,146 @@ export class NotificationsService {
   }
 
   async markAllRead(userId: string) {
-    await this.notifRepo.update({ userId, isRead: false }, { isRead: true });
+    const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
+    const ids = unread.filter((notification) =>
+      !isDirectMessageNotification(notification) &&
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body))
+      .map((notification) => notification.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true };
   }
 
   async markAllOfficialRead(userId: string) {
-    await this.notifRepo.update(
-      { userId, isRead: false, type: In(OFFICIAL_NEWS_TYPES) },
-      { isRead: true },
-    );
+    const unread = await this.notifRepo.find({
+      where: { userId, isRead: false, type: In(OFFICIAL_NEWS_TYPES) },
+    });
+    const ids = unread.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body))
+      .map((notification) => notification.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
     return { success: true };
   }
 
   async unreadCount(userId: string) {
-    const count = await this.notifRepo.count({ where: { userId, isRead: false } });
+    const unread = await this.notifRepo.find({ where: { userId, isRead: false } });
+    const count = unread.filter((notification) =>
+      !isDirectMessageNotification(notification) &&
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body)).length;
     return { count };
   }
 
   async officialUnreadCount(userId: string) {
-    const count = await this.notifRepo.count({
+    const unread = await this.notifRepo.find({
       where: { userId, type: In(OFFICIAL_NEWS_TYPES), isRead: false },
     });
+    const count = unread.filter((notification) =>
+      !isLuckyWinNotification(notification.data as any, notification.title, notification.body)).length;
     return { count };
+  }
+
+  /** Send a data-only direct-message push without adding it to Official News. */
+  async sendDirectMessagePush(
+    recipientUserId: string,
+    payload: {
+      conversationId: string;
+      messageId: string;
+      senderId: string;
+      senderName: string;
+      avatarUrl?: string | null;
+      body: string;
+    },
+  ): Promise<boolean> {
+    if (!recipientUserId || !payload.conversationId || !payload.messageId) return false;
+    try {
+      return await this.sendFcm(
+        recipientUserId,
+        payload.senderName || 'JEHO CHAT',
+        String(payload.body || 'لديك رسالة جديدة').slice(0, 180),
+        {
+          type: 'chat',
+          notificationKind: 'direct_message',
+          conversationId: payload.conversationId,
+          messageId: payload.messageId,
+          senderId: payload.senderId,
+          peer_id: payload.senderId,
+          senderName: payload.senderName || 'JEHO CHAT',
+          avatarUrl: payload.avatarUrl || '',
+        },
+      );
+    } catch (err) {
+      this.logger.warn(`Direct-message push failed: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Admin-only diagnostics: counts only, never returns device tokens or credentials. */
+  async fcmDeliveryStatus() {
+    const activeDevices = await this.devicesRepo.count({ where: { isActive: true } });
+    const tokenDevices = await this.devicesRepo.createQueryBuilder('device')
+      .where('device.isActive = :active', { active: true })
+      .andWhere('device.fcmToken IS NOT NULL')
+      .andWhere("device.fcmToken <> ''")
+      .getCount();
+    return {
+      ...this.firebase.diagnostics(),
+      firebaseReady: this.firebase.isReady(),
+      activeDevices,
+      tokenDevices,
+      activeDevicesMissingToken: Math.max(0, activeDevices - tokenDevices),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  /** Send a real push to the authenticated admin device for end-to-end FCM verification. */
+  async sendFcmTest(userId: string) {
+    const devices = await this.devicesRepo.find({ where: { userId, isActive: true } });
+    const tokenDevices = devices.filter((device) => !!device.fcmToken && !!device.fcmToken.trim()).length;
+    const firebaseDiagnostics = this.firebase.diagnostics();
+    const firebaseReady = firebaseDiagnostics.ready;
+    if (!firebaseReady || tokenDevices === 0) {
+      return {
+        sent: false,
+        ...firebaseDiagnostics,
+        firebaseReady,
+        activeDevices: devices.length,
+        tokenDevices,
+        reason: !firebaseReady
+          ? (firebaseDiagnostics.failureReason || 'firebase_not_ready')
+          : 'no_registered_device_token',
+      };
+    }
+    const title = 'JEHO CHAT';
+    const body = 'هذا إشعار اختبار للتأكد من عمل إشعارات الرسائل';
+    const tokens = Array.from(new Set(
+      devices.map((device) => device.fcmToken)
+        .filter((token): token is string => !!token && !!token.trim()),
+    ));
+    const delivery = await this.firebase.sendToTokens(tokens, title, body, {
+      type: 'system',
+      notificationKind: 'fcm_test',
+      title,
+      body,
+      test: 'true',
+    });
+    if (delivery.invalidTokens.length) {
+      await this.devicesRepo.update(
+        { fcmToken: In(delivery.invalidTokens) },
+        { isActive: false, fcmToken: null },
+      );
+    }
+    const sent = delivery.success > 0;
+    return {
+      sent,
+      ...firebaseDiagnostics,
+      firebaseReady,
+      activeDevices: devices.length,
+      tokenDevices,
+      successCount: delivery.success,
+      failureCount: delivery.failure,
+      errorCodes: delivery.errorCodes,
+      invalidTokenCount: delivery.invalidTokens.length,
+      reason: sent ? null : (delivery.errorCodes[0] || 'fcm_rejected_or_delivery_failed'),
+    };
   }
 
   async sendFcm(
@@ -258,12 +523,36 @@ export class NotificationsService {
     body: string,
     data?: Record<string, unknown>,
   ): Promise<boolean> {
+    // Central fail-safe: every push path (including dashboard push-only sends)
+    // passes here. Game/lucky/win announcements are delivered only over the
+    // in-app realtime channel and must never reach Android/iOS notification trays.
+    if (isRoomRewardWinPayload(data, title, body)) {
+      this.logger.log(`External FCM suppressed for in-app game win user=${userId}`);
+      return false;
+    }
     const devices = await this.devicesRepo.find({
       where: { userId, isActive: true },
     });
-    const tokens = devices.map((d) => d.fcmToken).filter(Boolean) as string[];
-    if (!tokens.length) return false;
+    const tokens = Array.from(new Set(
+      devices.map((d) => d.fcmToken).filter((token): token is string => !!token && !!token.trim()),
+    ));
+    if (!tokens.length) {
+      this.logger.warn(`FCM not sent: no active device token for user=${userId}`);
+      return false;
+    }
+    if (!this.firebase.isReady()) {
+      this.logger.error(`FCM not sent: Firebase Admin unavailable user=${userId} devices=${devices.length}`);
+      return false;
+    }
     const result = await this.firebase.sendToTokens(tokens, title, body, data);
+    if (result.invalidTokens?.length) {
+      await this.devicesRepo.update(
+        { fcmToken: In(result.invalidTokens) },
+        { isActive: false, fcmToken: null },
+      );
+      this.logger.warn(`Deactivated ${result.invalidTokens.length} expired FCM token(s)`);
+    }
+    this.logger.log(`FCM delivery user=${userId} devices=${devices.length} tokens=${tokens.length} success=${result.success} failure=${result.failure}`);
     return result.success > 0;
   }
 
@@ -310,7 +599,10 @@ export class NotificationsService {
             audience,
             channel,
             officialNews: isOfficial,
+            // Mark admin-originated sends so tapping their push opens Admin Messages.
+            adminMessage: true,
             source: 'admin',
+            originalType: type,
             targetUserId: userId,
             ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
             ...(imageUrl ? { imageUrl } : {}),
@@ -320,7 +612,32 @@ export class NotificationsService {
           sendPush: pushNow,
         });
         saved += 1;
-        if (notif.fcmSent) pushed += 1;
+        if (notif?.fcmSent) pushed += 1;
+
+        // Keep the normal notification/official-news entry and also place the same
+        // admin broadcast in the dedicated Admin Messages inbox. Do not send a
+        // second push: this mirror exists only for the in-app conversation list.
+        if (type !== NotificationType.CHAT) {
+          await this.create({
+            userId,
+            type: NotificationType.CHAT,
+            title: dto.title,
+            body: plainBody,
+            data: {
+              audience,
+              channel,
+              adminMessage: true,
+              source: 'admin',
+              originalType: type,
+              mirroredAdminMessage: true,
+              targetUserId: userId,
+              ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
+              ...(imageUrl ? { imageUrl } : {}),
+              ...(link ? { url: link, link } : {}),
+            },
+            sendPush: false,
+          });
+        }
       } else if (pushNow) {
         const ok = await this.sendFcm(userId, dto.title, plainBody, {
           type,
@@ -328,10 +645,37 @@ export class NotificationsService {
           title: dto.title,
           body: plainBody,
           targetUserId: userId,
+          // Route taps to Admin Messages even when the dashboard uses push-only delivery.
+          adminMessage: true,
+          source: 'admin',
+          originalType: type,
           ...(imageUrl ? { imageUrl } : {}),
           ...(link ? { url: link } : {}),
         });
         if (ok) pushed += 1;
+
+        // Push-only must still leave an in-app copy in the Admin Messages inbox.
+        // No second push is sent by this mirror.
+        await this.create({
+          userId,
+          type: NotificationType.CHAT,
+          title: dto.title,
+          body: plainBody,
+          data: {
+            audience,
+            channel,
+            adminMessage: true,
+            source: 'admin',
+            originalType: type,
+            mirroredAdminMessage: true,
+            targetUserId: userId,
+            ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(link ? { url: link, link } : {}),
+          },
+          sendPush: false,
+        });
+        saved += 1;
       }
     }
 
@@ -388,6 +732,25 @@ export class NotificationsService {
         .where('r.hostId IS NOT NULL')
         .getRawMany<{ hostId: string }>();
       return rows.map((r) => r.hostId).filter(Boolean);
+    }
+    if (audience === 'agency_leaders') {
+      const rows = await this.agencyMembersRepo
+        .createQueryBuilder('m')
+        .select('DISTINCT m.userId', 'userId')
+        .where('m.role = :role', { role: 'owner' })
+        .andWhere('m.status = :status', { status: 'active' })
+        .andWhere('m.isActive = true')
+        .getRawMany<{ userId: string }>();
+      return rows.map((r) => r.userId).filter(Boolean);
+    }
+    if (audience === 'staff') {
+      const rows = await this.usersRepo
+        .createQueryBuilder('u')
+        .select('u.id', 'id')
+        .where('u.staffRole IN (:...roles)', { roles: ['super', 'manager'] })
+        .orWhere('u.isAdmin = true')
+        .getRawMany<{ id: string }>();
+      return rows.map((r) => r.id).filter(Boolean);
     }
     if (audience === 'vip') {
       const now = new Date();

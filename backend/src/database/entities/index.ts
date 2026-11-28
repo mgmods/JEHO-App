@@ -57,3 +57,15 @@ export * from './female-identity-verification.entity';
 export * from './host-monthly-progress.entity';
 export * from './vanity-id.entity';
 export * from './user-promo-progress.entity';
+
+export * from './cp-relationship.entity';
+export * from './cp-request.entity';
+export * from './cp-audit-log.entity';
+export * from './cp-point-event.entity';
+
+export * from './badge.entity';
+export * from './user-badge.entity';
+
+export * from './custom-gift-grant.entity';
+
+export * from './advertisement.entity';

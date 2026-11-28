@@ -5,6 +5,10 @@
         android:icon="@android:drawable/ic_menu_myplaces"
         android:title="@string/view_profile" />
     <item
+        android:id="@+id/action_chat_background"
+        android:icon="@android:drawable/ic_menu_gallery"
+        android:title="@string/chat_background" />
+    <item
         android:id="@+id/action_archive_chat"
         android:icon="@android:drawable/ic_menu_save"
         android:title="@string/archive_conversation" />

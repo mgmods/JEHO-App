@@ -410,9 +410,9 @@
 <string name="tab_related">أتابع</string>
 <string name="tab_following">متابع</string>
 <string name="tab_recent">مؤخراً</string>
-<string name="tab_me_home">أنا</string>
-    <string name="tab_location">الدولة</string>
-<string name="tab_hot">حار</string>
+<string name="tab_me_home">ملكي</string>
+    <string name="tab_location">أخرى</string>
+<string name="tab_hot">شائع 🔥</string>
 <string name="tab_activities">النشاطات</string>
 <string name="home_section_following_rooms">غرف المتابعين</string>
 <string name="home_empty_following">لا توجد غرف لمن تتابعهم</string>
@@ -465,7 +465,7 @@
 <string name="room_msg_edit_hint">اكتب ما تريد قوله</string>
 <string name="room">غرفة</string>
 <string name="tool">أداة</string>
-<string name="effect">تأثير</string>
+<string name="effect">التحديات</string>
 <string name="room_more_tab_room">غرفة</string>
 <string name="room_more_tab_tool">أداة</string>
 <string name="room_more_tab_effect">تأثير</string>
@@ -481,6 +481,7 @@
 <string name="room_more_blacklist">القائمه السوداء</string>
 <string name="room_more_admin">ادمن</string>
 <string name="room_more_mic_interact">التفاعل مع الميكروفون</string>
+<string name="room_more_mic_request">طلب صعود المايك</string>
 <string name="room_more_photo">صوره</string>
 <string name="room_more_theme">سمه</string>
 <string name="room_more_mute_on">تشغيل كتم الصوت</string>
@@ -525,9 +526,9 @@
 <string name="allow_list">قائمة السماح</string>
 <string name="message_request">طلب رسالة</string>
 <string name="official_news">أخبار رسمية</string>
-<string name="official_news_hint">تحديثات التطبيق والإشعارات المهمة</string>
-<string name="official_news_readonly">لا يمكنك الرد — للقراءة فقط</string>
-<string name="official_news_empty">لا توجد أخبار رسمية بعد</string>
+<string name="official_news_hint">الأخبار والإعلانات الرسمية المرسلة من لوحة التحكم</string>
+<string name="official_news_readonly">رسائل الإدارة للقراءة فقط</string>
+<string name="official_news_empty">لا توجد رسائل من الإدارة حتى الآن</string>
     <string name="official_news_open_link">فتح الرابط</string>
     <string name="official_news_view_page">عرض الصفحة كاملة</string>
 <string name="official_news_link_hint">اضغط الروابط للفتح · اضغط مطولاً للنسخ</string>
@@ -618,11 +619,11 @@
 <string name="settings_version">الإصدار</string>
 <string name="settings_user_agreement">اتفاقية المستخدم</string>
 <string name="switch_account">تبديل الحساب</string>
-<string name="badges">الشارات</string>
-<string name="honourship">التكريم</string>
-<string name="badge">شارة</string>
+<string name="badges">الميداليات</string>
+<string name="honourship">الميداليات</string>
+<string name="badge">ميدالية</string>
 <string name="mine">خاصتي</string>
-<string name="have_not_yet_received_badge">لم تحصل على شارة بعد</string>
+<string name="have_not_yet_received_badge">لم تحصل على ميداليات بعد</string>
 <string name="medal_vip_tier">VIP %1$d</string>
 <string name="task_center">مركز المهام</string>
 <string name="contests">المسابقات</string>
@@ -694,9 +695,9 @@
 <string name="agency_host_kpi_earned">أرباح المضيفة (دولار)</string>
 <string name="agency_host_kpi_gifts">حجم الهدايا</string>
 <string name="agency_host_period_breakdown">أرباحك بالدولار</string>
-<string name="agency_host_wallet_format">المتاح: %,d ماسة ≈ $%,.2f</string>
+<string name="agency_host_wallet_format">المتاح: %1$,d ماسة ≈ $%2$,.2f</string>
 <string name="agency_available_balance_line">المتاح: %1$,d ماسة · %2$s</string>
-<string name="agency_earn_usd_diamonds_sub">%,d ماسة · $%,.2f</string>
+<string name="agency_earn_usd_diamonds_sub">%1$,d ماسة · $%2$,.2f</string>
 <string name="agency_payout_requests">طلبات السحب القديمة</string>
 <string name="agency_host_request_payout">سحب أرباح روم الوكالة</string>
 <string name="agency_host_request_payout_title">طلب سحب أرباح روم الوكالة</string>
@@ -716,6 +717,9 @@
 <string name="agency_manage_menu_style">شكل إشعار الانضمام</string>
 <string name="agency_manage_menu_branding">الاسم والترحيب</string>
 <string name="agency_manage_menu_mall">مول الوكالة</string>
+<string name="agency_manage_menu_managers">مشرفو الوكالة</string>
+<string name="agency_manage_menu_hosts">مضيفو الوكالة</string>
+<string name="agency_manage_menu_members">أعضاء الوكالة</string>
 <string name="agency_manage_menu_live">بدء البث</string>
 <string name="agency_manage_menu_delete">حذف الوكالة</string>
     <string name="agency_manage_section_team">الفريق</string>
@@ -747,7 +751,7 @@
 <string name="agency_earn_hosts">تقدير المضيفين</string>
 <string name="agency_earn_platform">تقدير التطبيق</string>
 <string name="agency_earn_agent">تقدير الوكيل</string>
-<string name="agency_earn_percents_format">عمولتك %.0f%% · حصة المضيف ≈ %.0f%%</string>
+<string name="agency_earn_percents_format">عمولتك %1$.0f%% · حصة المضيف ≈ %2$.0f%%</string>
 <string name="agency_earn_owner_only">لوحة العمولة لصاحب الوكالة / المدير فقط</string>
 <string name="agency_host_earnings_help">أرباح روم الوكالة تظهر كماس ودولار. اسحبي الماس مباشرةً إلى إدارة المنصة (زر سحب أرباح روم الوكالة). لا تحتاجين موافقة الوكالة، ولا تستخدمين مول وكلاء الشحن لهذا الرصيد.</string>
 <string name="agency_host_view_earnings">سجل الأرباح</string>
@@ -844,7 +848,7 @@
 <string name="agency_welcome_hint">نص الترحيب في الغرفة</string>
 <string name="agency_save_branding">حفظ الاسم والترحيب</string>
 <string name="agency_mall_frames">إطارات</string>
-<string name="agency_mall_badges">شارات</string>
+<string name="agency_mall_badges">ميداليات</string>
 <string name="agency_member_search_hint">بحث بالاسم أو ID</string>
 <string name="agency_notice_section">إشعار قبول المضيفات</string>
 <string name="agency_delete">حذف الوكالة</string>
@@ -1277,4 +1281,19 @@
 <string name="lang_name_hi" translatable="false">हिन्दी</string>
 <string name="lang_name_ur" translatable="false">اردو</string>
 <string name="lang_name_zh" translatable="false">简体中文</string>
+
+<string name="admin_messages">رسائل الإدارة</string>
+<string name="admin_messages_hint">لا توجد رسائل جديدة</string>
+<string name="admin_messages_readonly">رسائل مرسلة من السوبر أدمن</string>
+<string name="admin_messages_empty">لا توجد رسائل إدارية حتى الآن</string>
+<string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
+    <string name="support_website">الموقع الرسمي</string>
+    <string name="home_hot_all">شائع 🔥</string>
+    <string name="chat_hub_friends">الأصدقاء</string>
+    <string name="chat_hub_notifications">الإشعارات</string>
+    <string name="chat_hub_follow_requests">طلبات المتابعة</string>
+    <string name="chat_hub_visitors">الزوار</string>
+    <string name="chat_search_hint">ابحث في الدردشات أو الرسائل</string>
+    <string name="chat_search_clear">مسح البحث</string>
+    <string name="chat_search_no_results">لا توجد محادثات أو رسائل مطابقة</string>
 </resources>

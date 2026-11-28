@@ -3,7 +3,7 @@ package com.Dramizo.Series.util;
 import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
-import com.Dramizo.Series.zego.ZegoEngineManager;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 
 /**
  * Process-wide live-room session (Mikoo RoomDataManager analogue).
@@ -43,8 +43,20 @@ public final class ActiveRoomSession {
         this.session = session;
         this.zegoRoomId = session.zegoRoomId != null && !session.zegoRoomId.isEmpty()
                 ? session.zegoRoomId : roomId;
-        if (room != null) this.latestRoom = room;
-        else if (session.room != null) this.latestRoom = session.room;
+        if (room != null) {
+            // Capture can run during lifecycle transitions while the latest DTO is partial.
+            // Never replace a known seat roster with an omitted (null) seats field.
+            if (room.seats == null && this.latestRoom != null && this.latestRoom.seats != null) {
+                room.seats = this.latestRoom.seats;
+            }
+            this.latestRoom = room;
+        } else if (session.room != null) {
+            if (session.room.seats == null && this.latestRoom != null
+                    && this.latestRoom.seats != null) {
+                session.room.seats = this.latestRoom.seats;
+            }
+            this.latestRoom = session.room;
+        }
         this.host = host;
         this.agencyRoom = agencyRoom;
         this.micOn = micOn;
@@ -52,7 +64,14 @@ public final class ActiveRoomSession {
     }
 
     public synchronized void updateRoom(@Nullable RoomDtos.RoomDto room) {
-        if (room != null) latestRoom = room;
+        if (room != null) {
+            // A partial room refresh may omit the seats field (null). Keep the last known
+            // roster in that case; an explicit empty list remains authoritative.
+            if (room.seats == null && latestRoom != null && latestRoom.seats != null) {
+                room.seats = latestRoom.seats;
+            }
+            latestRoom = room;
+        }
     }
 
     public synchronized void setMinimized(boolean value) {
@@ -109,9 +128,14 @@ public final class ActiveRoomSession {
     public synchronized boolean canResumeUi(@Nullable String targetRoomId) {
         if (targetRoomId == null || targetRoomId.isEmpty()) return false;
         if (session == null || roomId == null || !roomId.equals(targetRoomId)) return false;
-        ZegoEngineManager zego = ZegoEngineManager.getInstance();
+        // Use the selected RTC provider. Checking Zego directly made LiveKit sessions
+        // look disconnected after minimize, so the app performed a fresh HTTP join and
+        // could lose the user's existing mic/seat state on restore.
+        RoomRtcEngine rtc = RoomRtcEngine.getInstance();
         String zegoId = zegoRoomId != null ? zegoRoomId : roomId;
-        return zego.isInRoom(zegoId) || zego.isInRoom(roomId);
+        if (rtc.isInRoom(zegoId) || rtc.isInRoom(roomId)) return true;
+        String livekitId = session.livekitRoomName;
+        return livekitId != null && !livekitId.isEmpty() && rtc.isInRoom(livekitId);
     }
 
     /** Snapshot flags for UI restore without inventing a new join. */

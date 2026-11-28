@@ -14,30 +14,43 @@ def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
+// CI can supply -PJEHO_OWN_API_URL; local builds may use android/local.properties.
+// Keep the API URL in BuildConfig so both debug and release variants use the same backend.
+def configuredApi = (
+    project.findProperty('JEHO_OWN_API_URL') ?:
+    System.getenv('JEHO_OWN_API_URL') ?:
+    localProperties.getProperty('API_BASE_URL', '')
+).toString().trim()
 android {
     namespace 'com.Dramizo.Series'
     compileSdk 36
     // NDK r28+ defaults to 16 KB ELF page alignment (Play requirement).
     ndkVersion "28.0.12433566"
     defaultConfig {
-        applicationId "com.Dramizo.Series"
+        applicationId "com.mgwa.chat"
         minSdk 24
         targetSdk 36
-        versionCode 47
-        versionName "2.0.49"
+        versionCode 51
+        versionName "2.0.53"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
         buildConfigField "long", "ZEGO_APP_ID", "0L"
         buildConfigField "String", "ZEGO_APP_SIGN", "\"\""
         // Production always uses ApiOrigin. Debug may override via local.properties.
-        buildConfigField "String", "API_BASE_URL", "\"\""
-        ndk {
-            // Real phones: 32-bit + 64-bit ARM.
-            // Play App Bundle (abi split) still delivers only the matching ABI per device.
-            // Universal sideload APK includes both (~larger) so older phones install too.
-            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        buildConfigField "String", "API_BASE_URL", "\"${configuredApi}\""
+        // ABI selection is configured once in android.splits.abi below.
+    }
+    // Build separate APKs per CPU architecture to reduce each download size.
+    // This preserves app features and both 32-bit and 64-bit device support.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk true
         }
     }
+
     signingConfigs {
         release {
             // Prefer project-local keystore (android/app/keystore/Dramizo.jks).
@@ -83,12 +96,16 @@ android {
         }
         debug {
             minifyEnabled false
-            // Optional local API override for developers only (never release).
-            def debugApi = localProperties.getProperty('API_BASE_URL', '')
-            if (debugApi != null && !debugApi.isEmpty()) {
-                buildConfigField "String", "API_BASE_URL", "\"${debugApi}\""
+            // API_BASE_URL is shared with defaultConfig for this build.
+            // CI supplies this exact keystore path so the APK certificate stays stable across runners.
+            def ciDebugKeystore = System.getenv('JEHO_DEBUG_KEYSTORE')
+            if (ciDebugKeystore && file(ciDebugKeystore).isFile()) {
+                signingConfig signingConfigs.debug
+                signingConfigs.debug.storeFile file(ciDebugKeystore)
+                signingConfigs.debug.storePassword(System.getenv('JEHO_DEBUG_STORE_PASSWORD') ?: 'android')
+                signingConfigs.debug.keyAlias(System.getenv('JEHO_DEBUG_KEY_ALIAS') ?: 'AndroidDebugKey')
+                signingConfigs.debug.keyPassword(System.getenv('JEHO_DEBUG_KEY_PASSWORD') ?: 'android')
             }
-            // Debug uses Android debug keystore (release jks may be corrupt locally).
         }
     }
     bundle {
@@ -123,9 +140,29 @@ android {
         // Uncompressed + 16 KB zip-aligned native libs (AGP 8.5.1+).
         // Required for Google Play 16 KB page-size compliance.
         jniLibs {
-            useLegacyPackaging = false
+            // Keep one direct-install APK small by compressing the native libraries.
+            // The release APK targets Android phones (ARM 32-bit + ARM 64-bit); do not bundle
+            // desktop/emulator x86 native libraries in the universal phone APK.
+            useLegacyPackaging = true
+            excludes += ['**/x86/**', '**/x86_64/**']
         }
     }
+}
+
+// Bundle the exact public mall HTML/CSS/JS from the backend source into the APK.
+// This avoids a blank WebView when the deployed server is behind the app branch, while
+// keeping a single maintained source of these pages (backend/public/mall).
+def mallHtmlSource = file("${projectDir}/../../backend/public/mall")
+def mallHtmlAssets = layout.buildDirectory.dir("generated/mallAssets")
+android.sourceSets.main.assets.srcDir(mallHtmlAssets)
+
+tasks.register('syncMallHtmlAssets', Sync) {
+    from mallHtmlSource
+    into mallHtmlAssets.map { it.dir('mall') }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('syncMallHtmlAssets')
 }
 
 // Release size: cosmetics frames/gift SFX live on the CDN (AssetCatalog + API URLs).
@@ -170,6 +207,7 @@ dependencies {
     annotationProcessor 'androidx.room:room-compiler:2.6.1'
     implementation 'androidx.preference:preference:1.2.1'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'com.github.yalantis:ucrop:2.2.8'
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     implementation 'com.github.bumptech.glide:okhttp3-integration:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'

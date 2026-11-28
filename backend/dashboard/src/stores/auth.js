@@ -19,15 +19,19 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperAdmin = computed(() => {
     const u = user.value
     if (!u) return false
-    if (u.isSuperAdmin === true) return true
     const role = String(u.staffRole || '')
       .trim()
       .toLowerCase()
-    if (role === 'super' || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+    // An explicit limited role wins over stale cached flags from older sessions.
+    if (['admin', 'manager', 'moderator', 'operator', 'dashboard_operator', 'admin_op', 'staff', 'user', 'none'].includes(role)) {
+      return false
+    }
+    if (role === 'super' || role === 'super_admin' || role === 'superadmin') {
       return true
     }
-    // Legacy sessions: isAdmin without operator/manager = Super owner
-    if (u.isAdmin && role !== 'operator' && role !== 'manager' && role !== 'moderator') {
+    if (u.isSuperAdmin === true) return true
+    // Backward compatibility only for legacy sessions with no role field at all.
+    if (u.isAdmin && !role) {
       return true
     }
     return false
@@ -55,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
   function canRoute(routeName, need = 'read') {
     if (isSuperAdmin.value) return true
     const mod = ROUTE_MODULE[routeName]
-    if (!mod) return true
+    if (!mod) return false
     return can(mod, need)
   }
 

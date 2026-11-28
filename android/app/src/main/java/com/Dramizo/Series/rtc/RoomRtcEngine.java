@@ -157,9 +157,36 @@ public final class RoomRtcEngine {
         this.sessionCanPublish = canPublish;
     }
 
-    public void setMicEnabled(boolean enabled) {
+    /** Restore a previously active room mic after an external recorder has ended. */
+    public void setMicEnabledForExternalRestore(boolean enabled, @Nullable Context context) {
         if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
         else ZegoEngineManager.getInstance().setMicEnabled(enabled);
+        if (enabled) RoomAudioSession.acquireForExternalRestore(context);
+        else RoomAudioSession.release(context);
+    }
+
+    public void setMicEnabled(boolean enabled) {
+        // Never let room controls reclaim the microphone while an external recorder
+        // owns capture. The dedicated external-restore method bypasses this guard.
+        if (enabled && RoomAudioSession.isExternalCaptureSuspended()) return;
+        // Seat/state callbacks can arrive repeatedly while entering a room. Do not
+        // toggle the RTC microphone or Android audio focus when the requested state
+        // already matches the engine state; repeated toggles caused the Android
+        // privacy mic indicator to flash and could interrupt music/voice routing.
+        boolean current = isMicEnabled();
+        if (current == enabled) {
+            // Idempotent no-op: a repeated room roster callback must not re-request
+            // Android audio focus or re-enter MODE_IN_COMMUNICATION. The join path
+            // already acquired the session; focus churn here can cause mic/audio flicker.
+            return;
+        }
+
+        if (isLiveKit()) LiveKitEngineManager.getInstance().setMicEnabled(enabled);
+        else ZegoEngineManager.getInstance().setMicEnabled(enabled);
+
+        // Muting the local microphone must not tear down the room's playback route.
+        // External recording uses the explicit handoff flag to release audio focus.
+        RoomAudioSession.acquire(null);
     }
 
     public boolean isMicEnabled() {
@@ -169,6 +196,9 @@ public final class RoomRtcEngine {
     }
 
     public void setSpeakerMuted(boolean muted) {
+        // Keep all room output muted until the external recorder releases capture;
+        // only the handoff restore path clears the suspension latch first.
+        if (!muted && RoomAudioSession.isExternalCaptureSuspended()) return;
         if (isLiveKit()) LiveKitEngineManager.getInstance().setSpeakerMuted(muted);
         else ZegoEngineManager.getInstance().setSpeakerMuted(muted);
     }
@@ -180,11 +210,15 @@ public final class RoomRtcEngine {
     }
 
     public void startPublishingAudio(String streamId) {
+        if (streamId == null || streamId.trim().isEmpty()) return;
+        // Repeated seat-state callbacks must not restart the publisher.
+        if (isPublishing() && streamId.equals(getPublishingStreamId())) return;
         if (isLiveKit()) LiveKitEngineManager.getInstance().startPublishingAudio(streamId);
         else ZegoEngineManager.getInstance().startPublishingAudio(streamId);
     }
 
     public void stopPublishing() {
+        if (!isPublishing()) return;
         if (isLiveKit()) LiveKitEngineManager.getInstance().stopPublishing();
         else ZegoEngineManager.getInstance().stopPublishing();
     }
@@ -343,6 +377,11 @@ public final class RoomRtcEngine {
 
     public void seekLocalMusic(long positionMs) {
         if (!isLiveKit()) ZegoEngineManager.getInstance().seekLocalMusic(positionMs);
+    }
+
+    /** Music-only output gain; deliberately does not touch mic or room voice gain. */
+    public void setLocalMusicVolume(float volume) {
+        if (!isLiveKit()) ZegoEngineManager.getInstance().setLocalMusicVolume(volume);
     }
 
     public void boostMusicMixVolume() {

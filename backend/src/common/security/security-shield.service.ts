@@ -2,6 +2,8 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  BadRequestException,
+  NotFoundException,
   Injectable,
   Logger,
   SetMetadata,
@@ -24,6 +26,14 @@ const BURST_PREFIX = 'shield:burst:';
 @Injectable()
 export class SecurityShieldService {
   private readonly logger = new Logger(SecurityShieldService.name);
+  // The global guard runs on every authenticated API request. Cache the durable
+  // users.status lookup briefly and coalesce concurrent misses so bursts of room
+  // and dashboard requests do not issue one identical SELECT per request.
+  private readonly userBanStatusCache = new Map<string, { banned: boolean; expiresAt: number }>();
+  private readonly userBanStatusInFlight = new Map<string, Promise<boolean>>();
+  private readonly userBanCacheEpoch = new Map<string, number>();
+  private static readonly USER_BAN_CACHE_TTL_MS = 1_000;
+  private static readonly USER_BAN_CACHE_MAX_ENTRIES = 10_000;
 
   constructor(
     private readonly redis: RedisService,
@@ -49,12 +59,75 @@ export class SecurityShieldService {
 
   async isUserBanned(userId: string): Promise<boolean> {
     if (!userId) return false;
-    if (await this.redis.get(`${BAN_USER_PREFIX}${userId}`)) return true;
-    const u = await this.users.findOne({
-      where: { id: userId },
-      select: ['id', 'status'],
-    });
-    return !!u && (u.status === UserStatus.BANNED || u.status === UserStatus.SUSPENDED);
+
+    // Redis-backed temporary bans remain authoritative and are checked on every
+    // request; this cache only covers the durable PostgreSQL users.status lookup.
+    if (await this.redis.get(BAN_USER_PREFIX + userId)) return true;
+
+    const now = Date.now();
+    const cached = this.userBanStatusCache.get(userId);
+    if (cached && cached.expiresAt > now) return cached.banned;
+    if (cached) this.userBanStatusCache.delete(userId);
+
+    const pending = this.userBanStatusInFlight.get(userId);
+    if (pending) return pending;
+
+    const epoch = this.userBanCacheEpoch.get(userId) || 0;
+    const lookup = (async () => {
+      let user: Pick<User, 'id' | 'status'> | null = null;
+      try {
+        user = await this.users.findOne({
+          where: { id: userId },
+          select: ['id', 'status'],
+        });
+      } catch (error) {
+        // A transient PostgreSQL lock must never turn the global security guard
+        // into a 5xx for every authenticated request. Security has Redis as the
+        // authoritative short-lived ban store; when the durable status lookup
+        // is temporarily unavailable, fail open here and let the actual API
+        // operation report its own database health instead of blanking the app.
+        this.logger.warn(
+          `Durable user ban lookup deferred for ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return false;
+      }
+      const banned = !!user && (
+        user.status === UserStatus.BANNED || user.status === UserStatus.SUSPENDED
+      );
+
+      // Do not repopulate a cache entry after an admin status update invalidated it.
+      if ((this.userBanCacheEpoch.get(userId) || 0) === epoch) {
+        if (this.userBanStatusCache.size >= SecurityShieldService.USER_BAN_CACHE_MAX_ENTRIES) {
+          for (const [key, value] of this.userBanStatusCache) {
+            if (value.expiresAt <= now) this.userBanStatusCache.delete(key);
+          }
+          if (this.userBanStatusCache.size >= SecurityShieldService.USER_BAN_CACHE_MAX_ENTRIES) {
+            const oldestKey = this.userBanStatusCache.keys().next().value;
+            if (oldestKey) this.userBanStatusCache.delete(oldestKey);
+          }
+        }
+        this.userBanStatusCache.set(userId, {
+          banned,
+          expiresAt: Date.now() + SecurityShieldService.USER_BAN_CACHE_TTL_MS,
+        });
+      }
+      return banned;
+    })();
+
+    this.userBanStatusInFlight.set(userId, lookup);
+    try {
+      return await lookup;
+    } finally {
+      if (this.userBanStatusInFlight.get(userId) === lookup) {
+        this.userBanStatusInFlight.delete(userId);
+      }
+    }
+  }
+
+  invalidateUserBanCache(userId: string): void {
+    if (!userId) return;
+    this.userBanCacheEpoch.set(userId, (this.userBanCacheEpoch.get(userId) || 0) + 1);
+    this.userBanStatusCache.delete(userId);
   }
 
   async banIp(ip: string, ttlSeconds = 86_400, reason = 'abuse') {
@@ -67,7 +140,67 @@ export class SecurityShieldService {
     if (!userId) return;
     await this.redis.set(`${BAN_USER_PREFIX}${userId}`, reason, ttlSeconds);
     await this.users.update({ id: userId }, { status: UserStatus.SUSPENDED });
+    this.invalidateUserBanCache(userId);
     this.logger.warn(`User banned ${userId} (${ttlSeconds}s): ${reason}`);
+  }
+
+  /**
+   * Temporary staff ban: Redis TTL is the enforcement source. Do not mutate
+   * users.status, because BANNED/SUSPENDED is a durable account restriction.
+   */
+  async createStaffTemporaryBan(
+    userId: string,
+    hours: number,
+    reason: string,
+    actorId: string,
+  ) {
+    const user = await this.users.findOne({
+      where: { id: userId },
+      select: ['id', 'status'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.status === UserStatus.BANNED || user.status === UserStatus.SUSPENDED) {
+      throw new BadRequestException('This account has a durable restriction; only Super Admin can review it');
+    }
+    const safeHours = Math.max(1, Math.min(24, Math.floor(Number(hours) || 1)));
+    const expiresAt = new Date(Date.now() + safeHours * 60 * 60 * 1000).toISOString();
+    const value = JSON.stringify({
+      kind: 'staff-temporary-ban',
+      actorId,
+      reason: String(reason || 'admin temporary ban').slice(0, 500),
+      expiresAt,
+    });
+    const key = `${BAN_USER_PREFIX}${userId}`;
+    const created = await this.redis.setIfAbsent(key, value, safeHours * 3600);
+    if (!created) {
+      const existing = await this.redis.get(key);
+      if (existing) {
+        throw new BadRequestException('An active ban already exists for this account; Super Admin review is required');
+      }
+      throw new BadRequestException('Temporary-ban storage is unavailable; no ban was applied');
+    }
+    return { userId, hours: safeHours, expiresAt, actorId };
+  }
+
+  async removeStaffTemporaryBan(userId: string, actorId: string, isSuper: boolean) {
+    const key = `${BAN_USER_PREFIX}${userId}`;
+    const raw = await this.redis.get(key);
+    if (!raw) throw new NotFoundException('No active temporary ban was found');
+    let ban: { kind?: string; actorId?: string; expiresAt?: string };
+    try { ban = JSON.parse(raw); } catch {
+      throw new ForbiddenException('This is not a staff temporary ban; Super Admin review is required');
+    }
+    if (ban.kind !== 'staff-temporary-ban') {
+      throw new ForbiddenException('This is not a staff temporary ban; Super Admin review is required');
+    }
+    if (!isSuper && ban.actorId !== actorId) {
+      throw new ForbiddenException('You can only remove a temporary ban you issued');
+    }
+    const removed = await this.redis.deleteIfValueMatches(key, raw);
+    if (!removed) {
+      throw new BadRequestException('The temporary ban changed or expired; refresh the user and retry');
+    }
+    return { ok: true, userId, removedBy: actorId };
   }
 
   async recordAbuse(opts: {

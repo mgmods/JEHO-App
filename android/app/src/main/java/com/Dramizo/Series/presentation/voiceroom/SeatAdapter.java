@@ -3,6 +3,8 @@ package com.Dramizo.Series.presentation.voiceroom;
 import com.Dramizo.Series.util.ImagePlaceholder;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
@@ -13,6 +15,10 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationSet;
 import android.view.animation.OvershootInterpolator;
 import android.view.animation.ScaleAnimation;
+import android.view.animation.RotateAnimation;
+import android.widget.TextView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -25,6 +31,8 @@ import com.Dramizo.Series.databinding.ItemSeatBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.util.VipNameStyle;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
@@ -40,6 +48,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     public static final int SCALE_NORMAL = 0;
     public static final int SCALE_MEDIUM = 1;
     public static final int SCALE_COMPACT = 2;
+    /** Six-column 30-mic layout: compact enough to keep five rows on-screen. */
+    public static final int SCALE_MICRO = 3;
 
     public interface Listener {
         void onSeatClick(View anchor, RoomDtos.SeatDto seat);
@@ -58,9 +68,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     @Nullable private String selfDisplayName;
     @Nullable private String selfAvatarUrl;
     private boolean agencyRoom;
+    @Nullable private String roomAgencyId;
+    private final Set<String> roomAgencyModeratorIds = new HashSet<>();
     private final Set<String> speakingUsers = new HashSet<>();
     private final Map<String, Float> speakingLevels = new HashMap<>();
     private final Map<String, Float> lastPaintedSpeakLevel = new HashMap<>();
+    // Ignore very short VAD silence gaps; otherwise the equipped wave flashes off/on.
+    private final Map<String, Runnable> speakingStopRunnables = new HashMap<>();
     private final Map<String, Integer> activeReactions = new HashMap<>();
     private final Map<String, String> activeReactionKeys = new HashMap<>();
     private final Map<String, Runnable> hideReactionRunnables = new HashMap<>();
@@ -76,6 +90,22 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (selfMicMuted == muted) return;
         selfMicMuted = muted;
         if (selfUserId == null || selfUserId.isEmpty()) return;
+        if (muted) {
+            // Closing the local mic must stop the local speaking ring immediately.
+            String key = normalizeUserId(selfUserId);
+            Runnable pending = speakingStopRunnables.remove(key);
+            if (pending != null) handler.removeCallbacks(pending);
+            speakingUsers.remove(key);
+            speakingLevels.remove(key);
+            lastPaintedSpeakLevel.remove(key);
+            for (int i = 0; i < items.size(); i++) {
+                if (key.equals(seatUserId(items.get(i)))) {
+                    notifyItemChanged(i, "speaking");
+                    notifyItemChanged(i, "mute");
+                    return;
+                }
+            }
+        }
         for (int i = 0; i < items.size(); i++) {
             RoomDtos.SeatDto seat = items.get(i);
             if (seat != null && selfUserId.equals(seatUserId(seat))) {
@@ -86,7 +116,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setScaleMode(int mode) {
-        int next = Math.max(SCALE_NORMAL, Math.min(SCALE_COMPACT, mode));
+        int next = Math.max(SCALE_NORMAL, Math.min(SCALE_MICRO, mode));
         if (scaleMode == next) return;
         scaleMode = next;
         notifyItemRangeChanged(0, getItemCount(), "scale");
@@ -120,8 +150,26 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setAgencyRoom(boolean agency) {
-        if (agencyRoom == agency) return;
+        setAgencyContext(agency, null, null);
+    }
+
+    public void setAgencyContext(boolean agency, @Nullable String agencyId,
+                                 @Nullable List<String> moderatorIds) {
+        String normalizedId = agencyId == null ? null : agencyId.trim();
+        if (normalizedId != null && normalizedId.isEmpty()) normalizedId = null;
+        Set<String> nextModerators = new HashSet<>();
+        if (moderatorIds != null) {
+            for (String id : moderatorIds) {
+                String normalized = normalizeUserId(id);
+                if (!normalized.isEmpty()) nextModerators.add(normalized);
+            }
+        }
+        if (agencyRoom == agency && Objects.equals(roomAgencyId, normalizedId)
+                && roomAgencyModeratorIds.equals(nextModerators)) return;
         agencyRoom = agency;
+        roomAgencyId = normalizedId;
+        roomAgencyModeratorIds.clear();
+        roomAgencyModeratorIds.addAll(nextModerators);
         notifyItemRangeChanged(0, getItemCount(), "wear");
     }
 
@@ -248,11 +296,17 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     seat.user.hostBadgeMeta = prev.hostBadgeMeta;
                 }
             }
+            // Do not carry a previous equipped voice wave into a fresh room payload.
+            // An empty/missing equipped URL means the user has unequipped it, so the
+            // legacy built-in speaking wave must become active again.
             if (isBlank(seat.user.levelBadgeUrl) && !isBlank(prev.levelBadgeUrl)) {
                 seat.user.levelBadgeUrl = prev.levelBadgeUrl;
             }
             if (isBlank(seat.user.displayName) && !isBlank(prev.displayName)) {
                 seat.user.displayName = prev.displayName;
+            }
+            if (seat.user.roomSupportMedal == null && prev.roomSupportMedal != null) {
+                seat.user.roomSupportMedal = prev.roomSupportMedal;
             }
         }
     }
@@ -271,6 +325,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         speakingUsers.retainAll(seated);
         speakingLevels.keySet().retainAll(seated);
+        for (String uid : new HashSet<>(speakingStopRunnables.keySet())) {
+            if (!seated.contains(uid)) {
+                Runnable pending = speakingStopRunnables.remove(uid);
+                if (pending != null) handler.removeCallbacks(pending);
+            }
+        }
     }
 
     private static boolean sameSeat(RoomDtos.SeatDto a, RoomDtos.SeatDto b) {
@@ -294,8 +354,29 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && Objects.equals(a.user.avatarUrl, b.user.avatarUrl)
                 && Objects.equals(a.user.hostBadgeUrl, b.user.hostBadgeUrl)
                 && Objects.equals(a.user.vipBadgeUrl, b.user.vipBadgeUrl)
+                && Objects.equals(a.user.vipFrameUrl, b.user.vipFrameUrl)
+                && Objects.equals(a.user.vipCardUrl, b.user.vipCardUrl)
+                && Objects.equals(a.user.profileCardUrl, b.user.profileCardUrl)
+                && Objects.equals(a.user.chatBubbleUrl, b.user.chatBubbleUrl)
+                && Objects.equals(a.user.nameplateUrl, b.user.nameplateUrl)
+                && Objects.equals(a.user.voiceWaveUrl, b.user.voiceWaveUrl)
                 && Objects.equals(a.user.levelBadgeUrl, b.user.levelBadgeUrl)
+                && Objects.equals(a.user.nameStyle, b.user.nameStyle)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.label,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.label)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.role,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.role)
+                && Objects.equals(a.user.agencyClub == null ? null : a.user.agencyClub.agencyId,
+                        b.user.agencyClub == null ? null : b.user.agencyClub.agencyId)
+                && Objects.equals(a.user.agency == null ? null : a.user.agency.role,
+                        b.user.agency == null ? null : b.user.agency.role)
+                && Objects.equals(a.user.agency == null ? null : a.user.agency.id,
+                        b.user.agency == null ? null : b.user.agency.id)
                 && Objects.equals(a.user.hostBadgeMeta, b.user.hostBadgeMeta)
+                && Objects.equals(a.user.roomSupportMedal == null ? null : a.user.roomSupportMedal.id,
+                        b.user.roomSupportMedal == null ? null : b.user.roomSupportMedal.id)
+                && Objects.equals(a.user.roomSupportMedal == null ? null : a.user.roomSupportMedal.imageUrl,
+                        b.user.roomSupportMedal == null ? null : b.user.roomSupportMedal.imageUrl)
                 && a.user.level == b.user.level
                 && a.user.vipLevel == b.user.vipLevel;
     }
@@ -355,12 +436,18 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setSpeaking(String userId, boolean speaking) {
-        setSpeaking(userId, speaking, speaking ? 48f : 0f);
+        // A microphone being enabled is not proof of speech. Only a measured
+        // live audio level may activate the seat waveform.
+        setSpeaking(userId, speaking, 0f);
     }
 
     public void setSpeaking(String userId, boolean speaking, float level0to100) {
         String key = normalizeUserId(userId);
         if (key.isEmpty()) {
+            return;
+        }
+        // A muted local microphone can never be considered actively speaking.
+        if (speaking && selfMicMuted && selfUserId != null && selfUserId.equals(key)) {
             return;
         }
         // Only light waves on a seat that currently holds this user.
@@ -372,17 +459,48 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
         if (seatPos < 0) {
+            Runnable pending = speakingStopRunnables.remove(key);
+            if (pending != null) handler.removeCallbacks(pending);
             speakingUsers.remove(key);
             speakingLevels.remove(key);
             lastPaintedSpeakLevel.remove(key);
             return;
         }
-        boolean changed = speaking ? speakingUsers.add(key) : speakingUsers.remove(key);
-        if (speaking) {
-            speakingLevels.put(key, Math.max(0f, level0to100));
-        } else {
-            speakingLevels.remove(key);
+        RoomDtos.SeatDto currentSeat = items.get(seatPos);
+        if (speaking && currentSeat != null && (currentSeat.isMuted || currentSeat.isModeratorMuted)) {
+            speaking = false;
+            level0to100 = 0f;
         }
+        // Suppress the false "speaking" pulse emitted when a user only opens
+        // the mic. RTC level updates must cross the speech-activity threshold.
+        if (speaking && (Float.isNaN(level0to100) || Float.isInfinite(level0to100)
+                || level0to100 < 5f)) {
+            speaking = false;
+            level0to100 = 0f;
+        }
+        Runnable pendingStop = speakingStopRunnables.remove(key);
+        if (pendingStop != null) handler.removeCallbacks(pendingStop);
+        if (!speaking) {
+            // Voice activity detection can briefly dip to zero between syllables or
+            // during RTC level updates. Keep the current wave through that short gap.
+            Runnable delayedStop = () -> {
+                speakingStopRunnables.remove(key);
+                if (!speakingUsers.remove(key)) return;
+                speakingLevels.remove(key);
+                lastPaintedSpeakLevel.remove(key);
+                for (int i = 0; i < items.size(); i++) {
+                    if (key.equals(seatUserId(items.get(i)))) {
+                        notifyItemChanged(i, "speaking");
+                        break;
+                    }
+                }
+            };
+            speakingStopRunnables.put(key, delayedStop);
+            handler.postDelayed(delayedStop, 40L);
+            return;
+        }
+        boolean changed = speakingUsers.add(key);
+        speakingLevels.put(key, Math.max(0f, level0to100));
         if (!changed) {
             // Already speaking: refresh intensity sparingly (avoid RecyclerView churn).
             if (speaking) {
@@ -503,11 +621,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 if ("speaking".equals(p)) {
                     // Re-sync bound id: payload-only binds can otherwise drop waves forever.
                     if (userId != null) holder.boundUserId = userId;
+                    holder.voiceWaveUrl = seat.user != null ? seat.user.voiceWaveUrl : null;
                     boolean match = userId != null
                             && speakingUsers.contains(userId)
+                            && seat != null && !seat.isMuted && !seat.isModeratorMuted
+                            && !(selfMicMuted && selfUserId != null && selfUserId.equals(userId))
                             && !activeReactions.containsKey(userId);
                     bindSpeaking(holder, match);
-                    if (match) {
+                    if (match && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())) {
+                        // Only drive the legacy speaking animation when no purchased wave is equipped.
+                        // bindSpeaking() already owns the equipped-wave visibility and loading state.
                         float lv = speakingLevels.containsKey(userId)
                                 ? speakingLevels.get(userId) : 48f;
                         if (holder.b.seatSpeakAura != null) {
@@ -515,12 +638,50 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                         }
                     }
                 } else if ("speak_level".equals(p)) {
-                    if (userId != null && speakingUsers.contains(userId)
-                            && holder.b.seatSpeakAura != null) {
+                    if (userId != null && speakingUsers.contains(userId)) {
                         float lv = speakingLevels.containsKey(userId)
                                 ? speakingLevels.get(userId) : 48f;
-                        holder.b.seatSpeakAura.setSpeaking(true);
-                        holder.b.seatSpeakAura.setIntensity(lv);
+                        boolean hasEquippedWave = holder.voiceWaveUrl != null
+                                && !holder.voiceWaveUrl.trim().isEmpty();
+                        if (hasEquippedWave) {
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setSpeaking(false);
+                                holder.b.seatSpeakAura.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatVoiceWaveBars != null) {
+                                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                            // Make equipped waves react to live RTC level updates instead of
+                            // remaining a decorative, constant-speed image around the avatar.
+                            float amplitude = Math.max(0f, Math.min(100f, lv)) / 100f;
+                            float innerScale = 0.96f + amplitude * 0.16f;
+                            if (holder.b.imgVoiceWave != null) {
+                                holder.b.imgVoiceWave.animate().cancel();
+                                holder.b.imgVoiceWave.animate()
+                                        .scaleX(innerScale).scaleY(innerScale)
+                                        .alpha(0.78f + amplitude * 0.22f)
+                                        .setDuration(110L).start();
+                            }
+                            if (holder.b.imgVoiceWaveOuter != null) {
+                                float outerScale = 1.02f + amplitude * 0.14f;
+                                holder.b.imgVoiceWaveOuter.animate().cancel();
+                                holder.b.imgVoiceWaveOuter.animate()
+                                        .scaleX(outerScale).scaleY(outerScale)
+                                        .alpha(0.28f + amplitude * 0.42f)
+                                        .setDuration(130L).start();
+                            }
+                        } else {
+                            if (holder.b.seatVoiceWaveBars != null) {
+                                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+                            }
+                            if (holder.b.seatSpeakAura != null) {
+                                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                                holder.b.seatSpeakAura.setSpeaking(true);
+                                holder.b.seatSpeakAura.setIntensity(lv);
+                            }
+                        }
                         holder.speaking = true;
                     }
                 } else if ("scale".equals(p)) {
@@ -583,6 +744,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (seat == null) return;
         String userId = seatUserId(seat);
         holder.boundUserId = userId;
+        holder.voiceWaveUrl = seat.user != null ? seat.user.voiceWaveUrl : null;
         Context ctx = holder.itemView.getContext();
         holder.b.getRoot().setOnClickListener(v -> {
             if (listener == null) return;
@@ -605,9 +767,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         boolean occupied = seat.user != null || (userId != null && !userId.isEmpty());
 
         if (seat.locked()) {
+            bindVipNameplate(holder, null);
+            if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
+            bindAgencyRoleSeatBadge(holder, null);
             bindEmptySeatShell(holder, true);
             holder.b.seatRing.setVisibility(View.GONE);
             holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
             holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
             holder.b.imgAvatar.setVisibility(View.GONE);
             if (holder.b.imgSeatShell != null) {
@@ -627,7 +793,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
             if (holder.b.tvGiftCount != null) {
-                holder.b.tvGiftCount.setVisibility(View.GONE);
+                holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
             }
             bindGiftSelection(holder, null);
             return;
@@ -650,10 +816,17 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
 
+            if (holder.b.tvAgencyClub != null) {
+                // Agency role is rendered once through tvAgencyRoleBadge, without agency name.
+                holder.b.tvAgencyClub.setText("");
+                holder.b.tvAgencyClub.setVisibility(View.GONE);
+            }
             if (seat.user != null) {
+                bindVipNameplate(holder, seat.user);
                 holder.b.tvName.setText(seat.user.displayName != null
                         ? seat.user.displayName
                         : String.valueOf(displaySeatNo(seat)));
+                VipNameStyle.bind(holder.b.tvName, seat.user);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
                 AvatarCosmetics.bindAvatar(holder.b.imgAvatar, seat.user.avatarUrl);
                 try {
@@ -662,9 +835,11 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     AvatarCosmetics.bindAvatar(holder.b.imgAvatar, seat.user.avatarUrl);
                 }
             } else if (selfUserId != null && selfUserId.equals(userId)) {
+                bindVipNameplate(holder, null);
                 // Seat hop race: userId set before nested user DTO arrives — keep self visible.
                 holder.b.tvName.setText(selfDisplayName != null && !selfDisplayName.isEmpty()
                         ? selfDisplayName : String.valueOf(displaySeatNo(seat)));
+                VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
                 com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto stub =
                         new com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto();
@@ -684,6 +859,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgAvatar.setImageResource(ImagePlaceholder.avatar());
                 clearHostWear(holder);
                 holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
                 holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
             }
 
@@ -694,6 +870,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
             }
             bindStaffSeatBadge(holder, seat.user);
+            bindAgencyRoleSeatBadge(holder, seat.user);
+            // Agency leader/host identity is text-only under the seat; dashboard images are profile-only.
+            bindCustomDisplayRank(holder, null);
+            bindRoomSupportMedal(holder, seat.user);
             if (holder.b.tvStatus != null) {
                 holder.b.tvStatus.setVisibility(View.GONE);
             }
@@ -707,6 +887,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             return;
         }
 
+        if (holder.b.tvAgencyClub != null) holder.b.tvAgencyClub.setVisibility(View.GONE);
+        bindAgencyRoleSeatBadge(holder, null);
         bindEmptySeatShell(holder, false);
         holder.b.seatRing.setVisibility(View.GONE);
         holder.b.imgAvatar.setVisibility(View.GONE);
@@ -714,13 +896,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             holder.b.imgSeatShell.setVisibility(View.VISIBLE);
         }
         holder.b.tvName.setText(String.valueOf(displaySeatNo(seat)));
+            VipNameStyle.bind(holder.b.tvName, (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto) null);
         holder.b.tvName.setCompoundDrawablesRelative(null, null, null, null);
         if (holder.b.imgSeatHostMark != null) {
             holder.b.imgSeatHostMark.setVisibility(View.GONE);
         }
         bindStaffSeatBadge(holder, null);
+        bindCustomDisplayRank(holder, null);
+        bindRoomSupportMedal(holder, null);
         if (holder.b.tvGiftCount != null) {
-            holder.b.tvGiftCount.setVisibility(View.GONE);
+            holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
         }
         if (holder.b.tvStatus != null) {
             holder.b.tvStatus.setVisibility(View.GONE);
@@ -752,41 +937,55 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         int padBottom;
         int hostMark;
         switch (scaleMode) {
-            case SCALE_COMPACT -> {
-                // Mikoo 20-mic: container 64dp, avatar 48dp
-                frame = 64;
+            case SCALE_MICRO -> {
+                // 30-mic six-column grid: 58dp seat frame with the number/name directly below.
+                // Keep all five rows visible while preserving room chat and controls.
+                frame = 58;
                 avatar = 48;
                 ring = 50;
                 reaction = 50;
                 muted = 14;
-                nameMax = 60;
-                nameSp = 10f;
+                nameMax = 56;
+                nameSp = 9.5f;
+                padTop = 0;
+                padBottom = 0;
+                hostMark = 11;
+            }
+            case SCALE_COMPACT -> {
+                // Mikoo 20-mic: container 64dp, avatar 48dp
+                frame = 60;
+                avatar = 45;
+                ring = 47;
+                reaction = 47;
+                muted = 14;
+                nameMax = 56;
+                nameSp = 9.5f;
                 padTop = 1;
                 padBottom = 2;
                 hostMark = 11;
             }
             case SCALE_MEDIUM -> {
                 // Between normal and compact (15 mics / 3 rows)
-                frame = 70;
-                avatar = 52;
-                ring = 54;
-                reaction = 54;
+                frame = 66;
+                avatar = 49;
+                ring = 51;
+                reaction = 51;
                 muted = 15;
-                nameMax = 66;
-                nameSp = 10.5f;
+                nameMax = 62;
+                nameSp = 10f;
                 padTop = 2;
                 padBottom = 3;
                 hostMark = 12;
             }
             default -> {
-                // Mikoo default item_rv_multi_audio_micro: 80 / 55
-                frame = 80;
-                avatar = 55;
-                ring = 55;
-                reaction = 56;
+                // Slightly compacted normal room seats to preserve spacing around room controls.
+                frame = 74;
+                avatar = 51;
+                ring = 53;
+                reaction = 53;
                 muted = 16;
-                nameMax = 72;
-                nameSp = 11f;
+                nameMax = 68;
+                nameSp = 10.5f;
                 padTop = 2;
                 padBottom = 4;
                 hostMark = 12;
@@ -808,8 +1007,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         setSeatSize(holder.b.imgSeatShell, avatar, ctx);
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
+        setSeatSize(holder.b.imgVoiceWave, frame, ctx);
+        if (holder.b.seatVoiceWaveBars != null) {
+            setSeatSize(holder.b.seatVoiceWaveBars, frame + 10, ctx);
+            holder.b.seatVoiceWaveBars.setBarCount(
+                    scaleMode == SCALE_MICRO ? 24 : scaleMode == SCALE_COMPACT ? 28
+                            : scaleMode == SCALE_MEDIUM ? 34 : 40);
+        }
         setSeatSize(holder.b.imgFrame, frame, ctx);
         setSeatSize(holder.b.imgHostBadge, frame, ctx);
+        if (holder.b.imgRoomSupportMedal != null) setSeatSize(holder.b.imgRoomSupportMedal, scaleMode == SCALE_MICRO ? 20 : 30, ctx);
         if (holder.b.seatHostSignal != null) {
             setSeatSize(holder.b.seatHostSignal, frame, ctx);
         }
@@ -820,13 +1027,60 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
 
         if (holder.b.tvName != null) {
             holder.b.tvName.setTextSize(nameSp);
-            holder.b.tvName.setMaxWidth(Math.round(nameMax * d));
+            int nameWidthPx = Math.round(nameMax * d);
+            holder.b.tvName.setMaxWidth(nameWidthPx);
+            View nameContainer = (View) holder.b.tvName.getParent();
+            ViewGroup.LayoutParams containerLp = nameContainer.getLayoutParams();
+            containerLp.width = nameWidthPx;
+            nameContainer.setLayoutParams(containerLp);
+            ViewGroup.LayoutParams textLp = holder.b.tvName.getLayoutParams();
+            textLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.tvName.setLayoutParams(textLp);
+            // Marquee activates only when the full name exceeds its viewport.
+            holder.b.tvName.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            holder.b.tvName.setMarqueeRepeatLimit(-1);
+            holder.b.tvName.setSelected(true);
+            View nameRow = (View) holder.b.tvName.getParent().getParent();
+            ViewGroup.LayoutParams nameRowRaw = nameRow.getLayoutParams();
+            nameRowRaw.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : ViewGroup.LayoutParams.WRAP_CONTENT;
+            if (nameRowRaw instanceof ViewGroup.MarginLayoutParams nameRowLp) {
+                nameRowLp.topMargin = 0;
+                nameRowLp.bottomMargin = 0;
+            }
+            nameRow.setLayoutParams(nameRowRaw);
+
+            // Reuse the nameContainer measured above; keep its width and set the row height.
+            ViewGroup.LayoutParams nameContainerLp = nameContainer.getLayoutParams();
+            nameContainerLp.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : Math.round(22 * d);
+            nameContainer.setLayoutParams(nameContainerLp);
+
+            ViewGroup.LayoutParams nameRaw = holder.b.tvName.getLayoutParams();
+            nameRaw.height = scaleMode == SCALE_MICRO
+                    ? Math.round(16 * d) : ViewGroup.LayoutParams.MATCH_PARENT;
+            holder.b.tvName.setLayoutParams(nameRaw);
+
+            View rankRow = holder.b.rowCustomDisplayRank;
+            if (rankRow != null && scaleMode == SCALE_MICRO) {
+                ViewGroup.LayoutParams rankRaw = rankRow.getLayoutParams();
+                if (rankRaw instanceof ViewGroup.MarginLayoutParams rankLp) {
+                    rankLp.topMargin = Math.round(7 * d);
+                    rankRow.setLayoutParams(rankLp);
+                }
+            }
         }
         if (holder.b.imgSeatHostMark != null) {
             setSeatSize(holder.b.imgSeatHostMark, hostMark, ctx);
         }
         if (holder.b.tvGiftCount != null) {
-            holder.b.tvGiftCount.setTextSize(scaleMode == SCALE_COMPACT ? 9f : 10f);
+            holder.b.tvGiftCount.setTextSize(scaleMode == SCALE_MICRO ? 8f : scaleMode == SCALE_COMPACT ? 9f : 10f);
+            ViewGroup.LayoutParams coinRaw = holder.b.tvGiftCount.getLayoutParams();
+            coinRaw.height = Math.round((scaleMode == SCALE_MICRO ? 12 : 14) * d);
+            if (coinRaw instanceof ViewGroup.MarginLayoutParams coinLp) {
+                coinLp.topMargin = Math.round((scaleMode == SCALE_MICRO ? 1 : 2) * d);
+            }
+            holder.b.tvGiftCount.setLayoutParams(coinRaw);
         }
     }
 
@@ -855,13 +1109,75 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         view.setLayoutParams(lp);
     }
 
+
+    private void bindRoomSupportMedal(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.imgRoomSupportMedal == null) return;
+        // Use the same physical anchor in agency and personal rooms. When a frame is
+        // equipped, pin the medal to the frame edge; otherwise pin it to the avatar.
+        android.view.ViewGroup.LayoutParams raw = holder.b.imgRoomSupportMedal.getLayoutParams();
+        if (raw instanceof android.widget.FrameLayout.LayoutParams lp) {
+            float density = holder.b.imgRoomSupportMedal.getResources().getDisplayMetrics().density;
+            int size = Math.round((scaleMode == SCALE_MICRO ? 20f : 30f) * density);
+            android.view.View anchor = holder.b.imgAvatar;
+            if (holder.b.imgFrame != null && holder.b.imgFrame.getVisibility() == View.VISIBLE) {
+                anchor = holder.b.imgFrame;
+            }
+            android.view.ViewGroup parent = anchor != null && anchor.getParent() instanceof android.view.ViewGroup
+                    ? (android.view.ViewGroup) anchor.getParent() : null;
+            if (parent != null && holder.b.imgRoomSupportMedal.getParent() == parent) {
+                android.view.ViewGroup.LayoutParams anchorParams = anchor.getLayoutParams();
+                android.view.ViewGroup.LayoutParams parentParams = parent.getLayoutParams();
+                int parentWidth = parent.getWidth() > 0 ? parent.getWidth()
+                        : (parentParams != null && parentParams.width > 0
+                            ? parentParams.width : Math.round(76f * density));
+                int parentHeight = parent.getHeight() > 0 ? parent.getHeight()
+                        : (parentParams != null && parentParams.height > 0
+                            ? parentParams.height : Math.round(76f * density));
+                int anchorWidth = anchor.getWidth() > 0 ? anchor.getWidth()
+                        : (anchorParams != null && anchorParams.width > 0
+                            ? anchorParams.width : Math.round(52f * density));
+                int anchorHeight = anchor.getHeight() > 0 ? anchor.getHeight()
+                        : (anchorParams != null && anchorParams.height > 0
+                            ? anchorParams.height : Math.round(52f * density));
+                int anchorLeft = anchor.getWidth() > 0 ? anchor.getLeft()
+                        : Math.round((parentWidth - anchorWidth) / 2f);
+                int anchorTop = anchor.getHeight() > 0 ? anchor.getTop()
+                        : Math.round((parentHeight - anchorHeight) / 2f);
+                // Center the medal over the upper-start corner: no room-type offsets.
+                lp.width = size;
+                lp.height = size;
+                lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+                int inset = Math.round(size * 0.25f);
+                lp.setMarginStart(anchorLeft - inset);
+                lp.topMargin = anchorTop - inset;
+                lp.setMarginEnd(0);
+                lp.rightMargin = 0;
+                lp.bottomMargin = 0;
+                holder.b.imgRoomSupportMedal.setLayoutParams(lp);
+            }
+        }
+        String url = user != null && user.roomSupportMedal != null ? user.roomSupportMedal.imageUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            holder.b.imgRoomSupportMedal.setVisibility(View.GONE);
+            Glide.with(holder.b.imgRoomSupportMedal).clear(holder.b.imgRoomSupportMedal);
+            return;
+        }
+        holder.b.imgRoomSupportMedal.setVisibility(View.VISIBLE);
+        holder.b.imgRoomSupportMedal.bringToFront();
+        Glide.with(holder.b.imgRoomSupportMedal)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url))
+                .fitCenter()
+                .dontAnimate()
+                .into(holder.b.imgRoomSupportMedal);
+    }
+
     private void bindGiftCount(VH holder, String userId) {
         if (holder.b.tvGiftCount == null) {
             return;
         }
         Long coins = userId != null ? giftCoinsByUser.get(userId) : null;
         if (coins == null || coins <= 0) {
-            holder.b.tvGiftCount.setVisibility(View.GONE);
+            holder.b.tvGiftCount.setVisibility(View.INVISIBLE);
             holder.lastGiftCoins = 0L;
             return;
         }
@@ -969,27 +1285,26 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             key = null;
         }
         String uri = key != null ? SeatReactionEmojis.urlForKey(key) : null;
-        holder.b.imgSeatReaction.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        // Circular overlay exactly matches the 76dp seat stage, covering the avatar/seat.
+        android.graphics.drawable.GradientDrawable circularMask = new android.graphics.drawable.GradientDrawable();
+        circularMask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        circularMask.setColor(android.graphics.Color.TRANSPARENT);
+        holder.b.imgSeatReaction.setBackground(circularMask);
+        holder.b.imgSeatReaction.setClipToOutline(true);
+        holder.b.imgSeatReaction.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         if (uri != null) {
-            if (SeatReactionEmojis.isWebpUrl(uri)) {
-                Glide.with(holder.b.imgSeatReaction)
-                        .load(uri)
-                        .fitCenter()
-                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
-                        .error(res)
-                        .into(holder.b.imgSeatReaction);
-            } else if (uri.toLowerCase(java.util.Locale.US).contains(".gif")) {
+            if (uri.toLowerCase(java.util.Locale.US).contains(".gif")) {
                 Glide.with(holder.b.imgSeatReaction)
                         .asGif()
                         .load(uri)
-                        .fitCenter()
+                        .centerCrop()
                         .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
             } else {
                 Glide.with(holder.b.imgSeatReaction)
                         .load(uri)
-                        .fitCenter()
+                        .centerCrop()
                         .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
@@ -1033,9 +1348,28 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             clearHostWear(holder);
             return;
         }
-        String hostUrl = user.hostBadgeUrl;
-        String vipUrl = user.vipBadgeUrl;
-        java.util.Map<String, Object> badgeMeta = user.hostBadgeMeta;
+        if (user.mysteriousMan) {
+            if (holder.b.seatHostSignal != null) {
+                holder.b.seatHostSignal.clearSignal();
+                holder.b.seatHostSignal.setVisibility(View.GONE);
+            }
+            holder.b.imgFrame.setVisibility(View.GONE);
+            holder.b.imgHostBadge.setVisibility(View.GONE);
+            String sharedAvatar = holder.itemView.getContext()
+                    .getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
+                    .getString("avatar_url", "");
+            if (sharedAvatar != null && !sharedAvatar.trim().isEmpty()) {
+                com.Dramizo.Series.util.AvatarImageLoader.load(holder.b.imgAvatar, sharedAvatar.trim());
+            } else {
+                holder.b.imgAvatar.setImageResource(R.drawable.ic_mysterious_man);
+            }
+            return;
+        }
+        // Keep VIP wearable/frame on the seat; role/agency/competition marks are not seat wear.
+        String hostUrl = null;
+        // Dashboard VIP frame has priority for active VIP members; retain equipped wear as fallback.
+        String vipUrl = AvatarCosmetics.avatarFrameUrl(user);
+        java.util.Map<String, Object> badgeMeta = null;
         boolean self = selfUserId != null && selfUserId.equals(normalizeUserId(user.id));
         if (self) {
             if ((hostUrl == null || hostUrl.isEmpty()) && selfHostBadgeUrl != null) {
@@ -1063,6 +1397,21 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
     }
 
+    private void bindVipNameplate(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.imgVipNameplate == null) return;
+        String url = user != null ? user.nameplateUrl : null;
+        if (url == null || url.trim().isEmpty()) {
+            Glide.with(holder.itemView).clear(holder.b.imgVipNameplate);
+            holder.b.imgVipNameplate.setVisibility(View.GONE);
+            return;
+        }
+        holder.b.imgVipNameplate.setVisibility(View.VISIBLE);
+        Glide.with(holder.itemView)
+                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url.trim()))
+                .centerCrop()
+                .into(holder.b.imgVipNameplate);
+    }
+
     private void clearHostWear(VH holder) {
         if (holder.b.seatHostSignal != null) {
             holder.b.seatHostSignal.clearSignal();
@@ -1072,22 +1421,148 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 null, null, null, null);
     }
 
+    private void bindCustomDisplayRank(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.rowCustomDisplayRank == null || holder.b.tvCustomRankBadge == null || holder.b.imgCustomRankBadge == null) return;
+        // Platform/administrative identities are deliberately never shown
+        // on microphone seats; their horizontal badge belongs to profile and chat UI.
+        if (user != null && (StaffRoleHelper.isStaff(user) || user.isRechargeAgent)) {
+            holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
+            holder.b.tvCustomRankBadge.setText("");
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            return;
+        }
+        String title = user != null ? user.customDisplayRankName : null;
+        String imageUrl = user != null ? user.customDisplayRankImageUrl : null;
+        if (title == null || title.trim().isEmpty()) {
+            holder.b.rowCustomDisplayRank.setVisibility(View.GONE);
+            holder.b.tvCustomRankBadge.setText("");
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+            return;
+        }
+        holder.b.rowCustomDisplayRank.setVisibility(View.VISIBLE);
+        holder.b.tvCustomRankBadge.setText(title.trim());
+        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+            holder.b.imgCustomRankBadge.setVisibility(View.VISIBLE);
+            // Glide animates GIF assets; static images remain static.
+            Glide.with(holder.itemView).load(imageUrl).into(holder.b.imgCustomRankBadge);
+        } else {
+            holder.b.imgCustomRankBadge.setVisibility(View.GONE);
+            Glide.with(holder.itemView).clear(holder.b.imgCustomRankBadge);
+        }
+    }
+
+    private void bindAgencyRoleSeatBadge(VH holder,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        TextView badge = holder.b.tvAgencyRoleBadge;
+        if (badge == null) return;
+        ViewGroup parent = badge.getParent() instanceof ViewGroup ? (ViewGroup) badge.getParent() : null;
+        ImageView image = parent != null ? parent.findViewWithTag("jeho_agency_role_badge_image") : null;
+        if (image != null) {
+            Glide.with(holder.itemView).clear(image);
+            image.setVisibility(View.GONE);
+        }
+        badge.setText("");
+        badge.setVisibility(View.GONE);
+        if (user == null) return;
+
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency = user.agency;
+        com.Dramizo.Series.data.remote.dto.AuthDtos.AgencyClubDto club = user.agencyClub;
+        String role = "";
+        String memberAgencyId = "";
+        if (agency != null && agency.role != null) {
+            role = agency.role.trim().toLowerCase(Locale.ROOT);
+            memberAgencyId = agency.id == null ? "" : agency.id.trim();
+        }
+        if ((role.isEmpty() || "member".equals(role)) && club != null && club.role != null) {
+            role = club.role.trim().toLowerCase(Locale.ROOT);
+            memberAgencyId = club.agencyId == null ? "" : club.agencyId.trim();
+        }
+        boolean leader = "owner".equals(role) || "leader".equals(role);
+        boolean host = "host".equals(role);
+        if (!leader && !(host && agencyRoom && roomAgencyId != null
+                && !roomAgencyId.isEmpty() && roomAgencyId.equals(memberAgencyId))) return;
+
+        String label = StaffRoleHelper.genderizeLabel(
+                leader ? "قائد الوكالة" : "مضيف", user.gender);
+        badge.setText(label);
+        badge.setVisibility(View.VISIBLE);
+    }
+
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        View superFrame = holder.itemView.findViewById(R.id.superAdminSeatFrame);
+        boolean isSuperAdmin = user != null && StaffRoleHelper.isSuper(user);
+        if (superFrame != null) {
+            superFrame.setVisibility(isSuperAdmin ? View.VISIBLE : View.GONE);
+            if (isSuperAdmin) {
+                GradientDrawable ring = new GradientDrawable();
+                ring.setShape(GradientDrawable.OVAL);
+                ring.setColor(Color.TRANSPARENT);
+                ring.setStroke(Math.max(2, Math.round(holder.itemView.getResources().getDisplayMetrics().density * 2)),
+                        Color.rgb(255, 194, 64));
+                superFrame.setBackground(ring);
+            }
+        }
         if (holder.b.tvStaffSeatBadge == null) return;
+        ViewGroup parent = holder.b.tvStaffSeatBadge.getParent() instanceof ViewGroup
+                ? (ViewGroup) holder.b.tvStaffSeatBadge.getParent() : null;
+        ImageView roleImage = parent != null ? parent.findViewWithTag("jeho_staff_role_badge_image") : null;
+        final ImageView[] roleImageRef = new ImageView[]{roleImage};
         if (user == null || !StaffRoleHelper.isStaff(user)) {
             holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
+            holder.b.tvStaffSeatBadge.setTag(null);
             holder.b.tvStaffSeatBadge.setText("");
+            if (roleImageRef[0] != null) {
+                Glide.with(holder.itemView).clear(roleImageRef[0]);
+                roleImageRef[0].setVisibility(View.GONE);
+            }
             return;
         }
         String role = StaffRoleHelper.normalize(user);
-        // Compact seat label
-        String label = StaffRoleHelper.SUPER.equals(role) ? "سوبر" : "مانجر";
-        holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
-        holder.b.tvStaffSeatBadge.setText(label);
+        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
+        String fallbackLabel = StaffRoleHelper.badgeAr(user);
+        holder.b.tvStaffSeatBadge.setTag(role);
+        holder.b.tvStaffSeatBadge.setText(identity.label.isEmpty() ? fallbackLabel : identity.label);
         holder.b.tvStaffSeatBadge.setBackgroundResource(
-                StaffRoleHelper.SUPER.equals(role)
-                        ? R.drawable.bg_chip_staff_super
-                        : R.drawable.bg_chip_staff_manager);
+                StaffRoleHelper.SUPER.equals(role) ? R.drawable.bg_chip_staff_super : R.drawable.bg_chip_staff_manager);
+        holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
+        StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
+            if (holder.b.tvStaffSeatBadge == null || !role.equals(holder.b.tvStaffSeatBadge.getTag())) return;
+            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+            String label = latest.label.isEmpty() ? fallbackLabel : latest.label;
+            if (latest.badgeUrl != null && !latest.badgeUrl.trim().isEmpty() && parent != null) {
+                holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
+                ImageView target = roleImageRef[0];
+                if (target == null) {
+                    target = new ImageView(holder.itemView.getContext());
+                    target.setTag("jeho_staff_role_badge_image");
+                    target.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    int size = Math.round(16 * holder.itemView.getResources().getDisplayMetrics().density);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                    lp.topMargin = Math.round(2 * holder.itemView.getResources().getDisplayMetrics().density);
+                    int index = Math.min(parent.indexOfChild(holder.b.tvStaffSeatBadge) + 1, parent.getChildCount());
+                    parent.addView(target, index, lp);
+                    roleImageRef[0] = target;
+                }
+                target.setVisibility(View.VISIBLE);
+                Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.badgeUrl.trim())).into(target);
+                target.setContentDescription(label);
+            } else {
+                if (roleImageRef[0] != null) {
+                    Glide.with(holder.itemView).clear(roleImageRef[0]);
+                    roleImageRef[0].setVisibility(View.GONE);
+                }
+                holder.b.tvStaffSeatBadge.setText(label);
+                holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
+            }
+            if (!latest.frameUrl.isEmpty() && holder.b.imgFrame != null) {
+                try {
+                    Glide.with(holder.itemView).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
+                            .into(holder.b.imgFrame);
+                    com.Dramizo.Series.util.StaffIdentityFrameMotion.start(holder.b.imgFrame);
+                } catch (Exception ignored) { }
+            }
+        });
     }
 
     private void bindSpeaking(VH holder, boolean speaking) {
@@ -1095,33 +1570,135 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             stopSpeakingRipples(holder);
             return;
         }
-        // Only while this bind is actually speaking (sound-level driven).
         holder.speaking = true;
-        if (holder.b.seatSpeakAura != null) {
-            holder.b.seatSpeakAura.setSpeaking(true);
-            String uid = holder.boundUserId;
-            float lv = uid != null && speakingLevels.containsKey(uid)
-                    ? speakingLevels.get(uid) : 48f;
-            holder.b.seatSpeakAura.setIntensity(lv);
-            return;
+        String waveUrl = holder.voiceWaveUrl;
+        boolean hasEquippedWave = waveUrl != null && !waveUrl.trim().isEmpty();
+
+        // Exactly one visual ring: the equipped asset OR the built-in seat aura.
+        if (holder.b.imgVoiceWaveOuter != null) {
+            holder.b.imgVoiceWaveOuter.animate().cancel();
+            holder.b.imgVoiceWaveOuter.clearAnimation();
+            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
         }
-        // Fallback (old layouts)
-        holder.b.seatRippleOuter.setVisibility(View.VISIBLE);
-        startRipple(holder.b.seatRippleOuter, 0);
-        if (holder.b.seatRippleMid != null) {
-            holder.b.seatRippleMid.setVisibility(View.VISIBLE);
-            startRipple(holder.b.seatRippleMid, 180);
+        if (hasEquippedWave && holder.b.imgVoiceWave != null) {
+            android.widget.ImageView wave = holder.b.imgVoiceWave;
+            wave.animate().cancel();
+            wave.setAlpha(1f);
+            wave.setScaleX(1f);
+            wave.setScaleY(1f);
+            wave.setVisibility(View.VISIBLE);
+            wave.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+            wave.setClipToOutline(false);
+            wave.setOutlineProvider(null);
+            if (!Objects.equals(holder.loadedVoiceWaveUrl, waveUrl.trim())) {
+                String absoluteWave = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(waveUrl.trim());
+                Glide.with(holder.itemView).clear(wave);
+                Glide.with(holder.itemView).load(absoluteWave).into(wave);
+                holder.loadedVoiceWaveUrl = waveUrl.trim();
+            }
+            startEquippedVoiceWaveMotion(holder);
+        } else if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.animate().cancel();
+            holder.b.imgVoiceWave.clearAnimation();
+            holder.b.imgVoiceWave.setVisibility(View.GONE);
+            stopEquippedVoiceWaveMotion(holder);
+            if (holder.loadedVoiceWaveUrl != null) {
+                Glide.with(holder.itemView).clear(holder.b.imgVoiceWave);
+                holder.loadedVoiceWaveUrl = null;
+            }
         }
-        if (holder.b.seatRippleInner != null) {
-            holder.b.seatRippleInner.setVisibility(View.VISIBLE);
-            startRipple(holder.b.seatRippleInner, 360);
+
+        String uid = holder.boundUserId;
+        float liveLevel = uid != null && speakingLevels.containsKey(uid)
+                ? speakingLevels.get(uid) : 48f;
+        if (hasEquippedWave) {
+            // A purchased/equipped wave replaces every built-in speaking effect.
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setSpeaking(false);
+                holder.b.seatSpeakAura.setVisibility(View.GONE);
+            }
+            if (holder.b.seatVoiceWaveBars != null) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            }
+        } else {
+            // No equipped wave: restore the original legacy aura only.
+            if (holder.b.seatVoiceWaveBars != null) {
+                holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+                holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+            }
+            if (holder.b.seatSpeakAura != null) {
+                holder.b.seatSpeakAura.setVisibility(View.VISIBLE);
+                holder.b.seatSpeakAura.setSpeaking(true);
+                holder.b.seatSpeakAura.setIntensity(liveLevel);
+            }
+        }
+        stopRipple(holder.b.seatRippleOuter);
+        stopRipple(holder.b.seatRippleMid);
+        stopRipple(holder.b.seatRippleInner);
+    }
+
+    /** The equipped image is one ring at the avatar boundary; only its rotation is continuous. */
+    private void startEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave == null) return;
+        holder.b.imgVoiceWave.animate().cancel();
+        holder.b.imgVoiceWave.clearAnimation();
+        RotateAnimation rotate = new RotateAnimation(
+                0f, 360f, Animation.RELATIVE_TO_SELF, 0.5f,
+                Animation.RELATIVE_TO_SELF, 0.5f);
+        rotate.setDuration(1250L);
+        rotate.setRepeatCount(Animation.INFINITE);
+        rotate.setRepeatMode(Animation.RESTART);
+        rotate.setInterpolator(new android.view.animation.LinearInterpolator());
+        holder.b.imgVoiceWave.startAnimation(rotate);
+    }
+
+    private void ensureEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave != null && holder.b.imgVoiceWave.getAnimation() == null) {
+            startEquippedVoiceWaveMotion(holder);
+        }
+    }
+
+    private void stopEquippedVoiceWaveMotion(VH holder) {
+        if (holder.b.imgVoiceWave != null) {
+            holder.b.imgVoiceWave.clearAnimation();
+            holder.b.imgVoiceWave.setScaleX(1f);
+            holder.b.imgVoiceWave.setScaleY(1f);
+            holder.b.imgVoiceWave.setRotation(0f);
+            holder.b.imgVoiceWave.setAlpha(1f);
         }
     }
 
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
         if (holder.b.seatSpeakAura != null) {
+            // SeatSpeakLightningView owns its short fade-out and hides itself afterwards.
             holder.b.seatSpeakAura.setSpeaking(false);
+        }
+        if (holder.b.seatVoiceWaveBars != null) {
+            holder.b.seatVoiceWaveBars.setSpeaking(false, 0f);
+            holder.b.seatVoiceWaveBars.setVisibility(View.GONE);
+        }
+        if (holder.b.imgVoiceWaveOuter != null) {
+            holder.b.imgVoiceWaveOuter.animate().cancel();
+            holder.b.imgVoiceWaveOuter.setVisibility(View.GONE);
+        }
+        if (holder.b.imgVoiceWave != null) {
+            android.widget.ImageView wave = holder.b.imgVoiceWave;
+            wave.clearAnimation();
+            wave.animate().cancel();
+            wave.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f)
+                    .setDuration(130L)
+                    .withEndAction(() -> {
+                        if (holder.speaking) return;
+                        wave.setVisibility(View.GONE);
+                        wave.setScaleX(1f);
+                        wave.setScaleY(1f);
+                        wave.setAlpha(1f);
+                        stopEquippedVoiceWaveMotion(holder);
+                        Glide.with(holder.itemView).clear(wave);
+                        holder.loadedVoiceWaveUrl = null;
+                    }).start();
         }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
@@ -1165,9 +1742,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 && holder.b.seatHostSignal.getVisibility() == View.VISIBLE) {
             holder.b.seatHostSignal.resumeMotion();
         }
-        if (holder.speaking && holder.b.seatSpeakAura != null
-                && !holder.b.seatSpeakAura.isSpeakingActive()) {
-            holder.b.seatSpeakAura.setSpeaking(true);
+        if (holder.speaking && (holder.voiceWaveUrl == null || holder.voiceWaveUrl.trim().isEmpty())
+                && holder.b.seatVoiceWaveBars != null) {
+            String uid = holder.boundUserId;
+            float liveLevel = uid != null && speakingLevels.containsKey(uid)
+                    ? speakingLevels.get(uid) : 48f;
+            holder.b.seatVoiceWaveBars.setVisibility(View.VISIBLE);
+            holder.b.seatVoiceWaveBars.setSpeaking(true, liveLevel);
         }
     }
 
@@ -1175,9 +1756,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     public void onViewRecycled(@NonNull VH holder) {
         cancelReaction(holder.boundUserId);
         holder.boundUserId = null;
+        holder.voiceWaveUrl = null;
+        holder.loadedVoiceWaveUrl = null;
         holder.lastGiftCoins = Long.MIN_VALUE;
         // Do NOT pause HostSignalView here — grid refresh recycles often and left frames frozen.
         stopSpeakingRipples(holder);
+        com.Dramizo.Series.util.StaffIdentityFrameMotion.stop(holder.b.imgFrame);
         clearReactionView(holder);
         super.onViewRecycled(holder);
     }
@@ -1202,6 +1786,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             handler.removeCallbacks(hide);
         }
         hideReactionRunnables.clear();
+        for (Runnable stop : speakingStopRunnables.values()) {
+            handler.removeCallbacks(stop);
+        }
+        speakingStopRunnables.clear();
         activeReactions.clear();
         activeReactionKeys.clear();
     }
@@ -1214,7 +1802,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         return RecyclerView.NO_ID;
     }
 
-    @Override
+    /** Stable user lookup for lightweight gift-flight overlays. */
+    @Nullable
+    public String getUserIdAtPosition(int position) {
+        if (position < 0 || position >= items.size()) return null;
+        return seatUserId(items.get(position));
+    }
+
     public int getItemCount() {
         return items.size();
     }
@@ -1222,6 +1816,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     static class VH extends RecyclerView.ViewHolder {
         final ItemSeatBinding b;
         String boundUserId;
+        String voiceWaveUrl;
+        String loadedVoiceWaveUrl;
         boolean speaking;
         long lastGiftCoins = Long.MIN_VALUE;
 

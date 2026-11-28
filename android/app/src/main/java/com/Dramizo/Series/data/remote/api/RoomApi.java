@@ -3,6 +3,7 @@ package com.Dramizo.Series.data.remote.api;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
+import com.Dramizo.Series.data.remote.dto.AdvertisementDtos;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
@@ -14,6 +15,19 @@ import retrofit2.http.Query;
 import java.util.Map;
 
 public interface RoomApi {
+
+    @GET("advertisements/config")
+    Call<ApiResponse<AdvertisementDtos.Config>> advertisementConfig();
+
+    @GET("advertisements/current")
+    Call<ApiResponse<AdvertisementDtos.Current>> advertisementCurrent();
+
+    @GET("advertisements/remaining")
+    Call<ApiResponse<AdvertisementDtos.Remaining>> advertisementRemaining();
+
+    @POST("advertisements")
+    Call<ApiResponse<AdvertisementDtos.CreateResponse>> createAdvertisement(@Body Map<String, String> body);
+
     @GET("rooms/music-library")
     Call<ApiResponse<RoomDtos.MusicLibraryDto>> musicLibrary();
 
@@ -84,6 +98,9 @@ public interface RoomApi {
     @GET("rooms/{id}/follow")
     Call<ApiResponse<java.util.Map<String, Object>>> roomFollowStatus(@Path("id") String id);
 
+    @GET("rooms/following")
+    Call<ApiResponse<MiscDtos.ListResult<RoomDtos.RoomDto>>> followingRooms();
+
     @PATCH("rooms/{id}")
     Call<ApiResponse<RoomDtos.RoomDto>> update(@Path("id") String id, @Body Map<String, String> body);
 
@@ -98,6 +115,9 @@ public interface RoomApi {
 
     @GET("rooms/{id}/seat-requests")
     Call<ApiResponse<RoomDtos.SeatRequestsResult>> seatRequests(@Path("id") String id);
+
+    @POST("rooms/{id}/seats/assign")
+    Call<ApiResponse<RoomDtos.RoomDto>> assignSeat(@Path("id") String id, @Body Map<String, Object> body);
 
     @POST("rooms/{id}/seat-requests/approve")
     Call<ApiResponse<RoomDtos.RoomDto>> approveSeat(@Path("id") String id, @Body Map<String, Object> body);
@@ -150,6 +170,9 @@ public interface RoomApi {
 
     @POST("rooms/{id}/seats/force-leave")
     Call<ApiResponse<Object>> forceLeaveSeat(@Path("id") String id, @Body Map<String, Object> body);
+
+    @POST("rooms/{id}/seats/remove-member")
+    Call<ApiResponse<Object>> removeMemberFromMic(@Path("id") String id, @Body Map<String, Object> body);
 
     @POST("rooms/{id}/seats/lock")
     Call<ApiResponse<RoomDtos.RoomDto>> lockSeat(@Path("id") String id, @Body Map<String, Object> body);

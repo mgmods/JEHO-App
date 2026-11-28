@@ -3,14 +3,19 @@ package com.Dramizo.Series.data.remote.api;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.VanityDtos;
 import retrofit2.Call;
+import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
+import java.util.Map;
 
 public interface VanityApi {
     @GET("vanity-ids")
     Call<ApiResponse<VanityDtos.Catalog>> list(@Query("status") String status);
+
+    @GET("vanity-ids/style/{publicId}")
+    Call<ApiResponse<VanityDtos.Style>> style(@Path("publicId") String publicId);
 
     @GET("vanity-ids/mine")
     Call<ApiResponse<VanityDtos.MineResult>> mine();
@@ -20,4 +25,8 @@ public interface VanityApi {
 
     @POST("vanity-ids/id/{publicId}/purchase")
     Call<ApiResponse<VanityDtos.PurchaseResult>> purchase(@Path("publicId") String publicId);
+
+    @POST("vanity-ids/id/{publicId}/apply")
+    Call<ApiResponse<VanityDtos.ApplyResult>> apply(
+            @Path("publicId") String publicId, @Body Map<String, String> body);
 }

@@ -42,6 +42,9 @@ export class LuckyBox {
   @Column({ type: 'jsonb', default: '[]' })
   rewardsJson: LuckyBoxReward[];
 
+  @Column({ type: 'varchar', length: 1024, nullable: true })
+  videoUrl: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

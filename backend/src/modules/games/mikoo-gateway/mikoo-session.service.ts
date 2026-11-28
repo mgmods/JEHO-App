@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createHmac } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 import { SlotGameSession } from '../../../database/entities/slot-game-session.entity';
 import { User } from '../../../database/entities/user.entity';
 import { Wallet } from '../../../database/entities/wallet.entity';
@@ -129,7 +129,7 @@ export class MikooSessionService {
 
   async signLocalCode(publicId: number, gameId: string) {
     const secret = await this.secret();
-    const nonce = Math.random().toString(16).slice(2, 10);
+    const nonce = randomBytes(4).toString('hex');
     const payload = `${publicId}:${gameId}:${Date.now()}:${nonce}`;
     const sig = createHmac('sha256', secret).update(payload).digest('hex').slice(0, 32);
     return `${sig}${nonce}`;

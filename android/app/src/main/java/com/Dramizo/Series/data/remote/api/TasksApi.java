@@ -19,6 +19,12 @@ public interface TasksApi {
             @Query("roomId") String roomId,
             @Query("agencyId") String agencyId);
 
+    @GET("tasks/daily-login")
+    Call<ApiResponse<MiscDtos.DailyLoginStatusDto>> dailyLoginStatus();
+
+    @POST("tasks/daily-login/claim")
+    Call<ApiResponse<Map<String, Object>>> claimDailyLogin();
+
     @POST("tasks/checkin")
     Call<ApiResponse<Map<String, Object>>> checkin();
 

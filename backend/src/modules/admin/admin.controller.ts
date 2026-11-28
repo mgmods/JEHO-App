@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   UseGuards,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
@@ -52,7 +53,6 @@ import { PatchZegoSettingsDto } from '../zego/dto/patch-zego-settings.dto';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { PatchLiveKitSettingsDto } from '../livekit/dto/patch-livekit-settings.dto';
 import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
-import { DramaService } from '../drama/drama.service';
 import { GameAdsService } from '../games/game-ads.service';
 import { IdentityVerificationService } from '../users/identity-verification.service';
 import { GenderVerificationStatus } from '../../database/entities/female-identity-verification.entity';
@@ -61,6 +61,8 @@ import { AbuseSeverity } from '../../database/entities/abuse-log.entity';
 import { EconomySettingsService } from '../economy/economy-settings.service';
 import { GameOddsSettingsService } from '../games/game-odds-settings.service';
 import { GiftsService } from '../gifts/gifts.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 class ResolveReportDto {
   @IsEnum(ReportStatus)
@@ -73,7 +75,8 @@ class ResolveReportDto {
 
 class AdminLoginDto {
   @ApiProperty()
-  @IsEmail()
+  @IsString()
+  @MinLength(3)
   email!: string;
 
   @ApiProperty()
@@ -116,14 +119,118 @@ export class AdminController {
     private readonly paymentsService: PaymentsService,
     private readonly zegoSettingsService: ZegoSettingsService,
     private readonly liveKitSettingsService: LiveKitSettingsService,
-    private readonly dramaService: DramaService,
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
     private readonly shield: SecurityShieldService,
     private readonly economySettings: EconomySettingsService,
     private readonly gameOddsSettings: GameOddsSettingsService,
     private readonly giftsService: GiftsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('agency-role-badges/public')
+  @ApiOperation({ summary: 'Read dashboard-managed public agency role badge images' })
+  getPublicAgencyRoleBadges() {
+    return this.adminService.getPublicAgencyRoleBadges();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('staff-identity/public')
+  @ApiOperation({ summary: 'Read public staff role identity assets for profile and room rendering' })
+  getPublicStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('staff-identity')
+  @ApiOperation({ summary: 'Read native platform staff identity assets' })
+  getStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('staff-identity')
+  @ApiOperation({ summary: 'Update native platform staff identity assets' })
+  patchStaffIdentityConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchStaffIdentityConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('mysterious-man/config')
+  @ApiOperation({ summary: 'Get shared Mysterious Man media configured by dashboard' })
+  getMysteriousManConfig() {
+    return this.adminService.getMysteriousManConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('mysterious-man/config')
+  @ApiOperation({ summary: 'Update shared Mysterious Man media configured by dashboard' })
+  patchMysteriousManConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchMysteriousManConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('support-chest/config')
+  @ApiOperation({ summary: 'Get support chest configuration' })
+  getSupportChestConfig() {
+    return this.adminService.getSupportChestConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('support-chest/config')
+  @ApiOperation({ summary: 'Update support chest configuration' })
+  patchSupportChestConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchSupportChestConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('lucky-gift-odds/config')
+  @ApiOperation({ summary: 'Get dashboard-managed lucky gift odds, audit, and recent results' })
+  getLuckyGiftOddsDashboard() {
+    return this.giftsService.getLuckyGiftOddsDashboard();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('lucky-gift-odds/config')
+  @ApiOperation({ summary: 'Apply lucky gift odds immediately for new sends' })
+  updateLuckyGiftOddsConfig(@Body() body: Record<string, unknown>, @CurrentUser('sub') actorId: string) {
+    return this.giftsService.updateLuckyGiftOddsConfig(body || {}, actorId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('lucky-gift-odds/simulate')
+  @ApiOperation({ summary: 'Simulate lucky gift win/loss outcomes before applying odds' })
+  simulateLuckyGiftOdds(@Body() body: Record<string, unknown>) {
+    return this.giftsService.simulateLuckyGiftOdds(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('lucky-gift-cannon/config')
+  @ApiOperation({ summary: 'Get Lucky Gift Cannon configuration' })
+  getLuckyCannonConfig() {
+    return this.adminService.getLuckyCannonConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('lucky-gift-cannon/config')
+  @ApiOperation({ summary: 'Update Lucky Gift Cannon configuration' })
+  patchLuckyCannonConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchLuckyCannonConfig(body || {});
+  }
 
   // ─── Economy settings (dashboard-owned live config) ─────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -194,6 +301,8 @@ export class AdminController {
     if (body.giftDiamondRatio !== undefined) patch.giftDiamondRatio = num(body.giftDiamondRatio);
     if (body.luckyGiftDiamondRatio !== undefined)
       patch.luckyGiftDiamondRatio = num(body.luckyGiftDiamondRatio);
+    if (body.platformCommissionPercent !== undefined)
+      patch.platformCommissionPercent = num(body.platformCommissionPercent);
     if (body.maxDiamondsPerUnit !== undefined) patch.maxDiamondsPerUnit = num(body.maxDiamondsPerUnit);
     if (body.luckyGiftMaxMultiplier !== undefined)
       patch.luckyGiftMaxMultiplier = num(body.luckyGiftMaxMultiplier);
@@ -298,15 +407,15 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('dashboard')
-  dashboard() {
-    return this.adminService.dashboard();
+  dashboard(@CurrentUser() user: any) {
+    return this.adminService.dashboard(String(user?.staffRole || 'manager').toLowerCase());
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('dashboard/overview')
-  overview() {
-    return this.adminService.dashboard();
+  overview(@CurrentUser() user: any) {
+    return this.adminService.dashboard(String(user?.staffRole || 'manager').toLowerCase());
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -417,6 +526,68 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('users/:id/temporary-ban')
+  @ApiOperation({ summary: 'Issue an owned temporary user ban (Admin: max 24 hours)' })
+  async temporaryBanUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+    @Body() body: { hours?: number; reason?: string },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new BadRequestException('Only Admin or Super Admin can issue a temporary global ban');
+    }
+    const requestedHours = Number(body?.hours);
+    if (!Number.isInteger(requestedHours) || requestedHours < 1 || requestedHours > 24) {
+      throw new BadRequestException('Temporary ban duration must be a whole number between 1 and 24 hours');
+    }
+    const reason = String(body?.reason || '').trim();
+    if (!reason) throw new BadRequestException('A reason is required for temporary bans');
+    const result = await this.shield.createStaffTemporaryBan(
+      id,
+      requestedHours,
+      reason,
+      actor.sub,
+    );
+    await this.shield.recordAbuse({
+      userId: actor.sub,
+      action: 'staff_temporary_ban',
+      severity: AbuseSeverity.HIGH,
+      targetType: 'user',
+      targetId: id,
+      details: JSON.stringify({ targetUserId: id, hours: result.hours, expiresAt: result.expiresAt, reason: reason.slice(0, 500) }),
+    });
+    return { ok: true, ...result };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('users/:id/temporary-unban')
+  @ApiOperation({ summary: 'Remove own temporary ban; Super Admin may remove any staff temporary ban' })
+  async temporaryUnbanUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new BadRequestException('Only Admin or Super Admin can remove a temporary global ban');
+    }
+    const result = await this.shield.removeStaffTemporaryBan(id, actor.sub, isSuper);
+    await this.shield.recordAbuse({
+      userId: actor.sub,
+      action: 'staff_temporary_unban',
+      severity: AbuseSeverity.MEDIUM,
+      targetType: 'user',
+      targetId: id,
+      details: JSON.stringify({ targetUserId: id }),
+    });
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('security/ban-ip')
   @ApiOperation({ summary: 'Temporarily ban an IP (Redis shield)' })
   async banIp(
@@ -480,6 +651,56 @@ export class AdminController {
   @Get('rooms')
   listRooms(@Query() query: PaginationDto) {
     return this.adminService.listRooms(query);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/platform')
+  @ApiOperation({ summary: 'Create an official platform-managed room and assign moderators by public user ID' })
+  createPlatformRoom(
+    @Body() body: {
+      title?: string;
+      description?: string;
+      coverUrl?: string;
+      category?: string;
+      seatCount?: number;
+      moderatorIds?: string[];
+    },
+  ) {
+    return this.adminService.createPlatformRoom(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Add a moderator to an official platform room by public user ID' })
+  addPlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { publicId?: string },
+  ) {
+    return this.adminService.addPlatformRoomModerator(id, body?.publicId || '');
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('rooms/:id/platform-moderators/:publicId')
+  @ApiOperation({ summary: 'Remove a moderator from an official platform room by public user ID' })
+  removePlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('publicId') publicId: string,
+  ) {
+    return this.adminService.removePlatformRoomModerator(id, publicId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Replace official platform room moderators by public user ID' })
+  setPlatformRoomModerators(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { moderatorIds?: string[] },
+  ) {
+    return this.adminService.setPlatformRoomModerators(id, body?.moderatorIds || []);
   }
 
   // ─── Streams (live voice rooms for dashboard) ───────────────
@@ -747,17 +968,21 @@ export class AdminController {
   @ApiOperation({ summary: 'Manually complete a pending recharge (e.g. Sham Cash after WhatsApp proof)' })
   completeRecharge(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') adminId: string,
     @Body() body?: { providerPaymentId?: string; note?: string },
   ) {
-    return this.adminService.completeRechargeOrder(id, body?.providerPaymentId, body?.note);
+    return this.adminService.completeRechargeOrder(id, body?.providerPaymentId, body?.note, adminId);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('wallet/recharges/:id/cancel')
   @ApiOperation({ summary: 'Cancel a pending recharge order' })
-  cancelRecharge(@Param('id', ParseUUIDPipe) id: string) {
-    return this.adminService.cancelRechargeOrder(id);
+  cancelRecharge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body?: { note?: string },
+  ) {
+    return this.adminService.cancelRechargeOrder(id, body?.note);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -1015,7 +1240,21 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('vip/assign')
-  assignVip(@Body() body: { userId: string; planId: string }) {
+  assignVip(
+    @Body() body: { userId: string; planId: string; days?: number; permanent?: boolean },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new ForbiddenException('Only Admin or Super Admin can grant VIP');
+    }
+    if (!isSuper) {
+      const days = Number(body?.days);
+      if (body?.permanent === true || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
+        throw new BadRequestException('Admin VIP grants must be limited to 1, 3, 7 or 15 days');
+      }
+    }
     return this.adminService.assignVip(body);
   }
 
@@ -1235,6 +1474,22 @@ export class AdminController {
   // ─── Notifications / Settings / Logs ───────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('notifications/fcm-status')
+  @ApiOperation({ summary: 'Inspect live FCM readiness and registered device counts' })
+  notificationsFcmStatus() {
+    return this.adminService.notificationsFcmStatus();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('notifications/fcm-test')
+  @ApiOperation({ summary: 'Send a real FCM test notification to the current admin device' })
+  sendNotificationsFcmTest(@CurrentUser('sub') adminUserId: string) {
+    return this.adminService.sendNotificationsFcmTest(adminUserId);
+  }
+
   @Get('notifications')
   listNotifications(@Query() query: PaginationDto) {
     return this.adminService.listNotifications(query);
@@ -1260,6 +1515,63 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('paid-messages/settings')
+  @ApiOperation({ summary: 'Get paid direct-message rules' })
+  getPaidMessageSettings() {
+    return this.adminService.getPaidMessageSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('paid-messages/settings')
+  @ApiOperation({ summary: 'Update paid direct-message rules without redeploying' })
+  patchPaidMessageSettings(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchPaidMessageSettings(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('paid-messages/stats')
+  @ApiOperation({ summary: 'Paid direct-message performance and refund statistics' })
+  paidMessageStats() {
+    return this.adminService.paidMessageStats();
+  }
+
+  // Dedicated game catalog endpoints: use the games ACL module, not general settings.
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('games/catalog')
+  @ApiOperation({ summary: 'Read the app game catalog without exposing unrelated settings' })
+  async getGameCatalog() {
+    const rows = await this.adminService.getSettings();
+    const row = Array.isArray(rows) ? rows.find((item) => item?.key === 'app_games') : null;
+    return { value: row?.value || '' };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('games/catalog')
+  @ApiOperation({ summary: 'Save the app game catalog using games-module permissions' })
+  async patchGameCatalog(@Body() body: { value?: string }) {
+    const value = String(body?.value || '');
+    if (value.length > 200000) {
+      throw new BadRequestException('Game catalog is too large');
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new BadRequestException('Invalid game catalog JSON');
+    }
+    if (!Array.isArray(parsed)) {
+      throw new BadRequestException('Game catalog must be a list');
+    }
+    await this.adminService.patchSettings({ app_games: JSON.stringify(parsed) });
+    return { value: JSON.stringify(parsed) };
+  }
+
   @Get('settings')
   getSettings() {
     return this.adminService.getSettings();
@@ -1582,6 +1894,22 @@ export class AdminController {
   // ─── Tasks ─────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Get('daily-login-rewards')
+  @ApiOperation({ summary: 'Get seven-day daily login reward configuration' })
+  getDailyLoginRewards() {
+    return this.tasksService.getDailyLoginConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Put('daily-login-rewards')
+  @ApiOperation({ summary: 'Save seven-day daily login reward configuration' })
+  saveDailyLoginRewards(@Body() body: Record<string, unknown>) {
+    return this.tasksService.saveDailyLoginConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('tasks')
   async adminTasks() {
     const [items, enabled] = await Promise.all([
@@ -1620,12 +1948,165 @@ export class AdminController {
     return { enabled };
   }
 
+  // ─── Super-admin private entries (existing entry_effect inventory/equip pipeline) ───
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('private-entries/grant')
+  async grantPrivateEntry(
+    @Body() body: {
+      recipientPublicId?: string;
+      name?: string;
+      videoUrl?: string;
+      durationDays?: number;
+      permanent?: boolean;
+      personalMessage?: string;
+    },
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    const granted = await this.cosmeticsService.grantPrivateEntry({
+      recipientPublicId: String(body?.recipientPublicId || ''),
+      name: String(body?.name || ''),
+      videoUrl: String(body?.videoUrl || ''),
+      durationDays: Number(body?.durationDays),
+      permanent: body?.permanent === true,
+      personalMessage: String(body?.personalMessage || ''),
+      giftedByUserId: actor.sub,
+    });
+    const durationText = granted.permanent ? 'دائمة' : `${granted.durationDays} يوماً`;
+    const expiryText = granted.expiresAt
+      ? granted.expiresAt.toLocaleString('en-GB', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC',
+        })
+      : 'دائمة – بدون تاريخ انتهاء';
+    const personal = String(body?.personalMessage || '').trim();
+    const message = [
+      '🎁 مبروك! لقد وصلتك دخولية خاصة كهدية من الإدارة.',
+      '',
+      `اسم الدخولية: ${granted.cosmetic.name}`,
+      `مدة الصلاحية: ${durationText}`,
+      `تاريخ الانتهاء: ${expiryText}`,
+      `رسالة من الإدارة: ${personal || 'نتمنى لك تجربة ممتعة!'}`,
+    ].join('\n');
+    try {
+      await this.notificationsService.create({
+        userId: granted.userId,
+        type: NotificationType.CHAT,
+        title: '🎁 دخولية خاصة من الإدارة',
+        body: message,
+        data: {
+          adminMessage: true,
+          source: 'admin',
+          privateEntry: true,
+          privateEntryId: granted.cosmetic.id,
+          action: 'open_private_entry_inventory',
+          inventorySection: 'entry_effect',
+        },
+        sendPush: true,
+      });
+    } catch (error) {
+      // Do not leave a gifted item without its required Admin Messages record.
+      await this.cosmeticsService.deletePrivateEntry(granted.cosmetic.id).catch(() => undefined);
+      throw error;
+    }
+    return { ...granted, adminMessageSent: true };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('private-entries/:id')
+  async updatePrivateEntry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: {
+      recipientPublicId?: string;
+      name?: string;
+      durationDays?: number;
+      permanent?: boolean;
+      personalMessage?: string;
+    },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    return this.cosmeticsService.updatePrivateEntry(id, body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('private-entries/:id')
+  async deletePrivateEntry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    if (!actor?.isSuperAdmin && role !== 'super') {
+      throw new ForbiddenException('Private entries are available to Super Admin only');
+    }
+    return this.cosmeticsService.deletePrivateEntry(id, actor.sub);
+  }
+
   // ─── Cosmetics admin ───────────────────────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('cosmetics')
   adminCosmetics(@Query('type') type?: CosmeticType) {
     return this.cosmeticsService.adminList(type);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('cosmetics/grant')
+  @ApiOperation({ summary: 'Grant an existing cosmetic with role-specific type and duration limits' })
+  async grantCosmeticToUser(
+    @Body() body: { userId?: string; cosmeticCode?: string; days?: number; permanent?: boolean },
+    @CurrentUser() actor: { staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const userId = String(body?.userId || '').trim();
+    const cosmeticCode = String(body?.cosmeticCode || '').trim();
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin' && role !== 'manager') {
+      throw new ForbiddenException('Only Manager, Admin or Super Admin can grant cosmetics');
+    }
+    if (!userId || !cosmeticCode) {
+      throw new BadRequestException('userId and cosmeticCode are required');
+    }
+    await this.adminService.getUser(userId);
+    const catalog = await this.cosmeticsService.adminList();
+    const item = catalog.find((entry) => entry.code === cosmeticCode && entry.isActive);
+    if (!item) {
+      throw new BadRequestException('Active cosmetic code not found');
+    }
+    const permanent = body?.permanent === true;
+    const days = Number(body?.days);
+    const frameAndEntranceTypes = new Set(['entry_effect', 'profile_card', 'room_card', 'nameplate']);
+    if (isSuper) {
+      if (permanent !== true && (!Number.isInteger(days) || ![7, 15, 30].includes(days))) {
+        throw new BadRequestException('Super Admin cosmetic grants must be 7, 15, 30 days or permanent');
+      }
+    } else if (role === 'admin') {
+      if (permanent || !Number.isInteger(days) || ![1, 3, 7, 15].includes(days)) {
+        throw new BadRequestException('Admin cosmetic grants must be limited to 1, 3, 7 or 15 days');
+      }
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
+        throw new ForbiddenException('Admin may grant frames/nameplates and entrance effects only');
+      }
+    } else {
+      if (permanent || !Number.isInteger(days) || ![1, 3, 7].includes(days)) {
+        throw new BadRequestException('Manager cosmetic grants must be limited to 1, 3 or 7 days');
+      }
+      if (!frameAndEntranceTypes.has(String((item as any).type || '').toLowerCase())) {
+        throw new ForbiddenException('Manager may grant frames/nameplates and entrance effects only');
+      }
+    }
+    return this.cosmeticsService.grantTemporary(userId, cosmeticCode, days || 7, { permanent });
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -1647,6 +2128,22 @@ export class AdminController {
   @Delete('cosmetics/:id')
   deleteCosmetic(@Param('id', ParseUUIDPipe) id: string) {
     return this.cosmeticsService.adminDelete(id);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('ranking/rewards')
+  @ApiOperation({ summary: 'Get weekly and monthly ranking reward settings' })
+  getRankingRewards() {
+    return this.rankingService.getRewardConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('ranking/rewards')
+  @ApiOperation({ summary: 'Save weekly and monthly ranking rewards' })
+  patchRankingRewards(@Body() body: Record<string, unknown>) {
+    return this.rankingService.patchRewardConfig(body || {});
   }
 
   // ─── Ranking ───────────────────────────────────────────────
@@ -1711,86 +2208,6 @@ export class AdminController {
   @Patch('games/ads')
   patchGameAdsSettings(@Body() body: Record<string, unknown>) {
     return this.gameAdsService.adminPatchSettings(body as any);
-  }
-
-  // ─── Drama / short series ──────────────────────────────────
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/settings')
-  dramaSettings() {
-    return this.dramaService.adminGetSettings();
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/settings')
-  patchDramaSettings(@Body() body: Record<string, unknown>) {
-    return this.dramaService.adminPatchSettings(body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/series')
-  adminDramaSeries() {
-    return this.dramaService.adminListSeries();
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Get('drama/series/:id')
-  adminDramaSeriesGet(@Param('id') id: string) {
-    return this.dramaService.adminGetSeries(id);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Post('drama/series')
-  adminDramaSeriesCreate(@Body() body: Record<string, unknown>) {
-    return this.dramaService.adminCreateSeries(body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/series/:id')
-  adminDramaSeriesUpdate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminUpdateSeries(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Delete('drama/series/:id')
-  adminDramaSeriesDelete(@Param('id') id: string) {
-    return this.dramaService.adminDeleteSeries(id);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Post('drama/series/:id/episodes')
-  adminDramaEpisodeCreate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminCreateEpisode(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Patch('drama/episodes/:id')
-  adminDramaEpisodeUpdate(
-    @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.dramaService.adminUpdateEpisode(id, body as any);
-  }
-
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @ApiBearerAuth()
-  @Delete('drama/episodes/:id')
-  adminDramaEpisodeDelete(@Param('id') id: string) {
-    return this.dramaService.adminDeleteEpisode(id);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

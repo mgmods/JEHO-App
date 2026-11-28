@@ -79,7 +79,7 @@
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:text="@string/room_change_photo"
+        android:text="تغيير الصورة الشخصية للروم"
         android:textColor="@color/text_primary"
         android:textSize="14sp"
         android:textStyle="bold" />
@@ -110,42 +110,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/btnSeats10"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
+            android:id="@+id/btnChooseSeatCount"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
             android:background="@drawable/bg_room_dialog_item"
+            android:drawableStart="@drawable/ic_room_seats"
+            android:drawablePadding="10dp"
             android:gravity="center"
-            android:text="10"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnSeats15"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_dialog_item"
-            android:gravity="center"
-            android:text="15"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnSeats20"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_room_dialog_item"
-            android:gravity="center"
-            android:text="20"
-            android:textColor="@color/text_primary"
+            android:text="اختيار عدد المقاعد"
+            android:textColor="@color/aurora_teal"
+            android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -212,6 +189,7 @@
 
     <TextView
         android:id="@+id/btnPickRoomBackground"
+        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:layout_marginTop="8dp"
@@ -254,6 +232,23 @@
         android:gravity="center_vertical"
         android:text="إدارة المشرفين"
         android:textColor="@color/aurora_cyan"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/btnRoomPkChallenge"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_room_dialog_item"
+        android:drawableStart="@drawable/icon_room_opera_admin"
+        android:drawablePadding="10dp"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="تحديات PK"
+        android:textColor="@color/aurora_gold"
+        android:textSize="14sp"
         android:textStyle="bold"
         android:visibility="gone" />
 

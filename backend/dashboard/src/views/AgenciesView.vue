@@ -146,6 +146,48 @@
       </div>
     </div>
 
+    <div class="glass p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h5 class="mb-1">هوية أدوار الوكالة</h5>
+          <div class="small text-muted">ارفع شارة قائد الوكالة وشارة المضيف أو ضع رابط الصورة. تُحفظ على الخادم وتبقى بعد تحديث الداشبورد.</div>
+        </div>
+        <span class="badge bg-light text-dark border">قائد الوكالة · مضيف</span>
+      </div>
+      <div class="row g-3">
+        <div v-for="asset in agencyRoleAssets" :key="asset.key" class="col-md-6">
+          <div class="border rounded-3 p-3 h-100">
+            <label class="form-label fw-semibold">{{ asset.label }}</label>
+            <div v-if="agencyRoleBadges[asset.key]" class="border rounded-3 p-2 mb-2 text-center bg-light">
+              <img :src="agencyRoleBadges[asset.key]" :alt="asset.label" style="max-width:100%;height:90px;object-fit:contain" />
+              <div class="mt-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" @click="agencyRoleBadges[asset.key] = ''">إزالة</button>
+              </div>
+            </div>
+            <div v-else class="border rounded-3 p-3 mb-2 text-center text-muted small">لم تُرفع صورة بعد</div>
+            <input
+              class="form-control"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+              :disabled="agencyRoleUploading === asset.key"
+              @change="uploadAgencyRoleAsset(asset.key, $event)"
+            />
+            <div v-if="agencyRoleUploading === asset.key" class="small text-muted mt-1">جارٍ رفع الملف…</div>
+            <input
+              v-model.trim="agencyRoleBadges[asset.key]"
+              class="form-control form-control-sm mt-2"
+              placeholder="أو ضع رابط الصورة"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-aurora" :disabled="agencyRoleSaving || !!agencyRoleUploading" @click="saveAgencyRoleBadges">
+          {{ agencyRoleSaving ? 'جارٍ الحفظ…' : 'حفظ شارات أدوار الوكالة' }}
+        </button>
+      </div>
+    </div>
+
     <!-- Pending paid applications — this is what the app means by «قيد المراجعة» -->
     <div class="glass p-0 overflow-hidden mb-3">
       <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
@@ -408,7 +450,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { agenciesApi, settingsApi } from '@/api'
+import { agenciesApi, settingsApi, uploadsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
@@ -453,6 +495,14 @@ const form = reactive({
   exclusiveFrameUrl: '',
 })
 const grantingExclusives = ref(false)
+const agencyRoleAssets = [
+  { key: 'leaderBadgeUrl', label: 'شارة قائد الوكالة' },
+  { key: 'hostBadgeUrl', label: 'شارة المضيف' },
+]
+const agencyRoleBadges = reactive({ leaderBadgeUrl: '', hostBadgeUrl: '' })
+const agencyRoleSaving = ref(false)
+const agencyRoleUploading = ref('')
+
 const pricing = reactive({
   createPriceCoins: 50000,
   createFree: false,
@@ -670,6 +720,77 @@ function applicantName(app) {
     || app?.contactEmail
     || '—'
   )
+}
+
+function parseAgencyRoleBadges(raw) {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {})
+    agencyRoleBadges.leaderBadgeUrl = String(parsed?.leaderBadgeUrl || '')
+    agencyRoleBadges.hostBadgeUrl = String(parsed?.hostBadgeUrl || '')
+  } catch {
+    agencyRoleBadges.leaderBadgeUrl = ''
+    agencyRoleBadges.hostBadgeUrl = ''
+  }
+}
+
+async function loadAgencyRoleBadges() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) {
+    error.value = err.message
+    return
+  }
+  const rows = Array.isArray(data) ? data : (data?.data || [])
+  const row = Array.isArray(rows) ? rows.find((item) => item?.key === 'agency_role_badges') : null
+  parseAgencyRoleBadges(row?.value)
+}
+
+async function uploadAgencyRoleAsset(key, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    error.value = 'اختر ملف صورة صالحًا.'
+    event.target.value = ''
+    return
+  }
+  agencyRoleUploading.value = key
+  error.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw new Error(err.message || 'تعذر رفع الملف.')
+    const payload = data?.data ?? data ?? {}
+    if (!payload?.url) throw new Error('لم يُرجع الخادم رابط الملف المرفوع.')
+    agencyRoleBadges[key] = payload.url
+    success.value = 'تم رفع الصورة. اضغط «حفظ شارات أدوار الوكالة» لتثبيتها.'
+    toast().success(success.value)
+  } catch (e) {
+    error.value = e?.message || 'تعذر رفع الملف.'
+    toast().danger(error.value)
+  } finally {
+    agencyRoleUploading.value = ''
+    event.target.value = ''
+  }
+}
+
+async function saveAgencyRoleBadges() {
+  agencyRoleSaving.value = true
+  error.value = ''
+  try {
+    const { error: err } = await settingsApi.update({
+      agency_role_badges: JSON.stringify({
+        leaderBadgeUrl: agencyRoleBadges.leaderBadgeUrl || '',
+        hostBadgeUrl: agencyRoleBadges.hostBadgeUrl || '',
+      }),
+    })
+    if (err) throw new Error(err.message || 'تعذر حفظ الإعدادات.')
+    await loadAgencyRoleBadges()
+    success.value = 'تم حفظ شارات قائد الوكالة والمضيف والتحقق من قراءتها مجددًا من الخادم.'
+    toast().success(success.value)
+  } catch (e) {
+    error.value = e?.message || 'تعذر حفظ شارات أدوار الوكالة.'
+    toast().danger(error.value)
+  } finally {
+    agencyRoleSaving.value = false
+  }
 }
 
 async function loadPricing() {
@@ -1045,7 +1166,7 @@ async function savePricing() {
 }
 
 onMounted(async () => {
-  await loadPricing()
+  await Promise.all([loadPricing(), loadAgencyRoleBadges()])
   await Promise.all([load(), loadApplications()])
 })
 </script>

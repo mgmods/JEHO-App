@@ -1,5 +1,5 @@
 /** Platform staff roles for in-app moderation + dashboard multi-admin. */
-export type PlatformStaffRole = 'none' | 'manager' | 'operator' | 'super';
+export type PlatformStaffRole = 'none' | 'manager' | 'operator' | 'admin' | 'super';
 
 /** Resolve platform staff role from DB fields (legacy isAdmin ⇒ super, not operators). */
 export function normalizeStaffRole(user: {
@@ -13,11 +13,11 @@ export function normalizeStaffRole(user: {
   if (
     raw === 'super' ||
     raw === 'super_admin' ||
-    raw === 'superadmin' ||
-    raw === 'admin'
+    raw === 'superadmin'
   ) {
     return 'super';
   }
+  if (raw === 'admin') return 'admin';
   if (
     raw === 'operator' ||
     raw === 'dashboard_operator' ||
@@ -27,7 +27,10 @@ export function normalizeStaffRole(user: {
     return 'operator';
   }
   if (raw === 'manager' || raw === 'moderator' || raw === 'mod') return 'manager';
-  // Legacy dashboard flag without staffRole column filled in.
+  // Only use the legacy isAdmin flag when staffRole is genuinely absent.
+  // An explicit non-staff role (for example "user" after demotion) must win,
+  // otherwise stale isAdmin=true would resurrect Super Admin after downgrade.
+  if (raw.length > 0) return 'none';
   if (user.isAdmin) return 'super';
   return 'none';
 }
@@ -54,11 +57,12 @@ export function hasDashboardAccess(user: {
   isAdmin?: boolean;
 } | null | undefined): boolean {
   const role = normalizeStaffRole(user);
-  return role === 'super' || role === 'operator';
+  return role === 'super' || role === 'admin' || role === 'operator' || role === 'manager';
 }
 
 export function staffRank(role: PlatformStaffRole): number {
-  if (role === 'super') return 3;
+  if (role === 'super') return 4;
+  if (role === 'admin') return 3;
   if (role === 'operator') return 2;
   if (role === 'manager') return 1;
   return 0;

@@ -14,6 +14,8 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Starts HTTP room join as soon as the user taps a room — before VoiceRoomActivity
@@ -26,6 +28,14 @@ public final class RoomJoinPrefetch {
 
     private static final Object LOCK = new Object();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    // Keep room joins from waiting behind background feed, ranking, badge, and media requests.
+    // This executor is intentionally separate from the app's shared IO pool.
+    private static final ExecutorService JOIN_EXECUTOR = Executors.newFixedThreadPool(4, task -> {
+        Thread thread = new Thread(task, "jeho-room-join");
+        thread.setPriority(Thread.NORM_PRIORITY);
+        thread.setDaemon(true);
+        return thread;
+    });
     private static String targetRoomId;
     @Nullable private static RoomDtos.JoinRoomResult result;
     @Nullable private static String error;
@@ -33,6 +43,11 @@ public final class RoomJoinPrefetch {
     private static final List<Callback> waiters = new CopyOnWriteArrayList<>();
 
     private RoomJoinPrefetch() {}
+
+    /** Run every room-join HTTP call on the priority pool, never behind feed/media work. */
+    public static void executeJoin(Runnable task) {
+        if (task != null) JOIN_EXECUTOR.execute(task);
+    }
 
     /** Fire-and-forget join on IO — safe from home list / search / launchers. */
     public static void begin(@Nullable Context context, @Nullable String roomId,
@@ -54,7 +69,7 @@ public final class RoomJoinPrefetch {
             waiters.clear();
         }
         AppContainer c = ContainerProvider.from(context.getApplicationContext());
-        c.getIoExecutor().execute(() -> {
+        JOIN_EXECUTOR.execute(() -> {
             Result<RoomDtos.JoinRoomResult> r;
             try {
                 r = c.joinRoomUseCase.execute(rid, pass);
@@ -78,9 +93,36 @@ public final class RoomJoinPrefetch {
             final RoomDtos.JoinRoomResult sessionOut = result;
             final String errOut = error;
             for (Callback cb : toNotify) {
-                MAIN.post(() -> cb.onResult(sessionOut, errOut));
+                MAIN.post(() -> {
+                    try {
+                        cb.onResult(sessionOut, errOut);
+                    } catch (RuntimeException callbackError) {
+                        // A room launcher may be finishing while the prefetch completes.
+                        // A stale UI callback must not crash the app's main thread.
+                        android.util.Log.e("RoomJoinPrefetch",
+                                "Room join callback failed", callbackError);
+                    }
+                });
             }
         });
+    }
+
+    /**
+     * Adopt a join session already returned by a create/open endpoint. This avoids a second
+     * HTTP join round-trip when the launcher already has a fresh authenticated room session.
+     */
+    public static boolean seedReady(@Nullable String roomId,
+                                    @Nullable RoomDtos.JoinRoomResult session) {
+        if (roomId == null || roomId.isEmpty() || session == null) return false;
+        synchronized (LOCK) {
+            // Do not replace another room's active prefetch or race an in-flight request.
+            if (inFlight || (targetRoomId != null && !roomId.equals(targetRoomId))) return false;
+            targetRoomId = roomId;
+            result = session;
+            error = null;
+            inFlight = false;
+        }
+        return true;
     }
 
     /** Consume completed prefetch for this room (null if still running or different room). */

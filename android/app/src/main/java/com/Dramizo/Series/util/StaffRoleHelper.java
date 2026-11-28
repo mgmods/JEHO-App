@@ -11,13 +11,18 @@ public final class StaffRoleHelper {
     private StaffRoleHelper() {}
 
     public static final String SUPER = "super";
+    public static final String ADMIN = "admin";
     public static final String MANAGER = "manager";
     public static final String NONE = "none";
 
     public static String normalize(@Nullable AuthDtos.UserDto user) {
         if (user == null) return NONE;
-        if (user.isAdmin) return SUPER;
-        return normalize(user.staffRole);
+        String role = normalize(user.staffRole);
+        if (!NONE.equals(role)) return role;
+        // An explicit role from the server is authoritative; do not revive a
+        // removed staff role from a stale legacy isAdmin flag.
+        if (user.staffRole != null && !user.staffRole.trim().isEmpty()) return NONE;
+        return user.isAdmin ? SUPER : NONE;
     }
 
     public static String normalize(@Nullable String raw) {
@@ -25,10 +30,12 @@ public final class StaffRoleHelper {
         String r = raw.trim().toLowerCase(Locale.US);
         if (r.isEmpty() || "none".equals(r) || "null".equals(r)) return NONE;
         if ("super".equals(r) || "super_admin".equals(r) || "superadmin".equals(r)
-                || "admin".equals(r)) {
+                 ) {
             return SUPER;
         }
-        if ("manager".equals(r) || "moderator".equals(r) || "mod".equals(r)) {
+        if ("admin".equals(r) || "administrator".equals(r) || "platform_admin".equals(r)) return ADMIN;
+        if ("manager".equals(r) || "platform_manager".equals(r)
+                || "moderator".equals(r) || "mod".equals(r)) {
             return MANAGER;
         }
         return NONE;
@@ -36,11 +43,15 @@ public final class StaffRoleHelper {
 
     public static boolean isStaff(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
-        return SUPER.equals(r) || MANAGER.equals(r);
+        return SUPER.equals(r) || ADMIN.equals(r) || MANAGER.equals(r);
     }
 
     public static boolean isSuper(@Nullable AuthDtos.UserDto user) {
         return SUPER.equals(normalize(user));
+    }
+
+    public static boolean isAdmin(@Nullable AuthDtos.UserDto user) {
+        return ADMIN.equals(normalize(user));
     }
 
     public static boolean isManager(@Nullable AuthDtos.UserDto user) {
@@ -50,19 +61,45 @@ public final class StaffRoleHelper {
     /** Short label under the display name. */
     public static String badgeAr(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
-        if (SUPER.equals(r)) return "سوبر أدمن";
-        if (MANAGER.equals(r)) return "مانجر";
+        if (SUPER.equals(r)) return "Super Admin";
+        if (ADMIN.equals(r)) return "Admin";
+        if (MANAGER.equals(r)) return "Manager";
         return "";
+    }
+
+    /** Apply Arabic gender agreement to role labels returned by dashboard configuration. */
+    public static String genderizeLabel(@Nullable String label, @Nullable String gender) {
+        if (label == null || label.trim().isEmpty()) return label == null ? "" : label;
+        String value = label;
+        boolean female = gender != null && ("female".equalsIgnoreCase(gender.trim())
+                || "f".equalsIgnoreCase(gender.trim()) || "أنثى".equals(gender.trim()) || "انثى".equals(gender.trim()));
+        boolean male = gender != null && ("male".equalsIgnoreCase(gender.trim())
+                || "m".equalsIgnoreCase(gender.trim()) || "ذكر".equals(gender.trim()));
+        if (male) {
+            return value.replace("مضيفة", "مضيف").replace("مضيفـة", "مضيف")
+                    .replace("قائدة", "قائد").replace("مديرة", "مدير").replace("مشرفة", "مشرف");
+        }
+        if (female) {
+            // Avoid re-processing the ة added by an earlier replacement.
+            return value.replaceAll("مضيف(?!ة)", "مضيفة")
+                    .replaceAll("قائد(?!ة)", "قائدة")
+                    .replaceAll("مدير(?!ة)", "مديرة")
+                    .replaceAll("مشرف(?!ة)", "مشرفة");
+        }
+        return value;
     }
 
     /** One-line powers summary for profile. */
     public static String powersAr(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
         if (SUPER.equals(r)) {
-            return "صلاحيات سوبر أدمن كاملة: إدارة الغرف كلها (كتم · طرد · حظر · إعدادات · موسيقى · ألعاب) + لوحة الإدارة على المتصفح (لك وحدك — لا تُمنح لأي شخص عادي أو مانجر).";
+            return "صلاحيات سوبر أدمن كاملة: إدارة الغرف كلها (كتم · طرد · حظر · إعدادات · موسيقى · ألعاب) + مركز الإدارة داخل التطبيق (لك وحدك — لا يُمنح لأي شخص عادي أو مانجر).";
+        }
+        if (ADMIN.equals(r)) {
+            return "صلاحيات الأدمن: إدارة المستخدمين والرومات والوكالات والرسائل والهدايا ضمن حدود النظام؛ لا يستطيع تعديل السوبر أدمن أو صلاحياته.";
         }
         if (MANAGER.equals(r)) {
-            return "صلاحيات مانجر داخل الغرف فقط: كتم · طرد · حظر · مقاعد · دعوات. بدون لوحة الإدارة على المتصفح وبدون إعدادات الغرفة الكاملة.";
+            return "صلاحيات مانجر داخل الرومات والبث المباشر فقط؛ لا يستطيع إدارة رتب الإدارة أو الوكالات أو الاقتصاد.";
         }
         return "";
     }
