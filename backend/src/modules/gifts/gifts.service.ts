@@ -3565,6 +3565,20 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
         quantity: dto.quantity,
       }, rid === String(senderId));
     }
+    // Preserve legacy single-recipient behavior for callers that use this endpoint
+    // without all-mic mode. An all-mic send with one host target is equivalent to
+    // a normal host gift and must still be charged exactly once.
+    if (receiverIds.length === 1) {
+      return this.send(senderId, {
+        giftId: dto.giftId,
+        receiverId: receiverIds[0],
+        quantity: dto.quantity,
+        roomId: dto.roomId,
+        comboCount: dto.comboCount,
+        cannonLaunch: dto.cannonLaunch,
+        requestId: dto.requestId,
+      });
+    }
     const gift = await this.giftsRepo.findOne({
       where: { id: dto.giftId, isActive: true },
     });
