@@ -2867,9 +2867,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         if (current.userId && current.userId !== actorId) {
           throw new ConflictException('Cannot lock occupied seat');
         }
-        if (current.userId) {
-          throw new ConflictException('يجب إنزال المستخدم من المقعد قبل قفله');
-        }
+        current.userId = null;
+        current.isMuted = false;
+        current.isModeratorMuted = false;
         current.status = SeatStatus.LOCKED;
       } else {
         current.status = SeatStatus.EMPTY;
