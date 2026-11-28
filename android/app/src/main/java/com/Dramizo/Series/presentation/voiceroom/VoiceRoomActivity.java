@@ -350,7 +350,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 80L;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 70L;
     // Two units per request reduce round-trip overhead; concurrency remains bounded.
     private static final int LUCKY_CANNON_UNITS_PER_SHOT = 2;
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
