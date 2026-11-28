@@ -18960,7 +18960,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             me = ContainerProvider.from(this).getSessionManager().getUser();
         } catch (Exception ignored) {
         }
-        if (me == null || myUserId == null || myUserId.isEmpty()) return;
+        if (myUserId == null || myUserId.isEmpty()) return;
+        // Do not suppress the optimistic seat UI just because the cached profile DTO
+        // is temporarily unavailable; the authenticated user ID is enough to paint it.
+        if (me == null) {
+            me = new AuthDtos.UserDto();
+            me.id = myUserId;
+            me.displayName = "أنت";
+            me.username = "أنت";
+        }
         // Ensure wear fields present on optimistic user.
         if ((me.vipBadgeUrl == null || me.vipBadgeUrl.isEmpty())
                 || (me.hostBadgeUrl == null || me.hostBadgeUrl.isEmpty())) {
@@ -18970,6 +18978,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // and would otherwise skip the open-mic path after optimistic sit.
         boolean wasSeatedBefore = isOnSeat(currentSeats);
         List<RoomDtos.SeatDto> src = currentSeats != null ? currentSeats : new ArrayList<>();
+        RoomDtos.SeatDto previousSelfSeat = findMySeat(src);
+        boolean previousSeatMuted = previousSelfSeat != null && previousSelfSeat.isMuted;
+        boolean previousModeratorMuted = previousSelfSeat != null && previousSelfSeat.isModeratorMuted;
+        boolean shouldRemainMuted = userChoseMute || previousSeatMuted || previousModeratorMuted;
         List<RoomDtos.SeatDto> next = new ArrayList<>(src.size());
         boolean placed = false;
         for (RoomDtos.SeatDto s : src) {
@@ -18987,8 +18999,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 copy.isLocked = false;
                 // Don't inherit the previous occupant's mute badge; retain our
                 // own explicit mute choice when hopping between seats.
-                copy.isMuted = userChoseMute;
-                copy.isModeratorMuted = false;
+                copy.isMuted = shouldRemainMuted;
+                copy.isModeratorMuted = previousModeratorMuted;
                 placed = true;
             }
             next.add(copy);
@@ -18999,13 +19011,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             neu.userId = myUserId;
             neu.user = me;
             neu.status = "occupied";
-            neu.isMuted = userChoseMute;
-            neu.isModeratorMuted = false;
+            neu.isMuted = shouldRemainMuted;
+            neu.isModeratorMuted = previousModeratorMuted;
             next.add(neu);
         }
         currentSeats = next;
         // Open mic immediately on first sit (room LiveData arrives later with wasOnSeat=true).
-        if (!wasSeatedBefore && !userChoseMute) {
+        if (wasSeatedBefore && shouldRemainMuted && micOn) {
+            micOn = false;
+            try {
+                RoomRtcEngine.getInstance().setMicEnabled(false);
+            } catch (Exception ignored) {
+            }
+            if (!previousModeratorMuted && roomId != null) viewModel.setMic(roomId, true);
+            syncMicUi();
+        } else if (!wasSeatedBefore && !userChoseMute) {
             micOn = true;
             try {
                 RoomRtcEngine.getInstance().setMicEnabled(true);
@@ -19056,8 +19076,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             target.userId = myUserId;
             target.user = localSelf.user;
             target.status = "occupied";
-            target.isMuted = userChoseMute;
-            target.isModeratorMuted = false;
+            target.isMuted = userChoseMute || localSelf.isMuted;
+            target.isModeratorMuted = localSelf.isModeratorMuted;
         }
         reconciled.add(target);
         return reconciled;
