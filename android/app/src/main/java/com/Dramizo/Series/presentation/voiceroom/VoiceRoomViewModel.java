@@ -11,6 +11,8 @@ import com.Dramizo.Series.domain.model.Result;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import com.Dramizo.Series.util.RoomJoinPrefetch;
 
 public class VoiceRoomViewModel extends ViewModel {
@@ -26,6 +28,12 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<String> info = new MutableLiveData<>();
     private final AtomicInteger joinGeneration = new AtomicInteger();
     private final AtomicInteger refreshGeneration = new AtomicInteger();
+    // Pooled IO can reorder rapid seat taps; serialize seat mutations in tap order.
+    private final ExecutorService seatMutationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "jeho-seat-mutations");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public VoiceRoomViewModel(AppContainer c) { this.c = c; }
 
@@ -287,7 +295,7 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void takeSeat(String roomId, int seatIndex) {
-        c.getIoExecutor().execute(() -> {
+        seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().takeSeat(roomId, seatIndex);
                 if (r.success) room.postValue(r.data);
@@ -299,7 +307,7 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void leaveSeat(String roomId) {
-        c.getIoExecutor().execute(() -> {
+        seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().leaveSeat(roomId);
                 if (r.success) room.postValue(r.data);
@@ -308,6 +316,11 @@ public class VoiceRoomViewModel extends ViewModel {
                 error.postValue(e.getMessage() != null ? e.getMessage() : "تعذر مغادرة المقعد");
             }
         });
+    }
+
+    @Override protected void onCleared() {
+        seatMutationExecutor.shutdownNow();
+        super.onCleared();
     }
 
     public void removeMemberFromMic(String roomId, String userId) {

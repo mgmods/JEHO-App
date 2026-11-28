@@ -295,6 +295,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean micOn = false;
     /** True only after the user taps mute — survives refresh / WhatsApp return. */
     private boolean userChoseMute = false;
+    private long lastLocalMicChangeAtMs = 0L;
     /** Prevents transient seat refreshes from re-toggling the microphone on/off. */
     private boolean micStateInitializedForRoom = false;
     /** Last confirmed self-seat time; short stale-snapshot grace prevents mic publish flapping. */
@@ -349,18 +350,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 130L;
-    // A small bounded parallel window keeps press-and-hold responsive without queuing after release.
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 80L;
+    // Two units per request reduce round-trip overhead; concurrency remains bounded.
+    private static final int LUCKY_CANNON_UNITS_PER_SHOT = 2;
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private int luckyCannonInFlight;
-    private boolean luckyCannonHoldActive;
+    private volatile boolean luckyCannonHoldActive;
+    private volatile long luckyCannonHoldGeneration;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
             if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
             // Do not wait for ACTION_UP. Each repeat is a real lucky-gift send, so
             // releasing the finger stops scheduling new sends immediately.
             if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
-                sendLuckyCannonBatch(1);
+                sendLuckyCannonBatch(LUCKY_CANNON_UNITS_PER_SHOT);
             }
             if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
             if (luckyCannonHoldActive) {
@@ -1074,6 +1077,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             micOn = !micOn;
             userChoseMute = !micOn;
+            lastLocalMicChangeAtMs = System.currentTimeMillis();
             if (myUserId != null) getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
                     .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
             if (roomId != null) viewModel.setMic(roomId, !micOn);
@@ -5122,11 +5126,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         stopLuckyCannonHold(false);
         if (!luckyCannonEnabled || luckyCannonGiftId == null || roomId == null || roomId.isEmpty()) return;
         luckyCannonHoldActive = true;
+        luckyCannonHoldGeneration++;
         luckyCannonComboCount = 0;
         updateLuckyCannonCounter();
 
-        // First send happens on ACTION_DOWN. This removes the old "release then press
-        // again" feeling and makes every new press an independent lucky-gift start.
+        // A quick tap sends one gift; continued holding switches to the faster two-unit repeat.
         if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
             sendLuckyCannonBatch(1);
         }
@@ -5143,6 +5147,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void stopLuckyCannonHold(boolean sendAccumulated) {
         boolean wasHolding = luckyCannonHoldActive;
         luckyCannonHoldActive = false;
+        luckyCannonHoldGeneration++;
         handler.removeCallbacks(luckyCannonRepeatRunnable);
         if (wasHolding && binding != null && binding.comboGiftView != null) {
             binding.comboGiftView.finishCannonLive(2200L);
@@ -5172,6 +5177,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         final String requestId = java.util.UUID.randomUUID().toString();
         final int quantity = Math.max(1, Math.min(
                 LUCKY_CANNON_MAX_BATCH_QUANTITY, requestedQuantity));
+        final long requestHoldGeneration = luckyCannonHoldGeneration;
         final AppContainer container;
         try {
             container = ContainerProvider.from(this);
@@ -5182,26 +5188,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonInFlight++;
         luckyCannonSending = true;
         Runnable sendTask = () -> {
+            // Drop executor-queued shots if the finger was released before network dispatch.
+            if (!luckyCannonHoldActive || requestHoldGeneration != luckyCannonHoldGeneration) {
+                runOnUiThread(() -> {
+                    luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
+                    luckyCannonSending = luckyCannonInFlight > 0;
+                });
+                return;
+            }
+            runOnUiThread(() -> {
+                luckyCannonComboCount += quantity;
+                updateLuckyCannonCounter();
+                showLuckyCannonSendToast(luckyCannonComboCount, luckyCannonHoldActive);
+            });
             GiftDtos.SendAllMicRequest request =
                     new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
             request.cannonLaunch = true;
             request.requestId = requestId;
             Result<GiftDtos.SendGiftResult> result =
                     ApiCall.execute(container.getGiftApi().sendAllMic(request));
-            if (result != null && !result.success && isTransientLuckyCannonFailure(result.error)) {
-                // Retry a timeout once with the SAME idempotency key. If the first
-                // request reached the server, this cannot charge/send the shot twice.
-                try { Thread.sleep(220L); } catch (InterruptedException interrupted) {
+            if (result != null && !result.success && isTransientLuckyCannonFailure(result.error)
+                    && luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
+                // Retry only while the same press remains active, with the same idempotency key.
+                try { Thread.sleep(120L); } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 }
-                result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
+                if (luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
+                    result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
+                }
             }
 
             // Keep compatibility with an older pinned API schema, reusing the same
             // idempotency key so the rejected first attempt cannot be charged twice.
             if (result != null && !result.success && result.error != null) {
                 String errorText = result.error.toLowerCase(java.util.Locale.ROOT);
-                if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")) {
+                if (errorText.contains("cannonlaunch") && errorText.contains("should not exist")
+                        && luckyCannonHoldActive && requestHoldGeneration == luckyCannonHoldGeneration) {
                     GiftDtos.SendAllMicRequest retry =
                             new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
                     retry.cannonLaunch = null;
@@ -5237,13 +5259,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
         try {
             container.getLuckyCannonExecutor().execute(sendTask);
-            // Reflect each accepted one-unit shot immediately, rather than waiting
-            // for network latency; ACTION_UP prevents any later increments.
-            // Count every accepted shot, including a tap deferred until the previous
-            // request finishes. A released finger only changes the live animation state.
-            luckyCannonComboCount++;
-            updateLuckyCannonCounter();
-            showLuckyCannonSendToast(luckyCannonComboCount, luckyCannonHoldActive);
         } catch (RuntimeException rejected) {
             // Saturation is back-pressure, not a user-facing gift failure. Keep the
             // first tap pending and resume as soon as a sender slot becomes available.
@@ -10265,13 +10280,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         if (seatAdapter != null) seatAdapter.setSelfMicMuted(!micOn);
-        if (!Objects.equals(lastMicUiState, micOn)) {
-            lastMicUiState = micOn;
-            binding.imgMicIcon.setImageResource(
-                    micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
-            // Keep the professional mic art without a colored circle behind it.
-            binding.btnMic.setBackgroundResource(android.R.color.transparent);
-        }
+        // Always bind the icon from the live local mic state; don't preserve a stale mute glyph.
+        lastMicUiState = micOn;
+        binding.imgMicIcon.setImageResource(
+                micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
+        binding.btnMic.setBackgroundResource(android.R.color.transparent);
         updateHostMuteBadge();
     }
 
@@ -17435,28 +17448,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean moderatorMuted = memberBool(payload, "moderatorMuted", false)
                     || memberBool(payload, "isModeratorMuted", false);
             if (myUserId != null && sameUser(myUserId, targetUserId)) {
-                if (moderatorMuted || muted) {
+                if (moderatorMuted) {
                     RoomSoundFx.playMute(this);
                     micOn = false;
                     RoomRtcEngine.getInstance().setMicEnabled(false);
                     syncMicUi();
-                    if (moderatorMuted) {
-                        Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
-                    }
-                } else if (userChoseMute) {
-                    // A moderator lifting their restriction must not override the
-                    // user's own saved mute choice.
-                    micOn = false;
-                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                    Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
+                } else if (System.currentTimeMillis() - lastLocalMicChangeAtMs < 2500L) {
+                    // Ignore a delayed socket echo when a newer local tap already changed the mic.
+                    micOn = !userChoseMute;
+                    RoomRtcEngine.getInstance().setMicEnabled(micOn);
                     syncMicUi();
-                    activateSeatAudio(currentSeats);
+                    if (micOn) activateSeatAudio(currentSeats);
                 } else {
-                    // Server unmuted us — restore publish only when the user has not
-                    // explicitly chosen to stay muted.
-                    micOn = true;
-                    RoomRtcEngine.getInstance().setMicEnabled(true);
+                    userChoseMute = muted;
+                    getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
+                            .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
+                    micOn = !muted;
+                    RoomRtcEngine.getInstance().setMicEnabled(micOn);
                     syncMicUi();
-                    activateSeatAudio(currentSeats);
+                    if (micOn) activateSeatAudio(currentSeats);
                 }
             }
             requestRoomRefresh(true);
@@ -18949,7 +18960,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             me = ContainerProvider.from(this).getSessionManager().getUser();
         } catch (Exception ignored) {
         }
-        if (me == null || myUserId == null || myUserId.isEmpty()) return;
+        if (myUserId == null || myUserId.isEmpty()) return;
+        // Do not suppress the optimistic seat UI just because the cached profile DTO
+        // is temporarily unavailable; the authenticated user ID is enough to paint it.
+        if (me == null) {
+            me = new AuthDtos.UserDto();
+            me.id = myUserId;
+            me.displayName = "أنت";
+            me.username = "أنت";
+        }
         // Ensure wear fields present on optimistic user.
         if ((me.vipBadgeUrl == null || me.vipBadgeUrl.isEmpty())
                 || (me.hostBadgeUrl == null || me.hostBadgeUrl.isEmpty())) {
@@ -18959,6 +18978,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // and would otherwise skip the open-mic path after optimistic sit.
         boolean wasSeatedBefore = isOnSeat(currentSeats);
         List<RoomDtos.SeatDto> src = currentSeats != null ? currentSeats : new ArrayList<>();
+        RoomDtos.SeatDto previousSelfSeat = findMySeat(src);
+        boolean previousSeatMuted = previousSelfSeat != null && previousSelfSeat.isMuted;
+        boolean previousModeratorMuted = previousSelfSeat != null && previousSelfSeat.isModeratorMuted;
+        boolean shouldRemainMuted = userChoseMute || previousSeatMuted || previousModeratorMuted;
         List<RoomDtos.SeatDto> next = new ArrayList<>(src.size());
         boolean placed = false;
         for (RoomDtos.SeatDto s : src) {
@@ -18976,8 +18999,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 copy.isLocked = false;
                 // Don't inherit the previous occupant's mute badge; retain our
                 // own explicit mute choice when hopping between seats.
-                copy.isMuted = userChoseMute;
-                copy.isModeratorMuted = false;
+                copy.isMuted = shouldRemainMuted;
+                copy.isModeratorMuted = previousModeratorMuted;
                 placed = true;
             }
             next.add(copy);
@@ -18988,13 +19011,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             neu.userId = myUserId;
             neu.user = me;
             neu.status = "occupied";
-            neu.isMuted = userChoseMute;
-            neu.isModeratorMuted = false;
+            neu.isMuted = shouldRemainMuted;
+            neu.isModeratorMuted = previousModeratorMuted;
             next.add(neu);
         }
         currentSeats = next;
         // Open mic immediately on first sit (room LiveData arrives later with wasOnSeat=true).
-        if (!wasSeatedBefore && !userChoseMute) {
+        if (wasSeatedBefore && shouldRemainMuted && micOn) {
+            micOn = false;
+            try {
+                RoomRtcEngine.getInstance().setMicEnabled(false);
+            } catch (Exception ignored) {
+            }
+            if (!previousModeratorMuted && roomId != null) viewModel.setMic(roomId, true);
+            syncMicUi();
+        } else if (!wasSeatedBefore && !userChoseMute) {
             micOn = true;
             try {
                 RoomRtcEngine.getInstance().setMicEnabled(true);
@@ -19045,8 +19076,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             target.userId = myUserId;
             target.user = localSelf.user;
             target.status = "occupied";
-            target.isMuted = userChoseMute;
-            target.isModeratorMuted = false;
+            target.isMuted = userChoseMute || localSelf.isMuted;
+            target.isModeratorMuted = localSelf.isModeratorMuted;
         }
         reconciled.add(target);
         return reconciled;
