@@ -17643,18 +17643,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!PermissionHelper.hasAudioPermission(this)) {
                     PermissionHelper.ensureMediaPermissions(this, false);
                 }
-                // A seat hop is not a request to unmute. If the user was already
-                // seated and explicitly muted, carry that choice to the new seat.
-                boolean preserveUserMute = userChoseMute;
-                if (preserveUserMute) {
-                    micOn = false;
-                    RoomRtcEngine.getInstance().setMicEnabled(false);
-                    if (roomId != null) viewModel.setMic(roomId, true);
-                } else {
-                    micOn = true;
-                    RoomRtcEngine.getInstance().setMicEnabled(true);
-                    if (roomId != null) viewModel.setMic(roomId, false);
+                // Never let a delayed seat event bypass a moderator mute. The optimistic
+                // seat snapshot already carries the moderator flag across a hop.
+                RoomDtos.SeatDto selfSeat = findMySeat(currentSeats);
+                boolean moderatorMuted = selfSeat != null && selfSeat.isModeratorMuted;
+                boolean preserveUserMute = userChoseMute || moderatorMuted;
+                micOn = !preserveUserMute;
+                RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                if (!moderatorMuted && roomId != null) {
+                    viewModel.setMic(roomId, preserveUserMute);
                 }
+                micStateInitializedForRoom = true;
                 syncMicUi();
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
@@ -18979,9 +18978,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean wasSeatedBefore = isOnSeat(currentSeats);
         List<RoomDtos.SeatDto> src = currentSeats != null ? currentSeats : new ArrayList<>();
         RoomDtos.SeatDto previousSelfSeat = findMySeat(src);
-        boolean previousSeatMuted = previousSelfSeat != null && previousSelfSeat.isMuted;
+        // The previous seat's isMuted may be a stale server echo. Only the user's
+        // persisted local choice or an explicit moderator lock may govern the hop.
         boolean previousModeratorMuted = previousSelfSeat != null && previousSelfSeat.isModeratorMuted;
-        boolean shouldRemainMuted = userChoseMute || previousSeatMuted || previousModeratorMuted;
+        boolean shouldRemainMuted = userChoseMute || previousModeratorMuted;
         List<RoomDtos.SeatDto> next = new ArrayList<>(src.size());
         boolean placed = false;
         for (RoomDtos.SeatDto s : src) {
@@ -19016,24 +19016,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             next.add(neu);
         }
         currentSeats = next;
-        // Open mic immediately on first sit (room LiveData arrives later with wasOnSeat=true).
-        if (wasSeatedBefore && shouldRemainMuted && micOn) {
-            micOn = false;
-            try {
-                RoomRtcEngine.getInstance().setMicEnabled(false);
-            } catch (Exception ignored) {
-            }
-            if (!previousModeratorMuted && roomId != null) viewModel.setMic(roomId, true);
-            syncMicUi();
-        } else if (!wasSeatedBefore && !userChoseMute) {
-            micOn = true;
-            try {
-                RoomRtcEngine.getInstance().setMicEnabled(true);
-            } catch (Exception ignored) {
-            }
-            if (roomId != null) viewModel.setMic(roomId, false);
-            syncMicUi();
+        // A seat hop must re-apply the user's desired mic state, not inherit a stale
+        // isMuted flag from the previous seat. The ViewModel serializes this write
+        // before takeSeat; the backend uses the same per-user transaction lock.
+        micOn = !shouldRemainMuted;
+        try {
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
+        } catch (Exception micError) {
+            android.util.Log.w("VoiceRoom", "optimistic mic state apply failed", micError);
         }
+        if (!previousModeratorMuted && roomId != null) {
+            viewModel.setMic(roomId, shouldRemainMuted);
+        }
+        micStateInitializedForRoom = true;
+        syncMicUi();
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         if (binding != null && room != null) {
             applySeatGridUi(prepareGuestSeatsForGrid(next), next, room);
