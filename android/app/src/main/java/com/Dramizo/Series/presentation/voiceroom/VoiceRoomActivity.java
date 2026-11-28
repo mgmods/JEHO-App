@@ -18998,10 +18998,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean wasSeatedBefore = isOnSeat(currentSeats);
         List<RoomDtos.SeatDto> src = currentSeats != null ? currentSeats : new ArrayList<>();
         RoomDtos.SeatDto previousSelfSeat = findMySeat(src);
-        // The previous seat's isMuted may be a stale server echo. Only the user's
-        // persisted local choice or an explicit moderator lock may govern the hop.
+        // Restore the earlier seat-mute behavior without trusting a stale server echo:
+        // carry the previous seat's mute only when the RTC engine also confirms the mic is off.
+        boolean previousSeatMuted = previousSelfSeat != null && previousSelfSeat.isMuted && !micOn;
         boolean previousModeratorMuted = previousSelfSeat != null && previousSelfSeat.isModeratorMuted;
-        boolean shouldRemainMuted = userChoseMute || previousModeratorMuted;
+        boolean shouldRemainMuted = userChoseMute || previousSeatMuted || previousModeratorMuted;
         List<RoomDtos.SeatDto> next = new ArrayList<>(src.size());
         boolean placed = false;
         for (RoomDtos.SeatDto s : src) {
