@@ -262,19 +262,6 @@
     </LinearLayout>
 
     <TextView
-        android:id="@+id/tvGiftCount"
-        android:layout_width="wrap_content"
-        android:layout_height="14dp"
-        android:layout_marginTop="2dp"
-        android:background="@drawable/bg_mikoo_mic_charm"
-        android:drawablePadding="2dp"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="4dp"
-        android:textColor="#FFFFFF"
-        android:textSize="10sp"
-        android:visibility="gone" />
-
-    <TextView
         android:id="@+id/tvAgencyClub"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -308,6 +295,19 @@
         android:textColor="#FFFFE4A6"
         android:textSize="8sp"
         android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvGiftCount"
+        android:layout_width="wrap_content"
+        android:layout_height="14dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_mikoo_mic_charm"
+        android:drawablePadding="2dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
         android:visibility="gone" />
 
     <!-- Decorative admin-assigned rank. This is separate from platform staff permissions. -->
