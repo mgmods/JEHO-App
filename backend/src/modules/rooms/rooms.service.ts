@@ -3528,11 +3528,17 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
-      const previousSeat = await manager.findOne(RoomSeat, {
+      // Read every stale/duplicate row under the same per-user lock. findOne() could
+      // pick an arbitrary old seat and restore the wrong mute state during a rapid hop.
+      const previousSeats = await manager.find(RoomSeat, {
         where: { roomId, userId },
+        order: { seatIndex: 'ASC' },
+        lock: { mode: 'pessimistic_write' },
       });
-      const preserveMuted = previousSeat?.isMuted ?? false;
-      const preserveModeratorMuted = previousSeat?.isModeratorMuted ?? false;
+      const preserveMuted = previousSeats.some((previousSeat) => previousSeat.isMuted);
+      const preserveModeratorMuted = previousSeats.some(
+        (previousSeat) => previousSeat.isModeratorMuted,
+      );
       const seat = await manager.findOne(RoomSeat, {
         where: { roomId, seatIndex: dto.seatIndex },
         lock: { mode: 'pessimistic_write' },
