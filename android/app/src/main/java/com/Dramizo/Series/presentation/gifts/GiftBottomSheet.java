@@ -1289,7 +1289,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 + (targets.size() > 1 ? " · " + targets.size() : "") + "...");
 
         String fingerprint = selected.id + "|" + (chatMode ? "" : String.valueOf(roomId))
-                + "|" + qty + "|" + sendToAllMic + "|" + targets.toString();
+                + "|" + qty + "|" + sendToAllMic + "|"
+                + (sendToAllMic ? "ALL_CURRENT_ROOM_MICS" : targets.toString());
         if (pendingSendRequestId == null || !fingerprint.equals(pendingSendFingerprint)) {
             pendingSendRequestId = java.util.UUID.randomUUID().toString();
             pendingSendFingerprint = fingerprint;
