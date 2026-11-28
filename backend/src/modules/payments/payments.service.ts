@@ -945,8 +945,8 @@ export class PaymentsService {
     if (!Number.isFinite(amountSent) || amountSent <= 0 || amountSent > 100000000) {
       throw new BadRequestException('أدخل مبلغ التحويل بشكل صحيح');
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(transferDate) || Number.isNaN(Date.parse(transferDate))) {
-      throw new BadRequestException('تاريخ التحويل مطلوب');
+    if (transferDate && (!/^\d{4}-\d{2}-\d{2}$/.test(transferDate) || Number.isNaN(Date.parse(transferDate)))) {
+      throw new BadRequestException('تاريخ التحويل غير صالح');
     }
     if (!/^\/?uploads\/[A-Za-z0-9._-]+$/i.test(receiptUrl)) {
       throw new BadRequestException('ارفع صورة الإيصال أو ملف PDF صالحاً');
@@ -971,7 +971,7 @@ export class PaymentsService {
       ...current,
       senderName,
       amountSent,
-      transferDate,
+      ...(transferDate ? { transferDate } : {}),
       transferReference,
       note,
       receiptUrl,
