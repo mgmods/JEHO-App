@@ -419,45 +419,45 @@
     <div v-if="selectedRecharge" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.62); z-index: 1060">
       <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
         <div class="modal-content glass-modal recharge-review-modal">
-          <div class="modal-header">
+          <div class="modal-header recharge-modal-header">
             <div>
               <h5 class="modal-title mb-1">مراجعة إيصال شام كاش</h5>
               <div class="small text-muted">طلب {{ shortId(selectedRecharge.id) }} · المستخدم {{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
             </div>
             <button type="button" class="btn-close" @click="selectedRecharge = null"></button>
           </div>
-          <div class="modal-body">
-            <div class="row g-3">
+          <div class="modal-body recharge-modal-body">
+            <div class="recharge-detail-grid">
               <div class="recharge-detail-item">
                 <div class="small text-muted">اسم المستخدم</div>
                 <div class="fw-semibold">{{ selectedRecharge.userName || '—' }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">معرّف الحساب (User ID)</div>
                 <div class="fw-semibold font-monospace text-break">{{ selectedRecharge.userPublicId || selectedRecharge.userId }}</div>
                 <div class="small text-muted font-monospace text-break">{{ selectedRecharge.userId }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">الباقة</div>
                 <div class="fw-semibold">{{ selectedRecharge.sku || '—' }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">الكوينز المستحقة</div>
                 <div class="fw-semibold">{{ formatNumber(Number(selectedRecharge.coins || 0) + Number(selectedRecharge.bonusCoins || 0)) }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">السعر المحدد للباقة</div>
                 <div class="fw-semibold">{{ formatMoney(selectedRecharge.amountFiat || 0, selectedRecharge.currency || 'USD') }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">اسم المرسل في الحوالة</div>
                 <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.senderName || '—' }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">المبلغ المرسل</div>
                 <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.amountSent ?? '—' }}</div>
               </div>
-              <div class="col-md-6">
+              <div class="recharge-detail-item">
                 <div class="small text-muted">رقم العملية</div>
                 <div class="fw-semibold font-monospace">{{ selectedRecharge.shamCashReceipt?.transferReference || '—' }}</div>
               </div>
@@ -485,8 +485,8 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" type="button" @click="selectedRecharge = null">إغلاق</button>
+          <div class="modal-footer recharge-modal-footer">
+            <button class="btn btn-ghost" type="button" @click="selectedRecharge = null">إغلاق</button>
             <button
               class="btn btn-outline-danger"
               type="button"
