@@ -2850,21 +2850,32 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       'canManageSeats',
       'Seat management permission is required',
     );
-    const seat = await this.seatsRepo.findOne({ where: { roomId, seatIndex } });
-    if (!seat) throw new NotFoundException('Seat not found');
-    if (seat.isHostSeat || seat.seatIndex === 0) {
-      throw new ForbiddenException('Host seat cannot be locked or cleared');
-    }
-    if (locked) {
-      if (seat.userId && seat.userId !== actorId) {
-        throw new ConflictException('Cannot lock occupied seat');
+    const seat = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      const current = await manager.findOne(RoomSeat, {
+        where: { roomId, seatIndex },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current) throw new NotFoundException('Seat not found');
+      if (current.isHostSeat || current.seatIndex === 0) {
+        throw new ForbiddenException('Host seat cannot be locked or cleared');
       }
-      seat.userId = null;
-      seat.status = SeatStatus.LOCKED;
-    } else {
-      seat.status = SeatStatus.EMPTY;
-    }
-    await this.seatsRepo.save(seat);
+      if (locked) {
+        if (current.userId && current.userId !== actorId) {
+          throw new ConflictException('Cannot lock occupied seat');
+        }
+        if (current.userId) {
+          throw new ConflictException('يجب إنزال المستخدم من المقعد قبل قفله');
+        }
+        current.status = SeatStatus.LOCKED;
+      } else {
+        current.status = SeatStatus.EMPTY;
+      }
+      return manager.save(RoomSeat, current);
+    });
     this.emitRoomEvent(roomId, 'room:seat_locked', {
       seatIndex,
       locked,
@@ -4025,12 +4036,25 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Auto-moderation: mute mic without requiring a human moderator. */
   async systemMuteMic(roomId: string, userId: string, reason?: string) {
-    const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
-    if (seat) {
-      seat.isMuted = true;
-      seat.isModeratorMuted = true;
-      await this.seatsRepo.save(seat);
-    }
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      const seats = await manager.find(RoomSeat, {
+        where: { roomId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      for (const seat of seats) {
+        seat.isMuted = true;
+        seat.isModeratorMuted = true;
+      }
+      if (seats.length) await manager.save(RoomSeat, seats);
+    });
     this.notifyRoomUpdated(roomId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
