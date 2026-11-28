@@ -3211,6 +3211,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${targetUserId}`],
       );
       const seats = await manager.find(RoomSeat, {
@@ -3318,6 +3321,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${effectiveUserId}`],
       );
       const currentSeats = await manager.find(RoomSeat, {
@@ -3380,6 +3386,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       const currentSeat = await manager.findOne(RoomSeat, {
@@ -3562,6 +3571,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       // Read every stale/duplicate row under the same per-user lock. findOne() could
@@ -3768,6 +3780,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       const seat = await manager.findOne(RoomSeat, {
@@ -3928,6 +3943,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat-map:${roomId}`],
+      );
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${userId}`],
       );
       await manager.update(
