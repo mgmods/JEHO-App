@@ -1,6 +1,5 @@
 package com.Dramizo.Series.presentation.wallet;
 
-import android.app.DatePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -37,7 +36,6 @@ import com.Dramizo.Series.util.QrBitmap;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -71,7 +69,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
     private TextView tvInstructions;
     private TextView tvPackageSummary;
     private TextView tvReceiptName;
-    private TextView tvTransferDate;
     private EditText etSenderName;
     private EditText etAmountSent;
     private EditText etTransferReference;
@@ -80,7 +77,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
     private Uri selectedReceiptUri;
     private String selectedReceiptMime;
     private String selectedReceiptName;
-    private String selectedTransferDate = "";
     private Bitmap generatedQrBitmap;
     private Bitmap pendingQrSaveBitmap;
     private boolean submitting;
@@ -109,7 +105,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         tvInstructions = findViewById(R.id.tvInstructions);
         tvPackageSummary = findViewById(R.id.tvPackageSummary);
         tvReceiptName = findViewById(R.id.tvReceiptName);
-        tvTransferDate = findViewById(R.id.tvTransferDate);
         etSenderName = findViewById(R.id.etSenderName);
         etAmountSent = findViewById(R.id.etAmountSent);
         etTransferReference = findViewById(R.id.etTransferReference);
@@ -125,8 +120,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         findViewById(R.id.btnSaveQr).setOnClickListener(v -> saveQrImage());
         imgQr.setOnClickListener(v -> showQrPreview());
         findViewById(R.id.btnSelectReceipt).setOnClickListener(v -> chooseReceipt());
-        findViewById(R.id.btnTransferDate).setOnClickListener(v -> chooseTransferDate());
-        tvTransferDate.setOnClickListener(v -> chooseTransferDate());
         btnSubmitReceipt.setOnClickListener(v -> submitReceipt());
         findViewById(R.id.btnCancelOrder).setOnClickListener(v -> cancelOrder());
 
@@ -262,12 +255,14 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         preview.setImageDrawable(imgQr.getDrawable());
         int pad = (int) (18 * getResources().getDisplayMetrics().density);
         preview.setPadding(pad, pad, pad, pad);
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("باركود شام كاش")
                 .setView(preview)
-                .setPositiveButton("تحميل الصورة", (dialog, which) -> saveQrImage())
+                .setPositiveButton("تحميل الصورة", (d, which) -> saveQrImage())
                 .setNegativeButton("إغلاق", null)
-                .show();
+                .create();
+        dialog.show();
+        styleDialog(dialog);
     }
 
     private void saveQrImage() {
@@ -296,16 +291,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         startActivityForResult(intent, REQUEST_RECEIPT);
     }
 
-    private void chooseTransferDate() {
-        Calendar calendar = Calendar.getInstance();
-        DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, day) -> {
-            selectedTransferDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day);
-            tvTransferDate.setText(selectedTransferDate);
-        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
-        dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
-        dialog.show();
-    }
-
     private void submitReceipt() {
         if (submitting) return;
         String sender = etSenderName.getText() == null ? "" : etSenderName.getText().toString().trim();
@@ -318,10 +303,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         if (amountText.isEmpty()) {
             etAmountSent.setError("المبلغ المرسل مطلوب");
             etAmountSent.requestFocus();
-            return;
-        }
-        if (selectedTransferDate.isEmpty()) {
-            Toast.makeText(this, "اختر تاريخ التحويل", Toast.LENGTH_SHORT).show();
             return;
         }
         if (selectedReceiptUri == null) {
@@ -345,7 +326,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
         final Uri receiptUri = selectedReceiptUri;
         final String receiptMime = selectedReceiptMime != null ? selectedReceiptMime : "application/octet-stream";
         final String receiptName = selectedReceiptName != null ? selectedReceiptName : "receipt";
-        final String transferDate = selectedTransferDate;
         final String transferReference = etTransferReference.getText() == null ? "" : etTransferReference.getText().toString().trim();
         final String transferNote = etTransferNote.getText() == null ? "" : etTransferNote.getText().toString().trim();
         final String orderId = orderResult.order.id;
@@ -376,7 +356,6 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
                 Map<String, Object> body = new HashMap<>();
                 body.put("senderName", sender);
                 body.put("amountSent", sentAmount);
-                body.put("transferDate", transferDate);
                 body.put("transferReference", transferReference);
                 body.put("note", transferNote);
                 body.put("receiptUrl", upload.data.url);
@@ -391,12 +370,14 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
                 runOnUiThread(() -> {
                     showLoading(false);
                     submitting = false;
-                    new AlertDialog.Builder(this)
+                    AlertDialog dialog = new AlertDialog.Builder(this)
                             .setTitle("تم إرسال إيصالك للمراجعة")
-                            .setMessage("تم استلام إيصال التحويل بنجاح. عند مراجعة الدفع والتأكد منه، سيتم تفعيل اشتراكك أو شحن حسابك بالباقة التي اخترتها.")
+                            .setMessage("استلمنا إيصال التحويل بنجاح. بعد مراجعة الدفع والتأكد منه، سيتم تفعيل اشتراكك أو شحن حسابك بالباقة التي اخترتها.")
                             .setCancelable(false)
-                            .setPositiveButton("موافق", (dialog, which) -> finish())
-                            .show();
+                            .setPositiveButton("ممتاز", (d, which) -> finish())
+                            .create();
+                    dialog.show();
+                    styleDialog(dialog);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -414,11 +395,11 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
             finish();
             return;
         }
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("إلغاء طلب التحويل")
                 .setMessage("هل تريد إلغاء طلب شام كاش الحالي؟")
                 .setNegativeButton("رجوع", null)
-                .setPositiveButton("إلغاء الطلب", (dialog, which) -> {
+                .setPositiveButton("إلغاء الطلب", (d, which) -> {
                     showLoading(true);
                     c.getIoExecutor().execute(() -> {
                         Result<Map<String, Object>> result = ApiCall.execute(
@@ -434,7 +415,20 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
                         });
                     });
                 })
-                .show();
+                .create();
+        dialog.show();
+        styleDialog(dialog);
+    }
+
+    private void styleDialog(AlertDialog dialog) {
+        if (dialog == null) return;
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_sham_cash_dialog);
+        }
+        android.widget.Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (positive != null) positive.setTextColor(android.graphics.Color.rgb(22, 184, 160));
+        if (negative != null) negative.setTextColor(android.graphics.Color.rgb(164, 178, 197));
     }
 
     private void showLoading(boolean show) {
