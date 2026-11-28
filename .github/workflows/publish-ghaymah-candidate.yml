@@ -181,4 +181,5 @@ jobs:
 
           echo "Cumin accepted the exact JEHO-OWN image digest for app jeho-own: $IMAGE"
 
+# 2026-11-28: force candidate rebuild from the merged MG-JEHO head.
 # Explicit rebuild trigger: publish the latest MG-JEHO backend and admin dashboard without deploying.
