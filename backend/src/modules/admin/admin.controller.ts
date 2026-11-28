@@ -968,17 +968,21 @@ export class AdminController {
   @ApiOperation({ summary: 'Manually complete a pending recharge (e.g. Sham Cash after WhatsApp proof)' })
   completeRecharge(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') adminId: string,
     @Body() body?: { providerPaymentId?: string; note?: string },
   ) {
-    return this.adminService.completeRechargeOrder(id, body?.providerPaymentId, body?.note);
+    return this.adminService.completeRechargeOrder(id, body?.providerPaymentId, body?.note, adminId);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('wallet/recharges/:id/cancel')
   @ApiOperation({ summary: 'Cancel a pending recharge order' })
-  cancelRecharge(@Param('id', ParseUUIDPipe) id: string) {
-    return this.adminService.cancelRechargeOrder(id);
+  cancelRecharge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body?: { note?: string },
+  ) {
+    return this.adminService.cancelRechargeOrder(id, body?.note);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
