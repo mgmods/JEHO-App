@@ -909,7 +909,6 @@ export class AdminService {
     });
     const baseline = Math.max(0, Number(baselineRow?.value || 0) || 0);
     const totalRev = Math.max(0, rawTotal - baseline);
-    const scale = rawTotal > 0 ? totalRev / rawTotal : 0;
     const todayRaw = Number(revenueTotals?.today || 0);
     // After a revenue reset, hide legacy totals; keep today's new sales visible.
     const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
