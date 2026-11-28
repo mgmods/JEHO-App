@@ -2909,13 +2909,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       const seatsRepo = manager.getRepository(RoomSeat);
       const roomsRepo = manager.getRepository(Room);
-      // Serialize resize with take/leave/approve/mute operations, all of which
-      // use the same room-level advisory lock. Row locks alone allowed a resize
-      // to race a seat hop and publish a temporarily short seat map.
-      await manager.query(
-        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-        [`room-seat-map:${roomId}`],
-      );
       const managedRoom = await roomsRepo.findOne({
         where: { id: roomId },
         lock: { mode: 'pessimistic_write' },
