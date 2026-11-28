@@ -2716,6 +2716,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     receiverIds: string[],
     manager?: any,
     expected?: { giftId?: string; quantity?: number; roomId?: string; comboCount?: number },
+    compareRecipients = true,
   ): Promise<any | null> {
     const sendsRepo = manager ? manager.getRepository(GiftSend) : this.sendsRepo;
     const giftsRepo = manager ? manager.getRepository(Gift) : this.giftsRepo;
@@ -2724,7 +2725,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     if (!rows.length) return null;
     const requested = [...new Set(receiverIds.map(String))].sort();
     const recorded = [...new Set(rows.map((row) => String(row.receiverId)))].sort();
-    if (requested.length !== recorded.length || requested.some((id, i) => id !== recorded[i])) {
+    if (compareRecipients && (requested.length !== recorded.length || requested.some((id, i) => id !== recorded[i]))) {
       throw new BadRequestException('This gift request ID was already used for a different recipient list');
     }
     const first = rows[0];
@@ -3537,13 +3538,23 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
     const roomHostId = String(room.activeHostId || room.hostId || '').trim();
     if (!roomHostId) throw new BadRequestException('Room has no host');
 
-    // Keep the explicit selection unchanged. Only "all mics" adds the room host.
-    const receiverIds = [
-      ...new Set((Array.isArray(dto.receiverIds) ? dto.receiverIds : [])
-        .map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
-    ];
-    if (dto.includeHost === true && !receiverIds.includes(roomHostId)) receiverIds.push(roomHostId);
-    if (receiverIds.length === 0) receiverIds.push(roomHostId);
+    // For "all mics", the database is the source of truth: include every currently
+    // occupied mic plus the room host, independent of a delayed Android seat snapshot.
+    // For a manually selected group, preserve the exact selected IDs without additions.
+    let receiverIds: string[];
+    if (dto.includeHost === true) {
+      const occupiedSeats = await this.seatsRepo.find({ where: { roomId: dto.roomId } });
+      receiverIds = [
+        ...new Set(occupiedSeats.map((seat) => String(seat.userId || '').trim()).filter(Boolean)),
+      ];
+      if (!receiverIds.includes(roomHostId)) receiverIds.push(roomHostId);
+    } else {
+      receiverIds = [
+        ...new Set((Array.isArray(dto.receiverIds) ? dto.receiverIds : [])
+          .map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
+      ];
+      if (receiverIds.length === 0) receiverIds.push(roomHostId);
+    }
     if (receiverIds.length > 31) throw new BadRequestException('Too many gift recipients');
 
     const selfGiftBlocked = await this.isSelfGiftBlocked();
@@ -3551,7 +3562,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة');
     }
     if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto, dto.includeHost !== true);
       if (prior) return prior;
     }
 
@@ -3636,7 +3647,7 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
       // reuse the first committed send and never attempt another charge.
       if (dto.requestId) {
         const prior = await this.findPriorCannonRequest(
-          senderId, dto.requestId, receiverIds, manager, dto,
+          senderId, dto.requestId, receiverIds, manager, dto, dto.includeHost !== true,
         );
         if (prior) return prior;
       }
