@@ -45,11 +45,20 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
     }
 
     public void submit(List<GiftRecipient> data, @Nullable String selectedId, boolean allSelected) {
+        submit(data, selectedId, allSelected, null);
+    }
+
+    public void submit(List<GiftRecipient> data, @Nullable String selectedId, boolean allSelected,
+                       @Nullable List<String> selectedIds) {
         items.clear();
         if (data != null) items.addAll(data);
         selectedUserId = selectedId;
         selectedUserIds.clear();
-        if (selectedId != null && !selectedId.isEmpty()
+        if (selectedIds != null) {
+            for (String id : selectedIds) {
+                if (id != null && !id.isEmpty() && !GiftRecipient.ALL_MIC_ID.equals(id)) selectedUserIds.add(id);
+            }
+        } else if (selectedId != null && !selectedId.isEmpty()
                 && !GiftRecipient.ALL_MIC_ID.equals(selectedId)) selectedUserIds.add(selectedId);
         selectAll = allSelected;
         if (allSelected) {

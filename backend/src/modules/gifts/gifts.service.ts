@@ -3531,76 +3531,40 @@ export class GiftsService implements OnModuleInit, OnModuleDestroy {
    * - Remainder: 50% → room host, 50% → seated mics (equal split)
    */
   async sendAllMic(senderId: string, dto: SendAllMicGiftDto) {
-    const rawIds = Array.isArray(dto.receiverIds) ? dto.receiverIds : [];
-    const selfGiftBlocked = await this.isSelfGiftBlocked();
-    if (selfGiftBlocked && rawIds.some((id) => String(id || '').trim() === String(senderId))) {
-      throw new BadRequestException(
-        'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة',
-      );
-    }
-    const receiverIds = [
-      ...new Set(rawIds.map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
-    ].slice(0, 30);
-    if (receiverIds.length === 0) {
-      // Match the established room-gift fallback: when nobody occupies a mic,
-      // deliver the gift to the live room owner/active host instead of rejecting it.
-      const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
-      if (!room) throw new NotFoundException('Room not found');
-      const roomHostId = String(room.activeHostId || room.hostId || '').trim();
-      if (!roomHostId) throw new BadRequestException('Room has no host');
-      receiverIds.push(roomHostId);
-    }
-    if (dto.requestId) {
-      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
-      if (prior) return prior;
-    }
     const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
     if (!room) throw new NotFoundException('Room not found');
-    const roomHostId = String(room.activeHostId || room.cohostId || room.hostId || '').trim();
+    // activeHostId is the current stage host; otherwise use the room owner.
+    const roomHostId = String(room.activeHostId || room.hostId || '').trim();
     if (!roomHostId) throw new BadRequestException('Room has no host');
 
-    // The Android seat roster can briefly contain a user who has just left.
-    // Ignore only those stale IDs and keep every authoritative live target;
-    // one stale recipient must not reject the entire multi-seat gift.
-    const liveReceiverIds: string[] = [];
-    for (const rid of receiverIds) {
-      try {
-        await this.assertGiftTarget({
-          giftId: dto.giftId,
-          receiverId: rid,
-          roomId: dto.roomId,
-          quantity: dto.quantity,
-        }, rid === String(senderId));
-        liveReceiverIds.push(rid);
-      } catch (error) {
-        if (error instanceof BadRequestException
-            && String(error.message || '') === 'Receiver is not in this room') {
-          continue;
-        }
-        throw error;
-      }
-    }
-    receiverIds.splice(0, receiverIds.length, ...liveReceiverIds);
-    if (receiverIds.length === 0) {
-      // No selected seat survived validation: deliver only to the actual live host.
-      receiverIds.push(roomHostId);
+    // Keep the explicit selection unchanged. Only "all mics" adds the room host.
+    const receiverIds = [
+      ...new Set((Array.isArray(dto.receiverIds) ? dto.receiverIds : [])
+        .map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
+    ];
+    if (dto.includeHost === true && !receiverIds.includes(roomHostId)) receiverIds.push(roomHostId);
+    if (receiverIds.length === 0) receiverIds.push(roomHostId);
+    if (receiverIds.length > 31) throw new BadRequestException('Too many gift recipients');
+
+    const selfGiftBlocked = await this.isSelfGiftBlocked();
+    if (selfGiftBlocked && receiverIds.some((id) => id === String(senderId))) {
+      throw new BadRequestException('إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة');
     }
     if (dto.requestId) {
       const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds, undefined, dto);
       if (prior) return prior;
     }
-    if (receiverIds.length === 1) {
-      return this.send(senderId, {
-        giftId: dto.giftId,
-        receiverId: receiverIds[0],
-        quantity: dto.quantity,
-        roomId: dto.roomId,
-        comboCount: dto.comboCount,
-        cannonLaunch: dto.cannonLaunch,
-        requestId: dto.requestId,
-      });
-    }
 
+    // Validate every selected ID against authoritative room state. Never silently
+    // drop a selected recipient or redirect their gift to the host on a stale snapshot.
+    for (const rid of receiverIds) {
+      await this.assertGiftTarget({
+        giftId: dto.giftId,
+        receiverId: rid,
+        roomId: dto.roomId,
+        quantity: dto.quantity,
+      }, rid === String(senderId));
+    }
     const gift = await this.giftsRepo.findOne({
       where: { id: dto.giftId, isActive: true },
     });

@@ -295,15 +295,25 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public Result<GiftDtos.SendGiftResult> sendGift(
             String giftId, String receiverId, int qty, String roomId, int comboCount) {
-        return ApiCall.execute(
-                api.send(new GiftDtos.SendGiftRequest(giftId, receiverId, qty, roomId, comboCount)));
+        return sendGift(giftId, receiverId, qty, roomId, comboCount, java.util.UUID.randomUUID().toString());
     }
-
+    @Override
+    public Result<GiftDtos.SendGiftResult> sendGift(String giftId, String receiverId, int qty,
+            String roomId, int comboCount, String requestId) {
+        return ApiCall.execute(api.send(new GiftDtos.SendGiftRequest(
+                giftId, receiverId, qty, roomId, comboCount, requestId)));
+    }
     @Override
     public Result<GiftDtos.SendGiftResult> sendAllMic(
             String giftId, List<String> receiverIds, int qty, String roomId, int comboCount) {
-        return ApiCall.execute(api.sendAllMic(
-                new GiftDtos.SendAllMicRequest(giftId, receiverIds, qty, roomId, comboCount)));
+        return sendAllMic(giftId, receiverIds, qty, roomId, comboCount, false,
+                java.util.UUID.randomUUID().toString());
+    }
+    @Override
+    public Result<GiftDtos.SendGiftResult> sendAllMic(String giftId, List<String> receiverIds,
+            int qty, String roomId, int comboCount, boolean includeHost, String requestId) {
+        return ApiCall.execute(api.sendAllMic(new GiftDtos.SendAllMicRequest(
+                giftId, receiverIds, qty, roomId, comboCount, includeHost, requestId)));
     }
 
     /** True when memory catalog is young enough to skip spinner entirely. */

@@ -244,6 +244,11 @@ public class GiftViewModel extends ViewModel {
     }
 
     public void sendMany(String giftId, List<String> receiverIds, int quantity, String roomId) {
+        sendMany(giftId, receiverIds, quantity, roomId, false, java.util.UUID.randomUUID().toString());
+    }
+
+    public void sendMany(String giftId, List<String> receiverIds, int quantity, String roomId,
+                         boolean includeHost, String requestId) {
         if (giftId == null || receiverIds == null || receiverIds.isEmpty()) {
             error.postValue("اختر مستلماً");
             return;
@@ -276,10 +281,11 @@ public class GiftViewModel extends ViewModel {
             c.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> r;
             try {
-                if (targets.size() > 1 && roomId != null && !roomId.isEmpty()) {
-                    r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId, comboCount);
+                if ((targets.size() > 1 || includeHost) && roomId != null && !roomId.isEmpty()) {
+                    r = c.sendGiftUseCase.executeAllMic(giftId, targets, qty, roomId,
+                            comboCount, includeHost, requestId);
                 } else {
-                    r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount);
+                    r = c.sendGiftUseCase.execute(giftId, first, qty, roomId, comboCount, requestId);
                 }
             } catch (RuntimeException failure) {
                 android.util.Log.e("GiftViewModel", "Gift send request failed safely", failure);

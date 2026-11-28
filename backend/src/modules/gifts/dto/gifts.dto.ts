@@ -47,7 +47,7 @@ export class SendAllMicGiftDto {
   @ApiProperty({ type: [String] })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(30)
+  @ArrayMaxSize(31)
   @IsUUID('all', { each: true })
   receiverIds: string[];
 
@@ -66,6 +66,11 @@ export class SendAllMicGiftDto {
   @IsInt()
   @Min(1)
   comboCount?: number;
+
+  @ApiPropertyOptional({ description: 'Include the room host in an all-mic send' })
+  @IsOptional()
+  @IsBoolean()
+  includeHost?: boolean;
 
   @ApiPropertyOptional({ description: 'Mark the visual effect as a cannon launch' })
   @IsOptional()

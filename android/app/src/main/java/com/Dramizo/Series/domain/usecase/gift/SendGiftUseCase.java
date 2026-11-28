@@ -11,7 +11,11 @@ public class SendGiftUseCase {
         return execute(giftId, receiverId, qty, roomId, 1);
     }
     public Result<GiftDtos.SendGiftResult> execute(String giftId, String receiverId, int qty, String roomId, int comboCount) {
-        return repo.sendGift(giftId, receiverId, qty, roomId, comboCount);
+        return execute(giftId, receiverId, qty, roomId, comboCount, java.util.UUID.randomUUID().toString());
+    }
+    public Result<GiftDtos.SendGiftResult> execute(String giftId, String receiverId, int qty,
+            String roomId, int comboCount, String requestId) {
+        return repo.sendGift(giftId, receiverId, qty, roomId, comboCount, requestId);
     }
 
     public Result<GiftDtos.SendGiftResult> executeAllMic(
@@ -20,6 +24,13 @@ public class SendGiftUseCase {
             int qty,
             String roomId,
             int comboCount) {
-        return repo.sendAllMic(giftId, receiverIds, qty, roomId, comboCount);
+        return executeAllMic(giftId, receiverIds, qty, roomId, comboCount, false,
+                java.util.UUID.randomUUID().toString());
+    }
+
+    public Result<GiftDtos.SendGiftResult> executeAllMic(String giftId,
+            java.util.List<String> receiverIds, int qty, String roomId, int comboCount,
+            boolean includeHost, String requestId) {
+        return repo.sendAllMic(giftId, receiverIds, qty, roomId, comboCount, includeHost, requestId);
     }
 }

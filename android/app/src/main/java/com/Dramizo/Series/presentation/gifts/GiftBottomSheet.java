@@ -66,12 +66,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private static final String STATE_GIFT = "sel_gift";
     private static final String STATE_QTY = "qty";
     private static final String STATE_ALL_MIC = "all_mic";
+    private static final String STATE_GIFT_REQUEST_ID = "gift_request_id";
+    private static final String STATE_GIFT_REQUEST_FINGERPRINT = "gift_request_fingerprint";
 
     @Nullable private GiftDtos.GiftDto selected;
     @Nullable private String receiverId;
     @Nullable private String pendingGiftId;
     @Nullable private GiftRecipient selectedRecipient;
     private boolean sending;
+    @Nullable private String pendingSendRequestId;
+    @Nullable private String pendingSendFingerprint;
     private boolean sendToAllMic;
     private boolean chatMode;
     private int giftQty = 1;
@@ -248,6 +252,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             pendingGiftId = savedState.getString(STATE_GIFT);
             giftQty = Math.max(1, savedState.getInt(STATE_QTY, 1));
             sendToAllMic = savedState.getBoolean(STATE_ALL_MIC, false);
+            pendingSendRequestId = savedState.getString(STATE_GIFT_REQUEST_ID);
+            pendingSendFingerprint = savedState.getString(STATE_GIFT_REQUEST_FINGERPRINT);
             if (receiverId == null || receiverId.isEmpty()) {
                 receiverId = savedState.getString(ARG_RECEIVER);
             }
@@ -905,6 +911,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
+        LinkedHashSet<String> preservedSelection = new LinkedHashSet<>(selectedRecipientIds);
         List<GiftRecipient> all = source.getGiftRecipients();
         micRecipients.clear();
         if (all != null) micRecipients.addAll(all);
@@ -958,17 +965,25 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             return;
         }
 
-        GiftRecipient initial = findRecipient(receiverId);
-        if (initial != null) {
-            selectedRecipient = initial;
-            receiverId = initial.userId;
-        } else if (!micRecipients.isEmpty()) {
-            selectedRecipient = micRecipients.get(0);
-            receiverId = selectedRecipient.userId;
+        if (!preservedSelection.isEmpty()) {
+            selectedRecipientIds.clear();
+            selectedRecipientIds.addAll(preservedSelection);
+            if (receiverId == null || receiverId.isEmpty()) receiverId = preservedSelection.iterator().next();
+            selectedRecipient = findRecipient(receiverId);
+        } else {
+            GiftRecipient initial = findRecipient(receiverId);
+            if (initial != null) {
+                selectedRecipient = initial;
+                receiverId = initial.userId;
+            } else if (!micRecipients.isEmpty()) {
+                selectedRecipient = micRecipients.get(0);
+                receiverId = selectedRecipient.userId;
+            }
+            selectedRecipientIds.clear();
+            if (receiverId != null && !receiverId.isEmpty()) selectedRecipientIds.add(receiverId);
         }
-        selectedRecipientIds.clear();
-        if (receiverId != null && !receiverId.isEmpty()) selectedRecipientIds.add(receiverId);
-        binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
+        binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false,
+                new ArrayList<>(selectedRecipientIds));
         refreshSendBtn();
         updateDockText();
         publishSeatGiftSelection();
@@ -1220,7 +1235,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         List<String> targets = new ArrayList<>();
         if (sendToAllMic) {
-            if (!chatMode) setupRecipientStrip(false);
             LinkedHashSet<String> unique = new LinkedHashSet<>();
             for (GiftRecipient r : micRecipients) {
                 if (r != null && r.userId != null && !r.userId.isEmpty())
@@ -1236,59 +1250,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
-        // Reconcile against the latest seat roster without changing the recipient chosen by
-        // the sender. A stale explicit selection must never be redirected to another user.
-        if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
-            boolean hasExplicitRecipientSelection = sendToAllMic || !selectedRecipientIds.isEmpty();
-            List<GiftRecipient> latest = src.getGiftRecipients();
-            LinkedHashSet<String> liveIds = new LinkedHashSet<>();
-            if (latest != null) {
-                for (GiftRecipient r : latest) {
-                    if (r != null && r.userId != null && !r.userId.trim().isEmpty()) {
-                        liveIds.add(r.userId.trim());
-                    }
-                }
-            }
-            List<String> reconciled = new ArrayList<>();
-            if (hasExplicitRecipientSelection) {
-                for (String id : targets) {
-                    if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
-                        reconciled.add(id.trim());
-                    }
-                }
-                if (reconciled.isEmpty()) {
-                    Toast.makeText(requireContext(),
-                            "المستلم الذي اخترته لم يعد على المايك. حدّث المقاعد واختر مستلماً آخر",
-                            Toast.LENGTH_LONG).show();
-                    refreshSendBtn();
-                    return;
-                }
-            } else {
-                // With no explicit selection, keep the room's authoritative default host target.
-                // The host is giftable even when the seat roster is temporarily empty.
-                String fallback = src.getDefaultGiftReceiverId();
-                if (fallback != null && !fallback.trim().isEmpty()) {
-                    reconciled.add(fallback.trim());
-                } else {
-                    for (String id : targets) {
-                        if (id != null && liveIds.contains(id.trim()) && !reconciled.contains(id.trim())) {
-                            reconciled.add(id.trim());
-                        }
-                    }
-                }
-            }
-            targets.clear();
-            targets.addAll(reconciled);
-            if (!targets.isEmpty()) {
-                receiverId = targets.get(0);
-                selectedRecipientIds.clear();
-                selectedRecipientIds.addAll(targets);
-            }
-        }
-
         // Self-gifting is controlled by the live dashboard policy and enforced by the server.
         // Keep selected recipients intact; stripping the sender here made the dashboard toggle ineffective.
 
+        if (targets.isEmpty() && sendToAllMic && !chatMode
+                && getActivity() instanceof GiftRecipientSource src) {
+            String hostId = src.getDefaultGiftReceiverId();
+            if (hostId != null && !hostId.trim().isEmpty()) targets.add(hostId.trim());
+        }
         if (targets.isEmpty()) {
             Toast.makeText(requireContext(),
                     R.string.choose_recipient_first, Toast.LENGTH_LONG).show();
@@ -1319,9 +1288,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.bltvSendGift.setText("جارٍ الإرسال ×" + qty
                 + (targets.size() > 1 ? " · " + targets.size() : "") + "...");
 
+        String fingerprint = selected.id + "|" + (chatMode ? "" : String.valueOf(roomId))
+                + "|" + qty + "|" + sendToAllMic + "|" + targets.toString();
+        if (pendingSendRequestId == null || !fingerprint.equals(pendingSendFingerprint)) {
+            pendingSendRequestId = java.util.UUID.randomUUID().toString();
+            pendingSendFingerprint = fingerprint;
+        }
         lastTargets.clear();
         lastTargets.addAll(targets);
-        vm.sendMany(selected.id, targets, qty, chatMode ? null : roomId);
+        vm.sendMany(selected.id, targets, qty, chatMode ? null : roomId,
+                sendToAllMic, pendingSendRequestId);
     }
 
     private void loadCpGiftMappings() {
@@ -1449,6 +1425,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             @Nullable String roomId) {
         sending = false;
         if (result == null) return;
+        pendingSendRequestId = null;
+        pendingSendFingerprint = null;
         // Consume sticky result first so re-observe never double-fires this payload.
         try {
             vm.clearSent();
@@ -1881,6 +1859,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (id != null) out.putString(STATE_GIFT, id);
         out.putInt(STATE_QTY, giftQty);
         out.putBoolean(STATE_ALL_MIC, sendToAllMic);
+        if (pendingSendRequestId != null) out.putString(STATE_GIFT_REQUEST_ID, pendingSendRequestId);
+        if (pendingSendFingerprint != null) out.putString(STATE_GIFT_REQUEST_FINGERPRINT, pendingSendFingerprint);
         if (receiverId != null) out.putString(ARG_RECEIVER, receiverId);
     }
 

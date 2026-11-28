@@ -101,15 +101,19 @@ public class GiftUserAvatarView extends LinearLayout {
         recycler.setAdapter(adapter);
     }
 
-    public void submit(@Nullable List<GiftRecipient> list,
-                       @Nullable String selectedUserId,
+    public void submit(@Nullable List<GiftRecipient> list, @Nullable String selectedUserId,
                        boolean selectAll) {
+        submit(list, selectedUserId, selectAll, null);
+    }
+
+    public void submit(@Nullable List<GiftRecipient> list, @Nullable String selectedUserId,
+                       boolean selectAll, @Nullable List<String> selectedUserIds) {
         recipients.clear();
         if (list != null) recipients.addAll(list);
         allMic = selectAll;
         if (recycler == null) return;
         ensureAdapter();
-        adapter.submit(recipients, selectedUserId, selectAll);
+        adapter.submit(recipients, selectedUserId, selectAll, selectedUserIds);
         setAvatarAllMic(selectAll);
     }
 

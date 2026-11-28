@@ -47,19 +47,19 @@ public final class GiftDtos {
         @SerializedName("cannonLaunch") public Boolean cannonLaunch;
         @SerializedName("requestId") public String requestId;
 
-        public SendGiftRequest(
-                String giftId,
-                String receiverId,
-                int quantity,
-                String roomId,
-                int comboCount) {
+        public SendGiftRequest(String giftId, String receiverId, int quantity, String roomId, int comboCount) {
+            this(giftId, receiverId, quantity, roomId, comboCount, java.util.UUID.randomUUID().toString());
+        }
+
+        public SendGiftRequest(String giftId, String receiverId, int quantity, String roomId,
+                int comboCount, String requestId) {
             this.giftId = giftId;
             this.receiverId = receiverId;
             this.quantity = quantity;
             this.roomId = roomId;
             this.comboCount = Math.max(1, comboCount);
-            // Stable for retries of this same request body; server deduplicates charge/payout.
-            this.requestId = java.util.UUID.randomUUID().toString();
+            // Stable request key supplied by the UI and reused for identical retries.
+            this.requestId = requestId != null ? requestId : java.util.UUID.randomUUID().toString();
         }
     }
 
@@ -71,20 +71,24 @@ public final class GiftDtos {
         @SerializedName("comboCount") public int comboCount;
         @SerializedName("cannonLaunch") public Boolean cannonLaunch;
         @SerializedName("requestId") public String requestId;
+        @SerializedName("includeHost") public boolean includeHost;
 
-        public SendAllMicRequest(
-                String giftId,
-                java.util.List<String> receiverIds,
-                int quantity,
-                String roomId,
-                int comboCount) {
+        public SendAllMicRequest(String giftId, java.util.List<String> receiverIds,
+                int quantity, String roomId, int comboCount) {
+            this(giftId, receiverIds, quantity, roomId, comboCount, false,
+                    java.util.UUID.randomUUID().toString());
+        }
+
+        public SendAllMicRequest(String giftId, java.util.List<String> receiverIds,
+                int quantity, String roomId, int comboCount, boolean includeHost, String requestId) {
             this.giftId = giftId;
             this.receiverIds = receiverIds;
             this.quantity = quantity;
             this.roomId = roomId;
             this.comboCount = Math.max(1, comboCount);
+            this.includeHost = includeHost;
             // Shared key across recipients makes all-mic sends retry-safe.
-            this.requestId = java.util.UUID.randomUUID().toString();
+            this.requestId = requestId != null ? requestId : java.util.UUID.randomUUID().toString();
         }
     }
 

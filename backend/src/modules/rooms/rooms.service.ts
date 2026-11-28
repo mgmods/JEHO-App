@@ -2104,7 +2104,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }),
       this.modsRepo.find({ where: { roomId: id } }),
     ]);
-    room.seats = loadedSeats;
+    const seatsByIndex = new Map<number, RoomSeat>();
+    for (const seat of loadedSeats) seatsByIndex.set(Number(seat.seatIndex), seat);
+    const maxSeatIndex = loadedSeats.reduce((max, seat) => Math.max(max, Number(seat.seatIndex) || 0), -1);
+    const stableSeatCount = Math.max(maxSeatIndex + 1, loadedSeats.length, Math.max(0, Number(room.seatCount) || 0));
+    room.seats = Array.from({ length: stableSeatCount }, (_, seatIndex) => {
+      const existing = seatsByIndex.get(seatIndex);
+      if (existing) return existing;
+      return this.seatsRepo.create({
+        roomId: id,
+        seatIndex,
+        isHostSeat: seatIndex === 0,
+        status: SeatStatus.EMPTY,
+        userId: null,
+        isMuted: false,
+        isModeratorMuted: false,
+        isLocked: false,
+      });
+    });
     room.moderators = loadedModerators;
     // Resolve the account-wide agency club identity once for every participant in this room.
     const clubUserIds = [...new Set([room.hostId, ...(loadedSeats || []).map((seat: any) => seat.userId)].filter(Boolean))];
