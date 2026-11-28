@@ -237,15 +237,20 @@ class AdminConsoleActivity : ThemedActivity() {
                 intArrayOf(0xFF15182B.toInt(), 0xFF302653.toInt()))
             elevation = dp(5).toFloat()
         }
-        backButton = TextView(this).apply {
+        backButton = MaterialButton(this).apply {
             text = "‹"
             textSize = 29f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+            minHeight = dp(48)
+            minimumHeight = dp(48)
+            cornerRadius = dp(14)
+            insetTop = 0
+            insetBottom = 0
             visibility = View.GONE
             contentDescription = "الرجوع إلى القسم السابق"
-            background = roundRect(0x332FFFFFFF.toInt(), 14)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(0x332FFFFFFF.toInt())
             setOnClickListener { handleAdminBack() }
         }
         val brand = LinearLayout(this).apply {
