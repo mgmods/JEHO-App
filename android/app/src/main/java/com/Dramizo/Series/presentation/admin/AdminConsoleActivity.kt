@@ -11,7 +11,7 @@ import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
+import com.google.android.material.button.MaterialButton
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -51,8 +51,8 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var body: LinearLayout
     private lateinit var progress: ProgressBar
     private lateinit var titleView: TextView
-    private lateinit var backButton: TextView
-    private lateinit var bottomBackButton: TextView
+    private lateinit var backButton: MaterialButton
+    private lateinit var bottomBackButton: MaterialButton
     private var currentSection = "home"
     private var currentRole = StaffRoleHelper.NONE
     private val sectionHistory = java.util.ArrayDeque<String>()
@@ -348,18 +348,25 @@ class AdminConsoleActivity : ThemedActivity() {
         else -> "Staff"
     }
 
-    private fun navButton(label: String, action: () -> Unit): TextView =
-        TextView(this).apply {
+    private fun navButton(label: String, action: () -> Unit): MaterialButton =
+        MaterialButton(this).apply {
             text = label
-            textSize = 13.5f
+            textSize = 13f
+            isAllCaps = false
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
             setTextColor(0xFFFFE7B7.toInt())
             contentDescription = label
-            background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF66502C.toInt(), 0xFF8A6B38.toInt())
-            ).apply { cornerRadius = dp(15).toFloat() }
+            cornerRadius = dp(15)
+            insetTop = 0
+            insetBottom = 0
+            minHeight = dp(48)
+            minimumHeight = dp(48)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF514071.toInt())
+            rippleColor = android.content.res.ColorStateList.valueOf(0x33FFFFFF)
+            strokeWidth = dp(1)
+            strokeColor = android.content.res.ColorStateList.valueOf(0x667F6AAE)
+            elevation = dp(2).toFloat()
             setOnClickListener { action() }
         }
 
@@ -4018,34 +4025,33 @@ class AdminConsoleActivity : ThemedActivity() {
         row.addView(control)
     }
 
-    private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
+    private fun button(label: String, action: () -> Unit): MaterialButton = MaterialButton(this).apply {
         text = label.trim().ifBlank { "إجراء" }
         textSize = 13f
         isAllCaps = false
         maxLines = 2
         gravity = Gravity.CENTER
-        minHeight = dp(46)
-        minimumHeight = dp(46)
+        minHeight = dp(48)
+        minimumHeight = dp(48)
         minWidth = 0
         setTextColor(Color.WHITE)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textDirection = View.TEXT_DIRECTION_RTL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         includeFontPadding = false
-        background = android.graphics.drawable.RippleDrawable(
-            android.content.res.ColorStateList.valueOf(0x44FFFFFF),
-            GradientDrawable().apply {
-                setColor(0xFF6B4CC2.toInt())
-                cornerRadius = dp(13).toFloat()
-            },
-            roundRect(0xFF49358F.toInt(), 13)
-        )
+        cornerRadius = dp(14)
+        insetTop = 0
+        insetBottom = 0
+        backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF6550B5.toInt())
+        rippleColor = android.content.res.ColorStateList.valueOf(0x44FFFFFF)
+        strokeWidth = dp(1)
+        strokeColor = android.content.res.ColorStateList.valueOf(0x337F6AAE)
         stateListAnimator = null
-        elevation = dp(1).toFloat()
+        elevation = dp(2).toFloat()
         contentDescription = label
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(4)
-            bottomMargin = dp(4)
+            topMargin = dp(5)
+            bottomMargin = dp(5)
         }
         setOnClickListener {
             if (!isEnabled) return@setOnClickListener
