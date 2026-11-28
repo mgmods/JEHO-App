@@ -329,7 +329,7 @@
                 </td>
                 <td>{{ r.providerLabel || r.provider || r.gateway || '—' }}</td>
                 <td><StatusBadge :status="r.status || 'completed'" /></td>
-                <td>{{ formatDate(r.createdAt) }}</td>
+                <td v-if="tab !== 'recharges'">{{ formatDate(r.createdAt) }}</td>
                 <td class="text-end">
                   <div
                     class="action-btns justify-content-end"
@@ -399,10 +399,6 @@
               <div class="col-md-6">
                 <div class="small text-muted">المبلغ المرسل</div>
                 <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.amountSent ?? '—' }}</div>
-              </div>
-              <div class="col-md-6">
-                <div class="small text-muted">تاريخ التحويل</div>
-                <div class="fw-semibold">{{ selectedRecharge.shamCashReceipt?.transferDate || '—' }}</div>
               </div>
               <div class="col-md-6">
                 <div class="small text-muted">رقم العملية</div>
@@ -689,7 +685,7 @@ const economyPreviewLine = computed(() => {
 const headers = computed(() => {
   if (tab.value === 'transactions') return [t('common.id'), t('common.user'), t('common.type'), t('common.amount'), t('common.status'), t('common.date')]
   if (tab.value === 'withdraws') return [t('common.id'), t('common.user'), t('common.amount'), t('wallet.payout'), t('common.status'), t('common.date'), t('common.actions')]
-  return [t('common.id'), t('common.user'), t('common.amount'), t('common.coins'), t('wallet.provider'), t('common.status'), t('common.date')]
+  return [t('common.id'), t('common.user'), t('common.amount'), t('common.coins'), t('wallet.provider'), t('common.status')]
 })
 
 function shortId(id) {
