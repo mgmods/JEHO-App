@@ -175,8 +175,14 @@ const systemHealth = ref(null)
 const healthLoading = ref(false)
 const cleaningLogs = ref(false)
 let timer = null
+let chartsTimer = null
+let chartsRefreshTimer = null
 let healthTimer = null
+let transactionsTimer = null
+let initialHealthTimer = null
+let initialTransactionsTimer = null
 let loadInFlight = false
+let chartsInFlight = false
 let healthInFlight = false
 let transactionsInFlight = false
 
@@ -457,27 +463,26 @@ async function onCleanLogs(payload) {
 }
 
 async function load() {
-  // A slow response must never overlap the next refresh and multiply DB load.
+  // Load the two small, immediately visible datasets first. Charts, transactions
+  // and process-health data are staggered so one heavy query cannot delay the
+  // first useful dashboard paint on a small database instance.
   if (loadInFlight) return
   loadInFlight = true
   loading.value = true
   error.value = ''
   try {
-    const [ov, ch, lv] = await Promise.all([
+    const [ov, lv] = await Promise.all([
       dashboardApi.overview(),
-      dashboardApi.charts({ range: '7d' }),
       dashboardApi.liveStats(),
     ])
-    if (ov.error && ch.error && lv.error) {
+    if (ov.error && lv.error) {
       error.value = ov.error.message || t('dashboard.apiError')
       toast().danger(error.value)
-    } else if (ov.error || ch.error || lv.error) {
-      error.value = [ov.error, ch.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
+    } else if (ov.error || lv.error) {
+      error.value = [ov.error, lv.error].filter(Boolean).map((e) => e.message).join(' · ')
       toast().warning(error.value)
     }
-    // Preserve the last good snapshot when one endpoint temporarily fails.
     if (ov.data) overview.value = ov.data
-    if (ch.data) charts.value = ch.data
     if (lv.data) live.value = extractList(lv.data).slice(0, 6)
   } finally {
     loading.value = false
@@ -485,24 +490,46 @@ async function load() {
   }
 }
 
+async function loadCharts() {
+  if (chartsInFlight) return
+  chartsInFlight = true
+  try {
+    const { data, error: err } = await dashboardApi.charts({ range: '7d' })
+    if (!err && data) charts.value = data
+    else if (err && !charts.value?.labels) error.value = err.message
+  } finally {
+    chartsInFlight = false
+  }
+}
+
 onMounted(() => {
   void load()
-  void loadTransactions()
-  void loadHealth()
+  // Defer secondary panels until the summary/live cards have had a chance to paint.
+  chartsTimer = setTimeout(() => { if (!document.hidden) void loadCharts() }, 250)
+  initialTransactionsTimer = setTimeout(() => { if (!document.hidden) void loadTransactions() }, 500)
+  initialHealthTimer = setTimeout(() => { if (!document.hidden) void loadHealth() }, 900)
+
   timer = setInterval(() => {
     if (!document.hidden) {
       void load()
       void loadTransactions()
     }
   }, 60000)
-  // Process health is comparatively expensive and does not need minute-by-minute polling.
+  chartsRefreshTimer = setInterval(() => {
+    if (!document.hidden) void loadCharts()
+  }, 300000)
   healthTimer = setInterval(() => {
     if (!document.hidden) void loadHealth()
   }, 300000)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (chartsTimer) clearTimeout(chartsTimer)
+  if (chartsRefreshTimer) clearInterval(chartsRefreshTimer)
   if (healthTimer) clearInterval(healthTimer)
+  if (transactionsTimer) clearInterval(transactionsTimer)
+  if (initialHealthTimer) clearTimeout(initialHealthTimer)
+  if (initialTransactionsTimer) clearTimeout(initialTransactionsTimer)
 })
 </script>
 
