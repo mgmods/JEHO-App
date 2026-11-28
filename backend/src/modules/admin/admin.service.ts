@@ -3335,59 +3335,87 @@ export class AdminService {
   }
 
   async charts() {
-    const days = 7;
+    // Use one grouped query per series instead of 14 sequential COUNT queries.
+    // The old loop waited for each day's users and rooms count before starting
+    // the next day, making dashboard navigation increasingly slow on larger DBs.
+    const now = new Date();
+    const end = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+    ));
+    const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
     const labels: string[] = [];
-    const usersSeries: number[] = [];
-    const roomsSeries: number[] = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const day = new Date();
-      day.setHours(0, 0, 0, 0);
-      day.setDate(day.getDate() - i);
-      const next = new Date(day);
-      next.setDate(next.getDate() + 1);
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
       labels.push(day.toISOString().slice(5, 10));
-      usersSeries.push(
-        await this.usersRepo
-          .createQueryBuilder('u')
-          .where('u.createdAt >= :day AND u.createdAt < :next', { day, next })
-          .getCount(),
-      );
-      roomsSeries.push(
-        await this.roomsRepo
-          .createQueryBuilder('r')
-          .where('r.createdAt >= :day AND r.createdAt < :next', { day, next })
-          .getCount(),
-      );
     }
-    const rechargeCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.type = :type', { type: TransactionType.RECHARGE })
-      .andWhere('t.currency = :cur', { cur: CurrencyType.COINS })
-      .getRawOne();
-    const giftCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.type = :type', { type: TransactionType.GIFT_SEND })
-      .andWhere('t.currency = :cur', { cur: CurrencyType.COINS })
-      .getRawOne();
-    const vipCoins = await this.txRepo
-      .createQueryBuilder('t')
-      .select('COALESCE(SUM(ABS(t.amount)), 0)', 'total')
-      .where('t.referenceType = :ref', { ref: 'vip_purchase' })
-      .getRawOne();
-    const rechargeVal = Math.max(0, Number(rechargeCoins?.total || 0));
-    const giftsVal = Math.max(0, Number(giftCoins?.total || 0));
-    const vipVal = Math.max(0, Number(vipCoins?.total || 0));
 
-    const providerRows = await this.rechargeRepo
-      .createQueryBuilder('r')
-      .select('r.provider', 'provider')
-      .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
-      .addSelect('COUNT(*)', 'count')
-      .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-      .groupBy('r.provider')
-      .getRawMany();
+    const userDayExpr = `to_char(u."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+    const roomDayExpr = `to_char(r."createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+    const [
+      userRows,
+      roomRows,
+      coinTotals,
+      providerRows,
+      chartBaselineRow,
+    ] = await Promise.all([
+      this.usersRepo.createQueryBuilder('u')
+        .select(userDayExpr, 'day')
+        .addSelect('COUNT(*)', 'count')
+        .where('u."createdAt" >= :start AND u."createdAt" < :end', { start, end })
+        .groupBy(userDayExpr)
+        .getRawMany(),
+      this.roomsRepo.createQueryBuilder('r')
+        .select(roomDayExpr, 'day')
+        .addSelect('COUNT(*)', 'count')
+        .where('r."createdAt" >= :start AND r."createdAt" < :end', { start, end })
+        .groupBy(roomDayExpr)
+        .getRawMany(),
+      this.txRepo.createQueryBuilder('t')
+        .select(
+          'COALESCE(SUM(CASE WHEN t.type = :rechargeType AND t.currency = :coinCurrency THEN ABS(t.amount) ELSE 0 END), 0)',
+          'recharge',
+        )
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN t.type = :giftType AND t.currency = :coinCurrency THEN ABS(t.amount) ELSE 0 END), 0)',
+          'gifts',
+        )
+        .addSelect(
+          "COALESCE(SUM(CASE WHEN t.\"referenceType\" = :vipReference THEN ABS(t.amount) ELSE 0 END), 0)",
+          'vip',
+        )
+        .setParameters({
+          rechargeType: TransactionType.RECHARGE,
+          giftType: TransactionType.GIFT_SEND,
+          coinCurrency: CurrencyType.COINS,
+          vipReference: 'vip_purchase',
+        })
+        .getRawOne(),
+      this.rechargeRepo.createQueryBuilder('r')
+        .select('r.provider', 'provider')
+        .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
+        .addSelect('COUNT(*)', 'count')
+        .where('r.status = :status', { status: RechargeStatus.COMPLETED })
+        .groupBy('r.provider')
+        .getRawMany(),
+      this.settingsRepo.findOne({ where: { key: 'dashboard_revenue_baseline_fiat' } }),
+    ]);
+
+    const countByDay = (rows: Array<{ day: string; count: string | number }>) =>
+      new Map((rows || []).map((row) => [String(row.day), Number(row.count || 0)]));
+    const usersByDay = countByDay(userRows);
+    const roomsByDay = countByDay(roomRows);
+    const usersSeries = labels.map((label) => usersByDay.get(
+      `${new Date().getUTCFullYear()}-${label}`,
+    ) ?? 0);
+    const roomsSeries = labels.map((label) => roomsByDay.get(
+      `${new Date().getUTCFullYear()}-${label}`,
+    ) ?? 0);
+
+    const rechargeVal = Math.max(0, Number(coinTotals?.recharge || 0));
+    const giftsVal = Math.max(0, Number(coinTotals?.gifts || 0));
+    const vipVal = Math.max(0, Number(coinTotals?.vip || 0));
     const byProviderRaw = (providerRows || [])
       .map((row: any) => ({
         provider: String(row.provider || 'other'),
@@ -3395,51 +3423,33 @@ export class AdminService {
         total: Number(row.total || 0),
         count: Number(row.count || 0),
       }))
-      .filter((r) => r.total > 0 || r.count > 0)
+      .filter((row) => row.total > 0 || row.count > 0)
       .sort((a, b) => b.total - a.total);
-    const chartRawTotal = byProviderRaw.reduce((s, r) => s + Number(r.total || 0), 0);
-    const chartBaselineRow = await this.settingsRepo.findOne({
-      where: { key: 'dashboard_revenue_baseline_fiat' },
-    });
+    const chartRawTotal = byProviderRaw.reduce((sum, row) => sum + Number(row.total || 0), 0);
     const chartBaseline = Math.max(0, Number(chartBaselineRow?.value || 0) || 0);
     const chartNet = Math.max(0, chartRawTotal - chartBaseline);
     const chartScale = chartRawTotal > 0 ? chartNet / chartRawTotal : 0;
-    const byProvider = byProviderRaw.map((r) => ({
-      ...r,
-      total: Math.round(Number(r.total || 0) * chartScale * 100) / 100,
-    })).filter((r) => r.total > 0 || (chartNet <= 0 && r.count > 0));
-    // Doughnut = real fiat revenue by payment channel (Play / card / USDT / …).
-    const revLabels = byProvider.length ? byProvider.map((r) => r.label) : ['—'];
-    const revValues = byProvider.length ? byProvider.map((r) => r.total) : [0];
-    if (chartNet <= 0) {
-      revLabels.length = 0;
-      revValues.length = 0;
-      revLabels.push('—');
-      revValues.push(0);
-    }
+    const byProvider = byProviderRaw.map((row) => ({
+      ...row,
+      total: Math.round(Number(row.total || 0) * chartScale * 100) / 100,
+    })).filter((row) => row.total > 0 || (chartNet <= 0 && row.count > 0));
+    const revLabels = chartNet > 0 ? byProvider.map((row) => row.label) : ['—'];
+    const revValues = chartNet > 0 ? byProvider.map((row) => row.total) : [0];
 
     return {
       labels,
-      users: {
-        labels,
-        users: usersSeries,
-        data: usersSeries,
-      },
+      users: { labels, users: usersSeries, data: usersSeries },
       revenue: {
         labels: revLabels,
         values: revValues,
         data: revValues,
         byProvider: chartNet <= 0 ? [] : byProvider,
-        // Keep coin totals for mini-stats (not revenue).
         coinVolume: {
           labels: ['Recharge', 'Gifts', 'VIP'],
           values: [rechargeVal, giftsVal, vipVal],
         },
       },
-      rooms: {
-        labels,
-        data: roomsSeries,
-      },
+      rooms: { labels, data: roomsSeries },
     };
   }
 
