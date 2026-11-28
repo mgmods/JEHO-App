@@ -2902,6 +2902,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     );
 
     await this.dataSource.transaction(async (manager) => {
+      // Serialize resize against take/leave/approve/mute and reopen repair.
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
+      );
       const seatsRepo = manager.getRepository(RoomSeat);
       const roomsRepo = manager.getRepository(Room);
       const managedRoom = await roomsRepo.findOne({
