@@ -2150,8 +2150,10 @@ export class AdminService {
       const raw = String(value || '').trim();
       if (!raw) return raw;
       if (raw.length > 512) throw new BadRequestException(`رابط ${field} أطول من المسموح`);
-      if (/^\/?(?:uploads|assets)\/[A-Za-z0-9._~!  async upsertGift(id: string | null, dto: UpsertGiftDto) {
-()*+,;=:@%/?-]+$/i.test(raw) && !raw.includes('..')) {
+      const localMediaPath = /^(uploads|assets)\//i.test(raw)
+        && !raw.includes('..')
+        && !raw.includes('\\');
+      if (localMediaPath) {
         return raw;
       }
       try {
