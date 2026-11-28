@@ -350,7 +350,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 80L;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 70L;
     // Two units per request reduce round-trip overhead; concurrency remains bounded.
     private static final int LUCKY_CANNON_UNITS_PER_SHOT = 2;
     private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
@@ -1075,16 +1075,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         Toast.LENGTH_SHORT).show();
                 return;
             }
-            micOn = !micOn;
-            userChoseMute = !micOn;
+            boolean requestedMicOn = !RoomRtcEngine.getInstance().isMicEnabled();
+            RoomRtcEngine.getInstance().setMicEnabled(requestedMicOn);
+            boolean actualMicOn = RoomRtcEngine.getInstance().isMicEnabled();
+            if (requestedMicOn && !actualMicOn) {
+                micOn = false;
+                syncMicUi();
+                Toast.makeText(this, "الميكروفون مشغول من تطبيق آخر؛ سيُفتح عند تحريره", Toast.LENGTH_LONG).show();
+                return;
+            }
+            micOn = actualMicOn;
+            userChoseMute = !actualMicOn;
             lastLocalMicChangeAtMs = System.currentTimeMillis();
             if (myUserId != null) getSharedPreferences("room_mic_preferences", MODE_PRIVATE)
                     .edit().putBoolean("muted:" + myUserId, userChoseMute).apply();
-            if (roomId != null) viewModel.setMic(roomId, !micOn);
-            RoomRtcEngine.getInstance().setMicEnabled(micOn);
+            if (roomId != null) viewModel.setMic(roomId, !actualMicOn);
             syncVoiceAudio(currentSeats);
             syncMicUi();
-            Toast.makeText(this, micOn ? R.string.mic_on : R.string.mic_off, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, actualMicOn ? R.string.mic_on : R.string.mic_off, Toast.LENGTH_SHORT).show();
         });
         binding.btnLock.setOnClickListener(v -> {
             if (!canManageRoom) {
@@ -10279,8 +10287,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             updateHostMuteBadge();
             return;
         }
+        // The SDK is the source of truth. A local toggle can be rejected while another
+        // recorder owns capture; never paint an open mic until RTC confirms publishing input.
+        try {
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+        } catch (Exception ignored) {
+            micOn = false;
+        }
         if (seatAdapter != null) seatAdapter.setSelfMicMuted(!micOn);
-        // Always bind the icon from the live local mic state; don't preserve a stale mute glyph.
         lastMicUiState = micOn;
         binding.imgMicIcon.setImageResource(
                 micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
@@ -17650,8 +17664,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 boolean preserveUserMute = userChoseMute || moderatorMuted;
                 micOn = !preserveUserMute;
                 RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                micOn = RoomRtcEngine.getInstance().isMicEnabled();
                 if (!moderatorMuted && roomId != null) {
-                    viewModel.setMic(roomId, preserveUserMute);
+                    viewModel.setMic(roomId, !micOn);
                 }
                 micStateInitializedForRoom = true;
                 syncMicUi();
@@ -18214,6 +18229,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean desiredMicEnabled = onSeat && micOn;
             if (RoomRtcEngine.getInstance().isMicEnabled() != desiredMicEnabled) {
                 RoomRtcEngine.getInstance().setMicEnabled(desiredMicEnabled);
+            }
+            boolean actualMicEnabled = RoomRtcEngine.getInstance().isMicEnabled();
+            if (micOn != actualMicEnabled) {
+                micOn = actualMicEnabled;
+                syncMicUi();
             }
             if (moderatorMuted && onSeat) {
                 rtcCanPublish = false;
@@ -19022,11 +19042,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         micOn = !shouldRemainMuted;
         try {
             RoomRtcEngine.getInstance().setMicEnabled(micOn);
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
         } catch (Exception micError) {
+            micOn = false;
             android.util.Log.w("VoiceRoom", "optimistic mic state apply failed", micError);
         }
+        RoomDtos.SeatDto optimisticSelf = findMySeat(currentSeats);
+        if (optimisticSelf != null) {
+            optimisticSelf.isMuted = !micOn;
+            optimisticSelf.isModeratorMuted = previousModeratorMuted;
+        }
         if (!previousModeratorMuted && roomId != null) {
-            viewModel.setMic(roomId, shouldRemainMuted);
+            // Persist the confirmed engine state, not the pre-RTC optimistic request.
+            viewModel.setMic(roomId, !micOn);
         }
         micStateInitializedForRoom = true;
         syncMicUi();

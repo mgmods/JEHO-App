@@ -80,6 +80,24 @@
             </div>
             <p v-if="splashMessage" class="form-text mt-3" role="status">{{ splashMessage }}</p>
           </section>
+          <section class="settings-card login-wallpaper-card">
+            <h3 class="settings-card-title">خلفية تسجيل الدخول عبر Google</h3>
+            <p class="form-text mb-3">تظهر هذه الخلفية على شاشة الدخول قبل تسجيل الدخول، ولا تغيّر خلفية إنشاء الحساب أو السبلاش. لا يُسمح بحفظ الرابط قبل التأكد من تحميل الصورة.</p>
+            <div class="mb-3 rounded-4 border bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden" style="min-height:180px">
+              <img v-if="loginBgPreviewUrl" :src="loginBgPreviewUrl" alt="معاينة خلفية تسجيل الدخول" style="display:block;width:100%;max-height:360px;object-fit:cover" />
+              <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لتسجيل الدخول</span>
+            </div>
+            <label class="form-label">رابط مباشر للصورة (HTTPS أو HTTP)</label>
+            <input v-model.trim="loginBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/login-background.webp" />
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-aurora" :disabled="!loginBgUrlInput.trim() || loginBgBusy || !auth.can('settings', 'write')" @click="saveLoginBgUrl">
+                <span v-if="loginBgBusy" class="spinner-border spinner-border-sm me-1"></span>
+                {{ loginBgBusy ? 'جارٍ التحقق والحفظ…' : 'التحقق وحفظ خلفية الدخول' }}
+              </button>
+              <button type="button" class="btn btn-ghost" :disabled="!loginBgSavedUrl || loginBgBusy || !auth.can('settings', 'write')" @click="removeLoginBg">إزالة الخلفية</button>
+            </div>
+            <p v-if="loginBgMessage" class="form-text mt-3" role="status">{{ loginBgMessage }}</p>
+          </section>
           <section class="settings-card">
             <h3 class="settings-card-title">خلفية إنشاء الحساب</h3>
             <p class="form-text mb-3">هذه الصورة تظهر فقط للمستخدم الجديد بعد اختياره المتابعة عبر Google وعند إكمال بيانات حسابه لأول مرة. لا تغيّر خلفية السبلاش ولا شاشة تسجيل الدخول.</p>
@@ -867,6 +885,11 @@ const registerBgFile = ref(null)
 const registerBgPreviewUrl = ref('')
 const registerBgSavedUrl = ref('')
 const registerBgUrlInput = ref('')
+const loginBgSavedUrl = ref('')
+const loginBgUrlInput = ref('')
+const loginBgPreviewUrl = ref('')
+const loginBgBusy = ref(false)
+const loginBgMessage = ref('')
 const registerBgBusy = ref(false)
 const registerBgMessage = ref('')
 
@@ -881,6 +904,64 @@ const splashSaving = ref(false)
 const splashMessage = ref('')
 let splashThemeConfig = {}
 
+async function verifyRemoteImage(url) {
+  const resolved = resolveAsset(String(url || '').trim())
+  if (!resolved) throw new Error('رابط الصورة فارغ')
+  await new Promise((resolve, reject) => {
+    const image = new Image()
+    const timeout = window.setTimeout(() => {
+      image.src = ''
+      reject(new Error('انتهت مهلة تحميل الصورة؛ تحقق من الرابط واستضافة الصورة'))
+    }, 12000)
+    image.onload = () => { window.clearTimeout(timeout); resolve(true) }
+    image.onerror = () => { window.clearTimeout(timeout); reject(new Error('تعذّر تحميل الصورة من الرابط؛ تأكد أنه رابط مباشر للصورة')) }
+    image.src = resolved
+  })
+}
+
+async function persistLoginBg(url) {
+  const { data, error: err } = await settingsApi.get()
+  if (err) throw new Error(err.message || 'تعذّر تحميل إعدادات الخلفية.')
+  const rows = data?.data || data || []
+  const row = Array.isArray(rows) ? rows.find(item => item.key === 'app_theme') : null
+  let config = {}
+  try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
+  config = { ...config, version: (Number(config.version) || 1) + 1,
+    updatedAt: new Date().toISOString(),
+    backgrounds: { ...(config.backgrounds || {}), auth: url || '' } }
+  const { error: saveErr } = await settingsApi.update({ app_theme: JSON.stringify(config) })
+  if (saveErr) throw new Error(saveErr.message || 'تعذّر حفظ خلفية تسجيل الدخول.')
+  loginBgSavedUrl.value = url || ''
+  loginBgUrlInput.value = url || ''
+  loginBgPreviewUrl.value = url ? resolveAsset(url) : ''
+}
+
+async function saveLoginBgUrl() {
+  const url = loginBgUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { loginBgMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  loginBgBusy.value = true
+  loginBgMessage.value = ''
+  try {
+    await verifyRemoteImage(url)
+    await persistLoginBg(url)
+    loginBgMessage.value = 'تم التحقق من تحميل الصورة وحفظ خلفية تسجيل الدخول.'
+    toast().success(loginBgMessage.value)
+  } catch (error) {
+    loginBgMessage.value = error.message || 'تعذّر التحقق من خلفية الدخول.'
+    toast().danger(loginBgMessage.value)
+  } finally { loginBgBusy.value = false }
+}
+
+async function removeLoginBg() {
+  loginBgBusy.value = true
+  try {
+    await persistLoginBg('')
+    loginBgMessage.value = 'تمت إزالة خلفية تسجيل الدخول.'
+  } catch (error) {
+    loginBgMessage.value = error.message || 'تعذّرت إزالة الخلفية.'
+  } finally { loginBgBusy.value = false }
+}
+
 async function loadRegisterBgSettings() {
   const { data, error: err } = await settingsApi.get()
   if (err) { registerBgMessage.value = err.message || 'تعذّر تحميل خلفية إنشاء الحساب.'; return }
@@ -891,6 +972,9 @@ async function loadRegisterBgSettings() {
   registerBgSavedUrl.value = config.backgrounds?.register || ''
   registerBgUrlInput.value = registerBgSavedUrl.value
   registerBgPreviewUrl.value = registerBgSavedUrl.value ? resolveAsset(registerBgSavedUrl.value) : ''
+  loginBgSavedUrl.value = config.backgrounds?.auth || ''
+  loginBgUrlInput.value = loginBgSavedUrl.value
+  loginBgPreviewUrl.value = loginBgSavedUrl.value ? resolveAsset(loginBgSavedUrl.value) : ''
 }
 
 function selectRegisterBg(event) {
@@ -934,6 +1018,7 @@ async function saveRegisterBg() {
     const uploaded = data?.data || data || {}
     const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
     if (!url) throw new Error('لم يرجع الخادم رابط الصورة بعد الرفع.')
+    await verifyRemoteImage(url)
     await persistRegisterBg(url)
     registerBgFile.value = null
     if (registerBgFileInput.value) registerBgFileInput.value.value = ''
@@ -951,6 +1036,7 @@ async function saveRegisterBgUrl() {
   registerBgBusy.value = true
   registerBgMessage.value = ''
   try {
+    await verifyRemoteImage(url)
     await persistRegisterBg(url)
     registerBgFile.value = null
     if (registerBgFileInput.value) registerBgFileInput.value.value = ''
@@ -1042,6 +1128,7 @@ async function uploadAndSaveSplash() {
     const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
     if (!url) throw new Error('تم الرفع لكن لم يرجع الخادم رابط الصورة.')
     splashSaving.value = true
+    await verifyRemoteImage(url)
     await persistSplashImage(url)
     splashSelectedFile.value = null
     if (splashFileInput.value) splashFileInput.value.value = ''
@@ -1062,6 +1149,7 @@ async function saveSplashUrl() {
   splashSaving.value = true
   splashMessage.value = ''
   try {
+    await verifyRemoteImage(url)
     await persistSplashImage(url)
     splashSelectedFile.value = null
     if (splashFileInput.value) splashFileInput.value.value = ''
