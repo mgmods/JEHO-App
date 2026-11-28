@@ -3372,8 +3372,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // clears the old rows and assigns exactly one target seat.
       for (const currentSeat of currentSeats) {
         if (moderatingOther) {
+          // A moderator mute is distinct from a user's own mute. Mark it explicitly
+          // so the client cannot reopen the mic until the moderator restriction ends.
           currentSeat.isMuted = true;
-          currentSeat.isModeratorMuted = false;
+          currentSeat.isModeratorMuted = true;
         } else {
           currentSeat.isMuted = !!muted;
         }
@@ -3644,10 +3646,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         },
       );
       seat.userId = userId;
-      seat.status = SeatStatus.OCCUPIED;
       // A seat hop is not an implicit unmute or a moderator-unmute action.
       seat.isMuted = preserveMuted;
       seat.isModeratorMuted = preserveModeratorMuted;
+      seat.status = preserveMuted || preserveModeratorMuted
+        ? SeatStatus.MUTED
+        : SeatStatus.OCCUPIED;
       await manager.save(RoomSeat, seat);
     });
     // Owner remains the live host for permissions; seat change only moves stage presence.
