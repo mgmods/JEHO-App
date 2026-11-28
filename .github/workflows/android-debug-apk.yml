@@ -413,3 +413,4 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
 # Build trigger: publish the current MG-JEHO Android sources for the verified manual-update APK.
+# 2026-11-28: rebuild after seat/microphone root-cause synchronization fixes.
