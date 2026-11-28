@@ -28,6 +28,9 @@ public class VoiceRoomViewModel extends ViewModel {
     private final MutableLiveData<String> info = new MutableLiveData<>();
     private final AtomicInteger joinGeneration = new AtomicInteger();
     private final AtomicInteger refreshGeneration = new AtomicInteger();
+    // A room snapshot started before a seat/mic mutation must never overwrite its result.
+    private final AtomicInteger roomMutationGeneration = new AtomicInteger();
+    private final AtomicInteger pendingRoomMutations = new AtomicInteger();
     // Pooled IO can reorder rapid seat taps; serialize seat mutations in tap order.
     private final ExecutorService seatMutationExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "jeho-seat-mutations");
@@ -87,8 +90,11 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void refresh(String roomId) {
+        // A refresh during a pending mutation can only return an obsolete seat map.
+        if (pendingRoomMutations.get() > 0) return;
         final String requestedRoomId = roomId;
         final int generation = refreshGeneration.incrementAndGet();
+        final int mutationGeneration = roomMutationGeneration.get();
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r;
             try {
@@ -96,7 +102,9 @@ public class VoiceRoomViewModel extends ViewModel {
             } catch (Exception e) {
                 r = Result.err(e.getMessage() != null ? e.getMessage() : "refresh failed");
             }
-            if (generation != refreshGeneration.get()) return;
+            if (generation != refreshGeneration.get()
+                    || mutationGeneration != roomMutationGeneration.get()
+                    || pendingRoomMutations.get() > 0) return;
             if (r != null && r.success && r.data != null
                     && (requestedRoomId == null || requestedRoomId.equals(r.data.id))) {
                 room.postValue(r.data);
@@ -279,7 +287,38 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void setMic(String roomId, boolean muted) {
-        c.getIoExecutor().execute(() -> c.getRoomRepository().setMic(roomId, muted));
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
+        seatMutationExecutor.execute(() -> {
+            try {
+                Result<Object> result = c.getRoomRepository().setMic(roomId, muted);
+                if (result == null || !result.success) {
+                    if (mutation == roomMutationGeneration.get()) {
+                        error.postValue(result != null && result.error != null
+                                ? result.error : "تعذر تغيير حالة المايك");
+                    }
+                    return;
+                }
+                // Read back the authoritative seat + mute flags after the write.
+                Result<RoomDtos.RoomDto> snapshot = c.getRoomUseCase.execute(roomId);
+                if (mutation == roomMutationGeneration.get()
+                        && snapshot != null && snapshot.success && snapshot.data != null) {
+                    room.postValue(snapshot.data);
+                } else if (mutation == roomMutationGeneration.get()
+                        && (snapshot == null || !snapshot.success)) {
+                    error.postValue(snapshot != null && snapshot.error != null
+                            ? snapshot.error : "تم تغيير المايك لكن تعذر مزامنة حالة المقعد");
+                }
+            } catch (Exception e) {
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر تغيير حالة المايك");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
+            }
+        });
     }
 
     public void setMic(String roomId, boolean muted, String targetUserId) {
@@ -295,25 +334,47 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void takeSeat(String roomId, int seatIndex) {
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
         seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().takeSeat(roomId, seatIndex);
-                if (r.success) room.postValue(r.data);
-                else error.postValue(r.error != null ? r.error : "تعذر الصعود على المايك");
+                if (mutation == roomMutationGeneration.get()) {
+                    if (r != null && r.success && r.data != null) room.postValue(r.data);
+                    else error.postValue(r != null && r.error != null
+                            ? r.error : "تعذر الصعود على المايك");
+                }
             } catch (Exception e) {
-                error.postValue(e.getMessage() != null ? e.getMessage() : "تعذر الصعود على المايك");
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر الصعود على المايك");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
             }
         });
     }
 
     public void leaveSeat(String roomId) {
+        final int mutation = roomMutationGeneration.incrementAndGet();
+        pendingRoomMutations.incrementAndGet();
+        refreshGeneration.incrementAndGet();
         seatMutationExecutor.execute(() -> {
             try {
                 Result<RoomDtos.RoomDto> r = c.getRoomRepository().leaveSeat(roomId);
-                if (r.success) room.postValue(r.data);
-                else error.postValue(r.error);
+                if (mutation == roomMutationGeneration.get()) {
+                    if (r != null && r.success && r.data != null) room.postValue(r.data);
+                    else error.postValue(r != null && r.error != null
+                            ? r.error : "تعذر مغادرة المقعد");
+                }
             } catch (Exception e) {
-                error.postValue(e.getMessage() != null ? e.getMessage() : "تعذر مغادرة المقعد");
+                if (mutation == roomMutationGeneration.get()) {
+                    error.postValue(e.getMessage() != null ? e.getMessage()
+                            : "تعذر مغادرة المقعد");
+                }
+            } finally {
+                pendingRoomMutations.decrementAndGet();
             }
         });
     }
