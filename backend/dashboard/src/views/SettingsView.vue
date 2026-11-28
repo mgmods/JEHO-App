@@ -1036,6 +1036,7 @@ async function saveRegisterBgUrl() {
   registerBgBusy.value = true
   registerBgMessage.value = ''
   try {
+    await verifyRemoteImage(url)
     await persistRegisterBg(url)
     registerBgFile.value = null
     if (registerBgFileInput.value) registerBgFileInput.value.value = ''
@@ -1148,6 +1149,7 @@ async function saveSplashUrl() {
   splashSaving.value = true
   splashMessage.value = ''
   try {
+    await verifyRemoteImage(url)
     await persistSplashImage(url)
     splashSelectedFile.value = null
     if (splashFileInput.value) splashFileInput.value.value = ''
