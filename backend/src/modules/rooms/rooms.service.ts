@@ -3175,6 +3175,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         : pending?.seatIndex ?? null;
 
     const target = await this.dataSource.transaction(async (manager) => {
+      // Approval/assignment must serialize with the target user's own seat and mic writes.
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${targetUserId}`],
+      );
       const seats = await manager.find(RoomSeat, {
         where: { roomId },
         order: { seatIndex: 'ASC' },
@@ -3329,17 +3334,25 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async leave(roomId: string, userId: string) {
-    const wasSeated = await this.seatsRepo.findOne({ where: { roomId, userId } });
     const roomBefore = await this.roomsRepo.findOne({ where: { id: roomId } });
-    await this.seatsRepo.update(
-      { roomId, userId },
-      {
-        userId: null,
-        status: SeatStatus.EMPTY,
-        isMuted: false,
-        isModeratorMuted: false,
-      },
-    );
+    const wasSeated = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      const currentSeat = await manager.findOne(RoomSeat, {
+        where: { roomId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (currentSeat) {
+        currentSeat.userId = null;
+        currentSeat.status = SeatStatus.EMPTY;
+        currentSeat.isMuted = false;
+        currentSeat.isModeratorMuted = false;
+        await manager.save(RoomSeat, currentSeat);
+      }
+      return !!currentSeat;
+    });
     await this.seatSignalsRepo.delete({ roomId, userId });
     await this.accessRepo.delete({
       roomId,
@@ -3701,31 +3714,41 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   /** Force a seated user into audience (keeps room access). Used by auto-mod + host/mod. */
   async forceLeaveSeat(roomId: string, userId: string, reason?: string) {
-    const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
-    if (!seat) return { left: false, userId };
-
-    // Use a conditional SQL update against the live occupant, then verify the
-    // persisted row before broadcasting. Do not trust an in-memory entity/save
-    // here: this action must empty the actual seat row for every room client.
-    const updateResult = await this.seatsRepo.update(
-      { roomId, userId },
-      {
-        userId: null,
-        status: SeatStatus.EMPTY,
-        isMuted: false,
-        isModeratorMuted: false,
-      },
-    );
+    // Serialize moderator removal with the target user's own seat/mic mutations.
+    const removal = await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      const seat = await manager.findOne(RoomSeat, {
+        where: { roomId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!seat) return null;
+      const updateResult = await manager.update(
+        RoomSeat,
+        { roomId, userId },
+        {
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isMuted: false,
+          isModeratorMuted: false,
+        },
+      );
+      const persistedSeat = await manager.findOne(RoomSeat, {
+        where: { roomId, seatIndex: seat.seatIndex },
+      });
+      if (
+        (updateResult.affected ?? 0) < 1 ||
+        !persistedSeat ||
+        persistedSeat.userId === userId
+      ) {
+        throw new BadRequestException('تعذر تحديث المقعد، حاول مرة أخرى');
+      }
+      return { seatIndex: seat.seatIndex };
+    });
+    if (!removal) return { left: false, userId };
     await this.seatSignalsRepo.delete({ roomId, userId });
-
-    const persistedSeat = await this.seatsRepo.findOne({ where: { roomId, seatIndex: seat.seatIndex } });
-    if (
-      (updateResult.affected ?? 0) < 1 ||
-      !persistedSeat ||
-      persistedSeat.userId === userId
-    ) {
-      throw new BadRequestException('تعذر تحديث المقعد، حاول مرة أخرى');
-    }
 
     this.notifyRoomUpdated(roomId);
     const member = await this.memberIdentity(userId);
