@@ -299,6 +299,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean micStateInitializedForRoom = false;
     /** Last confirmed self-seat time; short stale-snapshot grace prevents mic publish flapping. */
     private long lastSelfSeatConfirmedAtMs = 0L;
+    // Prevent stale room polls from restoring the previous seat after an optimistic hop.
+    private int pendingSelfSeatIndex = -1;
+    private long pendingSelfSeatUntilMs = 0L;
     private boolean locked;
     private boolean isHost;
     private boolean isOwner;
@@ -346,12 +349,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyCannonSending;
     /** Lucky cannon sends one server-authoritative unit immediately on press, then repeats while held. */
     private static final int LUCKY_CANNON_MAX_BATCH_QUANTITY = 177;
-    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 250L;
-    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 1;
+    private static final long LUCKY_CANNON_REPEAT_INTERVAL_MS = 130L;
+    // A small bounded parallel window keeps press-and-hold responsive without queuing after release.
+    private static final int LUCKY_CANNON_MAX_IN_FLIGHT = 3;
     private int luckyCannonInFlight;
-    /** Preserve the first tap if earlier requests temporarily occupy all sender slots. */
-    private int luckyCannonPendingTapShots;
-    private static final int LUCKY_CANNON_MAX_PENDING_TAPS = 20;
     private boolean luckyCannonHoldActive;
     private final Runnable luckyCannonRepeatRunnable = new Runnable() {
         @Override public void run() {
@@ -1486,6 +1487,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
             if (seats == null) seats = new ArrayList<>();
+            seats = reconcilePendingSelfSeat(seats);
             boolean wasOnSeat = isOnSeat(currentSeats);
             // Room snapshots can briefly omit a self seat while the room API and realtime
             // roster converge. Keep the last confirmed local seat for a short grace window;
@@ -5051,7 +5053,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!luckyCannonEnabled || isFinishing() || isDestroyed()
                 || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
         luckyCannonRequestId = null;
-        luckyCannonPendingTapShots = 0;
         luckyCannonGiftId = giftId;
         luckyCannonGiftIcon = giftIcon;
         luckyCannonGiftName = giftName;
@@ -5128,11 +5129,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // again" feeling and makes every new press an independent lucky-gift start.
         if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
             sendLuckyCannonBatch(1);
-        } else {
-            // A previous released press may still be completing on the network.
-            // Retain this new tap and send it as soon as one bounded slot is free.
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
         }
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
@@ -5156,11 +5152,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void sendLuckyCannonBatch(int requestedQuantity) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) {
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
-            return;
-        }
+        if (luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT) return;
         // Resolve only the recipients selected when the lucky gift was armed.
         // Their current seat positions are resolved later for the center-to-seat flight.
         // currentSeats is a presentation cache and may be empty/stale during
@@ -5231,10 +5223,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         // The same idempotency key was retried once. Stop this gesture
                         // quietly rather than issuing a new key that could double-charge
                         // a shot whose first server response was lost.
-                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                     } else {
-                        luckyCannonPendingTapShots = 0;
                         if (luckyCannonHoldActive) stopLuckyCannonHold(false);
                         BalanceRedirect.handle(VoiceRoomActivity.this,
                                 failure != null && !failure.trim().isEmpty()
@@ -5243,7 +5233,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 showLuckyCannonAndScheduleHide();
-                drainLuckyCannonPendingTap();
             });
         };
         try {
@@ -5261,10 +5250,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             luckyCannonInFlight = Math.max(0, luckyCannonInFlight - 1);
             luckyCannonSending = luckyCannonInFlight > 0;
             if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-            luckyCannonPendingTapShots = Math.min(LUCKY_CANNON_MAX_PENDING_TAPS,
-                    luckyCannonPendingTapShots + 1);
-            android.util.Log.w("LuckyCannon", "Gift send deferred while executor is busy", rejected);
-            handler.postDelayed(this::drainLuckyCannonPendingTap, 160L);
+            android.util.Log.w("LuckyCannon", "Gift send rejected by executor", rejected);
             if (luckyCannonHoldActive) {
                 handler.removeCallbacks(luckyCannonRepeatRunnable);
                 handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_INTERVAL_MS);
@@ -5283,13 +5269,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || value.contains("temporarily unavailable");
     }
 
-    private void drainLuckyCannonPendingTap() {
-        if (luckyCannonPendingTapShots <= 0 || luckyCannonInFlight >= LUCKY_CANNON_MAX_IN_FLIGHT
-                || !luckyCannonEnabled || luckyCannonGiftId == null
-                || roomId == null || roomId.isEmpty() || isFinishing() || isDestroyed()) return;
-        luckyCannonPendingTapShots--;
-        handler.post(() -> sendLuckyCannonBatch(1));
-    }
 
     private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
                                       long totalCoins, int quantity, int personCount,
@@ -13473,7 +13452,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onStop() {
         // A backgrounded room must never keep a hold-to-fire gesture running.
         stopLuckyCannonHold(false);
-        luckyCannonPendingTapShots = 0;
         handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
@@ -17687,6 +17665,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 restoreSeatSnapshot = null;
                 restoreSeatSnapshotUntilMs = 0L;
                 lastSelfSeatConfirmedAtMs = 0L;
+                pendingSelfSeatIndex = -1;
+                pendingSelfSeatUntilMs = 0L;
                 micOn = false;
                 micStateInitializedForRoom = false;
                 // Seat removal is not a request to erase the user's saved mute preference.
@@ -18961,6 +18941,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Instant local sit so wear shows before takeSeat API returns. */
     private void optimisticTakeSeat(int seatIndex) {
+        pendingSelfSeatIndex = seatIndex;
+        pendingSelfSeatUntilMs = System.currentTimeMillis() + 6000L;
         refreshSelfHostWearOnSeats();
         AuthDtos.UserDto me = null;
         try {
@@ -19026,6 +19008,48 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             applySeatGridUi(prepareGuestSeatsForGrid(next), next, room);
             bindHeaderHostVisual(room, next);
         }
+    }
+
+    /** Keep the just-selected local seat while older poll responses are still in flight. */
+    private List<RoomDtos.SeatDto> reconcilePendingSelfSeat(List<RoomDtos.SeatDto> incoming) {
+        if (pendingSelfSeatIndex < 0 || myUserId == null || myUserId.isEmpty()) return incoming;
+        if (System.currentTimeMillis() > pendingSelfSeatUntilMs) {
+            pendingSelfSeatIndex = -1;
+            pendingSelfSeatUntilMs = 0L;
+            return incoming;
+        }
+        RoomDtos.SeatDto serverSelf = findMySeat(incoming);
+        if (serverSelf != null && serverSelf.seatIndex == pendingSelfSeatIndex) {
+            pendingSelfSeatIndex = -1;
+            pendingSelfSeatUntilMs = 0L;
+            return incoming;
+        }
+        RoomDtos.SeatDto localSelf = findMySeat(currentSeats);
+        if (localSelf == null || localSelf.seatIndex != pendingSelfSeatIndex) return incoming;
+        List<RoomDtos.SeatDto> reconciled = new ArrayList<>();
+        RoomDtos.SeatDto target = null;
+        for (RoomDtos.SeatDto seat : incoming) {
+            if (seat == null) continue;
+            if (sameUser(myUserId, seatUserId(seat))) continue;
+            if (seat.seatIndex == pendingSelfSeatIndex) target = shallowCopySeat(seat);
+            else reconciled.add(seat);
+        }
+        if (target == null) {
+            target = shallowCopySeat(localSelf);
+        } else {
+            String occupant = seatUserId(target);
+            if (occupant != null && !occupant.isEmpty() && !sameUser(myUserId, occupant)) {
+                // Server says another user owns this seat; do not overwrite their occupancy.
+                return incoming;
+            }
+            target.userId = myUserId;
+            target.user = localSelf.user;
+            target.status = "occupied";
+            target.isMuted = userChoseMute;
+            target.isModeratorMuted = false;
+        }
+        reconciled.add(target);
+        return reconciled;
     }
 
     private static RoomDtos.SeatDto shallowCopySeat(RoomDtos.SeatDto s) {
