@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID, tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -96,15 +96,16 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async initializeSchemaAndCatalog(): Promise<void> {
+    const schemaRunner = this.dataSource.createQueryRunner();
+    let schemaLockAcquired = false;
     try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query("SET LOCAL lock_timeout = '250ms'");
-        await manager.query("SET LOCAL statement_timeout = '8s'");
-        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
-        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
-        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`);
-        await manager.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`);
-      });
+      await schemaRunner.connect();
+      await schemaRunner.query("SET lock_timeout = '250ms'");
+      await schemaRunner.query("SET statement_timeout = '8s'");
+      schemaLockAcquired = await tryAcquireJehoSchemaLock(schemaRunner);
+      if (!schemaLockAcquired) throw new Error('JEHO schema migration lock is owned by another API replica');
+      await schemaRunner.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "traderDiamonds" BIGINT NOT NULL DEFAULT 0`);
+      await schemaRunner.query(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`);
     } catch (err) {
       this.logger.warn(`Wallet schema migration deferred: ${(err as Error).message}`);
       if (!this.schemaRetryTimer) {
@@ -112,6 +113,15 @@ export class WalletService implements OnModuleInit, OnModuleDestroy {
         this.schemaRetryTimer.unref?.();
       }
       return;
+    } finally {
+      if (schemaLockAcquired) {
+        await releaseJehoSchemaLock(schemaRunner).catch((unlockError) =>
+          this.logger.error(`Wallet schema lock release failed; connection discarded: ${(unlockError as Error).message}`),
+        );
+      }
+      await schemaRunner.query('RESET lock_timeout').catch(() => undefined);
+      await schemaRunner.query('RESET statement_timeout').catch(() => undefined);
+      await schemaRunner.release().catch(() => undefined);
     }
     // These startup data repairs previously ran independently on every API
     // replica. In particular, the silverCoins UPDATE could make every replica

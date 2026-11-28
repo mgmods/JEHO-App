@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID } from '../../database/schema-migration-lock';
+import { tryAcquireJehoSchemaLock, releaseJehoSchemaLock } from '../../database/schema-migration-lock';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 
 /** Six-digit numerical IDs with length-based coin prices. Seeded when catalog is empty. */
@@ -49,18 +49,19 @@ export class VanityIdsService implements OnModuleInit {
   }
 
   private async initializeSchemaAndCatalog(): Promise<void> {
+    const runner = this.dataSource.createQueryRunner();
+    let lockAcquired = false;
     try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.query("SET LOCAL lock_timeout = '250ms'");
-        await manager.query("SET LOCAL statement_timeout = '8s'");
-        const lockRows = await manager.query('SELECT pg_try_advisory_xact_lock($1, $2) AS locked', [JEHO_SCHEMA_LOCK_NAMESPACE, JEHO_SCHEMA_LOCK_ID]);
-        if (lockRows?.[0]?.locked !== true) throw new Error('JEHO schema migration lock is busy; retrying later');
-        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
-        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
-        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
-        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
-        await manager.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
-      });
+      await runner.connect();
+      await runner.query("SET lock_timeout = '250ms'");
+      await runner.query("SET statement_timeout = '20s'");
+      lockAcquired = await tryAcquireJehoSchemaLock(runner);
+      if (!lockAcquired) throw new Error('JEHO schema migration lock is owned by another API replica');
+      await runner.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
+      await runner.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
+      await runner.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
+      await runner.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
+      await runner.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
     } catch (e) {
       this.log.warn(`Vanity ID schema migration deferred: ${e instanceof Error ? e.message : String(e)}`);
       if (!this.schemaRetryTimer) {
@@ -68,6 +69,15 @@ export class VanityIdsService implements OnModuleInit {
         this.schemaRetryTimer.unref?.();
       }
       return;
+    } finally {
+      if (lockAcquired) {
+        await releaseJehoSchemaLock(runner).catch((error) =>
+          this.log.error(`Vanity ID schema lock release failed; connection discarded: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      }
+      await runner.query('RESET lock_timeout').catch(() => undefined);
+      await runner.query('RESET statement_timeout').catch(() => undefined);
+      await runner.release().catch(() => undefined);
     }
     try {
       let added = 0;

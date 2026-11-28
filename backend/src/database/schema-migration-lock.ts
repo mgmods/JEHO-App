@@ -51,28 +51,39 @@ export async function releaseJehoSessionAdvisoryLock(
   await releaseJehoAdvisoryLock(runner, JEHO_SCHEMA_LOCK_NAMESPACE, lockId);
 }
 
-let localLockHeld = false;
+// Serialize every in-process migration through a FIFO gate before asking
+// PostgreSQL for the cluster-wide session advisory lock. Returning false merely
+// because another provider in this same Nest process is migrating caused
+// unrelated bootstraps to defer for 30 seconds even when PostgreSQL was free.
+let localLockTail: Promise<void> = Promise.resolve();
 const localLockOwners = new WeakSet<QueryRunner>();
+const localLockReleases = new WeakMap<QueryRunner, () => void>();
 
 export async function tryAcquireJehoSchemaLock(
   runner: QueryRunner,
 ): Promise<boolean> {
-  // PostgreSQL session advisory locks are re-entrant; avoid incrementing the
-  // lock count if a caller accidentally asks twice on the same QueryRunner.
+  // Session advisory locks are re-entrant; do not increment the lock count if
+  // the same pinned QueryRunner requests ownership more than once.
   if (localLockOwners.has(runner)) return true;
-  if (localLockHeld) return false;
 
-  localLockHeld = true;
+  let releaseLocal!: () => void;
+  const previousLocalOwner = localLockTail;
+  localLockTail = new Promise<void>((resolve) => {
+    releaseLocal = resolve;
+  });
+  await previousLocalOwner;
+
   try {
     const locked = await tryAcquireJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
     if (locked) {
       localLockOwners.add(runner);
-    } else {
-      localLockHeld = false;
+      localLockReleases.set(runner, releaseLocal);
+      return true;
     }
-    return locked;
+    releaseLocal();
+    return false;
   } catch (error) {
-    localLockHeld = false;
+    releaseLocal();
     throw error;
   }
 }
@@ -102,12 +113,15 @@ export async function releaseJehoAdvisoryLock(
 }
 
 export async function releaseJehoSchemaLock(runner: QueryRunner): Promise<void> {
-  const ownsLocalLock = localLockOwners.has(runner);
-  if (!ownsLocalLock) return;
+  if (!localLockOwners.has(runner)) return;
   localLockOwners.delete(runner);
+  const releaseLocal = localLockReleases.get(runner);
+  localLockReleases.delete(runner);
   try {
     await releaseJehoSessionAdvisoryLock(runner, JEHO_SCHEMA_LOCK_ID);
   } finally {
-    localLockHeld = false;
+    // Always hand the local gate to the next waiter, even if PostgreSQL could
+    // not confirm unlock (the underlying connection is discarded in that case).
+    releaseLocal?.();
   }
 }
