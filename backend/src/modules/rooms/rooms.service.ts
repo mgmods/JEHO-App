@@ -3210,6 +3210,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // Approval/assignment must serialize with the target user's own seat and mic writes.
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${targetUserId}`],
       );
       const seats = await manager.find(RoomSeat, {
@@ -3316,6 +3317,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const seat = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${effectiveUserId}`],
       );
       const currentSeats = await manager.find(RoomSeat, {
@@ -3377,6 +3379,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const wasSeated = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${userId}`],
       );
       const currentSeat = await manager.findOne(RoomSeat, {
@@ -3558,6 +3561,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // A user can only occupy one seat; serialize concurrent hops across target rows.
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${userId}`],
       );
       // Read every stale/duplicate row under the same per-user lock. findOne() could
@@ -3763,6 +3767,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const removal = await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${userId}`],
       );
       const seat = await manager.findOne(RoomSeat, {
@@ -3922,6 +3927,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.dataSource.transaction(async (manager) => {
       await manager.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat-map:${roomId}`],
         [`room-seat:${roomId}:${userId}`],
       );
       await manager.update(
