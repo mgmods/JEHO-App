@@ -216,10 +216,21 @@ public class ShamCashCheckoutActivity extends ThemedActivity {
 
         String qr = p.qrPayload != null && !p.qrPayload.isEmpty() ? p.qrPayload : accountId;
         generatedQrBitmap = QrBitmap.encode(qr, 512);
-        if (generatedQrBitmap != null) imgQr.setImageBitmap(generatedQrBitmap);
+        final android.graphics.drawable.Drawable generatedFallback = generatedQrBitmap != null
+                ? new BitmapDrawable(getResources(), generatedQrBitmap) : null;
+        if (generatedFallback != null) imgQr.setImageDrawable(generatedFallback);
         if (p.qrImageUrl != null && !p.qrImageUrl.trim().isEmpty()) {
             String imageUrl = resolveMediaUrl(p.qrImageUrl);
-            Glide.with(this).load(imageUrl).placeholder(imgQr.getDrawable()).error(imgQr.getDrawable()).into(imgQr);
+            // Keep the locally generated QR visible until the remote image has decoded.
+            // If the URL is unavailable, Glide restores the generated QR rather than a blank box.
+            Glide.with(imgQr)
+                    .load(imageUrl)
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .placeholder(generatedFallback)
+                    .error(generatedFallback)
+                    .fitCenter()
+                    .dontAnimate()
+                    .into(imgQr);
         }
     }
 
