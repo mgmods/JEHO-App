@@ -5130,10 +5130,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         luckyCannonComboCount = 0;
         updateLuckyCannonCounter();
 
-        // First send happens on ACTION_DOWN. This removes the old "release then press
-        // again" feeling and makes every new press an independent lucky-gift start.
+        // A quick tap sends one gift; continued holding switches to the faster two-unit repeat.
         if (luckyCannonInFlight < LUCKY_CANNON_MAX_IN_FLIGHT) {
-            sendLuckyCannonBatch(LUCKY_CANNON_UNITS_PER_SHOT);
+            sendLuckyCannonBatch(1);
         }
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         handler.removeCallbacks(luckyCannonRepeatRunnable);
