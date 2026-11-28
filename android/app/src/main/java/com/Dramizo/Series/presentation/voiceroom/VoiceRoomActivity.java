@@ -17664,8 +17664,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 boolean preserveUserMute = userChoseMute || moderatorMuted;
                 micOn = !preserveUserMute;
                 RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                micOn = RoomRtcEngine.getInstance().isMicEnabled();
                 if (!moderatorMuted && roomId != null) {
-                    viewModel.setMic(roomId, preserveUserMute);
+                    viewModel.setMic(roomId, !micOn);
                 }
                 micStateInitializedForRoom = true;
                 syncMicUi();
@@ -19046,8 +19047,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             micOn = false;
             android.util.Log.w("VoiceRoom", "optimistic mic state apply failed", micError);
         }
+        RoomDtos.SeatDto optimisticSelf = findMySeat(currentSeats);
+        if (optimisticSelf != null) {
+            optimisticSelf.isMuted = !micOn;
+            optimisticSelf.isModeratorMuted = previousModeratorMuted;
+        }
         if (!previousModeratorMuted && roomId != null) {
-            viewModel.setMic(roomId, shouldRemainMuted);
+            // Persist the confirmed engine state, not the pre-RTC optimistic request.
+            viewModel.setMic(roomId, !micOn);
         }
         micStateInitializedForRoom = true;
         syncMicUi();
