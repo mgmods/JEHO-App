@@ -3502,7 +3502,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       const previousSeat = await manager.findOne(RoomSeat, {
         where: { roomId, userId },
-        lock: { mode: 'pessimistic_write' },
       });
       const preserveMuted = previousSeat?.isMuted ?? false;
       const preserveModeratorMuted = previousSeat?.isModeratorMuted ?? false;
