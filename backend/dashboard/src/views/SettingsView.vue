@@ -68,12 +68,15 @@
                 <input v-model.number="splashDuration" class="form-control" type="number" min="1" max="5" />
               </div>
             </div>
+            <label class="form-label mt-3">أو رابط مباشر لصورة السبلاش</label>
+            <input v-model.trim="splashUrlInput" class="form-control" type="url" dir="ltr" placeholder="https://example.com/splash.webp" />
             <div class="d-flex flex-wrap gap-2 mt-3">
               <button type="button" class="btn btn-aurora" :disabled="!splashSelectedFile || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="uploadAndSaveSplash">
                 <span v-if="splashUploading || splashSaving" class="spinner-border spinner-border-sm me-1"></span>
                 {{ splashUploading ? 'جارٍ رفع الصورة…' : splashSaving ? 'جارٍ حفظ الصورة…' : 'رفع وحفظ صورة السبلاش' }}
               </button>
               <button type="button" class="btn btn-ghost" :disabled="!splashSavedUrl || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="removeSplashImage">إزالة الصورة</button>
+              <button type="button" class="btn btn-ghost" :disabled="!splashUrlInput.trim() || splashUploading || splashSaving || !auth.can('settings', 'write')" @click="saveSplashUrl">حفظ رابط السبلاش</button>
             </div>
             <p v-if="splashMessage" class="form-text mt-3" role="status">{{ splashMessage }}</p>
           </section>
@@ -85,11 +88,14 @@
               <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
             </div>
             <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <label class="form-label">أو رابط مباشر لصورة خلفية إنشاء الحساب</label>
+            <input v-model.trim="registerBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/register-background.webp" />
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
                 {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
               </button>
               <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgUrlInput.trim() || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBgUrl">حفظ رابط الخلفية</button>
             </div>
             <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
           </section>
@@ -104,11 +110,14 @@
               <span v-else class="text-secondary small">لم يتم تعيين خلفية خاصة لإنشاء الحساب</span>
             </div>
             <input ref="registerBgFileInput" class="form-control mb-3" type="file" accept="image/png,image/jpeg,image/webp" @change="selectRegisterBg" />
+            <label class="form-label">أو رابط مباشر لصورة خلفية إنشاء الحساب</label>
+            <input v-model.trim="registerBgUrlInput" class="form-control mb-3" type="url" dir="ltr" placeholder="https://example.com/register-background.webp" />
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-aurora" :disabled="!registerBgFile || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBg">
                 {{ registerBgBusy ? 'جارٍ الحفظ…' : 'رفع وحفظ خلفية إنشاء الحساب' }}
               </button>
               <button type="button" class="btn btn-ghost" :disabled="!registerBgSavedUrl || registerBgBusy || !auth.can('settings', 'write')" @click="removeRegisterBg">إزالة الخلفية</button>
+              <button type="button" class="btn btn-ghost" :disabled="!registerBgUrlInput.trim() || registerBgBusy || !auth.can('settings', 'write')" @click="saveRegisterBgUrl">حفظ رابط الخلفية</button>
             </div>
             <p v-if="registerBgMessage" class="form-text mt-3" role="status">{{ registerBgMessage }}</p>
           </section>
@@ -857,6 +866,7 @@ const registerBgFileInput = ref(null)
 const registerBgFile = ref(null)
 const registerBgPreviewUrl = ref('')
 const registerBgSavedUrl = ref('')
+const registerBgUrlInput = ref('')
 const registerBgBusy = ref(false)
 const registerBgMessage = ref('')
 
@@ -864,6 +874,7 @@ const splashFileInput = ref(null)
 const splashSelectedFile = ref(null)
 const splashPreviewUrl = ref('')
 const splashSavedUrl = ref('')
+const splashUrlInput = ref('')
 const splashDuration = ref(5)
 const splashUploading = ref(false)
 const splashSaving = ref(false)
@@ -878,6 +889,7 @@ async function loadRegisterBgSettings() {
   let config = {}
   try { config = row?.value ? JSON.parse(row.value) : {} } catch { config = {} }
   registerBgSavedUrl.value = config.backgrounds?.register || ''
+  registerBgUrlInput.value = registerBgSavedUrl.value
   registerBgPreviewUrl.value = registerBgSavedUrl.value ? resolveAsset(registerBgSavedUrl.value) : ''
 }
 
@@ -908,6 +920,7 @@ async function persistRegisterBg(url) {
   const { error: saveErr } = await settingsApi.update({ app_theme: JSON.stringify(config) })
   if (saveErr) throw new Error(saveErr.message || 'تعذّر حفظ خلفية إنشاء الحساب.')
   registerBgSavedUrl.value = url || ''
+  registerBgUrlInput.value = url || ''
   registerBgPreviewUrl.value = url ? resolveAsset(url) : ''
 }
 
@@ -932,10 +945,28 @@ async function saveRegisterBg() {
   } finally { registerBgBusy.value = false }
 }
 
+async function saveRegisterBgUrl() {
+  const url = registerBgUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { registerBgMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  registerBgBusy.value = true
+  registerBgMessage.value = ''
+  try {
+    await persistRegisterBg(url)
+    registerBgFile.value = null
+    if (registerBgFileInput.value) registerBgFileInput.value.value = ''
+    registerBgMessage.value = 'تم حفظ رابط خلفية إنشاء الحساب.'
+    toast().success(registerBgMessage.value)
+  } catch (error) {
+    registerBgMessage.value = error.message || 'تعذّر حفظ رابط الخلفية.'
+    toast().danger(registerBgMessage.value)
+  } finally { registerBgBusy.value = false }
+}
+
 async function removeRegisterBg() {
   registerBgBusy.value = true
   try {
     await persistRegisterBg('')
+    registerBgUrlInput.value = ''
     registerBgFile.value = null
     if (registerBgFileInput.value) registerBgFileInput.value.value = ''
     registerBgMessage.value = 'تمت إزالة خلفية إنشاء الحساب.'
@@ -954,6 +985,7 @@ async function loadSplashSettings() {
   const items = Array.isArray(splash.items) ? splash.items : []
   const item = items.find(x => x && x.id === 'dashboard-main-splash' && x.active !== false && x.url) || items.find(x => x && x.active !== false && x.url)
   splashSavedUrl.value = item?.url || splashThemeConfig.brand?.splashUrl || splashThemeConfig.backgrounds?.splash || ''
+  splashUrlInput.value = splashSavedUrl.value
   splashPreviewUrl.value = splashSavedUrl.value ? resolveAsset(splashSavedUrl.value) : ''
   splashDuration.value = Math.max(1, Math.min(5, Number(item?.durationSeconds) || 5))
 }
@@ -995,6 +1027,7 @@ async function persistSplashImage(url) {
   const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(splashThemeConfig) })
   if (err) throw new Error(err.message || 'تعذّر حفظ إعداد السبلاش.')
   splashSavedUrl.value = url || ''
+  splashUrlInput.value = url || ''
   splashPreviewUrl.value = url ? resolveAsset(url) : ''
 }
 
@@ -1023,11 +1056,29 @@ async function uploadAndSaveSplash() {
   }
 }
 
+async function saveSplashUrl() {
+  const url = splashUrlInput.value.trim()
+  if (!/^https?:\/\//i.test(url)) { splashMessage.value = 'أدخل رابط صورة يبدأ بـ https:// أو http://'; return }
+  splashSaving.value = true
+  splashMessage.value = ''
+  try {
+    await persistSplashImage(url)
+    splashSelectedFile.value = null
+    if (splashFileInput.value) splashFileInput.value.value = ''
+    splashMessage.value = 'تم حفظ رابط صورة السبلاش. ستظهر عند فتح التطبيق.'
+    toast().success(splashMessage.value)
+  } catch (error) {
+    splashMessage.value = error.message || 'تعذّر حفظ رابط السبلاش.'
+    toast().danger(splashMessage.value)
+  } finally { splashSaving.value = false }
+}
+
 async function removeSplashImage() {
   splashSaving.value = true
   splashMessage.value = ''
   try {
     await persistSplashImage('')
+    splashUrlInput.value = ''
     splashSelectedFile.value = null
     if (splashFileInput.value) splashFileInput.value.value = ''
     splashMessage.value = 'تمت إزالة صورة السبلاش.'

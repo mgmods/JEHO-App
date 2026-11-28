@@ -3495,6 +3495,17 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      // A user can only occupy one seat; serialize concurrent hops across target rows.
+      await manager.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`room-seat:${roomId}:${userId}`],
+      );
+      const previousSeat = await manager.findOne(RoomSeat, {
+        where: { roomId, userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const preserveMuted = previousSeat?.isMuted ?? false;
+      const preserveModeratorMuted = previousSeat?.isModeratorMuted ?? false;
       const seat = await manager.findOne(RoomSeat, {
         where: { roomId, seatIndex: dto.seatIndex },
         lock: { mode: 'pessimistic_write' },
@@ -3522,8 +3533,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
       seat.userId = userId;
       seat.status = SeatStatus.OCCUPIED;
-      seat.isMuted = false;
-      seat.isModeratorMuted = false;
+      // A seat hop is not an implicit unmute or a moderator-unmute action.
+      seat.isMuted = preserveMuted;
+      seat.isModeratorMuted = preserveModeratorMuted;
       await manager.save(RoomSeat, seat);
     });
     // Owner remains the live host for permissions; seat change only moves stage presence.

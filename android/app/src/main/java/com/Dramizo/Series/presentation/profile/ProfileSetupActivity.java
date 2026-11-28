@@ -31,6 +31,7 @@ import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.GenderVerificationGate;
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.RemoteTheme;
 
 import java.util.Calendar;
 import java.util.Locale;
@@ -59,6 +60,8 @@ public class ProfileSetupActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityProfileSetupBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Apply the cached dashboard register wallpaper immediately after inflation.
+        RemoteTheme.applyActivityBackground(this, "register");
 
         container = ContainerProvider.from(this);
         viewModel = new ViewModelProvider(this, new ViewModelFactory(container))
