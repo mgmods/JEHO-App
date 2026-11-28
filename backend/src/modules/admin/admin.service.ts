@@ -2143,6 +2143,29 @@ export class AdminService {
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
+    // Gift media is served from the app's CDN or existing upload paths. Reject
+    // insecure schemes, embedded credentials and oversized values at the API too;
+    // dashboard-side validation alone is not a security boundary.
+    const validateGiftMediaUrl = (value: string | null | undefined, field: string) => {
+      const raw = String(value || '').trim();
+      if (!raw) return raw;
+      if (raw.length > 512) throw new BadRequestException(`رابط ${field} أطول من المسموح`);
+      if (/^\/?(?:uploads|assets)\/[A-Za-z0-9._~!  async upsertGift(id: string | null, dto: UpsertGiftDto) {
+()*+,;=:@%/?-]+$/i.test(raw) && !raw.includes('..')) {
+        return raw;
+      }
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+          throw new Error('unsafe');
+        }
+        return raw;
+      } catch {
+        throw new BadRequestException(`رابط ${field} يجب أن يكون HTTPS صالحاً أو مسار وسائط محلياً`);
+      }
+    };
+    dto.iconUrl = validateGiftMediaUrl(dto.iconUrl, 'أيقونة الهدية');
+    dto.animationUrl = validateGiftMediaUrl(dto.animationUrl, 'حركة الهدية');
     const nextCategory = String(dto.category ?? '').trim().toLowerCase();
     const cpType = String(dto.cpRelationshipType ?? 'love').trim().toLowerCase();
     if (nextCategory === 'cp' && !['friendship', 'brotherhood', 'love', 'engagement', 'marriage'].includes(cpType)) {
