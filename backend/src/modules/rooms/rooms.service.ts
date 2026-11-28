@@ -3286,22 +3286,29 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`room-seat:${roomId}:${effectiveUserId}`],
       );
-      const currentSeat = await manager.findOne(RoomSeat, {
+      const currentSeats = await manager.find(RoomSeat, {
         where: { roomId, userId: effectiveUserId },
+        order: { seatIndex: 'ASC' },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!currentSeat) return null;
-      if (!moderatingOther && !muted && currentSeat.isModeratorMuted) {
+      if (currentSeats.length === 0) return null;
+      if (!moderatingOther && !muted
+          && currentSeats.some((currentSeat) => currentSeat.isModeratorMuted)) {
         throw new ForbiddenException('يحتاج المضيف أو المشرف لفك كتم المايك أولاً');
       }
-      if (moderatingOther) {
-        // A moderator can close another user's mic, but cannot open it on their behalf.
-        currentSeat.isMuted = true;
-        currentSeat.isModeratorMuted = false;
-      } else {
-        currentSeat.isMuted = !!muted;
+      // Repair any duplicate stale seat rows left by older racing requests too.
+      // Every row for this user receives the same mute decision before a later hop
+      // clears the old rows and assigns exactly one target seat.
+      for (const currentSeat of currentSeats) {
+        if (moderatingOther) {
+          currentSeat.isMuted = true;
+          currentSeat.isModeratorMuted = false;
+        } else {
+          currentSeat.isMuted = !!muted;
+        }
       }
-      return manager.save(RoomSeat, currentSeat);
+      const savedSeats = await manager.save(RoomSeat, currentSeats);
+      return savedSeats[0] ?? null;
     });
     if (!seat) {
       if (moderatingOther) {
