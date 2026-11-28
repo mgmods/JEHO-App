@@ -1184,6 +1184,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
       const hostSeat = byIndex.get(0) || missing.find((seat) => seat.seatIndex === 0);
       if (!hostSeat) throw new ConflictException('تعذر تجهيز مقعد صاحب الغرفة');
+      if (hostSeat.userId && hostSeat.userId !== hostId) {
+        throw new ConflictException('مقعد صاحب الغرفة مشغول بحساب آخر؛ لم يتم نقل أو حذف أي مستخدم');
+      }
       // Keep the host in the reserved index zero and remove any stale duplicate
       // host assignment elsewhere without touching other users' fixed indexes.
       await manager.update(
