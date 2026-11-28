@@ -873,9 +873,7 @@ export class AdminService {
       gifts,
       pendingWithdraws,
       pendingReports,
-      rechargeSum,
-      revenueByProviderRaw,
-      todayRechargeSum,
+      revenueTotals,
     ] = await Promise.all([
       this.usersRepo.count({ where: { status: Not(UserStatus.DELETED) } }),
       this.usersRepo.count({ where: { status: UserStatus.DELETED } }),
@@ -886,55 +884,33 @@ export class AdminService {
       this.giftsRepo.count({ where: { isActive: true } }),
       this.withdrawRepo.count({ where: { status: WithdrawStatus.PENDING } }),
       this.reportsRepo.count({ where: { status: ReportStatus.PENDING } }),
+      // One filtered aggregate replaces three full scans of recharge_orders
+      // (lifetime total, provider grouping and today's total). Provider detail
+      // is loaded lazily by the charts endpoint after the first dashboard paint.
       this.rechargeRepo
         .createQueryBuilder('r')
         .select('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .getRawOne(),
-      this.rechargeRepo
-        .createQueryBuilder('r')
-        .select('r.provider', 'provider')
-        .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .addSelect('COUNT(*)', 'count')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .groupBy('r.provider')
-        .getRawMany(),
-      this.rechargeRepo
-        .createQueryBuilder('r')
-        .select('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
-        .andWhere('r.completedAt >= :day', {
-          day: (() => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })(),
-        })
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN r.completedAt >= :dayStart THEN r.amountFiat ELSE 0 END),0)',
+          'today',
+        )
+        .where('r.status = :status', { status: RechargeStatus.COMPLETED })
+        .setParameter('dayStart', (() => {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          return d;
+        })())
         .getRawOne(),
     ]);
 
-    const revenueByProvider = (revenueByProviderRaw || []).map((row: any) => {
-      const provider = String(row.provider || 'other');
-      return {
-        provider,
-        label: this.providerRevenueLabel(provider),
-        total: Number(row.total || 0),
-        count: Number(row.count || 0),
-      };
-    }).sort((a, b) => b.total - a.total);
-
-    const rawTotal = Number(rechargeSum?.total || 0);
+    const rawTotal = Number(revenueTotals?.total || 0);
     const baselineRow = await this.settingsRepo.findOne({
       where: { key: 'dashboard_revenue_baseline_fiat' },
     });
     const baseline = Math.max(0, Number(baselineRow?.value || 0) || 0);
     const totalRev = Math.max(0, rawTotal - baseline);
     const scale = rawTotal > 0 ? totalRev / rawTotal : 0;
-    const scaledProviders = revenueByProvider.map((row) => ({
-      ...row,
-      total: Math.round(Number(row.total || 0) * scale * 100) / 100,
-    }));
-    const todayRaw = Number(todayRechargeSum?.total || 0);
+    const todayRaw = Number(revenueTotals?.today || 0);
     // After a revenue reset, hide legacy totals; keep today's new sales visible.
     const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
 
@@ -955,7 +931,7 @@ export class AdminService {
       revenue: totalRev,
       totalRevenue: totalRev,
       todayRevenue,
-      revenueByProvider: scaledProviders,
+      // Provider breakdown is supplied by the deferred charts request. Avoid a second full-table aggregate here.\n      revenueByProvider: [],
     };
 
     // The dashboard endpoint is shared by all three native staff ranks.
