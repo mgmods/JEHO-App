@@ -2119,7 +2119,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         userId: null,
         isMuted: false,
         isModeratorMuted: false,
-        isLocked: false,
       });
     });
     room.moderators = loadedModerators;
