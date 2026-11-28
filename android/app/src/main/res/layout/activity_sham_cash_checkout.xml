@@ -87,7 +87,6 @@
                         android:id="@+id/imgQr"
                         android:layout_width="240dp"
                         android:layout_height="240dp"
-                        android:contentDescription="باركود حساب شام كاش"
                         android:layout_gravity="center"
                         android:contentDescription="باركود حساب شام كاش"
                         android:scaleType="fitCenter" />
