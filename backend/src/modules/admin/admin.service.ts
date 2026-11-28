@@ -3346,8 +3346,10 @@ export class AdminService {
     ));
     const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
     const labels: string[] = [];
+    const dayKeys: string[] = [];
     for (let i = 0; i < 7; i++) {
       const day = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+      dayKeys.push(day.toISOString().slice(0, 10));
       labels.push(day.toISOString().slice(5, 10));
     }
 
@@ -3406,12 +3408,8 @@ export class AdminService {
       new Map((rows || []).map((row) => [String(row.day), Number(row.count || 0)]));
     const usersByDay = countByDay(userRows);
     const roomsByDay = countByDay(roomRows);
-    const usersSeries = labels.map((label) => usersByDay.get(
-      `${new Date().getUTCFullYear()}-${label}`,
-    ) ?? 0);
-    const roomsSeries = labels.map((label) => roomsByDay.get(
-      `${new Date().getUTCFullYear()}-${label}`,
-    ) ?? 0);
+    const usersSeries = dayKeys.map((day) => usersByDay.get(day) ?? 0);
+    const roomsSeries = dayKeys.map((day) => roomsByDay.get(day) ?? 0);
 
     const rechargeVal = Math.max(0, Number(coinTotals?.recharge || 0));
     const giftsVal = Math.max(0, Number(coinTotals?.gifts || 0));
